@@ -119,14 +119,14 @@ static void reach_settings_bluetooth_render_row(const reach_settings_render_inpu
         reach_ui_button_style accept_style =
             reach_settings_button_style(input, input->theme->settings_button_primary);
         reach_ui_button_render(commands, layout->bluetooth_pin_accept_button,
-                               (const uint16_t *)u"Yes", &accept_style, 1,
-                               reach_settings_model_button_press_value(
+                               (const uint16_t *)u"Yes", &accept_style, 1, 2,
+                               reach_settings_model_button_press_motion(
                                    model, REACH_SETTINGS_HIT_BLUETOOTH_PIN_ACCEPT));
         reach_ui_button_style reject_style =
             reach_settings_button_style(input, input->theme->settings_card_background);
         reach_ui_button_render(commands, layout->bluetooth_pin_reject_button,
-                               (const uint16_t *)u"No", &reject_style, 1,
-                               reach_settings_model_button_press_value(
+                               (const uint16_t *)u"No", &reject_style, 1, 2,
+                               reach_settings_model_button_press_motion(
                                    model, REACH_SETTINGS_HIT_BLUETOOTH_PIN_REJECT));
         return;
     }
@@ -139,8 +139,8 @@ static void reach_settings_bluetooth_render_row(const reach_settings_render_inpu
         reach_ui_button_render(
             commands, layout->bluetooth_action_button,
             device->paired ? (const uint16_t *)u"Remove" : (const uint16_t *)u"Pair", &action_style,
-            model->bluetooth_status != REACH_SETTINGS_BLUETOOTH_STATUS_PAIRING,
-            reach_settings_model_button_press_value(model, REACH_SETTINGS_HIT_BLUETOOTH_ACTION));
+            model->bluetooth_status != REACH_SETTINGS_BLUETOOTH_STATUS_PAIRING, 2,
+            reach_settings_model_button_press_motion(model, REACH_SETTINGS_HIT_BLUETOOTH_ACTION));
     }
 }
 
@@ -194,8 +194,8 @@ void reach_settings_render_bluetooth_page(const reach_settings_render_input *inp
     reach_ui_button_render(
         commands, layout->bluetooth_scan_button,
         model->bluetooth_scanning ? (const uint16_t *)u"Stop scanning" : (const uint16_t *)u"Scan",
-        &scan_style, enabled,
-        reach_settings_model_button_press_value(model, REACH_SETTINGS_HIT_BLUETOOTH_SCAN));
+        &scan_style, enabled, 2,
+        reach_settings_model_button_press_motion(model, REACH_SETTINGS_HIT_BLUETOOTH_SCAN));
 
     if (layout->bluetooth_loader_bar.width > 0.0f)
     {

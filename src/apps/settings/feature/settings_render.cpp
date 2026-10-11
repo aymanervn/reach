@@ -245,8 +245,8 @@ static void render_account_page(const reach_settings_render_input *input,
     reach_ui_button_style change_style =
         reach_settings_button_style(input, input->theme->settings_button_primary);
     reach_ui_button_render(
-        commands, layout->account_password_button, (const uint16_t *)L"Change", &change_style, 1,
-        reach_settings_model_button_press_value(model, REACH_SETTINGS_HIT_ACCOUNT_PASSWORD));
+        commands, layout->account_password_button, (const uint16_t *)L"Change", &change_style, 1, 2,
+        reach_settings_model_button_press_motion(model, REACH_SETTINGS_HIT_ACCOUNT_PASSWORD));
 }
 
 static void render_power_page(const reach_settings_render_input *input,
@@ -378,8 +378,8 @@ static void render_power_page(const reach_settings_render_input *input,
         reach_settings_button_style(input, input->theme->settings_button_primary);
     reach_ui_button_render(
         commands, layout->power_apply_button, (const uint16_t *)L"Apply", &apply_style,
-        reach_settings_model_power_dirty(model),
-        reach_settings_model_button_press_value(model, REACH_SETTINGS_HIT_POWER_APPLY));
+        reach_settings_model_power_dirty(model), 2,
+        reach_settings_model_button_press_motion(model, REACH_SETTINGS_HIT_POWER_APPLY));
 }
 
 typedef struct display_toggle_card
@@ -813,21 +813,16 @@ static void render_installed_apps_page(const reach_settings_render_input *input,
                                  REACH_TEXT_WEIGHT_NORMAL, input->text_alignment_leading,
                                  input->theme->settings_secondary_text, 1);
 
-        float press = reach_settings_model_installed_app_button_press_value(
+        const reach_motion *press = reach_settings_model_installed_app_button_press_motion(
             model, REACH_SETTINGS_HIT_APPLICATION_UNINSTALL, index);
         reach_ui_button_style uninstall_style = reach_settings_muted_button_style(input);
-        uninstall_style.background = reach_theme_color_mix(
-            uninstall_style.background, input->theme->settings_button_danger, press);
-        uninstall_style.disabled_background = reach_theme_color_mix(
-            uninstall_style.disabled_background, input->theme->settings_button_danger, press);
-        uninstall_style.text =
-            reach_theme_color_mix(uninstall_style.text, input->theme->settings_button_text, press);
-        uninstall_style.disabled_text = reach_theme_color_mix(
-            uninstall_style.disabled_text, input->theme->settings_button_text, press);
+        uninstall_style.has_pressed_colors = 1;
+        uninstall_style.pressed_background = input->theme->settings_button_danger;
+        uninstall_style.pressed_text = input->theme->settings_button_text;
         uninstall_style.radius = layout->installed_app_uninstall_buttons[index].height * 0.5f;
         reach_ui_button_render(commands, layout->installed_app_uninstall_buttons[index],
                                (const uint16_t *)u"Uninstall", &uninstall_style,
-                               !model->installed_apps_busy && entry->can_uninstall, 0.0f);
+                               !model->installed_apps_busy && entry->can_uninstall, 2, press);
     }
     reach_render_command_buffer_clear_scissor(commands);
 
@@ -934,8 +929,8 @@ static void render_reach_section(const reach_settings_render_input *input,
     reach_style.disabled_background = input->theme->settings_card_background;
     reach_ui_button_render(
         commands, layout->reach_update_button,
-        reach_settings_model_reach_update_button_label(model), &reach_style, enabled,
-        reach_settings_model_button_press_value(model, REACH_SETTINGS_HIT_REACH_UPDATE));
+        reach_settings_model_reach_update_button_label(model), &reach_style, enabled, 2,
+        reach_settings_model_button_press_motion(model, REACH_SETTINGS_HIT_REACH_UPDATE));
 }
 
 static void render_update_page(const reach_settings_render_input *input,
@@ -956,20 +951,20 @@ static void render_update_page(const reach_settings_render_input *input,
     reach_ui_button_style refresh_style =
         reach_settings_button_style(input, input->theme->settings_button_success);
     reach_ui_button_render(
-        commands, layout->update_refresh_button, scan_button_text, &refresh_style, !busy,
-        reach_settings_model_button_press_value(model, REACH_SETTINGS_HIT_UPDATE_REFRESH));
+        commands, layout->update_refresh_button, scan_button_text, &refresh_style, !busy, 2,
+        reach_settings_model_button_press_motion(model, REACH_SETTINGS_HIT_UPDATE_REFRESH));
     reach_ui_button_style install_style =
         reach_settings_button_style(input, input->theme->settings_button_primary);
     reach_ui_button_render(
         commands, layout->update_install_button, (const uint16_t *)u"Install selected",
-        &install_style, install_enabled,
-        reach_settings_model_button_press_value(model, REACH_SETTINGS_HIT_UPDATE_INSTALL));
+        &install_style, install_enabled, 2,
+        reach_settings_model_button_press_motion(model, REACH_SETTINGS_HIT_UPDATE_INSTALL));
     reach_ui_button_style restart_style =
         reach_settings_button_style(input, input->theme->settings_button_danger);
     reach_ui_button_render(
         commands, layout->update_restart_button, (const uint16_t *)u"Restart now", &restart_style,
-        restart_enabled,
-        reach_settings_model_button_press_value(model, REACH_SETTINGS_HIT_UPDATE_RESTART));
+        restart_enabled, 2,
+        reach_settings_model_button_press_motion(model, REACH_SETTINGS_HIT_UPDATE_RESTART));
 
     render_reach_section(input, commands);
 

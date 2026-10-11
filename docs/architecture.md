@@ -434,6 +434,15 @@ the native clip. `reach_render_group_clip_at` provides the same event-time recta
 and geometry consumers, and active clip motion participates in generic fallback frame demand.
 This group capability does not yet provide rounded popup-chrome resize or root-presentation clips.
 
+Explicit render groups can tint their rasterized alpha coverage with four normalized RGBA motion
+channels. Windows Composition retains a surface mask, color brush and property-set expression;
+DirectComposition retains a premultiplied color-matrix effect and uses Visual3 opacity separately.
+Content changes redraw coverage; color-only motion changes native properties. Disabling tint or
+retiring a group releases its tint objects. The HWND fallback renders aggregate coverage into a
+bounded temporary bitmap and applies sampled color once, preserving overlapping shapes.
+`reach_render_group_tint_at` and all fallback geometry sample one timestamp per frame. This
+capability belongs to explicit groups; root presentation tint is not implemented.
+
 Optional process-wide workload diagnostics count application wakes/updates, scalar/loader/scroll
 work, layout and command production, renderer executions and actual raster passes, compositor
 submissions, and native-thumbnail calls separately. `REACH_WORKLOAD_REPORT` enables collection at
@@ -448,6 +457,13 @@ its current pressed target, including output-row scissoring. Press and release e
 opacity descriptor. Each capsule owns capture and original-target activation, resets feedback on
 hide, and requests no periodic frames for feedback. The existing generic fallback samples the
 same command-buffer motion until its deadline when retained rendering is unavailable.
+
+Settings buttons publish the same pressable motion into shared UI controls. Ordinary buttons
+retain a background tint; uninstall buttons retain background and text tint independently. The
+model keeps original-target identity and retires settled feedback at the next input. Settings
+schedules all command-buffer motion only when retained rendering is unavailable, including one
+final endpoint frame. No button-feedback scalar manager, per-tick advancement or compositor frame
+demand remains. Target introduction, layout, enabled state and theme changes still redraw content.
 
 Top Bar tray and Dock icon groups use stable item identities. Pointer events publish direct
 positions, reordered neighbours and released items run compositor motion, and a stationary drag

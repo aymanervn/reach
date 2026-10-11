@@ -113,7 +113,7 @@ struct reach_settings_app
 {
     reach_platform_window_port window;
     reach_render_backend_port renderer;
-    int32_t nav_fallback_active;
+    int32_t motion_fallback_active;
     reach_monitor_port monitors;
     reach_power_session_port power_session;
     reach_windows_update_port windows_update;
@@ -1809,11 +1809,12 @@ static size_t reach_settings_pressable_feedback_index(reach_settings_hit_result 
 static reach_pressable_feedback_style reach_settings_pressable_feedback(reach_settings_app *app)
 {
     reach_pressable_feedback_style feedback = {};
-    feedback.animations = app != nullptr ? &app->model.button_press_animation : nullptr;
-    feedback.track = 0;
+    feedback.motion = app != nullptr ? &app->model.button_press_feedback : nullptr;
     feedback.pressed_value = 1.0f;
     feedback.release_seconds = 0.18;
     feedback.release_easing = REACH_EASING_EASE_OUT;
+    if (app != nullptr)
+        reach_pressable_settle_feedback(&app->model.button_pressable, &feedback);
     return feedback;
 }
 
@@ -2990,10 +2991,6 @@ reach_result reach_settings_app_update(reach_settings_app *app, double delta_sec
     {
         app->dirty = 1;
     }
-    if (reach_settings_model_tick_button_press(&app->model, delta_seconds))
-    {
-        app->dirty = 1;
-    }
     if (reach_settings_model_tick_display_animations(&app->model, delta_seconds))
     {
         app->dirty = 1;
@@ -3002,12 +2999,12 @@ reach_result reach_settings_app_update(reach_settings_app *app, double delta_sec
     {
         app->dirty = 1;
     }
-    int32_t nav_fallback = reach_motion_active(&app->model.nav_selection) &&
-                           (app->renderer.ops.retained_supported == nullptr ||
-                            !app->renderer.ops.retained_supported(app->renderer.backend));
-    if (nav_fallback || app->nav_fallback_active)
+    int32_t motion_fallback = reach_render_command_buffer_motion_active(&app->render_commands) &&
+                              (app->renderer.ops.retained_supported == nullptr ||
+                               !app->renderer.ops.retained_supported(app->renderer.backend));
+    if (motion_fallback || app->motion_fallback_active)
         app->dirty = 1;
-    app->nav_fallback_active = nav_fallback;
+    app->motion_fallback_active = motion_fallback;
     if (app->dirty)
     {
         reach_settings_refresh_bounds(app);
@@ -3069,8 +3066,8 @@ int32_t reach_settings_app_needs_frame(const reach_settings_app *app)
     reach_settings_update_worker *worker =
         const_cast<reach_settings_update_worker *>(&app->update_worker);
     std::lock_guard<std::mutex> lock(worker->mutex);
-    return app->nav_fallback_active ||
-           (reach_motion_active(&app->model.nav_selection) &&
+    return app->motion_fallback_active ||
+           (reach_render_command_buffer_motion_active(&app->render_commands) &&
             (app->renderer.ops.retained_supported == nullptr ||
              !app->renderer.ops.retained_supported(app->renderer.backend))) ||
            app->dirty || reach_busy || startup_busy || worker->pending || worker->in_flight ||
@@ -3083,7 +3080,6 @@ int32_t reach_settings_app_needs_frame(const reach_settings_app *app)
            app->update_scrollbar_drag.active || app->startup_scrollbar_drag.active ||
            reach_settings_model_startup_animations_active(&app->model) ||
            reach_settings_model_power_animations_active(&app->model) ||
-           reach_settings_model_button_press_active(&app->model) ||
            reach_settings_model_display_animations_active(&app->model) ||
            reach_settings_model_top_bar_animations_active(&app->model) ||
            app->model.power_focused_timer >= 0 || app->model.account_focused_field >= 0 ||

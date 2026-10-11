@@ -57,33 +57,55 @@ static void reach_ui_push_text(reach_render_command_buffer *commands, reach_rect
     (void)reach_render_command_buffer_push(commands, &command);
 }
 
+static int32_t reach_ui_begin_color_feedback(reach_render_command_buffer *commands, uint64_t id,
+                                             reach_rect_f32 bounds, reach_color from,
+                                             reach_color to, const reach_motion *pressed)
+{
+    if (pressed == nullptr)
+        return 0;
+    reach_render_group group = {};
+    group.id = id;
+    group.bounds = bounds;
+    group.has_tint = 1;
+    float source[] = {from.r, from.g, from.b, from.a};
+    float target[] = {to.r, to.g, to.b, to.a};
+    for (size_t index = 0; index < REACH_RENDER_COLOR_CHANNEL_COUNT; ++index)
+        group.tint[index] =
+            reach_motion_affine(pressed, target[index] - source[index], source[index]);
+    reach_motion_set(&group.opacity, 1.0f);
+    reach_motion_set(&group.scale, 1.0f);
+    return reach_render_command_buffer_begin_group(commands, &group) == REACH_OK;
+}
+
 void reach_ui_button_render(reach_render_command_buffer *commands, reach_rect_f32 bounds,
                             const uint16_t *label, const reach_ui_button_style *style,
-                            int32_t enabled, float pressed)
+                            int32_t enabled, uint64_t feedback_id, const reach_motion *pressed)
 {
     if (commands == nullptr || style == nullptr)
     {
         return;
     }
-    if (pressed < 0.0f)
-    {
-        pressed = 0.0f;
-    }
-    if (pressed > 1.0f)
-    {
-        pressed = 1.0f;
-    }
     reach_color background = enabled ? style->background : style->disabled_background;
-    if (enabled && pressed > 0.0f)
-    {
-        const float darken = style->pressed_darken > 0.0f ? style->pressed_darken : 1.0f;
-        reach_color darkened = {background.r * darken, background.g * darken, background.b * darken,
-                                background.a};
-        background = reach_theme_color_mix(background, darkened, pressed);
-    }
-    reach_ui_push_rect(commands, bounds, style->radius, background);
+    const float darken = style->pressed_darken > 0.0f ? style->pressed_darken : 1.0f;
+    reach_color target = style->has_pressed_colors
+                             ? style->pressed_background
+                             : reach_color{background.r * darken, background.g * darken,
+                                           background.b * darken, background.a};
+    const reach_motion *feedback = enabled || style->has_pressed_colors ? pressed : nullptr;
+    int32_t retained =
+        reach_ui_begin_color_feedback(commands, feedback_id, bounds, background, target, feedback);
+    reach_color white = {1.0f, 1.0f, 1.0f, 1.0f};
+    reach_ui_push_rect(commands, bounds, style->radius, retained ? white : background);
+    if (retained)
+        reach_render_command_buffer_end_group(commands);
+    reach_color text = enabled ? style->text : style->disabled_text;
+    retained = style->has_pressed_colors &&
+               reach_ui_begin_color_feedback(commands, feedback_id + 1, bounds, text,
+                                             style->pressed_text, feedback);
     reach_ui_push_text(commands, bounds, label, style->text_size, style->text_weight,
-                       REACH_TEXT_ALIGNMENT_CENTER, enabled ? style->text : style->disabled_text);
+                       REACH_TEXT_ALIGNMENT_CENTER, retained ? white : text);
+    if (retained)
+        reach_render_command_buffer_end_group(commands);
 }
 
 void reach_ui_selection_item_backdrop_render(reach_render_command_buffer *commands,

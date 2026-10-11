@@ -345,8 +345,30 @@ static void test_animated_clip_samples_absolute_geometry(void)
                 "disabled clipping ignores retained inset descriptors");
 }
 
+static void test_retained_tint_samples_one_timeline(void)
+{
+    reach_render_group group = {};
+    group.has_tint = 1;
+    reach_motion progress = {};
+    reach_motion_start_at(&progress, 0.0f, 1.0f, 2.0, REACH_EASING_EASE_OUT, 10.0);
+    group.tint[REACH_RENDER_COLOR_RED] = reach_motion_affine(&progress, 0.6f, 0.2f);
+    group.tint[REACH_RENDER_COLOR_GREEN] = reach_motion_affine(&progress, -0.4f, 0.9f);
+    group.tint[REACH_RENDER_COLOR_BLUE] = reach_motion_affine(&progress, 0.0f, 0.3f);
+    group.tint[REACH_RENDER_COLOR_ALPHA] = reach_motion_affine(&progress, -0.5f, 1.0f);
+    reach_color sample = reach_render_group_tint_at(&group, 11.0);
+    float value = reach_motion_value_at(&progress, 11.0);
+    expect_near(sample.r, 0.2f + 0.6f * value, 0.001f, "tint red derives the same progress");
+    expect_near(sample.g, 0.9f - 0.4f * value, 0.001f, "tint green supports descending values");
+    expect_near(sample.b, 0.3f, 0.001f, "constant tint channel remains stable");
+    expect_near(sample.a, 1.0f - 0.5f * value, 0.001f, "tint preserves its alpha timeline");
+    group.has_tint = 0;
+    expect_near(reach_render_group_tint_at(&group, 11.0).a, 1.0f, 0.001f,
+                "disabled tint does not change content");
+}
+
 int main(void)
 {
+    test_retained_tint_samples_one_timeline();
     test_animated_clip_samples_absolute_geometry();
     test_dock_reserves_side_safe_margins();
     test_launcher_border_wraps_stable_content_geometry();

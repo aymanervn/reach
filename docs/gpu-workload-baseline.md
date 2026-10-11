@@ -100,6 +100,24 @@ creation, alongside the existing motion/clip/feedback diagnostics. WUC mask-brus
 verified. This establishes supported native objects, not color-animation or displayed-pixel
 acceptance; neither object-creation check adds a product animation path.
 
+Settings button diagnostics drive the real model press/cancel intent through the shared UI
+renderer. Five runs per compositor at 100%, 125% and 200% geometry scales verify one release
+execution, two tint-property submissions, zero raster passes and zero scalar advances after cold
+background/text coverage creation. Ten identical post-completion submissions change no tint
+properties. Disabling tint releases its brushes/property sets/effects; suspension releases layers.
+Root opacity completion, default restoration and redraw after suspension pass on both backends
+after removing DirectComposition opacity-effect groups. The HWND fallback samples the descriptor,
+reaches its deadline and renders correctly without a retained backend.
+
+An ignored offscreen diagnostic reads GPU-rendered Direct2D color-matrix pixels for four coverage
+levels and four tint-alpha values, verifying source RGB replacement and premultiplied alpha within
+1.5 byte units. This checks the documented effect semantics used by DirectComposition, not the
+final native visual output. A separate WIC target executes the production fallback on overlapping
+rectangles and verifies that their aggregate 0.75 coverage is tinted once, with transparent exterior
+pixels. Both readback checks pass. Native WUC expression/mask submission succeeds; displayed
+compositor pixels, live Settings input, actual DPI/theme changes, and total CPU/GPU/memory cost
+remain pending. Geometry scales alone do not establish product DPI acceptance.
+
 The counters give a reproducible baseline for content reuse versus sampled visual changes. Full
 application wake/layout/native metrics, cold/warm workload cost, total CPU/GPU activity, latency,
 power, memory and instrumentation overhead still require product scenarios and system traces.

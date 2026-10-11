@@ -159,8 +159,8 @@ static void reach_settings_wifi_render_add_row(const reach_settings_render_input
         reach_ui_button_render(
             commands, layout->wifi_add_show_button,
             model->wifi_show_key ? (const uint16_t *)u"Hide" : (const uint16_t *)u"Show",
-            &show_style, 1,
-            reach_settings_model_button_press_value(model, REACH_SETTINGS_HIT_WIFI_ADD_SHOW_KEY));
+            &show_style, 1, 2,
+            reach_settings_model_button_press_motion(model, REACH_SETTINGS_HIT_WIFI_ADD_SHOW_KEY));
     }
 
     reach_ui_toggle_style toggle_style = {};
@@ -183,8 +183,8 @@ static void reach_settings_wifi_render_add_row(const reach_settings_render_input
         reach_settings_button_style(input, input->theme->settings_button_primary);
     reach_ui_button_render(
         commands, layout->wifi_add_submit_button, (const uint16_t *)u"Add", &submit_style,
-        reach_settings_model_wifi_add_ready(model),
-        reach_settings_model_button_press_value(model, REACH_SETTINGS_HIT_WIFI_ADD_SUBMIT));
+        reach_settings_model_wifi_add_ready(model), 2,
+        reach_settings_model_button_press_motion(model, REACH_SETTINGS_HIT_WIFI_ADD_SUBMIT));
 }
 
 static void reach_settings_wifi_render_row(const reach_settings_render_input *input,
@@ -271,8 +271,8 @@ static void reach_settings_wifi_render_row(const reach_settings_render_input *in
         reach_ui_button_render(
             commands, layout->wifi_show_button,
             model->wifi_show_key ? (const uint16_t *)u"Hide" : (const uint16_t *)u"Show",
-            &show_style, 1,
-            reach_settings_model_button_press_value(model, REACH_SETTINGS_HIT_WIFI_SHOW_KEY));
+            &show_style, 1, 2,
+            reach_settings_model_button_press_motion(model, REACH_SETTINGS_HIT_WIFI_SHOW_KEY));
 
         reach_ui_toggle_style toggle_style = {};
         toggle_style.track_off = input->theme->settings_toggle_track_off;
@@ -299,7 +299,7 @@ static void reach_settings_wifi_render_row(const reach_settings_render_input *in
             commands, layout->wifi_connect_button, (const uint16_t *)u"Connect", &connect_style,
             reach_settings_model_wifi_connect_ready(model) &&
                 !reach_settings_model_wifi_busy(model),
-            reach_settings_model_button_press_value(model, REACH_SETTINGS_HIT_WIFI_CONNECT));
+            2, reach_settings_model_button_press_motion(model, REACH_SETTINGS_HIT_WIFI_CONNECT));
     }
     if (layout->wifi_disconnect_button.width > 0.0f)
     {
@@ -307,16 +307,16 @@ static void reach_settings_wifi_render_row(const reach_settings_render_input *in
             reach_settings_button_style(input, input->theme->settings_card_background);
         reach_ui_button_render(
             commands, layout->wifi_disconnect_button, (const uint16_t *)u"Disconnect",
-            &disconnect_style, !reach_settings_model_wifi_busy(model),
-            reach_settings_model_button_press_value(model, REACH_SETTINGS_HIT_WIFI_DISCONNECT));
+            &disconnect_style, !reach_settings_model_wifi_busy(model), 2,
+            reach_settings_model_button_press_motion(model, REACH_SETTINGS_HIT_WIFI_DISCONNECT));
     }
     if (layout->wifi_forget_button.width > 0.0f)
     {
         reach_ui_button_style forget_style =
             reach_settings_button_style(input, input->theme->settings_button_danger);
         reach_ui_button_render(
-            commands, layout->wifi_forget_button, (const uint16_t *)u"Forget", &forget_style, 1,
-            reach_settings_model_button_press_value(model, REACH_SETTINGS_HIT_WIFI_FORGET));
+            commands, layout->wifi_forget_button, (const uint16_t *)u"Forget", &forget_style, 1, 2,
+            reach_settings_model_button_press_motion(model, REACH_SETTINGS_HIT_WIFI_FORGET));
     }
 }
 
@@ -332,8 +332,8 @@ void reach_settings_render_wifi_page(const reach_settings_render_input *input,
         reach_ui_button_style back_style =
             reach_settings_button_style(input, input->theme->settings_button_success);
         reach_ui_button_render(
-            commands, layout->wifi_back_button, (const uint16_t *)u"Return", &back_style, 1,
-            reach_settings_model_button_press_value(model, REACH_SETTINGS_HIT_WIFI_BACK));
+            commands, layout->wifi_back_button, (const uint16_t *)u"Return", &back_style, 1, 2,
+            reach_settings_model_button_press_motion(model, REACH_SETTINGS_HIT_WIFI_BACK));
     }
 
     if (layout->wifi_radio_card.width > 0.0f)
@@ -391,16 +391,17 @@ void reach_settings_render_wifi_page(const reach_settings_render_input *input,
             model->wifi_status == REACH_SETTINGS_WIFI_STATUS_SCANNING
                 ? (const uint16_t *)u"Scanning..."
                 : (const uint16_t *)u"Scan",
-            &scan_style, enabled && !reach_settings_model_wifi_busy(model),
-            reach_settings_model_button_press_value(model, REACH_SETTINGS_HIT_WIFI_SCAN));
+            &scan_style, enabled && !reach_settings_model_wifi_busy(model), 2,
+            reach_settings_model_button_press_motion(model, REACH_SETTINGS_HIT_WIFI_SCAN));
         reach_ui_button_style add_style = reach_settings_muted_button_style(input);
         reach_ui_button_render(
             commands, layout->wifi_add_button, (const uint16_t *)u"Add network", &add_style,
-            enabled, reach_settings_model_button_press_value(model, REACH_SETTINGS_HIT_WIFI_ADD));
+            enabled, 2,
+            reach_settings_model_button_press_motion(model, REACH_SETTINGS_HIT_WIFI_ADD));
         reach_ui_button_style known_style = reach_settings_muted_button_style(input);
         reach_ui_button_render(
             commands, layout->wifi_known_button, (const uint16_t *)u"Known networks", &known_style,
-            1, reach_settings_model_button_press_value(model, REACH_SETTINGS_HIT_WIFI_KNOWN));
+            1, 2, reach_settings_model_button_press_motion(model, REACH_SETTINGS_HIT_WIFI_KNOWN));
     }
 
     if (layout->wifi_loader_bar.width > 0.0f)

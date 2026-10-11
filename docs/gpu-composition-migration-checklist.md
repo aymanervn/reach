@@ -75,6 +75,12 @@ support expectation is explicitly resolved.
   - [x] Tray popup press/release uses retained icon-tint or rectangle opacity, preserving its
     previous appearance. The scalar track, accessor and composition frame blocker are removed.
     Debug builds, 39 tests and bounded capsule diagnostics pass on both compositors and fallback.
+  - [x] Settings button press/release, including uninstall background and text colors, uses shared
+    retained RGBA tint over cached coverage. Remove the scalar feedback manager and sampled colors;
+    generic Settings fallback scheduling samples every published motion through its final frame.
+    Debug builds, 39 tests and bounded native/fallback diagnostics pass at 100%, 125% and 200%
+    geometry scales. GPU color-matrix and fallback coverage readback pass. Displayed compositor
+    pixels, live input and total product cost remain part of final acceptance.
 - [ ] Migrate eligible loaders/repeating effects; select efficient compositor or deadline behavior for
   carets, preserve focus resets and marquee behavior, and stop hidden repetitions.
 

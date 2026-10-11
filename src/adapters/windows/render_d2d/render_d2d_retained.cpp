@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <math.h>
 #include <wrl/event.h>
+#include <wrl/wrappers/corewrappers.h>
 
 namespace
 {
@@ -182,6 +183,151 @@ static HRESULT dcomp_motion(reach_render_backend *backend, const reach_motion &m
     return hr;
 }
 
+static HRESULT sync_tint(reach_render_backend *backend, reach_d2d_retained_layer &layer,
+                         const reach_render_group &group, bool content_changed)
+{
+    if (!group.has_tint && !layer.group.has_tint)
+        return S_OK;
+    if (!content_changed && group.has_tint == layer.group.has_tint &&
+        memcmp(group.tint, layer.group.tint, sizeof(group.tint)) == 0)
+        return S_OK;
+    reach_workload_add(REACH_WORKLOAD_PROPERTY_SUBMISSIONS, 1);
+    if (!group.has_tint)
+    {
+        HRESULT hr;
+        if (backend->compositor != nullptr)
+        {
+            ComPtr<ICompositionBrush> brush;
+            hr = layer.surface_brush.As(&brush);
+            if (SUCCEEDED(hr))
+                hr = layer.visual->put_Brush(brush.Get());
+        }
+        else
+            hr = layer.dcomp_visual->SetEffect(nullptr);
+        if (SUCCEEDED(hr))
+        {
+            layer.tint_mask.Reset();
+            layer.tint_brush.Reset();
+            layer.tint_properties.Reset();
+            layer.dcomp_tint.Reset();
+        }
+        return hr;
+    }
+    if (backend->compositor != nullptr)
+    {
+        using Microsoft::WRL::Wrappers::HStringReference;
+        HRESULT hr = S_OK;
+        bool initialized = layer.tint_brush != nullptr && layer.tint_mask != nullptr &&
+                           layer.tint_properties != nullptr;
+        if (!initialized)
+        {
+            ComPtr<ICompositor2> compositor;
+            hr = backend->compositor->QueryInterface(IID_PPV_ARGS(&compositor));
+            if (SUCCEEDED(hr))
+                hr = compositor->CreateMaskBrush(layer.tint_mask.ReleaseAndGetAddressOf());
+            if (SUCCEEDED(hr))
+                hr = backend->compositor->CreateColorBrush(
+                    layer.tint_brush.ReleaseAndGetAddressOf());
+            if (SUCCEEDED(hr))
+                hr = backend->compositor->CreatePropertySet(
+                    layer.tint_properties.ReleaseAndGetAddressOf());
+        }
+        const wchar_t *names[] = {L"Red", L"Green", L"Blue", L"Alpha"};
+        for (size_t index = 0; index < REACH_RENDER_COLOR_CHANNEL_COUNT && SUCCEEDED(hr); ++index)
+        {
+            if (initialized &&
+                memcmp(&group.tint[index], &layer.group.tint[index], sizeof(reach_motion)) == 0)
+                continue;
+            reach_motion channel = reach_motion_affine(&group.tint[index], 255.0f, 0.0f);
+            hr = layer.tint_properties->InsertScalar(HStringReference(names[index]).Get(),
+                                                     reach_motion_value(&channel));
+            if (SUCCEEDED(hr))
+                hr = wuc_motion(backend, layer.tint_properties.Get(), names[index], channel);
+        }
+        if (SUCCEEDED(hr) && !initialized)
+        {
+            ComPtr<IExpressionAnimation> expression;
+            ComPtr<ICompositionAnimation> animation;
+            ComPtr<ICompositionObject> properties;
+            ComPtr<ICompositionObject> brush;
+            hr = backend->compositor->CreateExpressionAnimationWithExpression(
+                HStringReference(
+                    L"ColorRGB(channels.Alpha, channels.Red, channels.Green, channels.Blue)")
+                    .Get(),
+                &expression);
+            if (SUCCEEDED(hr))
+                hr = expression.As(&animation);
+            if (SUCCEEDED(hr))
+                hr = layer.tint_properties.As(&properties);
+            if (SUCCEEDED(hr))
+                hr = animation->SetReferenceParameter(HStringReference(L"channels").Get(),
+                                                      properties.Get());
+            if (SUCCEEDED(hr))
+                hr = layer.tint_brush.As(&brush);
+            if (SUCCEEDED(hr))
+                hr = brush->StartAnimation(HStringReference(L"Color").Get(), animation.Get());
+        }
+        ComPtr<ICompositionBrush> source, mask, brush;
+        if (SUCCEEDED(hr))
+            hr = layer.tint_brush.As(&source);
+        if (SUCCEEDED(hr))
+            hr = layer.surface_brush.As(&mask);
+        if (SUCCEEDED(hr))
+            hr = layer.tint_mask->put_Source(source.Get());
+        if (SUCCEEDED(hr))
+            hr = layer.tint_mask->put_Mask(mask.Get());
+        if (SUCCEEDED(hr))
+            hr = layer.tint_mask.As(&brush);
+        if (SUCCEEDED(hr))
+            hr = layer.visual->put_Brush(brush.Get());
+        if (FAILED(hr))
+        {
+            layer.tint_mask.Reset();
+            layer.tint_brush.Reset();
+            layer.tint_properties.Reset();
+        }
+        return hr;
+    }
+    HRESULT hr = S_OK;
+    bool initialized = layer.dcomp_tint != nullptr;
+    if (!initialized)
+    {
+        ComPtr<IDCompositionDevice3> device;
+        hr = backend->dcomp_device->QueryInterface(IID_PPV_ARGS(&device));
+        if (SUCCEEDED(hr))
+            hr = device->CreateColorMatrixEffect(&layer.dcomp_tint);
+        D2D1_MATRIX_5X4_F matrix = {};
+        matrix._44 = 1.0f;
+        if (SUCCEEDED(hr))
+            hr = layer.dcomp_tint->SetMatrix(matrix);
+        if (SUCCEEDED(hr))
+            hr = layer.dcomp_tint->SetAlphaMode(D2D1_COLORMATRIX_ALPHA_MODE_PREMULTIPLIED);
+        if (SUCCEEDED(hr))
+            hr = layer.dcomp_tint->SetClampOutput(TRUE);
+    }
+    for (size_t index = 0; index < REACH_RENDER_COLOR_CHANNEL_COUNT && SUCCEEDED(hr); ++index)
+    {
+        if (initialized &&
+            memcmp(&group.tint[index], &layer.group.tint[index], sizeof(reach_motion)) == 0)
+            continue;
+        int row = index == REACH_RENDER_COLOR_ALPHA ? 3 : 4;
+        hr = layer.dcomp_tint->SetMatrixElement(row, (int)index,
+                                                reach_motion_value(&group.tint[index]));
+        ComPtr<IDCompositionAnimation> animation;
+        HRESULT motion_hr =
+            SUCCEEDED(hr) ? dcomp_motion(backend, group.tint[index], &animation) : hr;
+        if (FAILED(motion_hr))
+            hr = motion_hr;
+        else if (motion_hr == S_OK)
+            hr = layer.dcomp_tint->SetMatrixElement(row, (int)index, animation.Get());
+    }
+    if (SUCCEEDED(hr))
+        hr = layer.dcomp_visual->SetEffect(layer.dcomp_tint.Get());
+    if (FAILED(hr))
+        layer.dcomp_tint.Reset();
+    return hr;
+}
+
 static HRESULT sync_clip(reach_render_backend *backend, reach_d2d_retained_layer &layer,
                          const reach_render_group &group, bool initialized)
 {
@@ -355,9 +501,8 @@ static HRESULT wuc_properties(reach_render_backend *backend, IInspectable *inspe
     return hr;
 }
 
-static HRESULT dcomp_properties(reach_render_backend *backend, IDCompositionVisual *visual,
-                                IDCompositionScaleTransform *scale,
-                                IDCompositionEffectGroup *opacity, const reach_render_group &group,
+static HRESULT dcomp_properties(reach_render_backend *backend, IDCompositionVisual2 *visual,
+                                IDCompositionScaleTransform *scale, const reach_render_group &group,
                                 float base_x, float base_y, bool preserve_repeat = false,
                                 unsigned mask = 31)
 {
@@ -367,6 +512,9 @@ static HRESULT dcomp_properties(reach_render_backend *backend, IDCompositionVisu
                      : visual->SetOffsetX(base_x + scalar_value(group.x, 0.0f));
     if (SUCCEEDED(hr) && (mask & 2))
         hr = visual->SetOffsetY(base_y + scalar_value(group.y, 0.0f));
+    ComPtr<IDCompositionVisual3> opacity;
+    if (SUCCEEDED(hr) && (mask & 4))
+        hr = visual->QueryInterface(IID_PPV_ARGS(&opacity));
     if (SUCCEEDED(hr) && (mask & 4))
         hr = opacity->SetOpacity(scalar_value(group.opacity, 1.0f));
     if (SUCCEEDED(hr) && (mask & 8))
@@ -481,10 +629,6 @@ static HRESULT create_scene(reach_render_backend *backend)
     if (SUCCEEDED(hr))
         hr = backend->dcomp_device->CreateScaleTransform(&backend->scene_scale);
     if (SUCCEEDED(hr))
-        hr = backend->dcomp_device->CreateEffectGroup(&backend->scene_opacity);
-    if (SUCCEEDED(hr))
-        hr = backend->dcomp_visual->SetEffect(backend->scene_opacity.Get());
-    if (SUCCEEDED(hr))
         hr = backend->dcomp_visual->SetTransform(backend->scene_scale.Get());
     if (SUCCEEDED(hr))
         retire_swap_chain(backend);
@@ -515,10 +659,6 @@ static HRESULT create_layer(reach_render_backend *backend, reach_d2d_retained_la
         hr = layer.dcomp_container->AddVisual(layer.dcomp_visual.Get(), TRUE, nullptr);
     if (SUCCEEDED(hr))
         hr = backend->dcomp_device->CreateScaleTransform(&layer.dcomp_scale);
-    if (SUCCEEDED(hr))
-        hr = backend->dcomp_device->CreateEffectGroup(&layer.dcomp_opacity);
-    if (SUCCEEDED(hr))
-        hr = layer.dcomp_visual->SetEffect(layer.dcomp_opacity.Get());
     if (SUCCEEDED(hr))
         hr = layer.dcomp_visual->SetTransform(layer.dcomp_scale.Get());
     return hr;
@@ -555,16 +695,16 @@ static HRESULT draw_layer(reach_render_backend *backend, reach_d2d_retained_laye
                 ABI::Windows::Graphics::DirectX::DirectXPixelFormat_B8G8R8A8UIntNormalized,
                 ABI::Windows::Graphics::DirectX::DirectXAlphaMode_Premultiplied, &layer.surface);
             ComPtr<ICompositionSurface> surface;
-            ComPtr<ICompositionSurfaceBrush> brush;
             ComPtr<ICompositionBrush> base;
             if (SUCCEEDED(hr))
                 hr = layer.surface.As(&surface);
             if (SUCCEEDED(hr))
-                hr = backend->compositor->CreateSurfaceBrushWithSurface(surface.Get(), &brush);
+                hr = backend->compositor->CreateSurfaceBrushWithSurface(surface.Get(),
+                                                                        &layer.surface_brush);
             if (SUCCEEDED(hr))
-                hr = brush->put_Stretch(CompositionStretch_None);
+                hr = layer.surface_brush->put_Stretch(CompositionStretch_None);
             if (SUCCEEDED(hr))
-                hr = brush.As(&base);
+                hr = layer.surface_brush.As(&base);
             if (SUCCEEDED(hr))
                 hr = layer.visual->put_Brush(base.Get());
         }
@@ -825,12 +965,13 @@ static HRESULT sync_layer(reach_render_backend *backend, reach_d2d_retained_laye
         if (SUCCEEDED(hr))
             hr = layer.dcomp_container->SetOffsetY(anchor_y);
         if (SUCCEEDED(hr) && mask != 0)
-            hr = dcomp_properties(backend, layer.dcomp_visual.Get(), layer.dcomp_scale.Get(),
-                                  layer.dcomp_opacity.Get(), group, base_x, base_y, preserve_repeat,
-                                  mask);
+            hr = dcomp_properties(backend, layer.dcomp_visual.Get(), layer.dcomp_scale.Get(), group,
+                                  base_x, base_y, preserve_repeat, mask);
     }
     if (SUCCEEDED(hr) && geometry_changed)
         hr = sync_clip(backend, layer, group, initialized);
+    if (SUCCEEDED(hr))
+        hr = sync_tint(backend, layer, group, content_changed);
     if (SUCCEEDED(hr) && repeat_changed && group.repeat_travel_seconds > 0.0f)
     {
         hr = repeat_motion(backend, layer, group, base_x);
@@ -895,13 +1036,15 @@ void reach_d2d_release_retained(reach_render_backend *backend)
         (void)backend->dcomp_visual->SetEffect(nullptr);
         (void)backend->dcomp_visual->SetOffsetX(0.0f);
         (void)backend->dcomp_visual->SetOffsetY(0.0f);
+        ComPtr<IDCompositionVisual3> opacity;
+        if (SUCCEEDED(backend->dcomp_visual->QueryInterface(IID_PPV_ARGS(&opacity))))
+            (void)opacity->SetOpacity(1.0f);
     }
     backend->retained_layers.clear();
     record_retained_bytes(backend);
     backend->scene_visual.Reset();
     backend->dcomp_scene_visual.Reset();
     backend->scene_scale.Reset();
-    backend->scene_opacity.Reset();
     backend->has_scene_presentation = 0;
 }
 
@@ -936,7 +1079,7 @@ int32_t reach_d2d_presentation_complete(reach_render_backend *backend, uint64_t 
             settled.x.duration_seconds = settled.y.duration_seconds = 0.0;
             settled.opacity.duration_seconds = settled.scale.duration_seconds = 0.0;
             if (FAILED(dcomp_properties(backend, backend->dcomp_visual, backend->scene_scale.Get(),
-                                        backend->scene_opacity.Get(), settled, 0.0f, 0.0f)))
+                                        settled, 0.0f, 0.0f)))
                 return 0;
             reach_workload_add(REACH_WORKLOAD_DCOMP_COMMITS, 1);
             if (FAILED(backend->dcomp_device->Commit()))
@@ -1146,7 +1289,7 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
                 hr = backend->scene_scale->SetCenterY(center_y);
             if (SUCCEEDED(hr))
                 hr = dcomp_properties(backend, backend->dcomp_visual, backend->scene_scale.Get(),
-                                      backend->scene_opacity.Get(), presentation, 0.0f, 0.0f, false,
+                                      presentation, 0.0f, 0.0f, false,
                                       property_mask(presentation, backend->scene_presentation, 0.0f,
                                                     0.0f, backend->has_scene_presentation != 0));
         }

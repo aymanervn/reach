@@ -86,7 +86,7 @@ void reach_settings_model_init(reach_settings_model *model)
     reach_animation_manager_init(&model->top_bar_style_animation, &model->top_bar_style_track, 1);
     reach_animation_manager_init(&model->top_bar_mode_animation, &model->top_bar_mode_track, 1);
     reach_animation_manager_set(&model->top_bar_mode_animation, 0, 1.0f);
-    reach_animation_manager_init(&model->button_press_animation, &model->button_press_track, 1);
+    reach_motion_set(&model->button_press_feedback, 0.0f);
     reach_pressable_init(&model->button_pressable);
     for (size_t field = 0; field < REACH_SETTINGS_ACCOUNT_FIELD_COUNT; ++field)
     {
@@ -128,47 +128,25 @@ void reach_settings_model_select_page(reach_settings_model *model, reach_setting
                             REACH_EASING_EASE_IN_OUT);
 }
 
-float reach_settings_model_button_press_value(const reach_settings_model *model, int32_t hit_type)
+const reach_motion *reach_settings_model_button_press_motion(const reach_settings_model *model,
+                                                             int32_t hit_type)
 {
-    if (model == nullptr ||
-        reach_pressable_feedback_index(&model->button_pressable) != (size_t)hit_type)
-    {
-        return 0.0f;
-    }
-    return reach_animation_manager_value(&model->button_press_animation, 0);
+    return model != nullptr &&
+                   reach_pressable_feedback_index(&model->button_pressable) == (size_t)hit_type
+               ? &model->button_press_feedback
+               : nullptr;
 }
 
-float reach_settings_model_installed_app_button_press_value(const reach_settings_model *model,
-                                                            int32_t hit_type,
-                                                            size_t installed_app_index)
+const reach_motion *
+reach_settings_model_installed_app_button_press_motion(const reach_settings_model *model,
+                                                       int32_t hit_type, size_t installed_app_index)
 {
     uint64_t target = (static_cast<uint64_t>(static_cast<uint32_t>(hit_type)) << 32) |
                       static_cast<uint32_t>(installed_app_index);
-    if (model == nullptr ||
-        reach_pressable_feedback_index(&model->button_pressable) != static_cast<size_t>(target))
-    {
-        return 0.0f;
-    }
-    return reach_animation_manager_value(&model->button_press_animation, 0);
-}
-
-int32_t reach_settings_model_tick_button_press(reach_settings_model *model, double delta_seconds)
-{
-    if (model == nullptr || !reach_animation_manager_any_active(&model->button_press_animation))
-    {
-        return 0;
-    }
-    reach_animation_manager_tick(&model->button_press_animation, delta_seconds);
-    reach_pressable_feedback_style feedback = {};
-    feedback.animations = &model->button_press_animation;
-    feedback.track = 0;
-    reach_pressable_settle_feedback(&model->button_pressable, &feedback);
-    return 1;
-}
-
-int32_t reach_settings_model_button_press_active(const reach_settings_model *model)
-{
-    return model != nullptr && reach_animation_manager_any_active(&model->button_press_animation);
+    return model != nullptr && reach_pressable_feedback_index(&model->button_pressable) ==
+                                   static_cast<size_t>(target)
+               ? &model->button_press_feedback
+               : nullptr;
 }
 
 int32_t reach_settings_model_set_hovered_button(reach_settings_model *model, int32_t hit_type)
