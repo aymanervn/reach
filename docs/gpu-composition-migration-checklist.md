@@ -42,6 +42,10 @@ support expectation is explicitly resolved.
   and size-dependent chrome remain pending, so this capability gate stays open.
 - [ ] Decide whether supported live-preview composition meets behavior and efficiency requirements;
   document the selected compositor or optimized hybrid design for Dock, Switcher and Stage.
+  - [x] Select the existing DWM port with retained Reach visuals and active-only native motion.
+    Supported API limits and five bounded adapter runs are recorded in the
+    [live-preview design](gpu-live-preview-design.md). Consumer migration, live pixels and total
+    workload verification remain pending, so the main capability gate stays open.
 
 ## 3. Shared motion and runtime
 
