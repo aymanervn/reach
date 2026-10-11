@@ -164,17 +164,39 @@ reach_host_execute_registered_surface(reach_host *host, reach_feature_runtime *d
         return result;
     }
     const reach_feature_definition *definition = desc->definition;
+    if (geometry->presentation.retained)
+    {
+        commands->has_presentation = 1;
+        commands->presentation = geometry->presentation.group;
+        if (ctx->content_transform_active)
+        {
+            reach_render_command_buffer_set_content_transform(commands, ctx->content_rect,
+                                                              ctx->render_transform);
+        }
+        else if (desc->surface->retained_presentation)
+        {
+            reach_render_command_buffer_set_content_transform(
+                commands, desc->surface->render_content_rect, desc->surface->render_transform);
+        }
+        else
+        {
+            reach_host_stamp_surface_content(host, desc->definition->id, commands);
+        }
+        commands->presentation.bounds = commands->content_rect;
+    }
+    desc->surface->fallback_animation_active =
+        (desc->surface->renderer.ops.retained_supported == nullptr ||
+         !desc->surface->renderer.ops.retained_supported(desc->surface->renderer.backend)) &&
+        reach_render_command_buffer_motion_active(commands);
     if (definition != nullptr && definition->surface.popup_chrome)
     {
-        return reach_host_render_popup_surface(
-            host, desc->definition->id, desc->surface, geometry->visible_bounds,
-            geometry->notch_anchor_x, geometry->notch_side, commands,
-            geometry->presentation.managed ? geometry->presentation.opacity : 1.0f);
+        return reach_host_render_popup_surface(host, desc->definition->id, desc->surface,
+                                               geometry->visible_bounds, geometry->notch_anchor_x,
+                                               geometry->notch_side, commands);
     }
-    reach_host_stamp_surface_content(host, desc->definition->id, commands);
-    if (geometry->presentation.managed)
+    if (!geometry->presentation.retained)
     {
-        reach_render_command_buffer_multiply_opacity(commands, geometry->presentation.opacity);
+        reach_host_stamp_surface_content(host, desc->definition->id, commands);
     }
     if (ctx->content_transform_active)
     {
@@ -479,12 +501,14 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
         return REACH_ERROR;
     }
 
-    int32_t needs_frame = reach_host_surface_needs_frame(desc);
+    int32_t needs_frame =
+        reach_host_surface_needs_frame(desc) || desc->surface->fallback_animation_active;
     int32_t active = reach_host_surface_presented(desc);
     int32_t visible = active;
     int32_t frame_active = active;
     if (!visible)
     {
+        desc->surface->fallback_animation_active = 0;
         reach_host_set_surface_visible(host, desc->definition->id, 0);
         reach_feature_surface_geometry hidden_geometry = {};
         desc->definition->capsule_ops->surface_geometry(desc->capsule, &hidden_geometry);
@@ -554,53 +578,37 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
             host, desc->definition->id, geometry.visible_bounds, ctx->monitor_bounds, &geometry);
     }
     reach_shadow_pad shadow_pad = reach_host_surface_shadow_pad(host, desc->definition->id);
-    float applied_scale = 1.0f;
-    int32_t scale_changed = 0;
-    int32_t transition_frame_active = 0;
-    if (geometry.presentation.managed && geometry.presentation.max_scale > 1.0f)
+    if (geometry.presentation.retained)
     {
-        float shadow_scale = geometry.presentation.max_scale;
-        shadow_pad.left *= shadow_scale;
-        shadow_pad.top *= shadow_scale;
-        shadow_pad.right *= shadow_scale;
-        shadow_pad.bottom *= shadow_scale;
+        float maximum_scale =
+            geometry.presentation.max_scale > 1.0f ? geometry.presentation.max_scale : 1.0f;
+        shadow_pad.left *= maximum_scale;
+        shadow_pad.top *= maximum_scale;
+        shadow_pad.right *= maximum_scale;
+        shadow_pad.bottom *= maximum_scale;
         reach_host_surface_presentation_frame frame = reach_host_surface_presentation_frame_compute(
             geometry.visible_bounds, geometry.envelope_bounds, shadow_pad,
-            geometry.presentation.y_offset, geometry.presentation.scale,
-            geometry.presentation.max_scale);
+            geometry.presentation.translation_bounds, geometry.presentation.max_scale);
         bounds = frame.window_bounds;
         surface_ctx.content_rect = frame.content_rect;
         surface_ctx.render_transform = frame.render_transform;
-        surface_ctx.content_transform_active = frame.scale_envelope_active;
-        applied_scale = frame.scale;
-        scale_changed = !desc->surface->transition_scale_valid ||
-                        !reach_host_scalar_equal(desc->surface->last_transition_scale, frame.scale);
-        transition_frame_active = needs_frame;
-        if (desc->definition->surface_ops->set_pointer_transform != nullptr)
-        {
-            desc->definition->surface_ops->set_pointer_transform(desc->capsule,
-                                                                 frame.pointer_transform);
-        }
+        surface_ctx.content_transform_active = 1;
+        desc->surface->render_content_rect = surface_ctx.content_rect;
+        desc->surface->render_transform = surface_ctx.render_transform;
+        desc->surface->retained_presentation = 1;
         if (desc->surface->window.ops.set_input_regions != nullptr)
+            (void)desc->surface->window.ops.set_input_regions(desc->surface->window.window,
+                                                              &surface_ctx.content_rect, 1);
+        if (desc->surface->window.ops.set_input_presentation != nullptr)
         {
-            if (frame.scale_envelope_active)
-            {
-                (void)desc->surface->window.ops.set_input_regions(desc->surface->window.window,
-                                                                  &frame.content_rect, 1);
-                desc->surface->transition_input_region_active = 1;
-            }
-            else if (desc->surface->transition_input_region_active)
-            {
-                (void)desc->surface->window.ops.set_input_regions(desc->surface->window.window,
-                                                                  nullptr, 0);
-                desc->surface->transition_input_region_active = 0;
-            }
+            reach_platform_window_input_presentation input = {};
+            input.bounds = surface_ctx.content_rect;
+            input.x = geometry.presentation.group.x;
+            input.y = geometry.presentation.group.y;
+            input.scale = geometry.presentation.group.scale;
+            (void)desc->surface->window.ops.set_input_presentation(desc->surface->window.window,
+                                                                   &input);
         }
-    }
-    else if (geometry.presentation.managed)
-    {
-        bounds.y += geometry.presentation.y_offset;
-        transition_frame_active = needs_frame;
     }
     surface_ctx.render_bounds = bounds;
 
@@ -610,8 +618,7 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
         &desc->surface->bounds_valid, &window_changed);
     int32_t position_only = reach_host_bar_position_only(desc);
     int32_t render_needed = host->dirty.render || desc->surface->dirty_flags || layout_changed ||
-                            geometry_changed || scale_changed || transition_frame_active ||
-                            (window_changed && !position_only);
+                            geometry_changed || (window_changed && !position_only);
     reach_result native_overlay_result = REACH_OK;
     if (result == REACH_OK && active && desc->definition->surface_ops->native_overlay != nullptr)
     {
@@ -649,12 +656,6 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
             desc->definition->capsule_ops->presentation_committed(desc->capsule, result, &tick);
             reach_host_apply_feature_tick_result(host, desc, &tick);
         }
-    }
-    if (result == REACH_OK && geometry.presentation.managed &&
-        geometry.presentation.max_scale > 1.0f)
-    {
-        desc->surface->last_transition_scale = applied_scale;
-        desc->surface->transition_scale_valid = 1;
     }
     return result;
 }

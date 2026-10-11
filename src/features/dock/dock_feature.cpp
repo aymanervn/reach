@@ -187,15 +187,6 @@ static void reach_dock_tick(reach_dock *animations, double delta_seconds,
 
     int32_t feedback_was_active =
         reach_animation_manager_active(manager, REACH_DOCK_ANIM_FEEDBACK_OPACITY);
-    int32_t drag_snap_was_active =
-        reach_animation_manager_active(manager, REACH_DOCK_ANIM_DRAG_SNAP);
-    int32_t item_was_active[REACH_MAX_DOCK_ITEMS] = {};
-    for (size_t index = 0; index < state->model.item_count; ++index)
-    {
-        item_was_active[index] =
-            reach_animation_manager_active(manager, reach_dock_item_animation_id(index));
-    }
-
     int32_t slots_were_animating = reach_dock_slots_animating(animations);
 
     reach_animation_manager_tick(manager, delta_seconds);
@@ -209,27 +200,6 @@ static void reach_dock_tick(reach_dock *animations, double delta_seconds,
 
     reach_pressable_feedback_style feedback = reach_dock_pressable_feedback(animations);
     reach_pressable_settle_feedback(&state->pressable, &feedback);
-
-    for (size_t index = 0; index < state->model.item_count; ++index)
-    {
-        if (item_was_active[index] ||
-            reach_animation_manager_active(manager, reach_dock_item_animation_id(index)))
-        {
-            redraw = 1;
-        }
-    }
-
-    if (drag_snap_was_active || reach_animation_manager_active(manager, REACH_DOCK_ANIM_DRAG_SNAP))
-    {
-        state->drag.x = reach_animation_manager_value(manager, REACH_DOCK_ANIM_DRAG_SNAP);
-        redraw = 1;
-    }
-
-    if (drag_snap_was_active && !reach_animation_manager_active(manager, REACH_DOCK_ANIM_DRAG_SNAP))
-    {
-        state->drag.target_index = REACH_MAX_DOCK_ITEMS;
-        state->drag.key = {};
-    }
 
     reach_dock_settle_slots(animations);
     if (slots_were_animating || reach_dock_slots_animating(animations))
@@ -400,8 +370,7 @@ static void reach_dock_capsule_on_game_mode(void *capsule, int32_t enabled)
 static int32_t reach_dock_capsule_needs_frame(const void *capsule)
 {
     const reach_dock *dock = static_cast<const reach_dock *>(capsule);
-    return dock != nullptr && (reach_animation_manager_any_active(&dock->manager) ||
-                               reach_draggable_tracking(&dock->state.drag.gesture));
+    return dock != nullptr && reach_animation_manager_any_active(&dock->manager);
 }
 
 static int32_t reach_dock_capsule_pointer_sequence_active(const void *capsule)
@@ -979,8 +948,7 @@ static reach_bar_reveal_animation reach_dock_bar_animation(const void *capsule)
         reach_animation_manager_active(&dock->manager, REACH_DOCK_ANIM_Y);
     animation.animated_y = reach_animation_manager_value(&dock->manager, REACH_DOCK_ANIM_Y);
     animation.content_animating =
-        reach_dock_slots_animating(dock) || reach_draggable_tracking(&dock->state.drag.gesture) ||
-        reach_animation_manager_active(&dock->manager, REACH_DOCK_ANIM_DRAG_SNAP) ||
+        reach_dock_slots_animating(dock) ||
         reach_animation_manager_active(&dock->manager, REACH_DOCK_ANIM_FEEDBACK_OPACITY);
     return animation;
 }
@@ -1944,12 +1912,11 @@ static void reach_dock_start_item_x_animation(reach_dock *dock, size_t index, fl
     const float offset = from - to;
     if (fabsf(offset) < 0.5f)
     {
-        reach_animation_manager_set(&dock->manager, reach_dock_item_animation_id(index), 0.0f);
+        reach_motion_set(&dock->state.item_x[index], 0.0f);
         dock->state.item_x_valid[index] = 1;
         return;
     }
-    reach_animation_manager_start(&dock->manager, reach_dock_item_animation_id(index), offset, 0.0f,
-                                  0.15, REACH_EASING_EASE_IN_OUT);
+    reach_motion_start(&dock->state.item_x[index], offset, 0.0f, 0.15, REACH_EASING_EASE_IN_OUT);
     dock->state.item_x_valid[index] = 1;
 }
 
@@ -1962,7 +1929,7 @@ void reach_dock_clear_item_x_animations(reach_dock *dock)
     reach_dock_snap_slots(dock);
     for (size_t index = 0; index < REACH_MAX_DOCK_ITEMS; ++index)
     {
-        reach_animation_manager_reset(&dock->manager, reach_dock_item_animation_id(index));
+        reach_motion_set(&dock->state.item_x[index], 0.0f);
         dock->state.item_x_valid[index] = 0;
         dock->state.item_x_keys[index] = {};
     }
@@ -2020,7 +1987,7 @@ void reach_dock_item_x_rebind(reach_dock *dock, const reach_theme *theme,
         state->item_x_keys[index] = item_key;
         if (item_key != 0 && state->drag.key == item_key &&
             (reach_draggable_tracking(&state->drag.gesture) ||
-             reach_animation_manager_active(&dock->manager, REACH_DOCK_ANIM_DRAG_SNAP)))
+             reach_motion_active(&state->drag.snap)))
         {
             reach_dock_start_item_x_animation(dock, index, target_x, target_x);
         }
@@ -2032,7 +1999,7 @@ void reach_dock_item_x_rebind(reach_dock *dock, const reach_theme *theme,
     for (size_t index = state->model.item_count; index < REACH_MAX_DOCK_ITEMS; ++index)
     {
         state->item_x_valid[index] = 0;
-        reach_animation_manager_reset(&dock->manager, reach_dock_item_animation_id(index));
+        reach_motion_set(&dock->state.item_x[index], 0.0f);
         state->item_x_keys[index] = {};
     }
 }

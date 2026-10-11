@@ -58,12 +58,13 @@ static void test_payloads_and_repeat_policy(void)
 
     reach_feature_tick_result tick = {};
     reach_system_hud_capsule_ops()->tick(hud, 0.5, &tick);
-    expect_true(state->elapsed_seconds >= 0.5, "the fixed lifetime advances while open");
+    expect_true(state->deadline_seconds > reach_motion_now_seconds(),
+                "the fixed lifetime has a future deadline");
 
     volume.level = 0.67f;
     volume.muted = 0;
     reach_system_hud_show_volume(hud, &volume);
-    expect_near((float)state->elapsed_seconds, 0.0f, 0.001f,
+    expect_near((float)(state->deadline_seconds - reach_motion_now_seconds()), 1.5f, 0.01f,
                 "a repeated key press restarts the fixed lifetime");
     expect_near(state->volume.level, 0.67f, 0.001f,
                 "a repeated key press replaces the displayed value");
@@ -122,12 +123,17 @@ static void test_layout_and_pointer_transparency(void)
     reach_feature_tick_result tick = {};
     ops->tick(hud, 1.499, &tick);
     expect_true(state->open, "the HUD remains open until its lifetime deadline");
+    const_cast<reach_system_hud_state *>(state)->deadline_seconds =
+        reach_motion_now_seconds() - 0.001;
     ops->tick(hud, 0.001, &tick);
     expect_true(!state->open, "the HUD is fully hidden at its lifetime deadline");
-    expect_near(reach_system_hud_opacity(hud), 0.0f, 0.001f,
+    ops->surface_geometry(hud, &geometry);
+    expect_near(reach_motion_value(&geometry.presentation.group.opacity), 0.0f, 0.001f,
                 "the HUD has zero opacity at its lifetime deadline");
 
     reach_system_hud_show_brightness(hud, &brightness);
+    const_cast<reach_system_hud_state *>(state)->deadline_seconds =
+        reach_motion_now_seconds() - 2.0;
     ops->tick(hud, 2.0, &tick);
     expect_true(!state->open, "a delayed frame cannot extend the fixed lifetime");
 

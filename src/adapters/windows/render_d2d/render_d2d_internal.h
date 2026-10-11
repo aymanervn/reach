@@ -24,6 +24,8 @@
 #include <new>
 #include <string>
 #include <vector>
+#include <atomic>
+#include <memory>
 
 using Microsoft::WRL::ComPtr;
 
@@ -55,21 +57,56 @@ struct reach_d2d_shadow_cache_entry
     ID2D1Bitmap1 *bitmap;
 };
 
-struct reach_d2d_animated_text_layer
+struct reach_d2d_text_format_entry
 {
-    reach_render_command command;
-    reach_transform_f32 transform;
-    int32_t has_command;
-    int32_t seen;
-    int32_t visible;
+    float size;
+    int32_t weight;
+    int32_t alignment;
+    int32_t paragraph;
+    int32_t ellipsis;
+    ComPtr<IDWriteTextFormat> format;
+};
+
+struct reach_d2d_text_layout_entry
+{
+    std::wstring text;
+    float size;
+    float width;
+    float height;
+    int32_t weight;
+    int32_t alignment;
+    int32_t paragraph;
+    int32_t ellipsis;
+    ComPtr<IDWriteTextLayout> layout;
+};
+
+struct reach_d2d_cover_entry
+{
+    uint64_t icon_id;
+    UINT width;
+    UINT height;
+    int32_t crop;
+    float blur;
+    float contrast;
+    ComPtr<ID2D1Bitmap1> bitmap;
+};
+
+struct reach_d2d_retained_layer
+{
+    uint64_t id = 0;
+    reach_render_group group = {};
+    std::vector<reach_render_command> commands;
+    ComPtr<ABI::Windows::UI::Composition::IContainerVisual> container;
+    ComPtr<ABI::Windows::UI::Composition::ISpriteVisual> visual;
     ComPtr<ABI::Windows::UI::Composition::ICompositionDrawingSurface> surface;
-    ComPtr<ABI::Windows::UI::Composition::ICompositionSurfaceBrush> brush;
-    ComPtr<ABI::Windows::UI::Composition::IContainerVisual> clip_visual;
-    ComPtr<ABI::Windows::UI::Composition::ISpriteVisual> content_visual;
+    ComPtr<IDCompositionVisual> dcomp_container;
+    ComPtr<IDCompositionVisual> dcomp_visual;
     ComPtr<IDCompositionSurface> dcomp_surface;
-    ComPtr<IDCompositionVisual> dcomp_clip_visual;
-    ComPtr<IDCompositionVisual> dcomp_content_visual;
-    ComPtr<IDCompositionAnimation> dcomp_animation;
+    ComPtr<IDCompositionScaleTransform> dcomp_scale;
+    ComPtr<IDCompositionEffectGroup> dcomp_opacity;
+    UINT width = 0;
+    UINT height = 0;
+    int32_t seen = 0;
 };
 
 struct reach_render_backend
@@ -98,8 +135,22 @@ struct reach_render_backend
     ComPtr<ABI::Windows::UI::Composition::ISpriteVisual> swap_chain_visual;
     ComPtr<ABI::Windows::UI::Composition::ICompositionSurface> composition_surface;
     ComPtr<ABI::Windows::UI::Composition::ICompositionGraphicsDevice> composition_graphics_device;
-    reach_d2d_animated_text_layer animated_text_layer;
+    std::vector<reach_d2d_retained_layer> retained_layers;
+    ComPtr<ABI::Windows::UI::Composition::IContainerVisual> scene_visual;
+    ComPtr<IDCompositionVisual> dcomp_scene_visual;
+    ComPtr<IDCompositionScaleTransform> scene_scale;
+    ComPtr<IDCompositionEffectGroup> scene_opacity;
+    reach_render_group scene_presentation;
+    int32_t has_scene_presentation;
+    ComPtr<ABI::Windows::UI::Composition::ICompositionScopedBatch> presentation_batch;
+    EventRegistrationToken presentation_token = {};
+    std::shared_ptr<std::atomic<uint64_t>> presentation_completed;
+    uint64_t submitted_presentation_generation = 0;
+    uint64_t reconciled_presentation_generation = 0;
 
+    std::vector<reach_d2d_text_format_entry> text_formats;
+    std::vector<reach_d2d_text_layout_entry> text_layouts;
+    std::vector<reach_d2d_cover_entry> cover_cache;
     IDWriteFactory *text_factory;
     IWICImagingFactory *wic_factory;
 
@@ -120,6 +171,14 @@ struct reach_render_backend
 };
 
 ID2D1RenderTarget *reach_d2d_target(reach_render_backend *backend);
+int32_t reach_d2d_retained_supported(const reach_render_backend *backend);
+reach_result reach_d2d_sync_retained(reach_render_backend *backend,
+                                     const reach_render_command_buffer *commands);
+void reach_d2d_release_retained(reach_render_backend *backend);
+int32_t reach_d2d_presentation_complete(reach_render_backend *backend, uint64_t generation);
+void reach_d2d_suspend(reach_render_backend *backend);
+reach_result reach_d2d_execute_commands(reach_render_backend *backend,
+                                        const reach_render_command *commands, size_t count);
 void reach_d2d_set_ui_font(reach_render_backend *backend, int32_t use_bundled_font);
 reach_result reach_d2d_measure_text(void *context, const uint16_t *text, float text_size,
                                     int32_t text_weight, float *out_width);
@@ -134,10 +193,6 @@ reach_result reach_dcomp_create_swap_chain(reach_render_backend *backend, UINT w
 reach_result reach_dcomp_create_target_bitmap(reach_render_backend *backend);
 reach_result reach_dcomp_create_target(reach_render_backend *backend);
 reach_result reach_dcomp_create_blur_target(reach_render_backend *backend);
-reach_result reach_dcomp_sync_animated_text(reach_render_backend *backend,
-                                             const reach_render_command *command,
-                                             const reach_transform_f32 *transform);
-void reach_dcomp_hide_animated_text(reach_render_backend *backend);
 
 HRESULT
 reach_winrt_activate_compositor(ABI::Windows::UI::Composition::ICompositor **out_compositor);
@@ -192,14 +247,6 @@ reach_result reach_d2d_draw_text_to_target(reach_render_backend *backend, ID2D1R
                                            const reach_render_command *command);
 reach_result reach_d2d_draw_textbox(reach_render_backend *backend,
                                     const reach_render_command *command);
-
-int32_t reach_d2d_animated_text_command_equal(const reach_render_command *left,
-                                               const reach_render_command *right);
-reach_result reach_d2d_sync_animated_text(reach_render_backend *backend,
-                                          const reach_render_command *command,
-                                          const reach_transform_f32 *transform);
-void reach_d2d_begin_animated_text_sync(reach_render_backend *backend);
-void reach_d2d_end_animated_text_sync(reach_render_backend *backend);
 
 reach_result reach_d2d_execute(reach_render_backend *backend,
                                const reach_render_command_buffer *commands);

@@ -107,13 +107,30 @@ void reach_host_finish_surface_presentations(reach_host *host)
     }
 }
 
+static int32_t reach_host_presentation_ready(reach_feature_runtime *runtime)
+{
+    if (runtime->surface == nullptr ||
+        runtime->definition->capsule_ops->surface_geometry == nullptr ||
+        runtime->surface->renderer.ops.presentation_complete == nullptr)
+        return 1;
+    reach_feature_surface_geometry geometry = {};
+    runtime->definition->capsule_ops->surface_geometry(runtime->capsule, &geometry);
+    const reach_motion *opacity = &geometry.presentation.group.opacity;
+    if (!geometry.wait_for_presentation || !geometry.presentation.retained || opacity->to != 0.0f ||
+        opacity->duration_seconds <= 0.0 ||
+        reach_motion_wait_ms(reach_motion_deadline(opacity)) != 0)
+        return 1;
+    return runtime->surface->renderer.ops.presentation_complete(runtime->surface->renderer.backend,
+                                                                opacity->generation);
+}
+
 static void reach_host_tick_features(reach_host *host, double delta_seconds)
 {
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
         reach_feature_runtime *desc = &host->feature_runtimes[index];
         if (desc->definition->capsule_ops == nullptr ||
-            desc->definition->capsule_ops->tick == nullptr)
+            desc->definition->capsule_ops->tick == nullptr || !reach_host_presentation_ready(desc))
         {
             continue;
         }
@@ -151,7 +168,7 @@ static reach_result reach_host_update_game_mode_surfaces(reach_host *host, doubl
         if ((desc->definition->surface.behavior_flags & REACH_SURFACE_BEHAVIOR_GAME_MODE_VISIBLE) ==
                 0 ||
             desc->definition->capsule_ops == nullptr ||
-            desc->definition->capsule_ops->tick == nullptr)
+            desc->definition->capsule_ops->tick == nullptr || !reach_host_presentation_ready(desc))
         {
             continue;
         }
@@ -401,6 +418,26 @@ int32_t reach_host_needs_frame(const reach_host *host)
         return 0;
     }
 
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    {
+        const reach_feature_runtime *runtime = &host->feature_runtimes[index];
+        if (runtime->definition == nullptr || runtime->definition->capsule_ops == nullptr ||
+            runtime->definition->capsule_ops->surface_geometry == nullptr ||
+            (reach_host_game_mode_enabled(host) && (runtime->definition->surface.behavior_flags &
+                                                    REACH_SURFACE_BEHAVIOR_GAME_MODE_VISIBLE) == 0))
+        {
+            continue;
+        }
+        reach_feature_surface_geometry geometry = {};
+        runtime->definition->capsule_ops->surface_geometry(runtime->capsule, &geometry);
+        if ((runtime->surface != nullptr && runtime->surface->fallback_animation_active) ||
+            (reach_motion_wait_ms(geometry.deadline_seconds) == 0 &&
+             reach_host_presentation_ready(const_cast<reach_feature_runtime *>(runtime))))
+        {
+            return 1;
+        }
+    }
+
     if (reach_monitor_refresh_retry_due(&host->monitor_refresh_retry))
     {
         return 1;
@@ -429,7 +466,8 @@ int32_t reach_host_needs_frame(const reach_host *host)
                  REACH_SURFACE_BEHAVIOR_GAME_MODE_VISIBLE) != 0 &&
                 desc->definition->capsule_ops != nullptr &&
                 desc->definition->capsule_ops->needs_frame != nullptr &&
-                desc->definition->capsule_ops->needs_frame(desc->capsule))
+                desc->definition->capsule_ops->needs_frame(desc->capsule) &&
+                reach_host_presentation_ready(const_cast<reach_feature_runtime *>(desc)))
             {
                 return 1;
             }
@@ -450,7 +488,8 @@ int32_t reach_host_needs_frame(const reach_host *host)
         const reach_feature_runtime *desc = &host->feature_runtimes[index];
         if (desc->definition->capsule_ops != nullptr &&
             desc->definition->capsule_ops->needs_frame != nullptr &&
-            desc->definition->capsule_ops->needs_frame(desc->capsule))
+            desc->definition->capsule_ops->needs_frame(desc->capsule) &&
+            reach_host_presentation_ready(const_cast<reach_feature_runtime *>(desc)))
         {
             return 1;
         }
@@ -465,8 +504,30 @@ uint32_t reach_host_idle_wait_ms(const reach_host *host)
         return REACH_CLOCK_WAIT_FOREVER;
     }
 
-    if (host->monitor_refresh_retry.scheduled ||
-        host->monitor_topology.confirmation_scheduled)
+    uint32_t feature_wait = REACH_CLOCK_WAIT_FOREVER;
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    {
+        const reach_feature_runtime *runtime = &host->feature_runtimes[index];
+        if (runtime->definition == nullptr || runtime->definition->capsule_ops == nullptr ||
+            runtime->definition->capsule_ops->surface_geometry == nullptr ||
+            (reach_host_game_mode_enabled(host) && (runtime->definition->surface.behavior_flags &
+                                                    REACH_SURFACE_BEHAVIOR_GAME_MODE_VISIBLE) == 0))
+        {
+            continue;
+        }
+        reach_feature_surface_geometry geometry = {};
+        runtime->definition->capsule_ops->surface_geometry(runtime->capsule, &geometry);
+        uint32_t wait = reach_motion_wait_ms(geometry.deadline_seconds);
+        if (wait == 0 &&
+            !reach_host_presentation_ready(const_cast<reach_feature_runtime *>(runtime)))
+            wait = REACH_CLOCK_WAIT_FOREVER;
+        if (wait < feature_wait)
+        {
+            feature_wait = wait;
+        }
+    }
+
+    if (host->monitor_refresh_retry.scheduled || host->monitor_topology.confirmation_scheduled)
     {
         uint32_t retry_wait = REACH_CLOCK_WAIT_FOREVER;
         if (host->monitor_refresh_retry.scheduled)
@@ -475,8 +536,8 @@ uint32_t reach_host_idle_wait_ms(const reach_host *host)
         }
         if (host->monitor_topology.confirmation_scheduled)
         {
-            uint32_t confirmation_wait = reach_monitor_topology_confirmation_wait_ms(
-                &host->monitor_topology);
+            uint32_t confirmation_wait =
+                reach_monitor_topology_confirmation_wait_ms(&host->monitor_topology);
             if (retry_wait == REACH_CLOCK_WAIT_FOREVER || confirmation_wait < retry_wait)
             {
                 retry_wait = confirmation_wait;
@@ -484,17 +545,20 @@ uint32_t reach_host_idle_wait_ms(const reach_host *host)
         }
         if (reach_host_game_mode_enabled(host))
         {
-            return retry_wait;
+            return retry_wait < feature_wait ? retry_wait : feature_wait;
         }
         uint32_t clock_wait = reach_clock_next_minute_delay_ms(host->clock);
-        return clock_wait == REACH_CLOCK_WAIT_FOREVER || retry_wait < clock_wait ? retry_wait
-                                                                                : clock_wait;
+        uint32_t wait = clock_wait == REACH_CLOCK_WAIT_FOREVER || retry_wait < clock_wait
+                            ? retry_wait
+                            : clock_wait;
+        return wait < feature_wait ? wait : feature_wait;
     }
     if (reach_host_game_mode_enabled(host))
     {
         return reach_host_needs_frame(host)
                    ? (uint32_t)ceil(1000.0 / reach_host_frame_rate_hz(host))
-                   : REACH_CLOCK_WAIT_FOREVER;
+                   : feature_wait;
     }
-    return reach_clock_next_minute_delay_ms(host->clock);
+    uint32_t clock_wait = reach_clock_next_minute_delay_ms(host->clock);
+    return clock_wait < feature_wait ? clock_wait : feature_wait;
 }

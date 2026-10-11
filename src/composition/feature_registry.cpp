@@ -995,17 +995,10 @@ static reach_result reach_launcher_surface_render(void *capsule,
                                                          ctx->theme, ctx->dpi_scale, out_commands);
 }
 
-static void reach_launcher_surface_set_pointer_transform(void *capsule,
-                                                         reach_transform_f32 transform)
-{
-    reach_launcher_set_pointer_transform(static_cast<reach_launcher *>(capsule), transform);
-}
-
 static const reach_feature_surface_ops reach_launcher_surface_ops = {
     reach_launcher_surface_arrange,
     reach_launcher_surface_render,
     nullptr,
-    reach_launcher_surface_set_pointer_transform,
 };
 
 static int32_t reach_context_menu_surface_layout_anchor(const void *capsule,
@@ -1127,7 +1120,9 @@ static const reach_feature_native_overlay_ops reach_stage_native_overlay_ops = {
 };
 
 static const reach_feature_surface_ops reach_stage_surface_ops = {
-    reach_stage_surface_arrange,     reach_stage_surface_render, nullptr, nullptr,
+    reach_stage_surface_arrange,
+    reach_stage_surface_render,
+    nullptr,
     &reach_stage_native_overlay_ops,
 };
 

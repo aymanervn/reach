@@ -13,6 +13,8 @@ static const double REACH_SYSTEM_HUD_DEFAULT_CLOSE_SECONDS = 0.12;
 static const float REACH_SYSTEM_HUD_MEDIA_COVER_WIDTH = 100.0f;
 static const size_t REACH_SYSTEM_HUD_APP_NAME_MAX_CHARACTERS = 8;
 
+static double reach_system_hud_lifetime(const reach_system_hud *hud);
+
 static int32_t reach_system_hud_rect_equal(reach_rect_f32 left, reach_rect_f32 right)
 {
     return fabsf(left.x - right.x) < 0.5f && fabsf(left.y - right.y) < 0.5f &&
@@ -27,21 +29,17 @@ static void reach_system_hud_begin_show(reach_system_hud *hud, reach_system_hud_
     }
     hud->state.kind = kind;
     hud->state.open = 1;
-    hud->state.elapsed_seconds = 0.0;
-    reach_animation_manager_animate_to(&hud->animations, REACH_SYSTEM_HUD_ANIMATION_OPACITY, 1.0f,
-                                       hud->open_seconds, REACH_EASING_EASE_OUT);
+    hud->state.deadline_seconds = reach_motion_now_seconds() + reach_system_hud_lifetime(hud);
+    reach_motion_animate_to(&hud->opacity, 1.0f, hud->open_seconds, REACH_EASING_EASE_OUT);
 }
 
 static void reach_system_hud_begin_close(reach_system_hud *hud, double remaining_seconds)
 {
-    if (hud == nullptr || !hud->state.open ||
-        reach_animation_manager_target(&hud->animations, REACH_SYSTEM_HUD_ANIMATION_OPACITY) <=
-            0.0f)
+    if (hud == nullptr || !hud->state.open || hud->opacity.to <= 0.0f)
     {
         return;
     }
-    reach_animation_manager_animate_to(&hud->animations, REACH_SYSTEM_HUD_ANIMATION_OPACITY, 0.0f,
-                                       remaining_seconds, REACH_EASING_EASE_IN);
+    reach_motion_animate_to(&hud->opacity, 0.0f, remaining_seconds, REACH_EASING_EASE_IN);
 }
 
 const reach_system_hud_state *reach_system_hud_state_ptr(const reach_system_hud *hud)
@@ -141,13 +139,6 @@ static double reach_system_hud_lifetime(const reach_system_hud *hud)
                : REACH_SYSTEM_HUD_LIFETIME_SECONDS;
 }
 
-float reach_system_hud_opacity(const reach_system_hud *hud)
-{
-    return hud != nullptr
-               ? reach_animation_manager_value(&hud->animations, REACH_SYSTEM_HUD_ANIMATION_OPACITY)
-               : 0.0f;
-}
-
 void reach_system_hud_force_close(reach_system_hud *hud)
 {
     if (hud == nullptr)
@@ -156,8 +147,8 @@ void reach_system_hud_force_close(reach_system_hud *hud)
     }
     hud->state.open = 0;
     hud->state.kind = REACH_SYSTEM_HUD_NONE;
-    hud->state.elapsed_seconds = 0.0;
-    reach_animation_manager_set(&hud->animations, REACH_SYSTEM_HUD_ANIMATION_OPACITY, 0.0f);
+    hud->state.deadline_seconds = 0.0;
+    reach_motion_set(&hud->opacity, 0.0f);
 }
 
 void reach_system_hud_reset(reach_system_hud *hud)
@@ -169,7 +160,7 @@ void reach_system_hud_reset(reach_system_hud *hud)
     hud->state = {};
     hud->open_seconds = REACH_SYSTEM_HUD_DEFAULT_OPEN_SECONDS;
     hud->close_seconds = REACH_SYSTEM_HUD_DEFAULT_CLOSE_SECONDS;
-    reach_animation_manager_set(&hud->animations, REACH_SYSTEM_HUD_ANIMATION_OPACITY, 0.0f);
+    reach_motion_set(&hud->opacity, 0.0f);
 }
 
 static void reach_system_hud_capsule_reset(void *capsule)
@@ -190,35 +181,21 @@ static void reach_system_hud_capsule_tick(void *capsule, double delta_seconds,
         return;
     }
 
-    if (delta_seconds < 0.0)
-    {
-        delta_seconds = 0.0;
-    }
-    int32_t was_animating = reach_animation_manager_any_active(&hud->animations);
-    reach_animation_manager_tick(&hud->animations, delta_seconds);
-    int32_t animating = reach_animation_manager_any_active(&hud->animations);
-    if (was_animating || animating)
-    {
-        out->redraw = 1;
-    }
-
-    double lifetime = reach_system_hud_lifetime(hud);
-    hud->state.elapsed_seconds += delta_seconds;
-    if (hud->state.elapsed_seconds >= lifetime)
+    (void)delta_seconds;
+    double now = reach_motion_now_seconds();
+    if (now >= hud->state.deadline_seconds)
     {
         reach_system_hud_force_close(hud);
         out->redraw = 1;
         return;
     }
 
-    double close_start = lifetime - hud->close_seconds;
-    if (hud->state.elapsed_seconds >= close_start &&
-        reach_animation_manager_target(&hud->animations, REACH_SYSTEM_HUD_ANIMATION_OPACITY) > 0.0f)
+    double close_start = hud->state.deadline_seconds - hud->close_seconds;
+    if (now >= close_start && hud->opacity.to > 0.0f)
     {
-        reach_system_hud_begin_close(hud, lifetime - hud->state.elapsed_seconds);
+        reach_system_hud_begin_close(hud, hud->state.deadline_seconds - now);
         out->redraw = 1;
     }
-    out->request_update = 1;
 }
 
 static int32_t reach_system_hud_capsule_is_open(const void *capsule)
@@ -229,7 +206,8 @@ static int32_t reach_system_hud_capsule_is_open(const void *capsule)
 
 static int32_t reach_system_hud_capsule_needs_frame(const void *capsule)
 {
-    return reach_system_hud_capsule_is_open(capsule);
+    (void)capsule;
+    return 0;
 }
 
 static void reach_system_hud_capsule_surface_geometry(const void *capsule,
@@ -247,6 +225,13 @@ static void reach_system_hud_capsule_surface_geometry(const void *capsule,
     }
     out->visible_bounds = hud->state.layout.bounds;
     out->envelope_bounds = hud->state.layout.bounds;
+    out->deadline_seconds =
+        hud->state.open
+            ? hud->state.deadline_seconds - (hud->opacity.to > 0.0f ? hud->close_seconds : 0.0)
+            : 0.0;
+    out->presentation.retained = 1;
+    out->presentation.max_scale = 1.0f;
+    out->presentation.group.opacity = hud->opacity;
 }
 
 const reach_feature_capsule_ops *reach_system_hud_capsule_ops(void)
@@ -277,8 +262,6 @@ reach_result reach_system_hud_create(reach_system_hud **out_hud)
     {
         return REACH_ERROR;
     }
-    reach_animation_manager_init(&hud->animations, hud->animation_tracks,
-                                 REACH_SYSTEM_HUD_ANIMATION_COUNT);
     reach_system_hud_reset(hud);
     *out_hud = hud;
     return REACH_OK;

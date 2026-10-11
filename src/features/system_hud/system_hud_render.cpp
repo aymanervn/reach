@@ -234,6 +234,5 @@ reach_result reach_system_hud_append_render_commands(const reach_system_hud *hud
     {
         reach_system_hud_render_level(state, render_ctx, out_commands);
     }
-    reach_render_command_buffer_multiply_opacity(out_commands, reach_system_hud_opacity(hud));
     return REACH_OK;
 }

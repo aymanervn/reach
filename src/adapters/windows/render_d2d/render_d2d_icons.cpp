@@ -4,6 +4,7 @@
 #include <dcommon.h>
 #include <d2d1effects.h>
 #include <math.h>
+#include <algorithm>
 
 static D2D1_RECT_F reach_d2d_snap_bitmap_rect(reach_rect_f32 rect)
 {
@@ -197,6 +198,7 @@ void reach_d2d_clear_icon_cache(reach_render_backend *backend)
     }
 
     backend->icon_cache.clear();
+    backend->cover_cache.clear();
 }
 
 void reach_d2d_release_icon_cache_entry(reach_render_backend *backend, uint64_t icon_id)
@@ -206,6 +208,18 @@ void reach_d2d_release_icon_cache_entry(reach_render_backend *backend, uint64_t 
         return;
     }
 
+    for (auto &layer : backend->retained_layers)
+    {
+        if (std::any_of(layer.commands.begin(), layer.commands.end(),
+                        [icon_id](const reach_render_command &command)
+                        { return command.icon_id == icon_id; }))
+            layer.commands.clear();
+    }
+    backend->cover_cache.erase(std::remove_if(backend->cover_cache.begin(),
+                                              backend->cover_cache.end(),
+                                              [icon_id](const reach_d2d_cover_entry &entry)
+                                              { return entry.icon_id == icon_id; }),
+                               backend->cover_cache.end());
     for (size_t index = 0; index < backend->icon_cache.size(); ++index)
     {
         if (backend->icon_cache[index].icon_id == icon_id)
@@ -775,78 +789,143 @@ reach_result reach_d2d_draw_blurred_image(reach_render_backend *backend,
     }
 
     HRESULT hr = S_OK;
+    ComPtr<ID2D1Bitmap1> processed;
+    float margin = ceilf(command->blur_radius * 3.0f) + 2.0f;
+    UINT width = (UINT)image_width;
+    UINT height = (UINT)image_height;
+    for (size_t index = 0; index < backend->cover_cache.size(); ++index)
+    {
+        const auto &entry = backend->cover_cache[index];
+        if (entry.icon_id == command->icon_id && entry.width == width && entry.height == height &&
+            entry.crop == command->icon_crop_to_fill && entry.blur == command->blur_radius &&
+            entry.contrast == actual_contrast)
+        {
+            auto hit = std::move(backend->cover_cache[index]);
+            processed = hit.bitmap;
+            backend->cover_cache.erase(backend->cover_cache.begin() + index);
+            backend->cover_cache.push_back(std::move(hit));
+            break;
+        }
+    }
     ID2D1Effect *color_mat = nullptr;
     ID2D1Effect *transform = nullptr;
     ID2D1Effect *blur = nullptr;
-
-    if (actual_contrast != 1.0f)
+    ComPtr<ID2D1DeviceContext> bake;
+    if (processed == nullptr)
     {
-        hr = context->CreateEffect(CLSID_D2D1ColorMatrix, &color_mat);
+        UINT bake_width = width + (UINT)(margin * 2.0f);
+        UINT bake_height = height + (UINT)(margin * 2.0f);
+        if (bake_width > 4096 || bake_height > 4096 ||
+            (uint64_t)bake_width * bake_height * 4 > 16 * 1024 * 1024)
+            return REACH_ERROR;
+        hr = backend->d2d_device->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE, &bake);
+        D2D1_BITMAP_PROPERTIES1 properties = D2D1::BitmapProperties1(
+            D2D1_BITMAP_OPTIONS_TARGET,
+            D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED));
+        if (SUCCEEDED(hr))
+            hr = bake->CreateBitmap(D2D1::SizeU(bake_width, bake_height), nullptr, 0, properties,
+                                    &processed);
+        if (FAILED(hr))
+            return REACH_ERROR;
+        context = bake.Get();
+        if (actual_contrast != 1.0f)
+        {
+            hr = context->CreateEffect(CLSID_D2D1ColorMatrix, &color_mat);
+            if (SUCCEEDED(hr))
+            {
+                color_mat->SetInput(0, bitmap);
+                float scale = actual_contrast;
+                float offset = 0.5f - 0.5f * scale;
+                D2D1_MATRIX_5X4_F matrix = D2D1::Matrix5x4F(
+                    scale, 0.0f, 0.0f, 0.0f, 0.0f, scale, 0.0f, 0.0f, 0.0f, 0.0f, scale, 0.0f, 0.0f,
+                    0.0f, 0.0f, 1.0f, offset, offset, offset, 0.0f);
+                color_mat->SetValue(D2D1_COLORMATRIX_PROP_COLOR_MATRIX, matrix);
+            }
+        }
+
         if (SUCCEEDED(hr))
         {
-            color_mat->SetInput(0, bitmap);
-            float scale = actual_contrast;
-            float offset = 0.5f - 0.5f * scale;
-            D2D1_MATRIX_5X4_F matrix =
-                D2D1::Matrix5x4F(scale, 0.0f, 0.0f, 0.0f, 0.0f, scale, 0.0f, 0.0f, 0.0f, 0.0f,
-                                 scale, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, offset, offset, offset, 0.0f);
-            color_mat->SetValue(D2D1_COLORMATRIX_PROP_COLOR_MATRIX, matrix);
+            hr = context->CreateEffect(CLSID_D2D12DAffineTransform, &transform);
         }
-    }
-
-    if (SUCCEEDED(hr))
-    {
-        hr = context->CreateEffect(CLSID_D2D12DAffineTransform, &transform);
-    }
-    if (SUCCEEDED(hr))
-    {
-        D2D1_MATRIX_3X2_F matrix =
-            D2D1::Matrix3x2F::Translation(-mapped_source.left, -mapped_source.top) *
-            D2D1::Matrix3x2F::Scale(image_width / source_width, image_height / source_height) *
-            D2D1::Matrix3x2F::Translation(image_rect.left, image_rect.top);
-        if (color_mat != nullptr)
+        if (SUCCEEDED(hr))
         {
-            transform->SetInputEffect(0, color_mat);
-        }
-        else
-        {
-            transform->SetInput(0, bitmap);
-        }
-        hr = transform->SetValue(D2D1_2DAFFINETRANSFORM_PROP_TRANSFORM_MATRIX, matrix);
-    }
-
-    if (SUCCEEDED(hr))
-    {
-        hr = context->CreateEffect(CLSID_D2D1GaussianBlur, &blur);
-    }
-    if (SUCCEEDED(hr))
-    {
-        ID2D1Effect *blur_input = nullptr;
-        if (transform != nullptr)
-        {
-            blur_input = transform;
-        }
-        else if (color_mat != nullptr)
-        {
-            blur_input = color_mat;
-        }
-        else
-        {
-            blur->SetInput(0, bitmap);
+            D2D1_MATRIX_3X2_F matrix =
+                D2D1::Matrix3x2F::Translation(-mapped_source.left, -mapped_source.top) *
+                D2D1::Matrix3x2F::Scale(image_width / source_width, image_height / source_height) *
+                D2D1::Matrix3x2F::Translation(margin, margin);
+            if (color_mat != nullptr)
+            {
+                transform->SetInputEffect(0, color_mat);
+            }
+            else
+            {
+                transform->SetInput(0, bitmap);
+            }
+            hr = transform->SetValue(D2D1_2DAFFINETRANSFORM_PROP_TRANSFORM_MATRIX, matrix);
         }
 
-        if (blur_input != nullptr)
+        if (SUCCEEDED(hr))
         {
-            blur->SetInputEffect(0, blur_input);
+            hr = context->CreateEffect(CLSID_D2D1GaussianBlur, &blur);
         }
-        hr = blur->SetValue(D2D1_GAUSSIANBLUR_PROP_STANDARD_DEVIATION, command->blur_radius);
-    }
-    if (SUCCEEDED(hr))
-    {
-        hr = blur->SetValue(D2D1_GAUSSIANBLUR_PROP_OPTIMIZATION,
-                            D2D1_GAUSSIANBLUR_OPTIMIZATION_SPEED);
-    }
+        if (SUCCEEDED(hr))
+        {
+            ID2D1Effect *blur_input = nullptr;
+            if (transform != nullptr)
+            {
+                blur_input = transform;
+            }
+            else if (color_mat != nullptr)
+            {
+                blur_input = color_mat;
+            }
+            else
+            {
+                blur->SetInput(0, bitmap);
+            }
 
+            if (blur_input != nullptr)
+            {
+                blur->SetInputEffect(0, blur_input);
+            }
+            hr = blur->SetValue(D2D1_GAUSSIANBLUR_PROP_STANDARD_DEVIATION, command->blur_radius);
+        }
+        if (SUCCEEDED(hr))
+        {
+            hr = blur->SetValue(D2D1_GAUSSIANBLUR_PROP_OPTIMIZATION,
+                                D2D1_GAUSSIANBLUR_OPTIMIZATION_SPEED);
+        }
+
+        if (SUCCEEDED(hr))
+        {
+            bake->SetTarget(processed.Get());
+            bake->BeginDraw();
+            bake->Clear(D2D1::ColorF(0.0f, 0.0f, 0.0f, 0.0f));
+            bake->DrawImage(blur);
+            hr = bake->EndDraw();
+            bake->SetTarget(nullptr);
+        }
+        if (SUCCEEDED(hr))
+        {
+            uint64_t bytes = (uint64_t)bake_width * bake_height * 4;
+            for (const auto &entry : backend->cover_cache)
+            {
+                D2D1_SIZE_U size = entry.bitmap->GetPixelSize();
+                bytes += (uint64_t)size.width * size.height * 4;
+            }
+            while (!backend->cover_cache.empty() &&
+                   (bytes > 16 * 1024 * 1024 || backend->cover_cache.size() >= 24))
+            {
+                D2D1_SIZE_U size = backend->cover_cache.front().bitmap->GetPixelSize();
+                bytes -= (uint64_t)size.width * size.height * 4;
+                backend->cover_cache.erase(backend->cover_cache.begin());
+            }
+            backend->cover_cache.push_back({command->icon_id, width, height,
+                                            command->icon_crop_to_fill, command->blur_radius,
+                                            actual_contrast, processed});
+        }
+    }
+    context = backend->d2d_context;
     if (SUCCEEDED(hr))
     {
         ID2D1Geometry *clip_geometry = nullptr;
@@ -921,14 +1000,11 @@ reach_result reach_d2d_draw_blurred_image(reach_render_backend *backend,
 
         if (SUCCEEDED(hr))
         {
-            ID2D1Image *blur_output = nullptr;
-            blur->GetOutput(&blur_output);
-            if (blur_output != nullptr)
-            {
-                context->DrawImage(blur_output, nullptr, nullptr, D2D1_INTERPOLATION_MODE_LINEAR,
-                                   D2D1_COMPOSITE_MODE_SOURCE_OVER);
-                blur_output->Release();
-            }
+            D2D1_RECT_F destination =
+                D2D1::RectF(image_rect.left - margin, image_rect.top - margin,
+                            image_rect.right + margin, image_rect.bottom + margin);
+            context->DrawBitmap(processed.Get(), destination, command->color.a,
+                                D2D1_INTERPOLATION_MODE_LINEAR);
         }
 
         if (pushed_layer)

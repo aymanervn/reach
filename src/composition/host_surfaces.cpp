@@ -106,43 +106,25 @@ reach_result reach_host_apply_window_state(reach_platform_window_port *window,
 
 reach_host_surface_presentation_frame reach_host_surface_presentation_frame_compute(
     reach_rect_f32 target_bounds, reach_rect_f32 envelope_bounds, reach_shadow_pad shadow_pad,
-    float y_offset, float scale, float max_scale)
+    reach_rect_f32 translation_bounds, float max_scale)
 {
     reach_host_surface_presentation_frame frame = {};
-    frame.window_bounds = target_bounds;
-    frame.content_rect = {shadow_pad.left, shadow_pad.top, target_bounds.width,
-                          target_bounds.height};
-    frame.render_transform = {1.0f, 1.0f, shadow_pad.left, shadow_pad.top};
-    frame.pointer_transform = {1.0f, 1.0f, 0.0f, y_offset};
-    frame.scale = 1.0f;
-
-    if (scale <= 0.0f || max_scale <= 1.0f)
-    {
-        frame.window_bounds.y += y_offset;
-        return frame;
-    }
-
-    float center_x = target_bounds.x + target_bounds.width * 0.5f;
-    float center_y = target_bounds.y + target_bounds.height * 0.5f;
-
-    float envelope_center_x = envelope_bounds.x + envelope_bounds.width * 0.5f;
-    float envelope_center_y = envelope_bounds.y + envelope_bounds.height * 0.5f;
-    frame.window_bounds.width = envelope_bounds.width * max_scale;
-    frame.window_bounds.height = envelope_bounds.height * max_scale;
-    frame.window_bounds.x = envelope_center_x - frame.window_bounds.width * 0.5f;
-    frame.window_bounds.y = envelope_center_y - frame.window_bounds.height * 0.5f;
-
-    frame.content_rect.width = target_bounds.width * scale;
-    frame.content_rect.height = target_bounds.height * scale;
-    float transformed_x = center_x - frame.content_rect.width * 0.5f;
-    float transformed_y = center_y - frame.content_rect.height * 0.5f + y_offset;
-    frame.content_rect.x = shadow_pad.left + transformed_x - frame.window_bounds.x;
-    frame.content_rect.y = shadow_pad.top + transformed_y - frame.window_bounds.y;
-    frame.render_transform = {scale, scale, frame.content_rect.x, frame.content_rect.y};
-    frame.pointer_transform = {scale, scale, center_x - center_x * scale,
-                               center_y + y_offset - center_y * scale};
-    frame.scale = scale;
-    frame.scale_envelope_active = 1;
+    reach_rect_f32 envelope = envelope_bounds.width > 0.0f && envelope_bounds.height > 0.0f
+                                  ? envelope_bounds
+                                  : target_bounds;
+    float maximum_scale = max_scale > 1.0f ? max_scale : 1.0f;
+    float minimum_y = translation_bounds.y;
+    float maximum_y = translation_bounds.y + translation_bounds.height;
+    frame.window_bounds.width = envelope.width * maximum_scale + translation_bounds.width;
+    frame.window_bounds.height = envelope.height * maximum_scale + maximum_y - minimum_y;
+    frame.window_bounds.x = envelope.x + envelope.width * 0.5f -
+                            envelope.width * maximum_scale * 0.5f + translation_bounds.x;
+    frame.window_bounds.y =
+        envelope.y + envelope.height * 0.5f - envelope.height * maximum_scale * 0.5f + minimum_y;
+    frame.content_rect = {shadow_pad.left + target_bounds.x - frame.window_bounds.x,
+                          shadow_pad.top + target_bounds.y - frame.window_bounds.y,
+                          target_bounds.width, target_bounds.height};
+    frame.render_transform = {1.0f, 1.0f, frame.content_rect.x, frame.content_rect.y};
     return frame;
 }
 
@@ -687,7 +669,6 @@ void reach_host_invalidate_display_geometry(reach_host *host)
         if (runtime->surface != nullptr)
         {
             runtime->surface->bounds_valid = 0;
-            runtime->surface->transition_scale_valid = 0;
             runtime->surface->native_visibility_invalidated = 1;
             runtime->surface->dirty_flags = 1;
         }

@@ -3,6 +3,7 @@
 
 #include "reach/core/theme.h"
 #include "reach/core/ui_layout.h"
+#include "reach/support/motion.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -10,6 +11,22 @@ extern "C"
 #endif
 
 #define REACH_MAX_RENDER_COMMANDS (REACH_MAX_DOCK_ITEMS * 2 + REACH_MAX_DOCK_RUNNING_APPS + 16)
+#define REACH_MAX_RENDER_GROUPS (REACH_MAX_DOCK_ITEMS + 32)
+
+    typedef struct reach_render_group
+    {
+        uint64_t id;
+        reach_rect_f32 bounds;
+        reach_motion x;
+        reach_motion y;
+        reach_motion opacity;
+        reach_motion scale;
+        int32_t has_clip;
+        reach_rect_f32 clip;
+        float repeat_offset_x;
+        float repeat_hold_seconds;
+        float repeat_travel_seconds;
+    } reach_render_group;
 
     typedef enum reach_render_command_type
     {
@@ -25,8 +42,7 @@ extern "C"
         REACH_RENDER_COMMAND_BLURRED_IMAGE = 14,
         REACH_RENDER_COMMAND_TEXTBOX = 15,
         REACH_RENDER_COMMAND_ARC_STROKE = 16,
-        REACH_RENDER_COMMAND_SHADOW = 17,
-        REACH_RENDER_COMMAND_ANIMATED_TEXT = 18
+        REACH_RENDER_COMMAND_SHADOW = 17
     } reach_render_command_type;
 
     typedef enum reach_render_corner_mask
@@ -111,6 +127,7 @@ extern "C"
     typedef struct reach_render_command
     {
         reach_render_command_type type;
+        uint64_t group_id;
         reach_rect_f32 rect;
         reach_rect_f32 clip_rect;
         reach_rect_f32 scissor_rect;
@@ -137,9 +154,6 @@ extern "C"
         int32_t notch_side;
         int32_t text_alignment;
         int32_t text_ellipsis;
-        float animation_offset_x;
-        float animation_hold_seconds;
-        float animation_travel_seconds;
         uint16_t text[260];
 
         reach_color text_color;
@@ -160,9 +174,18 @@ extern "C"
         int32_t has_scissor;
         reach_rect_f32 content_rect;
         reach_transform_f32 content_transform;
+        reach_render_group groups[REACH_MAX_RENDER_GROUPS];
+        size_t group_count;
+        uint64_t current_group_id;
+        int32_t has_presentation;
+        reach_render_group presentation;
     } reach_render_command_buffer;
 
     void reach_render_command_buffer_clear(reach_render_command_buffer *buffer);
+    int32_t reach_render_command_buffer_motion_active(const reach_render_command_buffer *buffer);
+    reach_result reach_render_command_buffer_begin_group(reach_render_command_buffer *buffer,
+                                                         const reach_render_group *group);
+    void reach_render_command_buffer_end_group(reach_render_command_buffer *buffer);
     reach_result reach_render_command_buffer_push(reach_render_command_buffer *buffer,
                                                   const reach_render_command *command);
     void reach_render_command_buffer_set_scissor(reach_render_command_buffer *buffer,
@@ -172,8 +195,6 @@ extern "C"
     void reach_render_command_buffer_set_content_transform(reach_render_command_buffer *buffer,
                                                            reach_rect_f32 content_rect,
                                                            reach_transform_f32 content_transform);
-    void reach_render_command_buffer_multiply_opacity(reach_render_command_buffer *buffer,
-                                                      float opacity);
     reach_result reach_render_push_shadow(reach_render_command_buffer *buffer,
                                           const reach_render_command *shape,
                                           const reach_shadow *shadow, float dpi_scale);

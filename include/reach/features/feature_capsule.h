@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "reach/core/geometry.h"
+#include "reach/core/render_commands.h"
 #include "reach/support/util.h"
 #include "reach/core/ui_events.h"
 #include "reach/features/common/feature_action.h"
@@ -121,13 +122,14 @@ extern "C"
         int32_t force_topmost;
         float notch_anchor_x;
         int32_t notch_side;
+        double deadline_seconds;
+        int32_t wait_for_presentation;
         struct
         {
-            int32_t managed;
-            float opacity;
-            float y_offset;
-            float scale;
             float max_scale;
+            reach_rect_f32 translation_bounds;
+            int32_t retained;
+            reach_render_group group;
         } presentation;
     } reach_feature_surface_geometry;
 

@@ -37,9 +37,8 @@ typedef struct reach_top_bar_render_input
     float power_hover;
     size_t click_feedback_index;
     float click_feedback_opacity;
-    float tray_item_x[REACH_TOP_BAR_MAX_TRAY_ICONS];
+    reach_motion tray_motion[REACH_TOP_BAR_MAX_TRAY_ICONS];
     size_t tray_dragged_index;
-    float tray_dragged_x;
 } reach_top_bar_render_input;
 
 static reach_rect_f32 reach_top_bar_center_square(reach_rect_f32 outer, float size)
@@ -224,12 +223,17 @@ static void reach_top_bar_push_current_app(const reach_top_bar_render_input *inp
 }
 
 static void reach_top_bar_push_tray_item(const reach_top_bar_render_input *input,
-                                         reach_render_command_buffer *commands, size_t index,
-                                         float x)
+                                         reach_render_command_buffer *commands, size_t index)
 {
     const reach_top_bar_metrics &metrics = reach_top_bar_metrics_values;
     reach_rect_f32 slot = input->layout->tray_icons[index];
-    slot.x = x;
+    reach_render_group group = {};
+    group.id = input->tray_items[index].id;
+    group.bounds = slot;
+    group.x = input->tray_motion[index];
+    group.x.from -= slot.x;
+    group.x.to -= slot.x;
+    reach_render_command_buffer_begin_group(commands, &group);
     if (input->tray_items[index].icon_id != 0)
     {
         reach_render_command icon = {};
@@ -242,12 +246,14 @@ static void reach_top_bar_push_tray_item(const reach_top_bar_render_input *input
 
     if (input->click_feedback_index != REACH_TOP_BAR_FEEDBACK_TRAY_BASE + index)
     {
+        reach_render_command_buffer_end_group(commands);
         return;
     }
     reach_push_icon_press_feedback(commands, slot, slot.height * 0.5f,
                                    input->tray_items[index].icon_id,
                                    input->theme->bar_tray_background, input->click_feedback_opacity,
                                    metrics.click_feedback_min_opacity);
+    reach_render_command_buffer_end_group(commands);
 }
 
 static void reach_top_bar_push_tray(const reach_top_bar_render_input *input,
@@ -268,15 +274,14 @@ static void reach_top_bar_push_tray(const reach_top_bar_render_input *input,
     {
         if (index != input->tray_dragged_index)
         {
-            reach_top_bar_push_tray_item(input, commands, index, input->tray_item_x[index]);
+            reach_top_bar_push_tray_item(input, commands, index);
         }
     }
 
     if (input->tray_dragged_index < layout->tray_icon_count &&
         input->tray_dragged_index < input->tray_item_count)
     {
-        reach_top_bar_push_tray_item(input, commands, input->tray_dragged_index,
-                                     input->tray_dragged_x);
+        reach_top_bar_push_tray_item(input, commands, input->tray_dragged_index);
     }
 
     if (!input->tray_overflow || layout->tray_overflow_button.width <= 0.0f)
@@ -552,13 +557,24 @@ reach_result reach_top_bar_append_render_commands(reach_top_bar *top_bar,
     input.click_feedback_opacity = reach_pressable_feedback_value(&state->pressable, &feedback);
     for (size_t index = 0; index < state->layout.tray_icon_count; ++index)
     {
-        input.tray_item_x[index] = reach_top_bar_tray_item_current_x(top_bar, index);
+        input.tray_motion[index] = top_bar->tray_x[index];
+        if (!reach_motion_active(&input.tray_motion[index]))
+        {
+            input.tray_motion[index].from = input.tray_motion[index].to =
+                state->layout.tray_icons[index].x;
+            input.tray_motion[index].duration_seconds = 0.0;
+        }
+        if (reach_top_bar_tray_dragged_index(top_bar) == index)
+        {
+            input.tray_motion[index] = top_bar->tray_drag.snap;
+            if (reach_draggable_tracking(&top_bar->tray_drag.gesture))
+            {
+                input.tray_motion[index].from = input.tray_motion[index].to = top_bar->tray_drag.x;
+                input.tray_motion[index].duration_seconds = 0.0;
+            }
+        }
     }
     input.tray_dragged_index = reach_top_bar_tray_dragged_index(top_bar);
-    input.tray_dragged_x =
-        reach_animation_manager_active(&top_bar->manager, REACH_TOP_BAR_ANIM_TRAY_DRAG_SNAP)
-            ? reach_animation_manager_value(&top_bar->manager, REACH_TOP_BAR_ANIM_TRAY_DRAG_SNAP)
-            : top_bar->tray_drag.x;
     input.current_app_name = state->current_app_name;
     input.tray_items = state->tray_items;
     input.tray_item_count = state->tray_item_count;
@@ -582,16 +598,58 @@ reach_result reach_top_bar_append_render_commands(reach_top_bar *top_bar,
             reach_top_bar_icons(top_bar), state->current_app_icon_ref, ctx->icon_size_px);
     }
 
-    reach_top_bar_push_power_button(&input, out_commands);
-    reach_top_bar_push_clock(&input, out_commands);
+    {
+        reach_render_group group = {};
+        group.id = UINT64_C(0x10000000000) + 1;
+        reach_render_command_buffer_begin_group(out_commands, &group);
+        reach_top_bar_push_power_button(&input, out_commands);
+        reach_render_command_buffer_end_group(out_commands);
+    }
+    {
+        reach_render_group group = {};
+        group.id = UINT64_C(0x10000000000) + 2;
+        reach_render_command_buffer_begin_group(out_commands, &group);
+        reach_top_bar_push_clock(&input, out_commands);
+        reach_render_command_buffer_end_group(out_commands);
+    }
     reach_top_bar_push_separator_dot(&input, out_commands, layout->now_playing_separator);
     reach_top_bar_push_separator_dot(&input, out_commands, layout->tray_separator);
-    reach_top_bar_push_current_app(&input, out_commands);
+    {
+        reach_render_group group = {};
+        group.id = UINT64_C(0x10000000000) + 3;
+        reach_render_command_buffer_begin_group(out_commands, &group);
+        reach_top_bar_push_current_app(&input, out_commands);
+        reach_render_command_buffer_end_group(out_commands);
+    }
     reach_top_bar_push_tray(&input, out_commands);
-    reach_top_bar_push_stats(&input, out_commands);
-    reach_top_bar_push_language(&input, out_commands);
-    reach_top_bar_push_battery(&input, out_commands);
-    reach_top_bar_push_quick_settings(&input, out_commands);
+    {
+        reach_render_group group = {};
+        group.id = UINT64_C(0x10000000000) + 4;
+        reach_render_command_buffer_begin_group(out_commands, &group);
+        reach_top_bar_push_stats(&input, out_commands);
+        reach_render_command_buffer_end_group(out_commands);
+    }
+    {
+        reach_render_group group = {};
+        group.id = UINT64_C(0x10000000000) + 5;
+        reach_render_command_buffer_begin_group(out_commands, &group);
+        reach_top_bar_push_language(&input, out_commands);
+        reach_render_command_buffer_end_group(out_commands);
+    }
+    {
+        reach_render_group group = {};
+        group.id = UINT64_C(0x10000000000) + 6;
+        reach_render_command_buffer_begin_group(out_commands, &group);
+        reach_top_bar_push_battery(&input, out_commands);
+        reach_render_command_buffer_end_group(out_commands);
+    }
+    {
+        reach_render_group group = {};
+        group.id = UINT64_C(0x10000000000) + 7;
+        reach_render_command_buffer_begin_group(out_commands, &group);
+        reach_top_bar_push_quick_settings(&input, out_commands);
+        reach_render_command_buffer_end_group(out_commands);
+    }
     reach_top_bar_push_glyph_button(&input, out_commands, layout->settings_button,
                                     REACH_VECTOR_ICON_SETTINGS,
                                     REACH_TOP_BAR_FEEDBACK_SETTINGS_BUTTON);

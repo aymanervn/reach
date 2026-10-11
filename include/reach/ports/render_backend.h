@@ -22,6 +22,9 @@ extern "C"
         reach_text_measure_fn measure_text;
         void (*destroy)(reach_render_backend *backend);
         reach_result (*synchronize)(reach_render_backend *backend);
+        int32_t (*retained_supported)(const reach_render_backend *backend);
+        int32_t (*presentation_complete)(reach_render_backend *backend, uint64_t generation);
+        void (*suspend)(reach_render_backend *backend);
     } reach_render_backend_ops;
 
     typedef struct reach_render_backend_port

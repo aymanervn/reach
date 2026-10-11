@@ -59,6 +59,7 @@ static reach_rect_f32 observed_bounds;
 static size_t observed_set_bounds_count;
 static size_t render_count;
 static float observed_last_command_alpha;
+static float observed_presentation_opacity;
 static size_t thumbnail_create_count;
 static size_t thumbnail_target_plane_create_count;
 static size_t thumbnail_behind_plane_create_count;
@@ -371,6 +372,8 @@ static reach_result fake_execute(reach_render_backend *backend,
     {
         ++render_count;
         observed_last_command_alpha = commands->commands[commands->count - 1].color.a;
+        observed_presentation_opacity =
+            commands->has_presentation ? commands->presentation.opacity.to : -1.0f;
     }
     return REACH_OK;
 }
@@ -585,27 +588,23 @@ static void test_window_manipulation_tracks_pointer_monitor_membership(void)
 
 static void test_scaled_presentation_keeps_native_envelope_stationary(void)
 {
+    reach_rect_f32 translation = {0.0f, 0.0f, 0.0f, 10.0f};
     reach_host_surface_presentation_frame offset_frame =
         reach_host_surface_presentation_frame_compute({710.0f, 900.0f, 500.0f, 72.0f},
-                                                      {710.0f, 900.0f, 500.0f, 300.0f}, {}, 10.0f,
-                                                      1.04f, 1.08f);
-
+                                                      {710.0f, 900.0f, 500.0f, 300.0f}, {},
+                                                      translation, 1.08f);
     reach_host_surface_presentation_frame settled_frame =
         reach_host_surface_presentation_frame_compute({710.0f, 900.0f, 500.0f, 72.0f},
-                                                      {710.0f, 900.0f, 500.0f, 300.0f}, {}, 0.0f,
-                                                      1.04f, 1.08f);
-
+                                                      {710.0f, 900.0f, 500.0f, 300.0f}, {},
+                                                      translation, 1.08f);
     expect_true(
         reach_host_scalar_equal(offset_frame.window_bounds.y, settled_frame.window_bounds.y),
         "a scaled transition keeps its native window envelope stationary");
-    expect_true(reach_host_scalar_equal(offset_frame.render_transform.offset_y -
-                                            settled_frame.render_transform.offset_y,
-                                        10.0f),
-                "a scaled transition applies vertical motion in the render transform");
-    expect_true(reach_host_scalar_equal(offset_frame.pointer_transform.offset_y -
-                                            settled_frame.pointer_transform.offset_y,
-                                        10.0f),
-                "a scaled transition keeps pointer motion aligned with rendered content");
+    expect_true(reach_host_scalar_equal(offset_frame.render_transform.offset_y,
+                                        settled_frame.render_transform.offset_y),
+                "the retained surface keeps a stable content origin during motion");
+    expect_true(reach_host_scalar_equal(offset_frame.content_rect.y, settled_frame.content_rect.y),
+                "the native input presentation keeps the same base content bounds");
 }
 
 static void test_window_state_commits_terminal_subpixel_position(void)
@@ -989,7 +988,7 @@ static void test_registered_feature_lifecycle(void)
 
     const reach_feature_definition *launcher =
         host->feature_runtimes[REACH_SURFACE_ID_LAUNCHER].definition;
-    expect_true(launcher->surface_ops->set_pointer_transform != nullptr,
+    expect_true(launcher->capsule_ops->surface_geometry != nullptr,
                 "Launcher owns its presentation while composition applies its transform");
     expect_true(host->feature_runtimes[REACH_SURFACE_ID_CONTEXT_MENU]
                         .definition->surface_ops->layout_anchor != nullptr,
@@ -1092,7 +1091,7 @@ static void test_frame_scheduling_does_not_present_a_closed_surface(void)
                 "capsule-owned close presentation remains visible when declared explicitly");
 }
 
-static void test_popup_surface_applies_managed_opacity(void)
+static void test_popup_surface_retains_presentation(void)
 {
     reach_host *host = &popup_render_host;
     host->layout_dpi_scale = 1.0f;
@@ -1107,16 +1106,19 @@ static void test_popup_surface_applies_managed_opacity(void)
     reach_render_command command = {};
     command.type = REACH_RENDER_COMMAND_RECT;
     command.color = {0.1f, 0.2f, 0.3f, 0.8f};
+    content.has_presentation = 1;
+    reach_motion_set(&content.presentation.opacity, 0.25f);
     expect_true(reach_render_command_buffer_push(&content, &command) == REACH_OK,
-                "popup opacity test records its content command");
+                "popup presentation test records its content command");
 
     observed_last_command_alpha = -1.0f;
     expect_true(reach_host_render_popup_surface(host, REACH_SURFACE_ID_QUICK_SETTINGS, &surface,
-                                                {0.0f, 0.0f, 320.0f, 240.0f}, 160.0f, 0, &content,
-                                                0.25f) == REACH_OK,
-                "popup rendering succeeds with managed opacity");
-    expect_true(reach_host_scalar_equal(observed_last_command_alpha, 0.2f),
-                "managed opacity applies to the complete popup command buffer");
+                                                {0.0f, 0.0f, 320.0f, 240.0f}, 160.0f, 0,
+                                                &content) == REACH_OK,
+                "popup rendering succeeds with retained presentation");
+    expect_true(reach_host_scalar_equal(observed_last_command_alpha, 0.8f) &&
+                    reach_host_scalar_equal(observed_presentation_opacity, 0.25f),
+                "popup opacity belongs to retained presentation instead of raster content");
 }
 
 static void test_registered_surface_frame_uses_declared_anchor(void)
@@ -1450,7 +1452,7 @@ int main(void)
     test_registered_feature_lifecycle();
     test_registered_surface_input_passthrough();
     test_frame_scheduling_does_not_present_a_closed_surface();
-    test_popup_surface_applies_managed_opacity();
+    test_popup_surface_retains_presentation();
     test_registered_surface_frame_uses_declared_anchor();
     test_registered_surface_frame_syncs_native_overlay();
     test_forced_bars_hold_through_a_closing_stage();

@@ -48,6 +48,12 @@ static void reach_top_bar_now_playing_push_text(reach_render_command_buffer *com
                                                 float size, int32_t weight, int32_t alignment,
                                                 reach_color color, reach_rect_f32 clip)
 {
+    reach_render_group group = {};
+    group.id = UINT64_C(0x4000000000000001);
+    group.bounds = rect;
+    group.has_clip = 1;
+    group.clip = clip;
+    reach_render_command_buffer_begin_group(commands, &group);
     reach_render_command command = {};
     command.type = REACH_RENDER_COMMAND_TEXT;
     command.rect = rect;
@@ -55,32 +61,35 @@ static void reach_top_bar_now_playing_push_text(reach_render_command_buffer *com
     command.text_size = size;
     command.text_weight = weight;
     command.text_alignment = alignment;
-    command.has_scissor = 1;
-    command.scissor_rect = clip;
     reach_copy_utf16(command.text, 260, value);
     (void)reach_render_command_buffer_push(commands, &command);
+    reach_render_command_buffer_end_group(commands);
 }
 
-static void reach_top_bar_now_playing_push_animated_text(reach_render_command_buffer *commands,
-                                                         reach_rect_f32 rect, const uint16_t *value,
-                                                         float size, int32_t weight,
-                                                         reach_color color, reach_rect_f32 clip,
-                                                         float overflow)
+static void reach_top_bar_now_playing_push_marquee(reach_render_command_buffer *commands,
+                                                   reach_rect_f32 rect, const uint16_t *value,
+                                                   float size, int32_t weight, reach_color color,
+                                                   reach_rect_f32 clip, float overflow)
 {
     reach_render_command command = {};
-    command.type = REACH_RENDER_COMMAND_ANIMATED_TEXT;
+    reach_render_group group = {};
+    group.id = UINT64_C(0x4000000000000001);
+    group.bounds = rect;
+    group.has_clip = 1;
+    group.clip = clip;
+    group.repeat_offset_x = -overflow;
+    group.repeat_hold_seconds = REACH_TOP_BAR_NOW_PLAYING_MARQUEE_HOLD_SECONDS;
+    group.repeat_travel_seconds = overflow / REACH_TOP_BAR_NOW_PLAYING_MARQUEE_SPEED;
+    reach_render_command_buffer_begin_group(commands, &group);
+    command.type = REACH_RENDER_COMMAND_TEXT;
     command.rect = rect;
     command.color = color;
     command.text_size = size;
     command.text_weight = weight;
     command.text_alignment = REACH_TEXT_ALIGNMENT_LEADING;
-    command.has_scissor = 1;
-    command.scissor_rect = clip;
-    command.animation_offset_x = -overflow;
-    command.animation_hold_seconds = REACH_TOP_BAR_NOW_PLAYING_MARQUEE_HOLD_SECONDS;
-    command.animation_travel_seconds = overflow / REACH_TOP_BAR_NOW_PLAYING_MARQUEE_SPEED;
     reach_copy_utf16(command.text, 260, value);
     (void)reach_render_command_buffer_push(commands, &command);
+    reach_render_command_buffer_end_group(commands);
 }
 
 static float reach_top_bar_now_playing_text_advance(const reach_text_measure_port *measure,
@@ -255,6 +264,9 @@ reach_top_bar_now_playing_build_render_commands(const reach_top_bar_now_playing_
         return reach_render_command_buffer_push(out_commands, &glyph);
     }
 
+    reach_render_group artwork_group = {};
+    artwork_group.id = UINT64_C(0x4000000000000002);
+    reach_render_command_buffer_begin_group(out_commands, &artwork_group);
     reach_now_playing_artwork_render_input artwork = {};
     artwork.bounds = input->layout->bounds;
     artwork.cover_bounds = input->layout->cover;
@@ -267,6 +279,7 @@ reach_top_bar_now_playing_build_render_commands(const reach_top_bar_now_playing_
     artwork.cover_corner_mask = REACH_RENDER_CORNER_TOP_LEFT | REACH_RENDER_CORNER_BOTTOM_LEFT;
     reach_result artwork_result =
         reach_now_playing_artwork_build_render_commands(&artwork, out_commands);
+    reach_render_command_buffer_end_group(out_commands);
     if (artwork_result != REACH_OK)
     {
         return artwork_result;
@@ -284,7 +297,7 @@ reach_top_bar_now_playing_build_render_commands(const reach_top_bar_now_playing_
     float overflow = input->layout->text_advance - input->layout->text.width;
     if (input->animate_text && overflow > REACH_TOP_BAR_NOW_PLAYING_MIN_OVERFLOW)
     {
-        reach_top_bar_now_playing_push_animated_text(
+        reach_top_bar_now_playing_push_marquee(
             out_commands, text, input->model->line, REACH_TEXT_SIZE_MEDIUM * dpi_scale,
             REACH_TEXT_WEIGHT_BOLD, theme->now_playing_title, input->layout->text, overflow);
     }
@@ -307,6 +320,9 @@ reach_top_bar_now_playing_build_render_commands(const reach_top_bar_now_playing_
                           input->model->next_enabled};
     for (size_t index = 0; index < 3; ++index)
     {
+        reach_render_group control_group = {};
+        control_group.id = UINT64_C(0x4000000000000003) + index;
+        reach_render_command_buffer_begin_group(out_commands, &control_group);
         reach_rect_f32 button = buttons[index];
         reach_rect_f32 background = button;
         if (index == 1)
@@ -344,6 +360,7 @@ reach_top_bar_now_playing_build_render_commands(const reach_top_bar_now_playing_
             icon.color.a *= 0.30f;
         }
         (void)reach_render_command_buffer_push(out_commands, &icon);
+        reach_render_command_buffer_end_group(out_commands);
     }
 
     return REACH_OK;

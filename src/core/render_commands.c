@@ -2,6 +2,25 @@
 
 #include <math.h>
 
+static int32_t reach_render_group_motion_active(const reach_render_group *group)
+{
+    return reach_motion_active(&group->x) || reach_motion_active(&group->y) ||
+           reach_motion_active(&group->scale) || reach_motion_active(&group->opacity);
+}
+
+int32_t reach_render_command_buffer_motion_active(const reach_render_command_buffer *buffer)
+{
+    size_t index;
+    if (buffer == 0)
+        return 0;
+    if (buffer->has_presentation && reach_render_group_motion_active(&buffer->presentation))
+        return 1;
+    for (index = 0; index < buffer->group_count; ++index)
+        if (reach_render_group_motion_active(&buffer->groups[index]))
+            return 1;
+    return 0;
+}
+
 static void reach_copy_text(uint16_t *dst, size_t dst_count, const uint16_t *src)
 {
     size_t index = 0;
@@ -35,9 +54,38 @@ void reach_render_command_buffer_clear(reach_render_command_buffer *buffer)
     {
         reach_rect_f32 empty = {0.0f, 0.0f, 0.0f, 0.0f};
         buffer->count = 0;
+        buffer->group_count = 0;
+        buffer->current_group_id = 0;
+        buffer->has_presentation = 0;
         buffer->has_scissor = 0;
         buffer->content_rect = empty;
         buffer->content_transform = (reach_transform_f32){1.0f, 1.0f, 0.0f, 0.0f};
+    }
+}
+
+reach_result reach_render_command_buffer_begin_group(reach_render_command_buffer *buffer,
+                                                     const reach_render_group *group)
+{
+    size_t index;
+    if (buffer == 0 || group == 0 || group->id == 0 ||
+        (group->id & UINT64_C(0x8000000000000000)) != 0 ||
+        buffer->group_count >= REACH_MAX_RENDER_GROUPS || buffer->current_group_id != 0)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    for (index = 0; index < buffer->group_count; ++index)
+        if (buffer->groups[index].id == group->id)
+            return REACH_INVALID_ARGUMENT;
+    buffer->groups[buffer->group_count++] = *group;
+    buffer->current_group_id = group->id;
+    return REACH_OK;
+}
+
+void reach_render_command_buffer_end_group(reach_render_command_buffer *buffer)
+{
+    if (buffer != 0)
+    {
+        buffer->current_group_id = 0;
     }
 }
 
@@ -78,32 +126,6 @@ void reach_render_command_buffer_clear_scissor(reach_render_command_buffer *buff
     if (buffer != 0)
     {
         buffer->has_scissor = 0;
-    }
-}
-
-void reach_render_command_buffer_multiply_opacity(reach_render_command_buffer *buffer,
-                                                  float opacity)
-{
-    size_t index;
-    if (buffer == 0)
-    {
-        return;
-    }
-    if (opacity < 0.0f)
-    {
-        opacity = 0.0f;
-    }
-    if (opacity > 1.0f)
-    {
-        opacity = 1.0f;
-    }
-    for (index = 0; index < buffer->count; ++index)
-    {
-        reach_render_command *command = &buffer->commands[index];
-        command->color.a *= opacity;
-        command->text_color.a *= opacity;
-        command->placeholder_color.a *= opacity;
-        command->selection_color.a *= opacity;
     }
 }
 
@@ -227,6 +249,10 @@ reach_result reach_render_command_buffer_push(reach_render_command_buffer *buffe
     }
 
     buffer->commands[buffer->count] = *command;
+    if (buffer->current_group_id != 0)
+    {
+        buffer->commands[buffer->count].group_id = buffer->current_group_id;
+    }
     if (buffer->has_scissor && !command->has_scissor)
     {
         buffer->commands[buffer->count].scissor_rect = buffer->scissor_rect;

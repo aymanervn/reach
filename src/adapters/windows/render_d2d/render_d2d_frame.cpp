@@ -29,8 +29,6 @@ reach_result reach_d2d_begin_frame(reach_render_backend *backend)
 
     if (width != backend->target_width || height != backend->target_height)
     {
-        reach_d2d_clear_icon_cache(backend);
-
         if (backend->d2d_context != nullptr && backend->swap_chain != nullptr)
         {
             backend->d2d_context->SetTarget(nullptr);
@@ -65,14 +63,21 @@ reach_result reach_d2d_begin_frame(reach_render_backend *backend)
                                             static_cast<float>(width), static_cast<float>(height));
             }
         }
-        else
+        else if (backend->target != nullptr)
         {
+            reach_d2d_clear_icon_cache(backend);
             HRESULT resize_hr = backend->target->Resize(D2D1::SizeU(width, height));
             if (FAILED(resize_hr))
             {
                 return REACH_ERROR;
             }
         }
+
+        if (backend->root_visual != nullptr)
+            (void)reach_visual_set_size(backend->root_visual.Get(), (float)width, (float)height);
+        if (backend->backdrop_visual != nullptr)
+            (void)reach_visual_set_size(backend->backdrop_visual.Get(), (float)width,
+                                        (float)height);
 
         backend->target_width = width;
         backend->target_height = height;
@@ -85,8 +90,11 @@ reach_result reach_d2d_begin_frame(reach_render_backend *backend)
         return REACH_ERROR;
     }
 
-    target->BeginDraw();
-    target->Clear(D2D1::ColorF(0.0f, 0.0f, 0.0f, 0.0f));
+    if (!reach_d2d_retained_supported(backend))
+    {
+        target->BeginDraw();
+        target->Clear(D2D1::ColorF(0.0f, 0.0f, 0.0f, 0.0f));
+    }
 
     return REACH_OK;
 }
@@ -101,7 +109,7 @@ reach_result reach_d2d_end_frame(reach_render_backend *backend)
         return REACH_INVALID_ARGUMENT;
     }
 
-    HRESULT hr = target->EndDraw();
+    HRESULT hr = reach_d2d_retained_supported(backend) ? S_OK : target->EndDraw();
 
     if (hr == D2DERR_RECREATE_TARGET)
     {
@@ -119,7 +127,7 @@ reach_result reach_d2d_end_frame(reach_render_backend *backend)
         return REACH_ERROR;
     }
 
-    if (SUCCEEDED(hr) && backend->swap_chain != nullptr)
+    if (SUCCEEDED(hr) && backend->swap_chain != nullptr && !reach_d2d_retained_supported(backend))
     {
         hr = backend->swap_chain->Present(1, 0);
     }

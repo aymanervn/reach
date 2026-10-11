@@ -8,6 +8,7 @@
 #include "reach/core/ui_events.h"
 #include "reach/core/window_id.h"
 #include "reach/support/util.h"
+#include "reach/support/motion.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -43,6 +44,14 @@ extern "C"
         size_t exclusion_count;
     } reach_platform_window_caption;
 
+    typedef struct reach_platform_window_input_presentation
+    {
+        reach_rect_f32 bounds;
+        reach_motion x;
+        reach_motion y;
+        reach_motion scale;
+    } reach_platform_window_input_presentation;
+
     typedef struct reach_platform_window_ops
     {
         reach_result (*show)(reach_platform_window *window);
@@ -72,6 +81,9 @@ extern "C"
         reach_result (*set_input_regions)(reach_platform_window *window,
                                           const reach_rect_f32 *regions, size_t region_count);
         void (*destroy)(reach_platform_window *window);
+        reach_result (*set_input_presentation)(
+            reach_platform_window *window,
+            const reach_platform_window_input_presentation *presentation);
     } reach_platform_window_ops;
 
     typedef struct reach_platform_window_port

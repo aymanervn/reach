@@ -14,6 +14,7 @@ typedef struct reach_top_bar_tray_drag_state
     uint32_t item_id;
     float grab_offset_x;
     float x;
+    reach_motion snap;
 } reach_top_bar_tray_drag_state;
 
 struct reach_top_bar
@@ -37,6 +38,7 @@ struct reach_top_bar
     uint32_t tray_order[REACH_MAX_TRAY_ITEMS];
     size_t tray_order_count;
     reach_top_bar_tray_drag_state tray_drag;
+    reach_motion tray_x[REACH_TOP_BAR_MAX_TRAY_ICONS];
     float now_playing_target_width;
     float current_app_target_width;
     float tray_target_width;

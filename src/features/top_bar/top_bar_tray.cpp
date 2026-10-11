@@ -104,7 +104,7 @@ void reach_top_bar_reset_tray_drag(reach_top_bar *top_bar)
     }
     reach_draggable_init(&top_bar->tray_drag.gesture);
     top_bar->tray_drag.item_id = 0;
-    reach_animation_manager_reset(&top_bar->manager, REACH_TOP_BAR_ANIM_TRAY_DRAG_SNAP);
+    reach_motion_set(&top_bar->tray_drag.snap, 0.0f);
 }
 
 void reach_top_bar_reconcile_tray_order(reach_top_bar *top_bar)
@@ -479,7 +479,7 @@ static void reach_top_bar_tray_tick(void *capsule, double delta_seconds,
     if ((was_active || active || popup_changed) && out != nullptr)
     {
         out->redraw = 1;
-        out->request_update = reach_feature_transition_active(&popup->popup_transition);
+        out->request_update = reach_feature_transition_needs_update(&popup->popup_transition);
     }
     reach_pressable_feedback_style feedback = reach_top_bar_tray_feedback(top_bar);
     reach_pressable_settle_feedback(&popup->pressable, &feedback);
@@ -501,7 +501,7 @@ static int32_t reach_top_bar_tray_needs_frame(const void *capsule)
 {
     const reach_top_bar *top_bar = static_cast<const reach_top_bar *>(capsule);
     return top_bar != nullptr && top_bar->tray_popup != nullptr &&
-           (reach_feature_transition_active(&top_bar->tray_popup->popup_transition) ||
+           (reach_feature_transition_needs_update(&top_bar->tray_popup->popup_transition) ||
             reach_animation_manager_any_active(&top_bar->tray_popup->animations));
 }
 

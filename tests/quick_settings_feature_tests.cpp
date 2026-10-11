@@ -95,21 +95,28 @@ static void test_feature_transition_owns_presentation(void)
                 "opening starts the shared popup transition");
     reach_feature_surface_geometry geometry = {};
     reach_feature_transition_presentation(&transition, &geometry);
-    expect_true(geometry.presentation.managed, "the popup reports managed presentation");
-    expect_near(geometry.presentation.opacity, 0.0f, 0.001f, "the popup begins transparent");
-    expect_near(geometry.presentation.y_offset, -12.0f, 0.001f,
+    expect_true(geometry.presentation.retained, "the popup reports managed presentation");
+    expect_near(geometry.presentation.group.opacity.from, 0.0f, 0.001f,
+                "the popup begins transparent");
+    expect_near(geometry.presentation.group.y.from, -12.0f, 0.001f,
                 "a dropdown begins above its anchor at DPI-scaled distance");
 
+    transition.y.started_seconds -= 1.0;
+    transition.opacity.started_seconds -= 1.0;
+    transition.completion_seconds -= 1.0;
     (void)reach_feature_transition_tick(&transition, 1.0);
     reach_feature_transition_presentation(&transition, &geometry);
     expect_true(!reach_feature_transition_active(&transition),
                 "the settled popup does not request animation frames");
     expect_true(reach_feature_transition_visible(&transition), "the settled popup stays visible");
-    expect_near(geometry.presentation.opacity, 1.0f, 0.001f, "the popup settles opaque");
-    expect_near(geometry.presentation.y_offset, 0.0f, 0.001f, "the popup settles on its anchor");
+    expect_near(geometry.presentation.group.opacity.to, 1.0f, 0.001f, "the popup settles opaque");
+    expect_near(geometry.presentation.group.y.to, 0.0f, 0.001f, "the popup settles on its anchor");
 
     expect_true(reach_feature_transition_set_open(&transition, 0),
                 "closing reverses the shared popup transition");
+    transition.y.started_seconds -= 1.0;
+    transition.opacity.started_seconds -= 1.0;
+    transition.completion_seconds -= 1.0;
     (void)reach_feature_transition_tick(&transition, 1.0);
     expect_true(!reach_feature_transition_visible(&transition),
                 "the popup hides after its close transition settles");
@@ -118,7 +125,7 @@ static void test_feature_transition_owns_presentation(void)
                                        REACH_FEATURE_TRANSITION_FROM_BELOW);
     reach_feature_transition_reset(&transition);
     reach_feature_transition_presentation(&transition, &geometry);
-    expect_near(geometry.presentation.y_offset, 8.0f, 0.001f,
+    expect_near(geometry.presentation.group.y.to, 8.0f, 0.001f,
                 "an upward popup begins below its anchor");
 }
 
@@ -146,12 +153,12 @@ static void test_expansion_keeps_popup_anchor_position(void)
     reach_quick_settings_refresh_layout(quick_settings, &ctx);
     reach_feature_surface_geometry opening_geometry = {};
     reach_quick_settings_capsule_ops()->surface_geometry(quick_settings, &opening_geometry);
-    expect_near(opening_geometry.presentation.y_offset, -10.0f, 0.001f,
+    expect_near(opening_geometry.presentation.group.y.from, -10.0f, 0.001f,
                 "quick settings keeps the shared dropdown opening motion");
     reach_feature_tick_result tick = {};
     reach_quick_settings_capsule_ops()->tick(quick_settings, 1.0, &tick);
     reach_quick_settings_capsule_ops()->surface_geometry(quick_settings, &opening_geometry);
-    expect_near(opening_geometry.presentation.y_offset, 0.0f, 0.001f,
+    expect_near(opening_geometry.presentation.group.y.to, 0.0f, 0.001f,
                 "quick settings opening motion settles on its anchor");
     const reach_quick_settings_state *state = reach_quick_settings_state_ptr(quick_settings);
     const float narrow_width = state->bounds.width;
@@ -185,9 +192,9 @@ static void test_expansion_keeps_popup_anchor_position(void)
     reach_quick_settings_capsule_ops()->tick(quick_settings, 0.06, &tick);
     reach_feature_surface_geometry closing_geometry = {};
     reach_quick_settings_capsule_ops()->surface_geometry(quick_settings, &closing_geometry);
-    expect_true(closing_geometry.presentation.y_offset < 0.0f,
+    expect_true(closing_geometry.presentation.group.y.to < 0.0f,
                 "quick settings keeps the shared dropdown closing motion");
-    expect_true(closing_geometry.presentation.opacity < 1.0f,
+    expect_true(closing_geometry.presentation.group.opacity.to < 1.0f,
                 "quick settings keeps the shared dropdown closing fade");
     reach_quick_settings_destroy(quick_settings);
 }

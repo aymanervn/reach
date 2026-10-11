@@ -71,20 +71,25 @@ static void test_overflow_uses_one_gpu_animation()
 
     expect_true(reach_top_bar_now_playing_build_render_commands(&input, &commands) == REACH_OK,
                 "GPU render commands build");
-    const reach_render_command *animated =
-        find_command(commands, REACH_RENDER_COMMAND_ANIMATED_TEXT);
+    const reach_render_group *animated = nullptr;
+    for (size_t index = 0; index < commands.group_count; ++index)
+        if (commands.groups[index].repeat_travel_seconds > 0.0f)
+            animated = &commands.groups[index];
     expect_true(animated != nullptr, "overflow uses one animated text layer");
     if (animated != nullptr)
     {
-        expect_near(animated->animation_offset_x, -52.0, 0.0001,
+        expect_near(animated->repeat_offset_x, -52.0, 0.0001,
                     "animation travels the exact overflow");
-        expect_near(animated->animation_hold_seconds, 1.6, 0.0001,
+        expect_near(animated->repeat_hold_seconds, 1.6, 0.0001,
                     "animation retains its endpoint hold");
-        expect_near(animated->animation_travel_seconds, 2.0, 0.0001,
+        expect_near(animated->repeat_travel_seconds, 2.0, 0.0001,
                     "animation retains its movement speed");
     }
-    expect_true(find_command(commands, REACH_RENDER_COMMAND_TEXT) == nullptr,
-                "GPU path does not draw duplicate text");
+    size_t text_count = 0;
+    for (size_t index = 0; index < commands.count; ++index)
+        if (commands.commands[index].type == REACH_RENDER_COMMAND_TEXT)
+            ++text_count;
+    expect_true(text_count == 1, "GPU path does not draw duplicate text");
 }
 
 static void test_unavailable_gpu_animation_stays_static()
@@ -101,8 +106,10 @@ static void test_unavailable_gpu_animation_stays_static()
     {
         expect_near(text->rect.x, 50.0, 0.0001, "static text never receives a CPU offset");
     }
-    expect_true(find_command(commands, REACH_RENDER_COMMAND_ANIMATED_TEXT) == nullptr,
-                "static path emits no animation command");
+    bool repeating = false;
+    for (size_t index = 0; index < commands.group_count; ++index)
+        repeating |= commands.groups[index].repeat_travel_seconds > 0.0f;
+    expect_true(!repeating, "static path emits no animation command");
 }
 
 int main()

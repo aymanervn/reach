@@ -1,6 +1,8 @@
 #include "reach/features/switcher.h"
 
 #include <stdio.h>
+#include <chrono>
+#include <thread>
 
 static int failures;
 static reach_window_snapshot fake_windows[2];
@@ -82,6 +84,10 @@ static void test_switcher_presents_immediately_and_closes_before_activation(void
     expect_true(reach_switcher_capsule_ops()->presentation_visible(switcher),
                 "switcher keeps presenting through its normal close transition");
 
+    reach_feature_surface_geometry geometry = {};
+    reach_switcher_capsule_ops()->surface_geometry(switcher, &geometry);
+    std::this_thread::sleep_for(
+        std::chrono::milliseconds(reach_motion_wait_ms(geometry.deadline_seconds) + 1));
     reach_feature_tick_result tick = {};
     reach_switcher_capsule_ops()->tick(switcher, 0.13, &tick);
     expect_true(!reach_switcher_capsule_ops()->presentation_visible(switcher),

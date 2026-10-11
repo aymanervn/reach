@@ -47,7 +47,7 @@ extern "C"
         reach_now_playing_action media_action;
         uint16_t app_name[REACH_APPLICATION_TEXT_CAPACITY];
         float content_scale;
-        double elapsed_seconds;
+        double deadline_seconds;
     } reach_system_hud_state;
 
     typedef struct reach_system_hud_arrange_context
@@ -84,7 +84,6 @@ extern "C"
     void reach_system_hud_refresh_media(reach_system_hud *hud);
     int32_t reach_system_hud_arrange(reach_system_hud *hud,
                                      const reach_system_hud_arrange_context *ctx);
-    float reach_system_hud_opacity(const reach_system_hud *hud);
     reach_result reach_system_hud_append_render_commands(const reach_system_hud *hud,
                                                          const reach_system_hud_render_context *ctx,
                                                          reach_render_command_buffer *out_commands);

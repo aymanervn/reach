@@ -1032,7 +1032,7 @@ static void reach_context_menu_capsule_tick(void *capsule, double delta_seconds,
     if (reach_feature_transition_tick(&menu->popup_transition, delta_seconds))
     {
         out->redraw = 1;
-        out->request_update = reach_feature_transition_active(&menu->popup_transition);
+        out->request_update = reach_feature_transition_needs_update(&menu->popup_transition);
     }
     if (popup_was_visible && !reach_feature_transition_visible(&menu->popup_transition) &&
         !menu->state.open)
@@ -1045,7 +1045,7 @@ static int32_t reach_context_menu_capsule_needs_frame(const void *capsule)
 {
     const reach_context_menu *menu = static_cast<const reach_context_menu *>(capsule);
     return menu != nullptr &&
-           (reach_feature_transition_active(&menu->popup_transition) ||
+           (reach_feature_transition_needs_update(&menu->popup_transition) ||
             (menu->state.open && reach_animation_manager_any_active(&menu->animations)));
 }
 
