@@ -162,7 +162,11 @@ the previously failing WUC root-completion check with local diagnostic
 Further isolation of the WUC completion finding measured root submission at about 0.05 ms, before
 the 50 ms curve deadline. An independent finite property-set batch on the same compositor also
 delivered no callback during a 300 ms hold. The cause remains unresolved; no production completion
-policy was changed based on this hidden-window result.
+policy was changed based on this hidden-window result. A follow-up 8px visible, nonactivating
+diagnostic target reproduced the missing callback, so visibility alone does not explain it.
+Agile delegates enqueue and execute on the owned/compositor dispatcher, and an explicit
+`RequestCommitAsync` reports completion. These narrow checks rule out those failed hypotheses;
+they do not identify the root cause or establish displayed-animation correctness.
 
 The counters give a reproducible baseline for content reuse versus sampled visual changes. Full
 application wake/layout/native metrics, cold/warm workload cost, total CPU/GPU activity, latency,
