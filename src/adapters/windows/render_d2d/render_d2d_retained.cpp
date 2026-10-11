@@ -999,6 +999,7 @@ void reach_d2d_release_retained(reach_render_backend *backend)
     if (backend->presentation_batch != nullptr)
         (void)backend->presentation_batch->remove_Completed(backend->presentation_token);
     backend->presentation_batch.Reset();
+    backend->presentation_commit.Reset();
     backend->presentation_completed.reset();
     backend->submitted_presentation_generation = 0;
     backend->reconciled_presentation_generation = 0;
@@ -1064,31 +1065,70 @@ int32_t reach_d2d_presentation_complete(reach_render_backend *backend, uint64_t 
         return 1;
     if (generation != backend->submitted_presentation_generation)
         return 1;
-    if (backend->presentation_completed != nullptr)
-        return backend->presentation_completed->load() == generation;
-    if (reach_motion_active(&backend->scene_presentation.opacity) ||
-        reach_motion_active(&backend->scene_presentation.x) ||
-        reach_motion_active(&backend->scene_presentation.y) ||
-        reach_motion_active(&backend->scene_presentation.scale))
+    double now_seconds = reach_motion_now_seconds();
+    if (reach_motion_active_at(&backend->scene_presentation.opacity, now_seconds) ||
+        reach_motion_active_at(&backend->scene_presentation.x, now_seconds) ||
+        reach_motion_active_at(&backend->scene_presentation.y, now_seconds) ||
+        reach_motion_active_at(&backend->scene_presentation.scale, now_seconds))
         return 0;
-    if (backend->reconciled_presentation_generation != generation)
+    if (backend->reconciled_presentation_generation == generation)
+        return 1;
+    if (backend->presentation_commit != nullptr)
     {
-        if (backend->dcomp_device != nullptr)
-        {
-            reach_render_group settled = backend->scene_presentation;
-            settled.x.duration_seconds = settled.y.duration_seconds = 0.0;
-            settled.opacity.duration_seconds = settled.scale.duration_seconds = 0.0;
-            if (FAILED(dcomp_properties(backend, backend->dcomp_visual, backend->scene_scale.Get(),
-                                        settled, 0.0f, 0.0f)))
-                return 0;
-            reach_workload_add(REACH_WORKLOAD_DCOMP_COMMITS, 1);
-            if (FAILED(backend->dcomp_device->Commit()))
-                return 0;
-        }
-        if (reach_d2d_synchronize(backend) != REACH_OK)
+        ComPtr<ABI::Windows::Foundation::IAsyncInfo> info;
+        AsyncStatus status = Started;
+        if (FAILED(backend->presentation_commit.As(&info)) || FAILED(info->get_Status(&status)) ||
+            status != Completed || FAILED(backend->presentation_commit->GetResults()) ||
+            reach_d2d_synchronize(backend) != REACH_OK)
             return 0;
         backend->reconciled_presentation_generation = generation;
+        return 1;
     }
+    if (backend->presentation_completed != nullptr &&
+        backend->presentation_completed->load() == generation)
+        return 1;
+    reach_render_group settled = backend->scene_presentation;
+    settled.x.duration_seconds = settled.y.duration_seconds = 0.0;
+    settled.opacity.duration_seconds = settled.scale.duration_seconds = 0.0;
+    if (backend->compositor != nullptr)
+    {
+        if (FAILED(wuc_properties(backend, backend->root_visual.Get(), settled, 0.0f, 0.0f)))
+            return 0;
+        ComPtr<ICompositor5> compositor;
+        HRESULT hr = backend->compositor.As(&compositor);
+        if (SUCCEEDED(hr))
+            hr = compositor->RequestCommitAsync(&backend->presentation_commit);
+        std::weak_ptr<std::atomic<uint64_t>> lifetime = backend->presentation_completed;
+        HWND hwnd = backend->hwnd;
+        auto handler = Microsoft::WRL::Callback<Microsoft::WRL::Implements<
+            Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>,
+            ABI::Windows::Foundation::IAsyncActionCompletedHandler, Microsoft::WRL::FtmBase>>(
+            [lifetime, hwnd](ABI::Windows::Foundation::IAsyncAction *, AsyncStatus) -> HRESULT
+            {
+                if (!lifetime.expired())
+                    PostMessageW(hwnd, WM_NULL, 0, 0);
+                return S_OK;
+            });
+        if (SUCCEEDED(hr) && handler == nullptr)
+            hr = E_OUTOFMEMORY;
+        if (SUCCEEDED(hr))
+            hr = backend->presentation_commit->put_Completed(handler.Get());
+        if (FAILED(hr))
+            backend->presentation_commit.Reset();
+        return 0;
+    }
+    if (backend->dcomp_device != nullptr)
+    {
+        if (FAILED(dcomp_properties(backend, backend->dcomp_visual, backend->scene_scale.Get(),
+                                    settled, 0.0f, 0.0f)))
+            return 0;
+        reach_workload_add(REACH_WORKLOAD_DCOMP_COMMITS, 1);
+        if (FAILED(backend->dcomp_device->Commit()))
+            return 0;
+    }
+    if (reach_d2d_synchronize(backend) != REACH_OK)
+        return 0;
+    backend->reconciled_presentation_generation = generation;
     return 1;
 }
 
@@ -1225,12 +1265,18 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
     {
         bool animation_changed =
             !backend->has_scene_presentation ||
-            presentation.opacity.generation != backend->scene_presentation.opacity.generation;
+            memcmp(&presentation.opacity, &backend->scene_presentation.opacity,
+                   sizeof(reach_motion)) != 0 ||
+            memcmp(&presentation.x, &backend->scene_presentation.x, sizeof(reach_motion)) != 0 ||
+            memcmp(&presentation.y, &backend->scene_presentation.y, sizeof(reach_motion)) != 0 ||
+            memcmp(&presentation.scale, &backend->scene_presentation.scale, sizeof(reach_motion)) !=
+                0;
         if (animation_changed)
         {
             if (backend->presentation_batch != nullptr)
                 (void)backend->presentation_batch->remove_Completed(backend->presentation_token);
             backend->presentation_batch.Reset();
+            backend->presentation_commit.Reset();
             backend->presentation_completed.reset();
             backend->submitted_presentation_generation = presentation.opacity.generation;
             backend->reconciled_presentation_generation = 0;
@@ -1277,10 +1323,12 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
             if (SUCCEEDED(hr))
                 hr = root->put_CenterPoint({center_x, center_y, 0.0f});
             if (SUCCEEDED(hr))
-                hr = wuc_properties(backend, backend->root_visual.Get(), presentation, 0.0f, 0.0f,
-                                    false,
-                                    property_mask(presentation, backend->scene_presentation, 0.0f,
-                                                  0.0f, backend->has_scene_presentation != 0));
+                hr = wuc_properties(
+                    backend, backend->root_visual.Get(), presentation, 0.0f, 0.0f, false,
+                    animation_changed
+                        ? 31
+                        : property_mask(presentation, backend->scene_presentation, 0.0f, 0.0f,
+                                        backend->has_scene_presentation != 0));
         }
         else
         {

@@ -148,8 +148,9 @@ During these runs, the independent WUC root-opacity completion check failed in a
 the submitted generation remained current but its scoped-batch callback stayed zero, also after
 a 700 ms hold and after explicitly clearing diagnostic presentation state. DirectComposition root
 completion and all close-hover checks passed. Earlier bounded runs passed that callback check;
-the cause of the changed WUC result remains unresolved. This is an open completion-verification
-finding, not evidence of native displayed-pixel or latency acceptance.
+the failure was subsequently isolated to hidden/occluded callback delivery and resolved by
+canonical endpoint reconciliation, described below. These observations do not establish native
+displayed-pixel or latency acceptance.
 
 Stage close-hover diagnostics settle geometry and tile hover, then enter and reverse the close
 feedback through public pointer input. Five runs per compositor verify two executions/four tint
@@ -166,7 +167,29 @@ policy was changed based on this hidden-window result. A follow-up 8px visible, 
 diagnostic target reproduced the missing callback, so visibility alone does not explain it.
 Agile delegates enqueue and execute on the owned/compositor dispatcher, and an explicit
 `RequestCommitAsync` reports completion. These narrow checks rule out those failed hypotheses;
-they do not identify the root cause or establish displayed-animation correctness.
+they did not identify the root cause or establish displayed-animation correctness. Moving the
+same diagnostic target to an unoccluded topmost position subsequently allowed both the independent
+batch and root callback to fire, isolating visibility/occlusion-dependent delivery in this setup.
+
+The production adapter now waits for all canonical root motion deadlines and preserves normal
+scoped-batch completion. If a WUC callback remains pending after the deadline, it submits settled
+properties once, awaits an explicit asynchronous commit and then synchronizes before reporting
+completion. The existing host deadline wakes this path; the commit callback wakes the existing
+message loop with weak lifetime ownership. Any root-motion retarget resets completion ownership,
+even when opacity identity is unchanged; the new WUC batch aggregates all remaining root curves.
+
+Five full native runs per compositor now pass without excluding WUC completion, alongside all
+feedback/clip/readback diagnostics. A separate unoccluded 8px target passes. Native checks cover
+unequal root deadlines, no early completion, one endpoint property submission with no render/raster
+work, cached repeated readiness, component-only retarget, stale generations, clearing a pending
+commit and suspension/recreation. Debug builds and all 39 tests pass. Forced native commit/device
+failures, complete live product lifecycle and total performance acceptance remain pending.
+
+The commit/fence path uses supported
+[RequestCommitAsync](https://learn.microsoft.com/en-us/uwp/api/windows.ui.composition.compositor.requestcommitasync)
+and a single
+[IAsyncAction completion handler](https://learn.microsoft.com/en-us/uwp/api/windows.foundation.iasyncaction.completed);
+it does not sample visual animation on application frames.
 
 The counters give a reproducible baseline for content reuse versus sampled visual changes. Full
 application wake/layout/native metrics, cold/warm workload cost, total CPU/GPU activity, latency,
