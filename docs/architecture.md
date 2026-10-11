@@ -474,6 +474,11 @@ Top Bar power hover publishes retained RGBA tint over fixed rounded background c
 its glyph in a separate cached group. Enter/leave retarget the canonical motion; reset and game
 mode clear it. Power hover has no scalar track, periodic capsule frame or bar frame blocker.
 
+Stage close hover uses the shared RGBA tint with separate background and glyph coverage for its
+current target. Pointer events publish changes directly, including interruption; settled movement
+does not resubmit feedback. Source retirement and hide/reset clear the canonical motion. Stage
+geometry, backdrop and native close choreography remain separately owned scalar/native consumers.
+
 Dock preview close buttons retain separate background groups keyed by source window identity.
 The capsule publishes affine hover opacity and keeps the glyph outside that group. Close hover
 owns no scalar track or sampled accessor; hiding/reset clears its motion. Preview header/border

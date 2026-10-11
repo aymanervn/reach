@@ -151,6 +151,19 @@ completion and all close-hover checks passed. Earlier bounded runs passed that c
 the cause of the changed WUC result remains unresolved. This is an open completion-verification
 finding, not evidence of native displayed-pixel or latency acceptance.
 
+Stage close-hover diagnostics settle geometry and tile hover, then enter and reverse the close
+feedback through public pointer input. Five runs per compositor verify two executions/four tint
+property submissions, zero raster passes and zero scalar advances. Capsule ticks request no work
+for this feedback; theme RGB/alpha endpoints, settled pointer input and game-mode retirement pass.
+The HWND fallback samples three frames, including the endpoint. This scoped run explicitly skips
+the previously failing WUC root-completion check with local diagnostic
+`REACH_PROBE_SKIP_WUC_ROOT`; it does not resolve that failure or final product acceptance.
+
+Further isolation of the WUC completion finding measured root submission at about 0.05 ms, before
+the 50 ms curve deadline. An independent finite property-set batch on the same compositor also
+delivered no callback during a 300 ms hold. The cause remains unresolved; no production completion
+policy was changed based on this hidden-window result.
+
 The counters give a reproducible baseline for content reuse versus sampled visual changes. Full
 application wake/layout/native metrics, cold/warm workload cost, total CPU/GPU activity, latency,
 power, memory and instrumentation overhead still require product scenarios and system traces.

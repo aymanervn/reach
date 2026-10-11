@@ -96,6 +96,11 @@ support expectation is explicitly resolved.
     Debug build, 39 tests and five close-hover runs per compositor plus fallback pass with no
     retained raster work. An independent WUC root-completion probe failure remains open in the
     workload baseline and shared runtime verification; final product acceptance is still pending.
+  - [x] Stage close hover uses the shared retained RGBA tint for background and glyph. Pointer
+    events submit changes directly; remove the scalar enum/state sampling and feedback frame demand.
+    Preserve theme colors, presence alpha, reversal, source retirement and hide/game-mode reset.
+    Debug build, 39 tests and five scoped native runs per compositor plus fallback pass. The known
+    WUC root-completion check is excluded from this scoped run and remains unresolved separately.
 - [ ] Migrate eligible loaders/repeating effects; select efficient compositor or deadline behavior for
   carets, preserve focus resets and marquee behavior, and stop hidden repetitions.
 
