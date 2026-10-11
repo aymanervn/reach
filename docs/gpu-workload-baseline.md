@@ -162,7 +162,7 @@ the previously failing WUC root-completion check with local diagnostic
 
 Further isolation of the WUC completion finding measured root submission at about 0.05 ms, before
 the 50 ms curve deadline. An independent finite property-set batch on the same compositor also
-delivered no callback during a 300 ms hold. The cause remains unresolved; no production completion
+delivered no callback during a 300 ms hold. At that checkpoint the cause remained unresolved; no production completion
 policy was changed based on this hidden-window result. A follow-up 8px visible, nonactivating
 diagnostic target reproduced the missing callback, so visibility alone does not explain it.
 Agile delegates enqueue and execute on the owned/compositor dispatcher, and an explicit
@@ -182,8 +182,25 @@ Five full native runs per compositor now pass without excluding WUC completion, 
 feedback/clip/readback diagnostics. A separate unoccluded 8px target passes. Native checks cover
 unequal root deadlines, no early completion, one endpoint property submission with no render/raster
 work, cached repeated readiness, component-only retarget, stale generations, clearing a pending
-commit and suspension/recreation. Debug builds and all 39 tests pass. Forced native commit/device
+commit and suspension/recreation. Debug builds and all 39 tests pass. Actual native device/fence
 failures, complete live product lifecycle and total performance acceptance remain pending.
+
+Terminal presentation error handling is now explicit in the render port. A pending commit returns
+success with completion false; status/query/result failures or cancellation return an error with
+completion false and latch that generation without resubmitting work. The host suspends the failed
+renderer and permits ordinary capsule close cleanup; a cleared capsule deadline ends completion
+queries. Retarget and suspension clear the error state.
+
+`probe-completion-errors-retarget.log` passes five full runs per native backend plus HWND fallback.
+The bounded probe injects six asynchronous failure variants per run: Error, Canceled, failed
+GetResults, failed status query, failed error-code query and Error with an invalid success code.
+Started remains pending; ten repeated terminal queries perform no native queries, property
+submissions or render executions. Stale queries preserve current failure; component-only retarget
+with unchanged opacity identity and suspension/recreation recover. A real Battery capsule with a
+diagnostic renderer confirms pending close retention, one error suspension, ordinary close cleanup
+and no hidden completion queries. These are controlled failure-state diagnostics, not actual GPU
+device removal or total product performance measurements. Build, 39 tests, architecture, formatting
+and whitespace checks pass.
 
 The commit/fence path uses supported
 [RequestCommitAsync](https://learn.microsoft.com/en-us/uwp/api/windows.ui.composition.compositor.requestcommitasync)

@@ -117,12 +117,22 @@ static int32_t reach_host_presentation_ready(reach_feature_runtime *runtime)
     reach_feature_surface_geometry geometry = {};
     runtime->definition->capsule_ops->surface_geometry(runtime->capsule, &geometry);
     const reach_motion *opacity = &geometry.presentation.group.opacity;
-    if (!geometry.wait_for_presentation || !geometry.presentation.retained || opacity->to != 0.0f ||
+    if (!geometry.wait_for_presentation || geometry.deadline_seconds <= 0.0 ||
+        !geometry.presentation.retained || opacity->to != 0.0f ||
         opacity->duration_seconds <= 0.0 ||
         reach_motion_wait_ms(reach_motion_deadline(opacity)) != 0)
         return 1;
-    return runtime->surface->renderer.ops.presentation_complete(runtime->surface->renderer.backend,
-                                                                opacity->generation);
+    reach_render_backend_port *renderer = &runtime->surface->renderer;
+    int32_t complete = 0;
+    reach_result result =
+        renderer->ops.presentation_complete(renderer->backend, opacity->generation, &complete);
+    if (result != REACH_OK)
+    {
+        if (renderer->ops.suspend != nullptr)
+            renderer->ops.suspend(renderer->backend);
+        return 1;
+    }
+    return complete;
 }
 
 static void reach_host_tick_features(reach_host *host, double delta_seconds)

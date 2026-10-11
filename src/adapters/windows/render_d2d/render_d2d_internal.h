@@ -155,6 +155,7 @@ struct reach_render_backend
     std::shared_ptr<std::atomic<uint64_t>> presentation_completed;
     uint64_t submitted_presentation_generation = 0;
     uint64_t reconciled_presentation_generation = 0;
+    reach_result presentation_result = REACH_OK;
 
     std::vector<reach_d2d_text_format_entry> text_formats;
     std::vector<reach_d2d_text_layout_entry> text_layouts;
@@ -183,7 +184,8 @@ int32_t reach_d2d_retained_supported(const reach_render_backend *backend);
 reach_result reach_d2d_sync_retained(reach_render_backend *backend,
                                      const reach_render_command_buffer *commands);
 void reach_d2d_release_retained(reach_render_backend *backend);
-int32_t reach_d2d_presentation_complete(reach_render_backend *backend, uint64_t generation);
+reach_result reach_d2d_presentation_complete(reach_render_backend *backend, uint64_t generation,
+                                             int32_t *out_complete);
 void reach_d2d_suspend(reach_render_backend *backend);
 reach_result reach_d2d_execute_commands(reach_render_backend *backend,
                                         const reach_render_command *commands, size_t count);

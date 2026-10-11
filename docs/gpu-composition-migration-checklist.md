@@ -70,6 +70,13 @@ support expectation is explicitly resolved.
     per backend pass without exclusions; unoccluded native verification also passes. Broader
     failure/recreation, displayed-pixel and product-performance acceptance remain pending.
 
+  - [x] Report terminal presentation errors separately from pending completion; latch failures
+    until retarget/reset, suspend failed composition and release ordinary close cleanup. Hidden
+    capsules stop completion queries when their deadline clears. Debug builds, 39 tests and five
+    bounded native runs per backend pass, including injected async error/cancel/result failures,
+    unchanged terminal queries, stale generations and suspension/recreation. Actual device-loss,
+    fence failure and full live acceptance remain pending in the broader resource gate.
+
 ## 4. Feedback and repetition
 
 - [ ] Migrate eligible hover, press, selection and close feedback across Context Menu, Battery, tray,
@@ -101,13 +108,14 @@ support expectation is explicitly resolved.
   - [x] Dock preview close hover uses stable window groups and shared retained opacity. Preserve
     alpha range, easing and pointer behavior; remove its scalar track/accessor and clear hidden motion.
     Debug build, 39 tests and five close-hover runs per compositor plus fallback pass with no
-    retained raster work. An independent WUC root-completion probe failure remains open in the
-    workload baseline and shared runtime verification; final product acceptance is still pending.
+    retained raster work. Subsequent full native runs include the resolved WUC completion path;
+    final product acceptance is still pending.
   - [x] Stage close hover uses the shared retained RGBA tint for background and glyph. Pointer
     events submit changes directly; remove the scalar enum/state sampling and feedback frame demand.
     Preserve theme colors, presence alpha, reversal, source retirement and hide/game-mode reset.
     Debug build, 39 tests and five scoped native runs per compositor plus fallback pass. The known
-    WUC root-completion check is excluded from this scoped run and remains unresolved separately.
+    WUC root-completion check was excluded from the initial scoped run; subsequent full native
+    runs include that resolved path. Final product acceptance remains pending.
 - [ ] Migrate eligible loaders/repeating effects; select efficient compositor or deadline behavior for
   carets, preserve focus resets and marquee behavior, and stop hidden repetitions.
 
