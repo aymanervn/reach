@@ -26,8 +26,9 @@ Drivers and present work:
 - **Deadline:** CPU lifecycle/content updates at an actual deadline, rather than every animation frame.
 
 Dispositions are **migrate**, **verify existing**, **capability decision**, or **CPU deadline**.
-The latter preserves semantic timing/event work, not an exemption for per-frame rendering. Capability
-decisions must resolve to an implemented compositor path or an evidenced, optimized hybrid path.
+The latter preserves semantic timing/event work, not an exemption for per-frame rendering. The selected [live-preview design](gpu-live-preview-design.md) retains DWM live content with
+active-only native synchronization and retained Reach visuals; its consumers remain pending.
+Capability decisions must resolve to an implemented compositor path or an evidenced, optimized hybrid path.
 No current CPU visual path has final measured acceptance yet. Retained resource and source lifetime
 are evaluated independently from the animation's active lifetime.
 
