@@ -8,16 +8,9 @@
 #include <math.h>
 #include <new>
 
-enum
-{
-    REACH_TOP_BAR_TRAY_ANIM_FEEDBACK = 0,
-    REACH_TOP_BAR_TRAY_ANIM_COUNT
-};
-
 struct reach_top_bar_tray_popup
 {
-    reach_animation_manager animations;
-    reach_animation_track tracks[REACH_TOP_BAR_TRAY_ANIM_COUNT];
+    reach_motion press_feedback;
     reach_feature_transition popup_transition;
     reach_pressable pressable;
     reach_rect_f32 item_viewport;
@@ -49,8 +42,9 @@ typedef struct reach_top_bar_tray_hit
 static reach_pressable_feedback_style reach_top_bar_tray_feedback(reach_top_bar *top_bar)
 {
     reach_pressable_feedback_style feedback = {};
-    feedback.animations = top_bar != nullptr ? &top_bar->tray_popup->animations : nullptr;
-    feedback.track = REACH_TOP_BAR_TRAY_ANIM_FEEDBACK;
+    feedback.motion = top_bar != nullptr && top_bar->tray_popup != nullptr
+                          ? &top_bar->tray_popup->press_feedback
+                          : nullptr;
     feedback.pressed_value = 0.50f;
     feedback.press_seconds = 0.055;
     feedback.release_seconds = 0.055;
@@ -251,8 +245,6 @@ reach_result reach_top_bar_tray_popup_create(reach_top_bar_tray_popup **out_popu
     {
         return REACH_ERROR;
     }
-    reach_animation_manager_init(&(*out_popup)->animations, (*out_popup)->tracks,
-                                 REACH_TOP_BAR_TRAY_ANIM_COUNT);
     reach_feature_transition_init(&(*out_popup)->popup_transition,
                                   REACH_FEATURE_TRANSITION_FROM_ABOVE);
     reach_pressable_init(&(*out_popup)->pressable);
@@ -470,13 +462,8 @@ static void reach_top_bar_tray_tick(void *capsule, double delta_seconds,
         return;
     }
     reach_top_bar_tray_popup *popup = top_bar->tray_popup;
-    int32_t was_active =
-        reach_animation_manager_active(&popup->animations, REACH_TOP_BAR_TRAY_ANIM_FEEDBACK);
-    reach_animation_manager_tick(&popup->animations, delta_seconds);
-    int32_t active =
-        reach_animation_manager_active(&popup->animations, REACH_TOP_BAR_TRAY_ANIM_FEEDBACK);
     int32_t popup_changed = reach_feature_transition_tick(&popup->popup_transition, delta_seconds);
-    if ((was_active || active || popup_changed) && out != nullptr)
+    if (popup_changed && out != nullptr)
     {
         out->redraw = 1;
         out->request_update = reach_feature_transition_needs_update(&popup->popup_transition);
@@ -501,8 +488,7 @@ static int32_t reach_top_bar_tray_needs_frame(const void *capsule)
 {
     const reach_top_bar *top_bar = static_cast<const reach_top_bar *>(capsule);
     return top_bar != nullptr && top_bar->tray_popup != nullptr &&
-           (reach_feature_transition_needs_update(&top_bar->tray_popup->popup_transition) ||
-            reach_animation_manager_any_active(&top_bar->tray_popup->animations));
+           reach_feature_transition_needs_update(&top_bar->tray_popup->popup_transition);
 }
 
 static int32_t reach_top_bar_tray_wants_pointer_move(const void *capsule)
@@ -697,12 +683,6 @@ const reach_feature_capsule_ops *reach_top_bar_tray_capsule_ops(void)
     return &ops;
 }
 
-reach_animation_manager *reach_top_bar_tray_animation_manager(reach_top_bar *top_bar)
-{
-    return top_bar != nullptr && top_bar->tray_popup != nullptr ? &top_bar->tray_popup->animations
-                                                                : nullptr;
-}
-
 reach_result reach_top_bar_append_tray_render_commands(reach_top_bar *top_bar,
                                                        const reach_top_bar_tray_render_context *ctx,
                                                        reach_render_command_buffer *out_commands)
@@ -730,9 +710,7 @@ reach_result reach_top_bar_append_tray_render_commands(reach_top_bar *top_bar,
 
     float icon_box_radius = reach_theme_icon_box_corner_radius(
         ctx->theme, reach_theme_tray_slot_size(ctx->theme, popup_state->anchor.bar_height));
-    reach_pressable_feedback_style feedback = reach_top_bar_tray_feedback(top_bar);
     size_t feedback_index = reach_pressable_feedback_index(&popup_state->pressable);
-    float feedback_opacity = reach_pressable_feedback_value(&popup_state->pressable, &feedback);
     size_t count = reach_top_bar_ordered_tray_item_count(top_bar);
     reach_render_command_buffer_set_scissor(out_commands, popup_state->item_viewport);
     for (size_t index = popup_state->overflow_start; index < count; ++index)
@@ -767,12 +745,14 @@ reach_result reach_top_bar_append_tray_render_commands(reach_top_bar *top_bar,
         }
         reach_render_command_buffer_push(out_commands, &command);
 
-        if (feedback_index == index && feedback_opacity > 0.001f)
+        if (feedback_index == index)
         {
-            reach_push_icon_press_feedback(
-                out_commands, item != nullptr && item->icon_id != 0 ? icon_rect : slot,
+            result = reach_push_icon_press_feedback_motion(
+                out_commands, 1, item != nullptr && item->icon_id != 0 ? icon_rect : slot,
                 icon_box_radius, item != nullptr ? item->icon_id : 0,
-                ctx->theme->bar_tray_background, feedback_opacity, 0.001f);
+                ctx->theme->bar_tray_background, &popup_state->press_feedback);
+            if (result != REACH_OK)
+                return result;
         }
     }
     reach_render_command_buffer_clear_scissor(out_commands);

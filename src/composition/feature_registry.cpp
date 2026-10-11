@@ -503,13 +503,6 @@ static int32_t reach_feature_quick_settings_blocks_position_frame(const void *ca
         static_cast<const reach_quick_settings *>(capsule));
 }
 
-static int32_t reach_feature_tray_blocks_position_frame(const void *capsule)
-{
-    reach_animation_manager *animations = reach_top_bar_tray_animation_manager(
-        const_cast<reach_top_bar *>(static_cast<const reach_top_bar *>(capsule)));
-    return animations != nullptr && reach_animation_manager_any_active(animations);
-}
-
 static size_t reach_feature_quick_settings_take_retired(void *capsule,
                                                         reach_feature_render_resource *out,
                                                         size_t cap)
@@ -688,8 +681,7 @@ static const reach_feature_control_ops reach_switcher_control_ops = {
 static const reach_feature_control_ops reach_clipboard_control_ops = {
     reach_feature_control_clipboard_open, nullptr, nullptr, nullptr, &reach_clipboard_resource_ops};
 static const reach_feature_control_ops reach_tray_control_ops = {
-    reach_feature_control_tray_open, nullptr, nullptr, reach_feature_tray_blocks_position_frame,
-    &reach_tray_resource_ops};
+    reach_feature_control_tray_open, nullptr, nullptr, nullptr, &reach_tray_resource_ops};
 static const reach_feature_control_ops reach_quick_settings_control_ops = {
     reach_feature_control_quick_settings_open, nullptr, reach_feature_notify_quick_settings,
     reach_feature_quick_settings_blocks_position_frame, &reach_quick_settings_resource_ops};

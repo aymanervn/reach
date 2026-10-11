@@ -68,6 +68,9 @@ support expectation is explicitly resolved.
   - [x] Quick Settings press/release overlay uses the same shared primitive; obsolete feedback track
     and sampled alpha removed (`e4c133e`). Build, 39 tests and native compositor/fallback diagnostics pass.
     Height and section expansion remain separate pending work.
+  - [x] Tray popup press/release uses retained icon-tint or rectangle opacity, preserving its
+    previous appearance. The scalar track, accessor and composition frame blocker are removed.
+    Debug builds, 39 tests and bounded capsule diagnostics pass on both compositors and fallback.
 - [ ] Migrate eligible loaders/repeating effects; select efficient compositor or deadline behavior for
   carets, preserve focus resets and marquee behavior, and stop hidden repetitions.
 

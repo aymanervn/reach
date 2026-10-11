@@ -79,6 +79,14 @@ descriptor with one raster pass. Initial target introduction may allocate/raster
 geometry or clipping changes still update content. Hidden/source/DPI and product cost verification
 remain part of the final acceptance matrix.
 
+The same bounded diagnostic now drives the Tray popup capsule with a local synthetic provider.
+Five runs per compositor verify cancellation requires one execution/property submission, zero
+raster passes and zero scalar advances after the initial target submission. Held feedback and
+release request no periodic capsule frames; hiding resets the feedback. The fallback rectangle
+path samples the same descriptor with one raster pass on cancellation. The diagnostic uses a
+fallback title rather than a real shell icon: real icon tint appearance, DPI/theme/source churn
+and total product cost remain pending.
+
 The animated-group-clip diagnostic adds a right-inset motion, reverses it after 30 ms, then submits
 ten identical descriptors after completion. Five runs per compositor report two changed-property
 submissions, zero raster passes and stable surface allocation; removing clipping releases the native
