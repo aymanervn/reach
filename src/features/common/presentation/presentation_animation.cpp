@@ -68,10 +68,12 @@ int32_t reach_feature_transition_set_open(reach_feature_transition *transition, 
     {
         double seconds = target ? transition->open_seconds : transition->close_seconds;
         reach_easing easing = target ? REACH_EASING_EASE_OUT : REACH_EASING_EASE_IN;
-        reach_motion_animate_to(&transition->y,
-                                target ? 0.0f : reach_feature_transition_origin(transition),
-                                seconds, easing);
-        reach_motion_animate_to(&transition->opacity, target ? 1.0f : 0.0f, seconds, easing);
+        double now_seconds = reach_motion_now_seconds();
+        reach_motion_animate_to_at(&transition->y,
+                                   target ? 0.0f : reach_feature_transition_origin(transition),
+                                   seconds, easing, now_seconds);
+        reach_motion_animate_to_at(&transition->opacity, target ? 1.0f : 0.0f, seconds, easing,
+                                   now_seconds);
         transition->completion_seconds = reach_motion_deadline(&transition->opacity);
         double y_deadline = reach_motion_deadline(&transition->y);
         if (y_deadline > transition->completion_seconds)

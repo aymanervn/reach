@@ -1,5 +1,7 @@
 #include "reach/support/util.h"
+#include "reach/support/motion.h"
 
+#include <math.h>
 #include <stdio.h>
 
 static int failed = 0;
@@ -13,8 +15,70 @@ static void expect(int condition, const char *message)
     }
 }
 
+static void test_motion_retarget_uses_one_event_time(void)
+{
+    reach_motion motion = {};
+    reach_motion_start_at(&motion, 20.0f, 80.0f, 1.0, REACH_EASING_EASE_IN_OUT, 10.0);
+    float interrupted = reach_motion_value_at(&motion, 10.3);
+    uint64_t generation = motion.generation;
+    reach_motion_animate_to_at(&motion, 0.0f, 0.5, REACH_EASING_EASE_OUT, 10.3);
+    expect(motion.from == interrupted && motion.started_seconds == 10.3 &&
+               motion.generation == generation + 1,
+           "retarget samples and submits at exactly one event time");
+    expect(reach_motion_active_at(&motion, 10.79) && !reach_motion_active_at(&motion, 10.8),
+           "explicit motion sampling has a deterministic completion boundary");
+    expect(reach_motion_value_at(&motion, 11.0) == 0.0f,
+           "retarget reaches its final value without accumulated ticks");
+    reach_motion_set(&motion, 7.0f);
+    expect(!reach_motion_active_at(&motion, 10.4) && motion.generation == generation + 2 &&
+               reach_motion_value_at(&motion, 10.4) == 7.0f,
+           "reset cancels the previous absolute-time generation");
+}
+
+static void test_motion_affine_preserves_the_physical_timeline(void)
+{
+    for (int easing = REACH_EASING_EASE_IN; easing <= REACH_EASING_EASE_IN_OUT; ++easing)
+    {
+        reach_motion motion = {};
+        reach_motion_start_at(&motion, 3.0f, 20.0f, 2.0, (reach_easing)easing, 10.0);
+        reach_motion edge = reach_motion_affine(&motion, -1.0f, 80.0f);
+        expect(edge.started_seconds == motion.started_seconds &&
+                   edge.duration_seconds == motion.duration_seconds &&
+                   edge.generation == motion.generation && edge.easing == motion.easing,
+               "derived geometry preserves event time, easing and generation");
+        for (int sample = 0; sample <= 10; ++sample)
+        {
+            double time = 10.0 + 0.2 * sample;
+            expect(fabsf(reach_motion_value_at(&edge, time) -
+                         (80.0f - reach_motion_value_at(&motion, time))) < 0.0001f,
+                   "native edge mapping follows the same physical motion as its inset");
+        }
+    }
+}
+
+static void test_motion_crossing_preserves_endpoint_deadlines(void)
+{
+    for (int easing = REACH_EASING_EASE_IN; easing <= REACH_EASING_EASE_IN_OUT; ++easing)
+    {
+        reach_motion motion = {};
+        reach_motion_start_at(&motion, 80.0f, 20.0f, 2.0, (reach_easing)easing, 10.0);
+        double crossing = reach_motion_time_to_value_at(&motion, 35.0f, 10.1);
+        expect(crossing > 0.0 &&
+                   fabsf(reach_motion_value_at(&motion, 10.1 + crossing) - 35.0f) < 0.001f,
+               "crossing solver handles descending motion for every easing");
+        expect(fabs(reach_motion_time_to_value_at(&motion, 20.0f, 10.1) - 1.9) < 0.000001,
+               "endpoint crossing uses the full deadline rather than float rounding");
+        expect(reach_motion_time_to_value_at(&motion, 80.0f, 10.1) == 0.0 &&
+                   reach_motion_time_to_value_at(&motion, 35.0f, 12.1) == 0.0,
+               "already crossed and completed motion need no additional wait");
+    }
+}
+
 int main(void)
 {
+    test_motion_retarget_uses_one_event_time();
+    test_motion_affine_preserves_the_physical_timeline();
+    test_motion_crossing_preserves_endpoint_deadlines();
     const uint16_t empty[] = {0};
     const uint16_t alpha[] = {'A', 'l', 'p', 'h', 'a', 0};
     const uint16_t alpha_copy[] = {'A', 'l', 'p', 'h', 'a', 0};

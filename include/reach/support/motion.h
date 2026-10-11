@@ -22,11 +22,19 @@ extern "C"
     void reach_motion_set(reach_motion *motion, float value);
     void reach_motion_start(reach_motion *motion, float from, float to, double duration_seconds,
                             reach_easing easing);
+    void reach_motion_start_at(reach_motion *motion, float from, float to, double duration_seconds,
+                               reach_easing easing, double now_seconds);
     void reach_motion_animate_to(reach_motion *motion, float to, double duration_seconds,
                                  reach_easing easing);
+    void reach_motion_animate_to_at(reach_motion *motion, float to, double duration_seconds,
+                                    reach_easing easing, double now_seconds);
+    reach_motion reach_motion_affine(const reach_motion *motion, float multiplier, float offset);
     float reach_motion_value_at(const reach_motion *motion, double now_seconds);
     float reach_motion_value(const reach_motion *motion);
     int32_t reach_motion_active(const reach_motion *motion);
+    int32_t reach_motion_active_at(const reach_motion *motion, double now_seconds);
+    double reach_motion_time_to_value_at(const reach_motion *motion, float target_value,
+                                         double now_seconds);
     double reach_motion_deadline(const reach_motion *motion);
     uint32_t reach_motion_wait_ms(double deadline_seconds);
 

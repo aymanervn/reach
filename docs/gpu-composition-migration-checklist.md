@@ -47,6 +47,9 @@ support expectation is explicitly resolved.
 
 - [ ] Unify animation intent around canonical absolute-time motion, easing and generation semantics;
   preserve interruption, reversal, cancellation and deterministic CPU sampling where required.
+  - [x] Add explicit event-time start/retarget/active/crossing APIs and affine motion derivation;
+    popup and Launcher presentation properties now share one timestamp. Focused non-UI tests cover
+    retarget continuity, affine sampling and endpoint deadlines. The scalar manager remains pending.
 - [ ] Separate content/layout invalidation, compositor submission, native placement and input updates
   in both application loops; pure compositor motion must not request periodic application frames.
 - [ ] Verify completion, stale-generation rejection, hide/reset and supported fallback semantics on
