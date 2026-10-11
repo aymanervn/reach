@@ -1003,6 +1003,7 @@ void reach_d2d_release_retained(reach_render_backend *backend)
     backend->presentation_completed.reset();
     backend->submitted_presentation_generation = 0;
     backend->reconciled_presentation_generation = 0;
+    backend->presentation_result = REACH_OK;
     if (backend->root_visual != nullptr)
     {
         ComPtr<ABI::Windows::UI::Composition::ICompositionObject> root;
@@ -1059,43 +1060,90 @@ void reach_d2d_suspend(reach_render_backend *backend)
     }
 }
 
-int32_t reach_d2d_presentation_complete(reach_render_backend *backend, uint64_t generation)
+static reach_result reach_d2d_fail_presentation(reach_render_backend *backend,
+                                                const wchar_t *operation, HRESULT hr)
 {
-    if (backend == nullptr || !reach_d2d_retained_supported(backend))
-        return 1;
-    if (generation != backend->submitted_presentation_generation)
-        return 1;
+    reach_d2d_log_hresult(operation, hr);
+    backend->presentation_result = REACH_ERROR;
+    backend->presentation_commit.Reset();
+    return REACH_ERROR;
+}
+
+reach_result reach_d2d_presentation_complete(reach_render_backend *backend, uint64_t generation,
+                                             int32_t *out_complete)
+{
+    if (out_complete == nullptr)
+        return REACH_INVALID_ARGUMENT;
+    *out_complete = 0;
+    if (backend == nullptr)
+        return REACH_INVALID_ARGUMENT;
+    if (!reach_d2d_retained_supported(backend) ||
+        generation != backend->submitted_presentation_generation)
+    {
+        *out_complete = 1;
+        return REACH_OK;
+    }
+    if (backend->presentation_result != REACH_OK)
+        return backend->presentation_result;
     double now_seconds = reach_motion_now_seconds();
     if (reach_motion_active_at(&backend->scene_presentation.opacity, now_seconds) ||
         reach_motion_active_at(&backend->scene_presentation.x, now_seconds) ||
         reach_motion_active_at(&backend->scene_presentation.y, now_seconds) ||
         reach_motion_active_at(&backend->scene_presentation.scale, now_seconds))
-        return 0;
+        return REACH_OK;
     if (backend->reconciled_presentation_generation == generation)
-        return 1;
+    {
+        *out_complete = 1;
+        return REACH_OK;
+    }
     if (backend->presentation_commit != nullptr)
     {
         ComPtr<ABI::Windows::Foundation::IAsyncInfo> info;
         AsyncStatus status = Started;
-        if (FAILED(backend->presentation_commit.As(&info)) || FAILED(info->get_Status(&status)) ||
-            status != Completed || FAILED(backend->presentation_commit->GetResults()) ||
-            reach_d2d_synchronize(backend) != REACH_OK)
-            return 0;
+        HRESULT hr = backend->presentation_commit.As(&info);
+        if (SUCCEEDED(hr))
+            hr = info->get_Status(&status);
+        if (FAILED(hr))
+            return reach_d2d_fail_presentation(backend, L"presentation commit status", hr);
+        if (status == Started)
+            return REACH_OK;
+        if (status == Error)
+        {
+            HRESULT error = E_FAIL;
+            hr = info->get_ErrorCode(&error);
+            return reach_d2d_fail_presentation(backend, L"presentation commit",
+                                               FAILED(hr)      ? hr
+                                               : FAILED(error) ? error
+                                                               : E_FAIL);
+        }
+        if (status != Completed)
+            return reach_d2d_fail_presentation(backend, L"presentation commit canceled", E_ABORT);
+        hr = backend->presentation_commit->GetResults();
+        if (FAILED(hr))
+            return reach_d2d_fail_presentation(backend, L"presentation commit results", hr);
+        if (reach_d2d_synchronize(backend) != REACH_OK)
+            return reach_d2d_fail_presentation(backend, L"presentation commit synchronization",
+                                               E_FAIL);
         backend->reconciled_presentation_generation = generation;
-        return 1;
+        *out_complete = 1;
+        return REACH_OK;
     }
     if (backend->presentation_completed != nullptr &&
         backend->presentation_completed->load() == generation)
-        return 1;
+    {
+        *out_complete = 1;
+        return REACH_OK;
+    }
     reach_render_group settled = backend->scene_presentation;
     settled.x.duration_seconds = settled.y.duration_seconds = 0.0;
     settled.opacity.duration_seconds = settled.scale.duration_seconds = 0.0;
     if (backend->compositor != nullptr)
     {
-        if (FAILED(wuc_properties(backend, backend->root_visual.Get(), settled, 0.0f, 0.0f)))
-            return 0;
+        HRESULT hr = wuc_properties(backend, backend->root_visual.Get(), settled, 0.0f, 0.0f);
+        if (FAILED(hr))
+            return reach_d2d_fail_presentation(backend, L"presentation endpoint properties", hr);
         ComPtr<ICompositor5> compositor;
-        HRESULT hr = backend->compositor.As(&compositor);
+        hr = backend->compositor.As(&compositor);
         if (SUCCEEDED(hr))
             hr = compositor->RequestCommitAsync(&backend->presentation_commit);
         std::weak_ptr<std::atomic<uint64_t>> lifetime = backend->presentation_completed;
@@ -1114,22 +1162,26 @@ int32_t reach_d2d_presentation_complete(reach_render_backend *backend, uint64_t 
         if (SUCCEEDED(hr))
             hr = backend->presentation_commit->put_Completed(handler.Get());
         if (FAILED(hr))
-            backend->presentation_commit.Reset();
-        return 0;
+            return reach_d2d_fail_presentation(backend, L"presentation endpoint commit", hr);
+        return REACH_OK;
     }
     if (backend->dcomp_device != nullptr)
     {
-        if (FAILED(dcomp_properties(backend, backend->dcomp_visual, backend->scene_scale.Get(),
-                                    settled, 0.0f, 0.0f)))
-            return 0;
+        HRESULT hr = dcomp_properties(backend, backend->dcomp_visual, backend->scene_scale.Get(),
+                                      settled, 0.0f, 0.0f);
+        if (FAILED(hr))
+            return reach_d2d_fail_presentation(backend, L"presentation endpoint properties", hr);
         reach_workload_add(REACH_WORKLOAD_DCOMP_COMMITS, 1);
-        if (FAILED(backend->dcomp_device->Commit()))
-            return 0;
+        hr = backend->dcomp_device->Commit();
+        if (FAILED(hr))
+            return reach_d2d_fail_presentation(backend, L"presentation endpoint commit", hr);
     }
     if (reach_d2d_synchronize(backend) != REACH_OK)
-        return 0;
+        return reach_d2d_fail_presentation(backend, L"presentation endpoint synchronization",
+                                           E_FAIL);
     backend->reconciled_presentation_generation = generation;
-    return 1;
+    *out_complete = 1;
+    return REACH_OK;
 }
 
 reach_result reach_d2d_sync_retained(reach_render_backend *backend,
@@ -1280,6 +1332,7 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
             backend->presentation_completed.reset();
             backend->submitted_presentation_generation = presentation.opacity.generation;
             backend->reconciled_presentation_generation = 0;
+            backend->presentation_result = REACH_OK;
             if (backend->compositor != nullptr && presentation.opacity.generation != 0)
             {
                 backend->presentation_completed = std::make_shared<std::atomic<uint64_t>>(0);

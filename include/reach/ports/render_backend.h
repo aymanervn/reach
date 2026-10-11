@@ -23,7 +23,8 @@ extern "C"
         void (*destroy)(reach_render_backend *backend);
         reach_result (*synchronize)(reach_render_backend *backend);
         int32_t (*retained_supported)(const reach_render_backend *backend);
-        int32_t (*presentation_complete)(reach_render_backend *backend, uint64_t generation);
+        reach_result (*presentation_complete)(reach_render_backend *backend, uint64_t generation,
+                                              int32_t *out_complete);
         void (*suspend)(reach_render_backend *backend);
     } reach_render_backend_ops;
 

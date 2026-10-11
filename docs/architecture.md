@@ -502,7 +502,11 @@ animation callback: after the canonical deadline, the adapter submits final prop
 Callbacks wake the existing message loop; retarget/reset retire the pending commit and stale
 generations cannot finish newer motion. The runtime already waits on the capsule deadline, so
 this reconciliation adds no timer or periodic application frames. DirectComposition retains its
-one endpoint commit and compositor synchronization before close delivery. HUD's fixed lifetime uses its deadline independently of completion, so the hold
+one endpoint commit and compositor synchronization before close delivery. The render port reports
+pending or complete separately from terminal native errors. Errors are latched for the submitted
+motion; retarget or suspension retires them. The runtime suspends failed composition and releases
+ordinary capsule close cleanup, and stops querying once the capsule clears its lifecycle deadline.
+HUD's fixed lifetime uses its deadline independently of completion, so the hold
 requires no animation frames and another action restarts the complete lifetime. Launcher caret
 blinking also uses a deadline. Renderers without composition sample the same finite group contract
 in a duration-limited CPU fallback; repeating marquee motion remains static there.
