@@ -94,6 +94,12 @@ clip object. Geometry tests sample all four insets at explicit absolute times, i
 edges and disabled clipping. These checks verify API acceptance, ownership and canonical sampling;
 they do not establish displayed-pixel equivalence or rounded-chrome resize capability.
 
+DirectComposition initialization now uses `DCompositionCreateDevice3` with the desktop-device
+interface and Visual2 objects. Five native runs verify its effects-device query and color-matrix
+creation, alongside the existing motion/clip/feedback diagnostics. WUC mask-brush creation is also
+verified. This establishes supported native objects, not color-animation or displayed-pixel
+acceptance; neither object-creation check adds a product animation path.
+
 The counters give a reproducible baseline for content reuse versus sampled visual changes. Full
 application wake/layout/native metrics, cold/warm workload cost, total CPU/GPU activity, latency,
 power, memory and instrumentation overhead still require product scenarios and system traces.

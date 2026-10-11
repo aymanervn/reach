@@ -100,8 +100,8 @@ struct reach_d2d_retained_layer
     ComPtr<ABI::Windows::UI::Composition::ISpriteVisual> visual;
     ComPtr<ABI::Windows::UI::Composition::ICompositionDrawingSurface> surface;
     ComPtr<ABI::Windows::UI::Composition::IInsetClip> inset_clip;
-    ComPtr<IDCompositionVisual> dcomp_container;
-    ComPtr<IDCompositionVisual> dcomp_visual;
+    ComPtr<IDCompositionVisual2> dcomp_container;
+    ComPtr<IDCompositionVisual2> dcomp_visual;
     ComPtr<IDCompositionSurface> dcomp_surface;
     ComPtr<IDCompositionScaleTransform> dcomp_scale;
     ComPtr<IDCompositionEffectGroup> dcomp_opacity;
@@ -125,9 +125,9 @@ struct reach_render_backend
     IDXGISwapChain1 *swap_chain;
     ID2D1Bitmap1 *swap_chain_bitmap;
 
-    IDCompositionDevice *dcomp_device;
+    IDCompositionDesktopDevice *dcomp_device;
     IDCompositionTarget *dcomp_target;
-    IDCompositionVisual *dcomp_visual;
+    IDCompositionVisual2 *dcomp_visual;
 
     int ro_initialized;
     ComPtr<ABI::Windows::UI::Composition::ICompositor> compositor;
@@ -140,7 +140,7 @@ struct reach_render_backend
     std::vector<reach_d2d_retained_layer> retained_layers;
     uint64_t reported_retained_bytes = 0;
     ComPtr<ABI::Windows::UI::Composition::IContainerVisual> scene_visual;
-    ComPtr<IDCompositionVisual> dcomp_scene_visual;
+    ComPtr<IDCompositionVisual2> dcomp_scene_visual;
     ComPtr<IDCompositionScaleTransform> scene_scale;
     ComPtr<IDCompositionEffectGroup> scene_opacity;
     reach_render_group scene_presentation;

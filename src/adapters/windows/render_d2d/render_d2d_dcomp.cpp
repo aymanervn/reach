@@ -125,7 +125,7 @@ reach_result reach_dcomp_create_target(reach_render_backend *backend)
     }
     if (SUCCEEDED(hr))
     {
-        hr = DCompositionCreateDevice2(backend->d2d_device, IID_PPV_ARGS(&backend->dcomp_device));
+        hr = DCompositionCreateDevice3(backend->d2d_device, IID_PPV_ARGS(&backend->dcomp_device));
     }
     if (SUCCEEDED(hr))
     {
