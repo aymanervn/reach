@@ -73,9 +73,11 @@ mutations on the latest stored snapshot, coalesces background writes by generati
 reconciles external-change reloads. Features consume snapshot copies and never access the
 config-store port directly. Window tracking owns the naming policy for a running app
 (`reach_window_tracking_app_display_name`: executable stem, window title as fallback);
-the top bar's current-app pill reads it from there. Window-oriented surfaces that already
-show the app icon, including Switcher and Stage, label each window from its snapshot title
-without prepending the app identity. Pinned apps do not persist a title; the Dock derives
+the top bar's current-app pill reads it from there. Switcher and Stage label each window from its
+snapshot title without prepending the app identity. Window tracking also caches visible frame
+geometry alongside each refreshed window snapshot through the window-manager port. Geometry
+changes publish window-world changes, and both preview capsules read those cached frames without
+querying the OS during layout or animation. Pinned apps do not persist a title; the Dock derives
 its icon fallback from the executable path and never treats config as a live label. When
 `reachctl` creates `reach.ini`, it imports the current Windows taskbar order once, including
 shortcut arguments, original shortcut paths, resolved executable paths, and application
@@ -250,7 +252,18 @@ duration, so this does not change Stage open/close timing or grid rearrangement.
 thumbnail port — it
 publishes a read-only placement list
 (`reach_stage_thumbnail_count` / `reach_stage_thumbnail_at`) that composition drives
-into `window_thumbnail` each frame, the dock-layout precedent. Its tiles live in
+into `window_thumbnail` each frame. Switcher uses that same generic native-overlay contract and
+thumbnail port. Its horizontal strip has one common preview height and per-window widths derived
+from cached source aspect ratios. A single capsule-owned card layout supplies drawn chrome and
+native placement, packs the visible range to the monitor, and keeps the selected window visible
+while cycling the full ring. Minimized or unavailable frame geometry uses an icon placeholder;
+native registration failure leaves the titled card usable. Titles and selection chrome stay outside
+native content. Visible membership changes reconcile relationships without recreating surviving
+sources. Switcher retains its ordinary non-activating Alt-Tab behavior and shared close transition.
+Each thumbnail relationship declares its destination at creation. Runtime teardown releases only
+that surface's IDs, and adapter entries retain stable addresses and support simultaneous targets,
+including overlapping Stage and Switcher presentations. Adapter destruction releases all remaining
+relationships. Stage's tiles live in
 screen space; the render pass converts to surface-local. Native-overlay placements
 select either the target surface or a plane behind it. App thumbnails remain DWM
 relationships on the Stage target. The Desktop relationship instead targets a
@@ -703,6 +716,11 @@ and executes rendering without naming the feature. System HUD uses this path and
 declares Dock as its anchor. The Dock's shown-position bounds are stored on
 its feature runtime rather than in a HUD-specific host cache. Switcher also uses the
 path: its capsule owns width animation, presentation, arranged bounds, and geometry publication.
+Generic native-overlay placement resolves screen geometry into the same client content space as
+drawn commands, including shadow and retained envelope offsets. It samples retained translation,
+centered scale, and opacity from the existing motion clock. Switcher requests frames only through
+its active transition or width animation; settled DWM content updates independently. Stage keeps
+its capsule-owned exact placement and synchronized close semantics.
 Layout definitions can also reserve a top or bottom edge. A consumer that opts into reserved
 bounds receives the remaining rectangle through the generic surface context; Stage uses this
 contract after Dock and top bar arrangement rather than reading either feature directly.

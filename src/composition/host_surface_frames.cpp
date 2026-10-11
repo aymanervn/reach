@@ -241,16 +241,18 @@ void reach_host_release_native_overlay(reach_host *host, reach_feature_runtime *
     }
     for (size_t index = 0; index < REACH_SURFACE_NATIVE_OVERLAY_CAPACITY; ++index)
     {
+        if (desc->native_overlay_ids[index] != REACH_WINDOW_THUMBNAIL_NONE &&
+            host->window_thumbnails.ops.release != nullptr)
+        {
+            (void)host->window_thumbnails.ops.release(host->window_thumbnails.thumbnails,
+                                                      desc->native_overlay_ids[index]);
+        }
         desc->native_overlay_ids[index] = REACH_WINDOW_THUMBNAIL_NONE;
         desc->native_overlay_sources[index] = 0;
         desc->native_overlay_planes[index] = REACH_WINDOW_THUMBNAIL_PLANE_TARGET;
     }
     desc->native_overlay_target = 0;
     desc->native_overlay_registered = 0;
-    if (host->window_thumbnails.ops.destroy_all != nullptr)
-    {
-        (void)host->window_thumbnails.ops.destroy_all(host->window_thumbnails.thumbnails);
-    }
 }
 
 static void reach_host_apply_native_overlay_front(reach_host *host, reach_feature_runtime *desc)
@@ -301,7 +303,6 @@ static void reach_host_reconcile_native_overlay(reach_host *host, reach_feature_
 {
     if (host->window_thumbnails.ops.create == nullptr ||
         host->window_thumbnails.ops.release == nullptr ||
-        host->window_thumbnails.ops.set_target == nullptr ||
         desc->surface->window.ops.native_id == nullptr)
     {
         return;
@@ -314,8 +315,7 @@ static void reach_host_reconcile_native_overlay(reach_host *host, reach_feature_
         reach_host_release_native_overlay(host, desc);
         desc->native_overlay_front_source = front_source;
     }
-    if (target == 0 || host->window_thumbnails.ops.set_target(host->window_thumbnails.thumbnails,
-                                                              target) != REACH_OK)
+    if (target == 0)
     {
         return;
     }
@@ -380,9 +380,10 @@ static void reach_host_reconcile_native_overlay(reach_host *host, reach_feature_
             continue;
         }
         reach_window_thumbnail_id id = REACH_WINDOW_THUMBNAIL_NONE;
-        if (host->window_thumbnails.ops.create(
-                host->window_thumbnails.thumbnails, desc->native_overlay_sources[item_index],
-                desc->native_overlay_planes[item_index], &id) == REACH_OK)
+        if (host->window_thumbnails.ops.create(host->window_thumbnails.thumbnails, target,
+                                               desc->native_overlay_sources[item_index],
+                                               desc->native_overlay_planes[item_index],
+                                               &id) == REACH_OK)
         {
             desc->native_overlay_ids[item_index] = id;
         }
@@ -393,8 +394,46 @@ static void reach_host_reconcile_native_overlay(reach_host *host, reach_feature_
     desc->native_overlay_registered = 1;
 }
 
+reach_window_thumbnail_placement reach_host_native_overlay_placement(
+    reach_window_thumbnail_placement placement, const reach_feature_surface_geometry *geometry,
+    const reach_feature_surface_context *ctx, reach_shadow_pad shadow_pad, double now_seconds)
+{
+    reach_rect_f32 *rect = &placement.destination;
+    rect->x -= geometry->visible_bounds.x;
+    rect->y -= geometry->visible_bounds.y;
+    reach_transform_f32 transform =
+        ctx->content_transform_active
+            ? ctx->render_transform
+            : reach_transform_f32{1.0f, 1.0f, shadow_pad.left, shadow_pad.top};
+    rect->x = rect->x * transform.scale_x + transform.offset_x;
+    rect->y = rect->y * transform.scale_y + transform.offset_y;
+    rect->width *= transform.scale_x;
+    rect->height *= transform.scale_y;
+    if (geometry->presentation.retained)
+    {
+        const reach_render_group *group = &geometry->presentation.group;
+        float scale =
+            group->scale.generation ? reach_motion_value_at(&group->scale, now_seconds) : 1.0f;
+        float center_x = ctx->content_rect.x + ctx->content_rect.width * 0.5f;
+        float center_y = ctx->content_rect.y + ctx->content_rect.height * 0.5f;
+        rect->x =
+            center_x + (rect->x - center_x) * scale + reach_motion_value_at(&group->x, now_seconds);
+        rect->y =
+            center_y + (rect->y - center_y) * scale + reach_motion_value_at(&group->y, now_seconds);
+        rect->width *= scale;
+        rect->height *= scale;
+        float opacity =
+            group->opacity.generation ? reach_motion_value_at(&group->opacity, now_seconds) : 1.0f;
+        placement.opacity *= opacity;
+        placement.background.a *= opacity;
+    }
+    return placement;
+}
+
 static reach_result reach_host_sync_native_overlay(reach_host *host, reach_feature_runtime *desc,
-                                                   reach_rect_f32 visible_bounds)
+                                                   const reach_feature_surface_geometry *geometry,
+                                                   const reach_feature_surface_context *ctx,
+                                                   reach_shadow_pad shadow_pad)
 {
     const reach_feature_native_overlay_ops *ops = desc->definition->surface_ops->native_overlay;
     if (ops == nullptr || ops->generation == nullptr || ops->count == nullptr ||
@@ -402,7 +441,10 @@ static reach_result reach_host_sync_native_overlay(reach_host *host, reach_featu
     {
         return REACH_ERROR;
     }
-    if (!desc->native_overlay_registered ||
+    reach_window_id target = desc->surface->window.ops.native_id != nullptr
+                                 ? desc->surface->window.ops.native_id(desc->surface->window.window)
+                                 : 0;
+    if (!desc->native_overlay_registered || desc->native_overlay_target != target ||
         desc->native_overlay_generation != ops->generation(desc->capsule))
     {
         reach_host_reconcile_native_overlay(host, desc, ops);
@@ -414,12 +456,17 @@ static reach_result reach_host_sync_native_overlay(reach_host *host, reach_featu
         count = REACH_SURFACE_NATIVE_OVERLAY_CAPACITY;
     }
     reach_result placement_result = REACH_OK;
+    double now_seconds = reach_motion_now_seconds();
     for (size_t index = 0; index < count; ++index)
     {
         reach_window_thumbnail_id id = desc->native_overlay_ids[index];
         reach_feature_native_overlay_item item = {};
         const reach_theme *theme = host->theme != nullptr ? host->theme : reach_theme_default();
         if (ops->item(desc->capsule, index, theme, &item) != REACH_OK)
+        {
+            continue;
+        }
+        if (item.source == 0)
         {
             continue;
         }
@@ -430,8 +477,8 @@ static reach_result reach_host_sync_native_overlay(reach_host *host, reach_featu
                 reach_window_thumbnail_id created = REACH_WINDOW_THUMBNAIL_NONE;
                 if (host->window_thumbnails.ops.create != nullptr &&
                     host->window_thumbnails.ops.create(host->window_thumbnails.thumbnails,
-                                                       item.source, item.plane,
-                                                       &created) == REACH_OK)
+                                                       desc->native_overlay_target, item.source,
+                                                       item.plane, &created) == REACH_OK)
                 {
                     desc->native_overlay_ids[index] = created;
                     id = created;
@@ -443,8 +490,8 @@ static reach_result reach_host_sync_native_overlay(reach_host *host, reach_featu
                 continue;
             }
         }
-        item.placement.destination.x -= visible_bounds.x;
-        item.placement.destination.y -= visible_bounds.y;
+        item.placement = reach_host_native_overlay_placement(item.placement, geometry, ctx,
+                                                             shadow_pad, now_seconds);
         reach_result result = host->window_thumbnails.ops.set_placement(
             host->window_thumbnails.thumbnails, id, &item.placement);
         if (result != REACH_OK)
@@ -622,7 +669,8 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
     reach_result native_overlay_result = REACH_OK;
     if (result == REACH_OK && active && desc->definition->surface_ops->native_overlay != nullptr)
     {
-        native_overlay_result = reach_host_sync_native_overlay(host, desc, geometry.visible_bounds);
+        native_overlay_result =
+            reach_host_sync_native_overlay(host, desc, &geometry, &surface_ctx, shadow_pad);
     }
     if (result != REACH_OK ||
         (native_overlay_result != REACH_OK && geometry.synchronize_presentation))

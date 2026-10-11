@@ -38,10 +38,8 @@ extern "C"
 
     typedef struct reach_window_thumbnail_ops
     {
-        reach_result (*set_target)(reach_window_thumbnails *thumbnails, reach_window_id target);
-
-        reach_result (*create)(reach_window_thumbnails *thumbnails, reach_window_id source,
-                               reach_window_thumbnail_plane plane,
+        reach_result (*create)(reach_window_thumbnails *thumbnails, reach_window_id target,
+                               reach_window_id source, reach_window_thumbnail_plane plane,
                                reach_window_thumbnail_id *out_id);
 
         reach_result (*set_placement)(reach_window_thumbnails *thumbnails,
@@ -52,8 +50,6 @@ extern "C"
                                        reach_window_thumbnail_id id);
 
         reach_result (*release)(reach_window_thumbnails *thumbnails, reach_window_thumbnail_id id);
-
-        reach_result (*destroy_all)(reach_window_thumbnails *thumbnails);
 
         void (*destroy)(reach_window_thumbnails *thumbnails);
     } reach_window_thumbnail_ops;
