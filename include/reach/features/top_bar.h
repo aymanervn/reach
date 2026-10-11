@@ -89,7 +89,6 @@ extern "C"
     enum reach_top_bar_animation_id
     {
         REACH_TOP_BAR_ANIM_Y = 0,
-        REACH_TOP_BAR_ANIM_POWER_HOVER,
         REACH_TOP_BAR_ANIM_NOW_PLAYING_WIDTH,
         REACH_TOP_BAR_ANIM_CURRENT_APP_WIDTH,
         REACH_TOP_BAR_ANIM_TRAY_WIDTH,
