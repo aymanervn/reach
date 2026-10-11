@@ -128,7 +128,7 @@ extern "C"
         float app_volumes_expansion;
         reach_text_measure_port text_measure;
         uint64_t press_feedback_target;
-        float press_feedback_opacity;
+        reach_motion press_feedback;
     } reach_quick_settings_render_input;
 
     void reach_quick_settings_model_init(reach_quick_settings_model *model);

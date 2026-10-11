@@ -436,8 +436,9 @@ system CPU/GPU, power and presentation latency require independent measurement. 
 `docs/gpu-workload-baseline.md`.
 
 Shared pressable feedback can publish absolute-time motion directly. Battery retains one fixed
-saver-row overlay through `reach_ui_feedback_render`; press and release events change only its
-opacity descriptor. Its capsule owns capture and original-target activation, resets feedback on
+saver-row overlay through `reach_ui_feedback_render`; Quick Settings uses the same primitive for
+its current pressed target, including output-row scissoring. Press and release events publish an
+opacity descriptor. Each capsule owns capture and original-target activation, resets feedback on
 hide, and requests no periodic frames for feedback. The existing generic fallback samples the
 same command-buffer motion until its deadline when retained rendering is unavailable.
 

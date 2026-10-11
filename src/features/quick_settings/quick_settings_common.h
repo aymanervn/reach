@@ -46,7 +46,8 @@ extern "C"
                                                      float from_height, float to_height);
     float reach_quick_settings_height_animation_value(const reach_quick_settings *quick_settings);
     uint64_t reach_quick_settings_press_feedback_target(const reach_quick_settings *quick_settings);
-    float reach_quick_settings_press_feedback_value(reach_quick_settings *quick_settings);
+    reach_motion
+    reach_quick_settings_press_feedback_motion(const reach_quick_settings *quick_settings);
 #ifdef __cplusplus
 }
 #endif

@@ -3,6 +3,7 @@
 #include "reach/features/common/section_reveal.h"
 
 #include "quick_settings_common.h"
+#include "reach/features/common/ui_controls.h"
 
 #include "reach/features/common/level_presentation.h"
 #include "quick_settings_metrics.h"
@@ -592,19 +593,20 @@ reach_quick_settings_press_feedback_bounds(const reach_quick_settings_render_inp
     }
 }
 
-static void reach_quick_settings_push_press_feedback(const reach_quick_settings_render_input *input,
-                                                     reach_render_command_buffer *commands)
+static reach_result
+reach_quick_settings_push_press_feedback(const reach_quick_settings_render_input *input,
+                                         reach_render_command_buffer *commands)
 {
-    if (input == nullptr || commands == nullptr || input->press_feedback_opacity <= 0.001f)
+    if (input == nullptr || commands == nullptr)
     {
-        return;
+        return REACH_INVALID_ARGUMENT;
     }
     reach_rect_f32 bounds = reach_quick_settings_press_feedback_bounds(input);
     if (bounds.width <= 0.0f || bounds.height <= 0.0f)
     {
-        return;
+        return REACH_OK;
     }
-    reach_color overlay = {0.0f, 0.0f, 0.0f, 0.12f * input->press_feedback_opacity};
+    reach_color overlay = {0.0f, 0.0f, 0.0f, 0.12f};
     float radius = input->theme.radius_small * (input->dpi_scale > 0.0f ? input->dpi_scale : 1.0f);
     int32_t clip_output_row =
         reach_quick_settings_pressable_target_kind(input->press_feedback_target) ==
@@ -613,11 +615,13 @@ static void reach_quick_settings_push_press_feedback(const reach_quick_settings_
     {
         reach_render_command_buffer_set_scissor(commands, input->layout.output_devices_clip);
     }
-    reach_quick_settings_push_rounded_rect(commands, bounds, radius, overlay);
+    reach_result result =
+        reach_ui_feedback_render(commands, 1, bounds, radius, overlay, &input->press_feedback);
     if (clip_output_row)
     {
         reach_render_command_buffer_clear_scissor(commands);
     }
+    return result;
 }
 
 reach_result
@@ -810,9 +814,7 @@ reach_quick_settings_build_render_commands(const reach_quick_settings_render_inp
         reach_render_command_buffer_clear_scissor(commands);
     }
 
-    reach_quick_settings_push_press_feedback(input, commands);
-
-    return REACH_OK;
+    return reach_quick_settings_push_press_feedback(input, commands);
 }
 
 static reach_rect_f32 reach_quick_settings_intersect(reach_rect_f32 a, reach_rect_f32 b)
@@ -844,7 +846,7 @@ reach_result reach_quick_settings_append_render_commands(
     input.output_devices_expansion = state->output_devices_expansion;
     input.app_volumes_expansion = state->app_volumes_expansion;
     input.press_feedback_target = reach_quick_settings_press_feedback_target(quick_settings);
-    input.press_feedback_opacity = reach_quick_settings_press_feedback_value(quick_settings);
+    input.press_feedback = reach_quick_settings_press_feedback_motion(quick_settings);
 
     reach_result result = reach_quick_settings_build_render_commands(&input, out_commands);
     if (result != REACH_OK)

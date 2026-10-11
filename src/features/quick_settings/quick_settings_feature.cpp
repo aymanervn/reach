@@ -649,7 +649,6 @@ enum
     REACH_QUICK_SETTINGS_ANIMATION_HEIGHT = 0,
     REACH_QUICK_SETTINGS_ANIMATION_OUTPUT_DEVICES_EXPANSION,
     REACH_QUICK_SETTINGS_ANIMATION_APP_VOLUMES_EXPANSION,
-    REACH_QUICK_SETTINGS_ANIMATION_PRESS_FEEDBACK,
     REACH_QUICK_SETTINGS_ANIMATION_COUNT
 };
 
@@ -664,6 +663,7 @@ struct reach_quick_settings
     reach_animation_track animation_tracks[REACH_QUICK_SETTINGS_ANIMATION_COUNT];
     reach_feature_transition popup_transition;
     reach_pressable pressable;
+    reach_motion press_feedback;
     reach_quick_settings_action press_action;
     reach_quick_settings_state state;
 
@@ -679,8 +679,7 @@ static reach_pressable_feedback_style
 reach_quick_settings_pressable_feedback(reach_quick_settings *quick_settings)
 {
     reach_pressable_feedback_style feedback = {};
-    feedback.animations = quick_settings != nullptr ? &quick_settings->animations : nullptr;
-    feedback.track = REACH_QUICK_SETTINGS_ANIMATION_PRESS_FEEDBACK;
+    feedback.motion = quick_settings != nullptr ? &quick_settings->press_feedback : nullptr;
     feedback.pressed_value = 1.0f;
     feedback.press_seconds = 0.055;
     feedback.release_seconds = 0.10;
@@ -753,13 +752,9 @@ uint64_t reach_quick_settings_press_feedback_target(const reach_quick_settings *
                                                            : static_cast<uint64_t>(feedback_index);
 }
 
-float reach_quick_settings_press_feedback_value(reach_quick_settings *quick_settings)
+reach_motion reach_quick_settings_press_feedback_motion(const reach_quick_settings *quick_settings)
 {
-    reach_pressable_feedback_style feedback =
-        reach_quick_settings_pressable_feedback(quick_settings);
-    return quick_settings != nullptr
-               ? reach_pressable_feedback_value(&quick_settings->pressable, &feedback)
-               : 0.0f;
+    return quick_settings != nullptr ? quick_settings->press_feedback : reach_motion{};
 }
 
 int32_t reach_quick_settings_is_open(const reach_quick_settings *quick_settings)
