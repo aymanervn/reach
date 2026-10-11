@@ -173,10 +173,12 @@ reach_result reach_d2d_execute(reach_render_backend *backend,
                 group = &commands->groups[at];
         target->SetTransform(content * root);
         if (group != nullptr && group->has_clip)
-            target->PushAxisAlignedClip(D2D1::RectF(group->clip.x, group->clip.y,
-                                                    group->clip.x + group->clip.width,
-                                                    group->clip.y + group->clip.height),
-                                        D2D1_ANTIALIAS_MODE_ALIASED);
+        {
+            reach_rect_f32 clip = reach_render_group_clip_at(group, reach_motion_now_seconds());
+            target->PushAxisAlignedClip(
+                D2D1::RectF(clip.x, clip.y, clip.x + clip.width, clip.y + clip.height),
+                D2D1_ANTIALIAS_MODE_ALIASED);
+        }
         float opacity = root_opacity;
         if (group != nullptr)
         {

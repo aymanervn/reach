@@ -99,11 +99,13 @@ struct reach_d2d_retained_layer
     ComPtr<ABI::Windows::UI::Composition::IContainerVisual> container;
     ComPtr<ABI::Windows::UI::Composition::ISpriteVisual> visual;
     ComPtr<ABI::Windows::UI::Composition::ICompositionDrawingSurface> surface;
+    ComPtr<ABI::Windows::UI::Composition::IInsetClip> inset_clip;
     ComPtr<IDCompositionVisual> dcomp_container;
     ComPtr<IDCompositionVisual> dcomp_visual;
     ComPtr<IDCompositionSurface> dcomp_surface;
     ComPtr<IDCompositionScaleTransform> dcomp_scale;
     ComPtr<IDCompositionEffectGroup> dcomp_opacity;
+    ComPtr<IDCompositionRectangleClip> dcomp_clip;
     UINT width = 0;
     UINT height = 0;
     int32_t seen = 0;

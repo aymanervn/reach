@@ -182,6 +182,138 @@ static HRESULT dcomp_motion(reach_render_backend *backend, const reach_motion &m
     return hr;
 }
 
+static HRESULT sync_clip(reach_render_backend *backend, reach_d2d_retained_layer &layer,
+                         const reach_render_group &group, bool initialized)
+{
+    if (!group.has_clip)
+    {
+        HRESULT hr = S_OK;
+        if (layer.inset_clip != nullptr)
+        {
+            ComPtr<IVisual> container;
+            hr = layer.container.As(&container);
+            if (SUCCEEDED(hr))
+                hr = container->put_Clip(nullptr);
+        }
+        else if (layer.dcomp_clip != nullptr)
+            hr = layer.dcomp_container->SetClip((IDCompositionClip *)nullptr);
+        if (SUCCEEDED(hr))
+        {
+            layer.inset_clip.Reset();
+            layer.dcomp_clip.Reset();
+        }
+        return hr;
+    }
+    unsigned mask = !initialized || !layer.group.has_clip ||
+                            group.clip.width != layer.group.clip.width ||
+                            group.clip.height != layer.group.clip.height
+                        ? 15
+                        : 0;
+    for (size_t edge = 0; edge < REACH_RENDER_CLIP_EDGE_COUNT; ++edge)
+        if (memcmp(&group.clip_insets[edge], &layer.group.clip_insets[edge],
+                   sizeof(reach_motion)) != 0)
+            mask |= 1u << edge;
+    if (mask == 0)
+        return S_OK;
+    reach_workload_add(REACH_WORKLOAD_PROPERTY_SUBMISSIONS, 1);
+    HRESULT hr = S_OK;
+    if (backend->compositor != nullptr)
+    {
+        if (layer.inset_clip == nullptr)
+        {
+            hr = backend->compositor->CreateInsetClip(&layer.inset_clip);
+            ComPtr<ICompositionClip> clip;
+            ComPtr<IVisual> container;
+            if (SUCCEEDED(hr))
+                hr = layer.inset_clip.As(&clip);
+            if (SUCCEEDED(hr))
+                hr = layer.container.As(&container);
+            if (SUCCEEDED(hr))
+                hr = container->put_Clip(clip.Get());
+            if (FAILED(hr))
+            {
+                layer.inset_clip.Reset();
+                return hr;
+            }
+        }
+        static const wchar_t *properties[] = {L"LeftInset", L"TopInset", L"RightInset",
+                                              L"BottomInset"};
+        for (size_t edge = 0; edge < REACH_RENDER_CLIP_EDGE_COUNT && SUCCEEDED(hr); ++edge)
+        {
+            if ((mask & (1u << edge)) == 0)
+                continue;
+            float value = reach_motion_value(&group.clip_insets[edge]);
+            switch (edge)
+            {
+            case REACH_RENDER_CLIP_LEFT:
+                hr = layer.inset_clip->put_LeftInset(value);
+                break;
+            case REACH_RENDER_CLIP_TOP:
+                hr = layer.inset_clip->put_TopInset(value);
+                break;
+            case REACH_RENDER_CLIP_RIGHT:
+                hr = layer.inset_clip->put_RightInset(value);
+                break;
+            case REACH_RENDER_CLIP_BOTTOM:
+                hr = layer.inset_clip->put_BottomInset(value);
+                break;
+            }
+            if (SUCCEEDED(hr))
+                hr = wuc_motion(backend, layer.inset_clip.Get(), properties[edge],
+                                group.clip_insets[edge]);
+        }
+        return hr;
+    }
+    if (layer.dcomp_clip == nullptr)
+    {
+        hr = backend->dcomp_device->CreateRectangleClip(&layer.dcomp_clip);
+        if (SUCCEEDED(hr))
+            hr = layer.dcomp_container->SetClip(layer.dcomp_clip.Get());
+        if (FAILED(hr))
+        {
+            layer.dcomp_clip.Reset();
+            return hr;
+        }
+    }
+    for (size_t edge = 0; edge < REACH_RENDER_CLIP_EDGE_COUNT && SUCCEEDED(hr); ++edge)
+    {
+        if ((mask & (1u << edge)) == 0)
+            continue;
+        reach_motion motion = group.clip_insets[edge];
+        if (edge == REACH_RENDER_CLIP_RIGHT || edge == REACH_RENDER_CLIP_BOTTOM)
+        {
+            float extent = edge == REACH_RENDER_CLIP_RIGHT ? group.clip.width : group.clip.height;
+            motion.from = extent - motion.from;
+            motion.to = extent - motion.to;
+        }
+        float value = reach_motion_value(&motion);
+        ComPtr<IDCompositionAnimation> animation;
+        hr = dcomp_motion(backend, motion, &animation);
+        if (FAILED(hr))
+            break;
+        switch (edge)
+        {
+        case REACH_RENDER_CLIP_LEFT:
+            hr = animation != nullptr ? layer.dcomp_clip->SetLeft(animation.Get())
+                                      : layer.dcomp_clip->SetLeft(value);
+            break;
+        case REACH_RENDER_CLIP_TOP:
+            hr = animation != nullptr ? layer.dcomp_clip->SetTop(animation.Get())
+                                      : layer.dcomp_clip->SetTop(value);
+            break;
+        case REACH_RENDER_CLIP_RIGHT:
+            hr = animation != nullptr ? layer.dcomp_clip->SetRight(animation.Get())
+                                      : layer.dcomp_clip->SetRight(value);
+            break;
+        case REACH_RENDER_CLIP_BOTTOM:
+            hr = animation != nullptr ? layer.dcomp_clip->SetBottom(animation.Get())
+                                      : layer.dcomp_clip->SetBottom(value);
+            break;
+        }
+    }
+    return hr;
+}
+
 static HRESULT wuc_properties(reach_render_backend *backend, IInspectable *inspectable,
                               const reach_render_group &group, float base_x, float base_y,
                               bool preserve_repeat = false, unsigned mask = 31)
@@ -683,18 +815,8 @@ static HRESULT sync_layer(reach_render_backend *backend, reach_d2d_retained_laye
         if (SUCCEEDED(hr) && group.has_clip)
         {
             hr = container->put_Size({group.clip.width, group.clip.height});
-            ComPtr<IInsetClip> inset;
-            ComPtr<ICompositionClip> clip;
-            if (SUCCEEDED(hr))
-                hr = backend->compositor->CreateInsetClipWithInsets(0.0f, 0.0f, 0.0f, 0.0f, &inset);
-            if (SUCCEEDED(hr))
-                hr = inset.As(&clip);
-            if (SUCCEEDED(hr))
-                hr = container->put_Clip(clip.Get());
         }
-        else if (SUCCEEDED(hr))
-            hr = container->put_Clip(nullptr);
-        if (SUCCEEDED(hr))
+        if (SUCCEEDED(hr) && mask != 0)
             hr = wuc_properties(backend, layer.visual.Get(), group, base_x, base_y, preserve_repeat,
                                 mask);
     }
@@ -703,18 +825,13 @@ static HRESULT sync_layer(reach_render_backend *backend, reach_d2d_retained_laye
         hr = layer.dcomp_container->SetOffsetX(anchor_x);
         if (SUCCEEDED(hr))
             hr = layer.dcomp_container->SetOffsetY(anchor_y);
-        if (SUCCEEDED(hr) && group.has_clip)
-        {
-            D2D_RECT_F clip = {0.0f, 0.0f, group.clip.width, group.clip.height};
-            hr = layer.dcomp_container->SetClip(clip);
-        }
-        else if (SUCCEEDED(hr))
-            hr = layer.dcomp_container->SetClip((IDCompositionClip *)nullptr);
-        if (SUCCEEDED(hr))
+        if (SUCCEEDED(hr) && mask != 0)
             hr = dcomp_properties(backend, layer.dcomp_visual.Get(), layer.dcomp_scale.Get(),
                                   layer.dcomp_opacity.Get(), group, base_x, base_y, preserve_repeat,
                                   mask);
     }
+    if (SUCCEEDED(hr) && geometry_changed)
+        hr = sync_clip(backend, layer, group, initialized);
     if (SUCCEEDED(hr) && repeat_changed && group.repeat_travel_seconds > 0.0f)
     {
         hr = repeat_motion(backend, layer, group, base_x);

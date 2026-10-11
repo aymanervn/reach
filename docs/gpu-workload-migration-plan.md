@@ -122,6 +122,16 @@ product/API incompatibilities before dependent implementation proceeds.
 **Gate:** resize design and preview disposition with capability, limitations, expected cost and
 consumer impact. Do not promise fully compositor-driven thumbnails before this gate.
 
+Implemented capability foundation: group clips expose canonical left/top/right/bottom inset motion.
+Adapters cache native clips and submit changed descriptors without changing retained content;
+fallback uses the same absolute-time rectangle. Supported properties are documented by
+[Microsoft's InsetClip reference](https://learn.microsoft.com/en-us/uwp/api/windows.ui.composition.insetclip)
+and [DirectComposition rectangle-clip edge animation](https://learn.microsoft.com/en-us/windows/win32/directcomp/idcompositionrectangleclip-setright-overloaded).
+This preserves unscaled content while changing its viewport. Bounded reversal/retirement and
+geometry checks pass; displayed pixels, section reveal integration and chrome resize remain open.
+Insets alone cannot preserve moving rounded corners, borders, notches and shadows. Resolve those
+through a shared chrome mechanism before migrating width/height consumers; keep this gate pending.
+
 ### 3. Unify animation intent and runtime scheduling
 
 Make reusable manager output declarative motion descriptions based on the existing absolute clock,

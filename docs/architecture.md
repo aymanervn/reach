@@ -427,6 +427,13 @@ before replacements are allocated. Processed cover artwork uses a 24-entry, 16 M
 ordinary text and measurement share 32 text formats and 128 layouts with bounded string lengths.
 Font changes, icon retirement, and backend destruction invalidate dependent entries.
 
+Group clips retain a stationary viewport and four independent absolute-time inset descriptors.
+Windows Composition animates the cached `InsetClip` properties; DirectComposition animates a cached
+rectangle clip, mapping right/bottom insets to native edge coordinates. Removing clipping retires
+the native clip. `reach_render_group_clip_at` provides the same event-time rectangle to CPU fallback
+and geometry consumers, and active clip motion participates in generic fallback frame demand.
+This group capability does not yet provide rounded popup-chrome resize or root-presentation clips.
+
 Optional process-wide workload diagnostics count application wakes/updates, scalar/loader/scroll
 work, layout and command production, renderer executions and actual raster passes, compositor
 submissions, and native-thumbnail calls separately. `REACH_WORKLOAD_REPORT` enables collection at
