@@ -70,6 +70,15 @@ scene's estimate in the diagnostic is 86,688 bytes; the feedback layer adds a fi
 cost must be included in the final product comparison. Do not infer zero GPU work from zero raster
 passes or use the deliberate message-pump hold as product latency.
 
+Quick Settings uses the same diagnostic method, isolating one system tile and cancellation from
+height/expansion and service work. Five runs on each compositor verify that after the first target
+submission, cancellation needs one execution/property submission, zero raster passes and zero
+scalar-manager advances. An explicit capsule tick during the held press requests neither redraw
+nor updates; press/release do not request frames. The HWND fallback executes the same release
+descriptor with one raster pass. Initial target introduction may allocate/raster a layer, and target
+geometry or clipping changes still update content. Hidden/source/DPI and product cost verification
+remain part of the final acceptance matrix.
+
 The counters give a reproducible baseline for content reuse versus sampled visual changes. Full
 application wake/layout/native metrics, cold/warm workload cost, total CPU/GPU activity, latency,
 power, memory and instrumentation overhead still require product scenarios and system traces.

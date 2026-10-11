@@ -59,7 +59,7 @@ are evaluated independently from the animation's active lifetime.
 | Quick Settings height | `REACH_QUICK_SETTINGS_ANIMATION_HEIGHT`; `reach_quick_settings_tick` | Scalar / popup chrome | Section/content target changes | Migrate: shared resize. |
 | Output-device expansion | `REACH_QUICK_SETTINGS_ANIMATION_OUTPUT_DEVICES_EXPANSION`; Quick Settings layout/render | Scalar / section height, reveal and following content | Expand/collapse | Migrate: shared retained section reveal. |
 | App-volume expansion | `REACH_QUICK_SETTINGS_ANIMATION_APP_VOLUMES_EXPANSION`; Quick Settings layout/render | Scalar / section height, reveal and following content | Expand/collapse | Migrate: same section capability. |
-| Quick Settings press feedback | `REACH_QUICK_SETTINGS_ANIMATION_PRESS_FEEDBACK`; shared pressable | Scalar / overlay | Press/release fade | Migrate: shared feedback. |
+| Quick Settings press feedback | `reach_quick_settings::press_feedback`; shared pressable and `reach_ui_feedback_render` | Retained motion / fixed target overlay | Press/release fade | Implemented: direct absolute-time intent, no feedback scalar advancement/frame demand; native compositor and HWND fallback verification pass. Final visual/performance acceptance remains open. |
 | Stage tile progress | `REACH_STAGE_ANIMATION_PROGRESS`; `stage_layout.cpp` | Scalar/native / geometry and close landing | Enter/close | Capability decision: preserve synchronized native close. |
 | Stage desktop progress | `REACH_STAGE_ANIMATION_DESKTOP_PROGRESS`; `stage_layout.cpp` | Scalar/native / desktop thumbnail geometry | Enter/close | Capability decision: desktop source and ordering semantics. |
 | Stage reflow | `REACH_STAGE_ANIMATION_REFLOW`; `stage_layout.cpp` | Scalar/native / source rearrangement | Membership changes | Capability decision: stable sources and shared motion. |
@@ -186,6 +186,12 @@ intent. Original-target arming, capture, cancellation and hide resets are preser
 pressable logic tests cover descriptor generation, cancellation and target retirement.
 
 The pressable style temporarily accepts either its existing manager/track or one motion pointer,
-and rejects ambiguous ownership. Migrated Battery uses only motion. Remaining legacy styles are
+and rejects ambiguous ownership. Migrated Battery and Quick Settings use only motion. Remaining legacy styles are
 enumerated above; remove the manager/track style fields and dispatch branches when those consumers
 migrate. This bridge is migration work, not an accepted final parallel animation design.
+
+Quick Settings removes its press-feedback scalar enum/track and sampled opacity from render input.
+It publishes the descriptor to the shared overlay, preserves output-row scissoring and the existing
+target/capture policy, and allocates content on target introduction or geometry changes. Retained
+release changes no raster content. Its height and section expansion tracks remain listed separately;
+their CPU work does not justify leaving the feedback animation on the CPU.

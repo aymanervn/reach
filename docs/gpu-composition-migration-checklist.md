@@ -1,7 +1,8 @@
 # GPU composition migration
 
-Status: migration active; inventory and initial dispositions complete, implementation and
-performance acceptance pending. Evidence is in the [animation ledger](gpu-animation-ledger.md).
+Status: migration active; inventory and initial dispositions complete, shared feedback consumers
+migrating, broader implementation and performance acceptance pending. Evidence is in the
+[animation ledger](gpu-animation-ledger.md).
 Counter verification and remaining measurement prerequisites are in the
 [workload baseline](gpu-workload-baseline.md).
 
@@ -55,6 +56,11 @@ support expectation is explicitly resolved.
 
 - [ ] Migrate eligible hover, press, selection and close feedback across Context Menu, Battery, tray,
   Clipboard, Quick Settings, Dock, Top Bar and Settings using shared retained primitives.
+  - [x] Battery press/release overlay: `d3f71dd`; obsolete scalar path removed, build/tests and both
+    compositor/fallback diagnostics pass.
+  - [x] Quick Settings press/release overlay uses the same shared primitive; obsolete feedback track
+    and sampled alpha removed. Build, 39 tests and native compositor/fallback diagnostics pass.
+    Height and section expansion remain separate pending work.
 - [ ] Migrate eligible loaders/repeating effects; select efficient compositor or deadline behavior for
   carets, preserve focus resets and marquee behavior, and stop hidden repetitions.
 
