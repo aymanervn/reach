@@ -251,7 +251,6 @@ extern "C"
     void reach_top_bar_layout_tray_popup(reach_top_bar *top_bar, const reach_theme *theme,
                                          const reach_popup_anchor *anchor, float dpi_scale,
                                          reach_rect_f32 *out_bounds);
-    reach_animation_manager *reach_top_bar_tray_animation_manager(reach_top_bar *top_bar);
     size_t reach_top_bar_tray_item_count(const reach_top_bar *top_bar);
     uint64_t reach_top_bar_tray_item_icon_id(const reach_top_bar *top_bar, size_t index);
 

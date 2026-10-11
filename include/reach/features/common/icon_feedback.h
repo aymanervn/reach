@@ -13,6 +13,11 @@ extern "C"
     void reach_push_icon_press_feedback(reach_render_command_buffer *commands, reach_rect_f32 rect,
                                         float radius, uint64_t icon_id, reach_color color,
                                         float opacity, float minimum_opacity);
+    reach_result reach_push_icon_press_feedback_motion(reach_render_command_buffer *commands,
+                                                       uint64_t id, reach_rect_f32 rect,
+                                                       float radius, uint64_t icon_id,
+                                                       reach_color color,
+                                                       const reach_motion *opacity);
 
 #ifdef __cplusplus
 }
