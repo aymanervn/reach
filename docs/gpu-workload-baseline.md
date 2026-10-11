@@ -130,6 +130,13 @@ three cases with one raster pass per cancellation. Overlay commands preserve the
 feedback alpha replaces theme alpha. Actual shell-icon/DPI churn, dragging/reordering live pixels
 and total product cost still require final acceptance. Existing diagnostics continue to pass.
 
+Top Bar power-hover diagnostics drive public pointer enter/leave and reverse the motion after
+60 ms. Five runs per compositor verify two executions and two property submissions, zero raster
+passes and zero scalar advances after cold coverage creation. Hover requests no capsule frames;
+reset and game-mode suppression stop the motion. The HWND fallback samples three explicitly
+submitted frames, including the endpoint, with three raster passes. Displayed pixels, live input,
+DPI/theme changes and total product cost remain pending.
+
 The counters give a reproducible baseline for content reuse versus sampled visual changes. Full
 application wake/layout/native metrics, cold/warm workload cost, total CPU/GPU activity, latency,
 power, memory and instrumentation overhead still require product scenarios and system traces.

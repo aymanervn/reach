@@ -592,9 +592,8 @@ void reach_top_bar_pointer_move(reach_top_bar *top_bar, int32_t local_x, int32_t
     }
 
     state->power_hovered = hovered;
-    reach_animation_manager_animate_to(reach_top_bar_manager(top_bar),
-                                       REACH_TOP_BAR_ANIM_POWER_HOVER, hovered ? 1.0f : 0.0f, 0.18,
-                                       REACH_EASING_EASE_IN_OUT);
+    reach_motion_animate_to(&top_bar->power_hover, hovered ? 1.0f : 0.0f, 0.18,
+                            REACH_EASING_EASE_IN_OUT);
     out->handled = 1;
     out->redraw = 1;
 }
@@ -631,8 +630,6 @@ void reach_top_bar_pointer_leave(reach_top_bar *top_bar, reach_top_bar_event_res
     }
 
     state->power_hovered = 0;
-    reach_animation_manager_animate_to(reach_top_bar_manager(top_bar),
-                                       REACH_TOP_BAR_ANIM_POWER_HOVER, 0.0f, 0.18,
-                                       REACH_EASING_EASE_IN_OUT);
+    reach_motion_animate_to(&top_bar->power_hover, 0.0f, 0.18, REACH_EASING_EASE_IN_OUT);
     out->redraw = 1;
 }

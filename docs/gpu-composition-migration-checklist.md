@@ -86,6 +86,11 @@ support expectation is explicitly resolved.
     alpha/colors, frame blockers and the final shared pressable scalar bridge are removed.
     Debug builds, 39 tests and five bounded capsule runs per compositor plus HWND fallback pass.
     Native cancellation reuses content; live pixels, icon/DPI churn and product cost remain pending.
+  - [x] Top Bar power hover uses the shared retained RGBA tint with a separately cached glyph.
+    Preserve enter/leave easing; remove scalar advancement, redraw/frame demand and bar blocker.
+    Reset and game-mode suppression clear the motion. Debug build, 39 tests and five bounded runs
+    per compositor plus HWND fallback pass, including reversal with no retained raster work.
+    Displayed pixels, live DPI/theme changes and total product cost remain in final acceptance.
 - [ ] Migrate eligible loaders/repeating effects; select efficient compositor or deadline behavior for
   carets, preserve focus resets and marquee behavior, and stop hidden repetitions.
 

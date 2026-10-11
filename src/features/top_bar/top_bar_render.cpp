@@ -37,7 +37,7 @@ typedef struct reach_top_bar_render_input
     int32_t battery_percent;
     int32_t battery_saver_on;
     int32_t battery_charging;
-    float power_hover;
+    const reach_motion *power_hover;
     size_t click_feedback_index;
     const reach_motion *click_feedback;
     reach_motion tray_motion[REACH_TOP_BAR_MAX_TRAY_ICONS];
@@ -130,18 +130,25 @@ static void reach_top_bar_push_power_button(const reach_top_bar_render_input *in
         return;
     }
 
-    reach_color background = reach_theme_color_mix(
-        theme->bar_button_background, theme->bar_power_hover_background, input->power_hover);
-
-    reach_top_bar_push_rect(commands, power_box, background, power_box.height * 0.5f);
+    int32_t background = reach_ui_color_feedback_begin(
+        commands, UINT64_C(0x10000000000) + 1, power_box, theme->bar_button_background,
+        theme->bar_power_hover_background, input->power_hover);
+    reach_top_bar_push_rect(commands, power_box,
+                            background ? reach_color{1, 1, 1, 1} : theme->bar_button_background,
+                            power_box.height * 0.5f);
+    if (background)
+        reach_render_command_buffer_end_group(commands);
+    reach_render_group glyph = {};
+    glyph.id = UINT64_C(0x10000000000) + 8;
+    reach_render_command_buffer_begin_group(commands, &glyph);
     reach_top_bar_push_vector_icon(
         commands,
         reach_top_bar_center_square(power_box, power_box.height * metrics.power_glyph_scale),
         REACH_VECTOR_ICON_POWER, theme->system_glyph);
+    reach_render_command_buffer_end_group(commands);
 
     if (input->click_feedback_index == REACH_TOP_BAR_FEEDBACK_POWER_BUTTON)
     {
-        reach_render_command_buffer_end_group(commands);
         (void)reach_ui_feedback_render(commands, REACH_TOP_BAR_FEEDBACK_GROUP_ID, power_box,
                                        power_box.height * 0.5f,
                                        reach_theme_color_alpha(theme->bar_click_feedback, 1.0f),
@@ -549,8 +556,7 @@ reach_result reach_top_bar_append_render_commands(reach_top_bar *top_bar,
     input.battery_saver_on = state->battery_saver_pending ? state->battery_saver_pending_enabled
                                                           : state->battery_saver_on;
     input.battery_charging = state->battery_charging;
-    input.power_hover =
-        reach_animation_manager_value(&top_bar->manager, REACH_TOP_BAR_ANIM_POWER_HOVER);
+    input.power_hover = &top_bar->power_hover;
     input.click_feedback_index = reach_pressable_feedback_index(&state->pressable);
     input.click_feedback = &top_bar->press_feedback;
     for (size_t index = 0; index < state->layout.tray_icon_count; ++index)
@@ -596,13 +602,7 @@ reach_result reach_top_bar_append_render_commands(reach_top_bar *top_bar,
             reach_top_bar_icons(top_bar), state->current_app_icon_ref, ctx->icon_size_px);
     }
 
-    {
-        reach_render_group group = {};
-        group.id = UINT64_C(0x10000000000) + 1;
-        reach_render_command_buffer_begin_group(out_commands, &group);
-        reach_top_bar_push_power_button(&input, out_commands);
-        reach_render_command_buffer_end_group(out_commands);
-    }
+    reach_top_bar_push_power_button(&input, out_commands);
     {
         reach_render_group group = {};
         group.id = UINT64_C(0x10000000000) + 2;

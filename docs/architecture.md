@@ -470,6 +470,9 @@ for moving icons. Shared UI feedback owns the group descriptor; the icon helper 
 original alpha-mask tint, while trigger and overflow glyphs use RGBA tint. Press feedback no longer
 owns scalar tracks, sampled render values, capsule frame demand or bar content-frame blockers.
 Original-target capture and context-feedback latching still use the shared pressable contract.
+Top Bar power hover publishes retained RGBA tint over fixed rounded background coverage, with
+its glyph in a separate cached group. Enter/leave retarget the canonical motion; reset and game
+mode clear it. Power hover has no scalar track, periodic capsule frame or bar frame blocker.
 
 Top Bar tray and Dock icon groups use stable item identities. Pointer events publish direct
 positions, reordered neighbours and released items run compositor motion, and a stationary drag
