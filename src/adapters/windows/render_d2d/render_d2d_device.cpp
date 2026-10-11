@@ -6,6 +6,10 @@ ID2D1RenderTarget *reach_d2d_target(reach_render_backend *backend)
     {
         return nullptr;
     }
+    if (backend->command_target != nullptr)
+    {
+        return backend->command_target;
+    }
     if (backend->d2d_context != nullptr)
     {
         return backend->d2d_context;

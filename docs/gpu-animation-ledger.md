@@ -96,7 +96,7 @@ migrated, rather than only changing the track representation.
 | `display_theme_track` | `settings_monitors_scaling.cpp`, `settings_render.cpp` | Theme selection | Migrate: retained selection without changing theme policy. |
 | `top_bar_style_track` | `settings_top_bar.cpp`, `settings_render.cpp` | Style selection | Migrate: retained segmented selection. |
 | `top_bar_mode_track` | `settings_top_bar.cpp`, `settings_render.cpp` | Mode selection | Migrate: retained segmented selection. |
-| `button_press_track` | `settings_feature.cpp`, app button routing and renderers | Press/disarm/release fade | Migrate: shared retained feedback with original-target identity. |
+| `button_press_feedback` | `settings_feature.cpp`, shared UI buttons and app routing | Absolute-time retained RGBA tint / original-target feedback | Implemented: scalar manager, tick and sampled colors removed. Both compositors reuse coverage; fallback schedules the same descriptors to their final frame. Build, tests and bounded diagnostics pass; displayed compositor pixels and total product cost remain pending. |
 
 ## Already retained presentation and movement
 
@@ -187,7 +187,7 @@ intent. Original-target arming, capture, cancellation and hide resets are preser
 pressable logic tests cover descriptor generation, cancellation and target retirement.
 
 The pressable style temporarily accepts either its existing manager/track or one motion pointer,
-and rejects ambiguous ownership. Migrated Battery, Quick Settings and tray popup use only motion. Remaining legacy styles
+and rejects ambiguous ownership. Migrated Battery, Quick Settings, tray popup and Settings buttons use only motion. Remaining legacy styles
 are enumerated above; remove the manager/track style fields and dispatch branches when those consumers
 migrate. This bridge is migration work, not an accepted final parallel animation design.
 
@@ -203,3 +203,12 @@ retained opacity; fallback rectangles use the shared UI feedback helper. The sca
 remains only for Dock and Top Bar until those consumers migrate. Canonical explicit-time and affine
 motion helpers landed in `18153ae`; tray feedback landed in `6845768`, with Debug build, full tests
 and bounded native verification. Supported preview design is recorded in `426d6e2`.
+
+Settings buttons now derive background and optional text RGBA channels from one press descriptor.
+Shared UI rendering emits fixed white coverage into independently identified retained groups. The
+Windows adapter owns WUC mask/color/property objects and DirectComposition color-matrix effects.
+DirectComposition uses Visual3 opacity, freeing the effect slot for tint and removing obsolete
+opacity-effect groups. The fallback tints aggregate coverage once, including overlaps, instead of
+replacing command colors independently. It samples all group/presentation properties at one frame
+time. Settings schedules generic command-buffer fallback motion with a final endpoint frame;
+feedback retirement happens on the next input, with no compositor feedback ticks.

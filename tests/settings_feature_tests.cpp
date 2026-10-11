@@ -551,13 +551,11 @@ static void test_button_press_feedback(void)
 {
     std::unique_ptr<reach_settings_model> model(new reach_settings_model());
     reach_settings_model_init(model.get());
-    expect_true(reach_settings_model_button_press_value(model.get(),
-                                                        REACH_SETTINGS_HIT_POWER_APPLY) == 0.0f,
-                "buttons start unpressed");
-
+    expect_true(reach_settings_model_button_press_motion(model.get(),
+                                                         REACH_SETTINGS_HIT_POWER_APPLY) == nullptr,
+                "buttons start without feedback intent");
     reach_pressable_feedback_style feedback = {};
-    feedback.animations = &model->button_press_animation;
-    feedback.track = 0;
+    feedback.motion = &model->button_press_feedback;
     feedback.pressed_value = 1.0f;
     feedback.release_seconds = 0.18;
     feedback.release_easing = REACH_EASING_EASE_OUT;
@@ -565,28 +563,25 @@ static void test_button_press_feedback(void)
     reach_pressable_press(&model->button_pressable, REACH_POINTER_BUTTON_PRIMARY,
                           REACH_SETTINGS_HIT_POWER_APPLY, REACH_SETTINGS_HIT_POWER_APPLY, &feedback,
                           &result);
-    expect_true(reach_settings_model_button_press_value(model.get(),
-                                                        REACH_SETTINGS_HIT_POWER_APPLY) == 1.0f,
-                "pressed button reports full press");
-    expect_true(reach_settings_model_button_press_value(
-                    model.get(), REACH_SETTINGS_HIT_ACCOUNT_PASSWORD) == 0.0f,
-                "other buttons stay unpressed");
-
+    const reach_motion *motion =
+        reach_settings_model_button_press_motion(model.get(), REACH_SETTINGS_HIT_POWER_APPLY);
+    expect_true(motion == &model->button_press_feedback && motion->to == 1.0f,
+                "pressed target publishes full feedback intent");
+    expect_true(reach_settings_model_button_press_motion(
+                    model.get(), REACH_SETTINGS_HIT_ACCOUNT_PASSWORD) == nullptr,
+                "other buttons have no feedback descriptor");
     reach_pressable_release(&model->button_pressable, REACH_POINTER_BUTTON_PRIMARY,
                             REACH_SETTINGS_HIT_POWER_APPLY, &feedback, &result);
-    expect_true(reach_settings_model_button_press_active(model.get()),
-                "release starts the fade animation");
-    reach_settings_model_tick_button_press(model.get(), 0.05);
-    float mid =
-        reach_settings_model_button_press_value(model.get(), REACH_SETTINGS_HIT_POWER_APPLY);
-    expect_true(mid > 0.0f && mid < 1.0f, "press fades out gradually");
-    reach_settings_model_tick_button_press(model.get(), 0.5);
-    expect_true(reach_settings_model_button_press_value(model.get(),
-                                                        REACH_SETTINGS_HIT_POWER_APPLY) == 0.0f,
-                "press fade completes");
+    expect_true(reach_motion_active(motion), "release starts the retained fade");
+    float mid = reach_motion_value_at(motion, motion->started_seconds + 0.05);
+    expect_true(mid > 0.0f && mid < 1.0f, "press fades on an absolute timeline");
+    expect_true(reach_motion_value_at(motion, reach_motion_deadline(motion)) == 0.0f,
+                "press reaches its endpoint without model ticks");
+    model->button_press_feedback.started_seconds = reach_motion_now_seconds() - 1.0;
+    reach_pressable_settle_feedback(&model->button_pressable, &feedback);
     expect_true(reach_pressable_feedback_index(&model->button_pressable) ==
                     REACH_PRESSABLE_FEEDBACK_NONE,
-                "completed fade clears the feedback target");
+                "settled input feedback clears the target");
 }
 
 static void test_top_bar_preferences(void)

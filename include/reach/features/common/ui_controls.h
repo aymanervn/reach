@@ -14,6 +14,9 @@ extern "C"
         reach_color disabled_background;
         reach_color text;
         reach_color disabled_text;
+        reach_color pressed_background;
+        reach_color pressed_text;
+        int32_t has_pressed_colors;
         float radius;
         float text_size;
         float pressed_darken;
@@ -67,7 +70,7 @@ extern "C"
 
     void reach_ui_button_render(reach_render_command_buffer *commands, reach_rect_f32 bounds,
                                 const uint16_t *label, const reach_ui_button_style *style,
-                                int32_t enabled, float pressed);
+                                int32_t enabled, uint64_t feedback_id, const reach_motion *pressed);
 
     void reach_ui_selection_item_backdrop_render(reach_render_command_buffer *commands,
                                                  reach_rect_f32 bounds,

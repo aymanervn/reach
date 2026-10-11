@@ -99,13 +99,17 @@ struct reach_d2d_retained_layer
     ComPtr<ABI::Windows::UI::Composition::IContainerVisual> container;
     ComPtr<ABI::Windows::UI::Composition::ISpriteVisual> visual;
     ComPtr<ABI::Windows::UI::Composition::ICompositionDrawingSurface> surface;
+    ComPtr<ABI::Windows::UI::Composition::ICompositionSurfaceBrush> surface_brush;
+    ComPtr<ABI::Windows::UI::Composition::ICompositionMaskBrush> tint_mask;
+    ComPtr<ABI::Windows::UI::Composition::ICompositionColorBrush> tint_brush;
+    ComPtr<ABI::Windows::UI::Composition::ICompositionPropertySet> tint_properties;
     ComPtr<ABI::Windows::UI::Composition::IInsetClip> inset_clip;
     ComPtr<IDCompositionVisual2> dcomp_container;
     ComPtr<IDCompositionVisual2> dcomp_visual;
     ComPtr<IDCompositionSurface> dcomp_surface;
     ComPtr<IDCompositionScaleTransform> dcomp_scale;
-    ComPtr<IDCompositionEffectGroup> dcomp_opacity;
     ComPtr<IDCompositionRectangleClip> dcomp_clip;
+    ComPtr<IDCompositionColorMatrixEffect> dcomp_tint;
     UINT width = 0;
     UINT height = 0;
     int32_t seen = 0;
@@ -117,6 +121,7 @@ struct reach_render_backend
 
     ID2D1Factory1 *factory;
     ID2D1HwndRenderTarget *target;
+    ID2D1RenderTarget *command_target = nullptr;
 
     ID3D11Device *d3d_device;
     IDXGIDevice *dxgi_device;
@@ -142,7 +147,6 @@ struct reach_render_backend
     ComPtr<ABI::Windows::UI::Composition::IContainerVisual> scene_visual;
     ComPtr<IDCompositionVisual2> dcomp_scene_visual;
     ComPtr<IDCompositionScaleTransform> scene_scale;
-    ComPtr<IDCompositionEffectGroup> scene_opacity;
     reach_render_group scene_presentation;
     int32_t has_scene_presentation;
     ComPtr<ABI::Windows::UI::Composition::ICompositionScopedBatch> presentation_batch;

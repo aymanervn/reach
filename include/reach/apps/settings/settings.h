@@ -284,8 +284,7 @@ extern "C"
         reach_animation_track top_bar_mode_track;
         reach_animation_manager top_bar_mode_animation;
         int32_t hovered_button;
-        reach_animation_track button_press_track;
-        reach_animation_manager button_press_animation;
+        reach_motion button_press_feedback;
         reach_pressable button_pressable;
         reach_wifi_radio_state wifi_radio;
         reach_wifi_network_list wifi_networks;
@@ -673,14 +672,10 @@ extern "C"
                                                     double delta_seconds);
     const uint16_t *reach_settings_account_status_message(int32_t status);
 
-    float reach_settings_model_button_press_value(const reach_settings_model *model,
-                                                  int32_t hit_type);
-    float reach_settings_model_installed_app_button_press_value(const reach_settings_model *model,
-                                                                int32_t hit_type,
-                                                                size_t installed_app_index);
-    int32_t reach_settings_model_tick_button_press(reach_settings_model *model,
-                                                   double delta_seconds);
-    int32_t reach_settings_model_button_press_active(const reach_settings_model *model);
+    const reach_motion *reach_settings_model_button_press_motion(const reach_settings_model *model,
+                                                                 int32_t hit_type);
+    const reach_motion *reach_settings_model_installed_app_button_press_motion(
+        const reach_settings_model *model, int32_t hit_type, size_t installed_app_index);
     int32_t reach_settings_model_set_hovered_button(reach_settings_model *model, int32_t hit_type);
 
     int32_t
