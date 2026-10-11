@@ -14,7 +14,28 @@ static int32_t reach_render_group_motion_active(const reach_render_group *group)
             if (reach_motion_active(&group->clip_insets[edge]))
                 return 1;
     return reach_motion_active(&group->x) || reach_motion_active(&group->y) ||
-           reach_motion_active(&group->scale) || reach_motion_active(&group->opacity);
+           reach_motion_active(&group->scale) || reach_motion_active(&group->scale_y) ||
+           reach_motion_active(&group->opacity);
+}
+
+reach_motion reach_render_group_y_scale(const reach_render_group *group)
+{
+    reach_motion empty = {0};
+    return group != 0 ? (group->scale_y.generation != 0 ? group->scale_y : group->scale) : empty;
+}
+
+reach_point_f32 reach_render_group_scale_at(const reach_render_group *group, double now_seconds)
+{
+    reach_point_f32 scale = {1.0f, 1.0f};
+    if (group != 0)
+    {
+        reach_motion y = reach_render_group_y_scale(group);
+        if (group->scale.generation != 0)
+            scale.x = reach_motion_value_at(&group->scale, now_seconds);
+        if (y.generation != 0)
+            scale.y = reach_motion_value_at(&y, now_seconds);
+    }
+    return scale;
 }
 
 reach_color reach_render_group_tint_at(const reach_render_group *group, double now_seconds)

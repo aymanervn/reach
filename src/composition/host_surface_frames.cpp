@@ -414,16 +414,15 @@ reach_window_thumbnail_placement reach_host_native_overlay_placement(
     if (geometry->presentation.retained)
     {
         const reach_render_group *group = &geometry->presentation.group;
-        float scale =
-            group->scale.generation ? reach_motion_value_at(&group->scale, now_seconds) : 1.0f;
+        reach_point_f32 scale = reach_render_group_scale_at(group, now_seconds);
         float center_x = ctx->content_rect.x + ctx->content_rect.width * 0.5f;
         float center_y = ctx->content_rect.y + ctx->content_rect.height * 0.5f;
-        rect->x =
-            center_x + (rect->x - center_x) * scale + reach_motion_value_at(&group->x, now_seconds);
-        rect->y =
-            center_y + (rect->y - center_y) * scale + reach_motion_value_at(&group->y, now_seconds);
-        rect->width *= scale;
-        rect->height *= scale;
+        rect->x = center_x + (rect->x - center_x) * scale.x +
+                  reach_motion_value_at(&group->x, now_seconds);
+        rect->y = center_y + (rect->y - center_y) * scale.y +
+                  reach_motion_value_at(&group->y, now_seconds);
+        rect->width *= scale.x;
+        rect->height *= scale.y;
         float opacity =
             group->opacity.generation ? reach_motion_value_at(&group->opacity, now_seconds) : 1.0f;
         placement.opacity *= opacity;
@@ -646,13 +645,19 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
     {
         float maximum_scale =
             geometry.presentation.max_scale > 1.0f ? geometry.presentation.max_scale : 1.0f;
+        const reach_render_group *group = &geometry.presentation.group;
+        reach_motion y_scale = reach_render_group_y_scale(group);
+        if (group->scale.generation != 0)
+            maximum_scale = fmaxf(maximum_scale, fmaxf(group->scale.from, group->scale.to));
+        if (y_scale.generation != 0)
+            maximum_scale = fmaxf(maximum_scale, fmaxf(y_scale.from, y_scale.to));
         shadow_pad.left *= maximum_scale;
         shadow_pad.top *= maximum_scale;
         shadow_pad.right *= maximum_scale;
         shadow_pad.bottom *= maximum_scale;
         reach_host_surface_presentation_frame frame = reach_host_surface_presentation_frame_compute(
             geometry.visible_bounds, geometry.envelope_bounds, shadow_pad,
-            geometry.presentation.translation_bounds, geometry.presentation.max_scale);
+            geometry.presentation.translation_bounds, maximum_scale);
         bounds = frame.window_bounds;
         surface_ctx.content_rect = frame.content_rect;
         surface_ctx.render_transform = frame.render_transform;
@@ -670,6 +675,7 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
             input.x = geometry.presentation.group.x;
             input.y = geometry.presentation.group.y;
             input.scale = geometry.presentation.group.scale;
+            input.scale_y = geometry.presentation.group.scale_y;
             (void)desc->surface->window.ops.set_input_presentation(desc->surface->window.window,
                                                                    &input);
         }

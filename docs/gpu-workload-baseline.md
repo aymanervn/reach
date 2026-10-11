@@ -208,6 +208,25 @@ and a single
 [IAsyncAction completion handler](https://learn.microsoft.com/en-us/uwp/api/windows.foundation.iasyncaction.completed);
 it does not sample visual animation on application frames.
 
+Fixed-cap chrome diagnostics now use `reach_render_push_stretched_chrome` and the independent
+axis-scale contract. `probe-stretched-chrome-verified.log` passes five full runs per compositor
+and the HWND fallback, including existing feedback/clip/completion/error diagnostics. Two resize
+intent changes plus an identical descriptor reuse check produce three native executions, zero
+raster passes and 18 property submissions for two-axis plain chrome or 12 for vertical notched
+chrome. The identical descriptor changes no properties. Retained source area totals 230,400 bytes
+at 100% and 921,600 bytes at 200%, split across nine cropped layers. The fallback checks two sampled
+executions/raster passes. These are bounded capability counters, not complete feature measurements.
+
+GPU D2D readback compares sampled patch rendering against directly sized chrome at 100/125/150/200%
+DPI. Plain chrome differs by at most one channel level; top/bottom notched chrome matches exactly.
+This covers borders, corners and shadows in offscreen sampled execution, not displayed retained
+WUC/DC pixels. A 150% notch check initially found a constant scale of approximately 1.0000002 from
+affine cancellation. Direct normalized endpoint division now preserves exact unit scale and the
+same two-level tolerance passes. Geometry tests cover patch tiling and anchored placement through
+motion; native checks cover reversal, unchanged descriptors, minimum/cap/content validation and
+independent root-Y completion/retarget. Debug builds and all 39 tests pass. Complete feature resize,
+live input and total product acceptance remain pending in the resize/reveal design and checklist.
+
 The counters give a reproducible baseline for content reuse versus sampled visual changes. Full
 application wake/layout/native metrics, cold/warm workload cost, total CPU/GPU activity, latency,
 power, memory and instrumentation overhead still require product scenarios and system traces.

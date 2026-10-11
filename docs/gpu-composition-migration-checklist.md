@@ -38,8 +38,14 @@ support expectation is explicitly resolved.
   Composition and DirectComposition without stretching text, icons, borders or thumbnail proportions.
   Animated group insets are implemented on both backends, with a shared fallback/event-time clip
   sampler. Bounded diagnostics verify reversal, unchanged raster content and native clip retirement;
-  focused geometry tests and Debug builds pass. Pixel verification, first animated reveal consumer
-  and size-dependent chrome remain pending, so this capability gate stays open.
+  focused geometry tests and Debug builds pass. Displayed pixels, complete reveal/resize consumers
+  and remaining compact/horizontal-notch capabilities are pending, so this gate stays open.
+  - [x] Implement fixed-cap retained chrome using independent axis scale on existing groups.
+    Geometry validation prevents corner/shadow distortion, unsupported compact sizes, stretched
+    text/icons and horizontal notch stretching. Both renderers, fallback, root completion and
+    input/native projection share the axis contract. Debug builds, 39 tests and bounded native
+    growth/reversal plus four-DPI pixel comparison pass; complete feature consumers, displayed
+    compositor pixels and the remaining small/notched-width capabilities stay pending.
 - [ ] Decide whether supported live-preview composition meets behavior and efficiency requirements;
   document the selected compositor or optimized hybrid design for Dock, Switcher and Stage.
   - [x] Select the existing DWM port with retained Reach visuals and active-only native motion.

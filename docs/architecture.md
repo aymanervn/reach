@@ -416,7 +416,10 @@ Transport controls retain their dedicated actions, and a pressable release on th
 opens the snapshot's source application through the shared `OPEN_TARGET` action.
 
 Retained render groups carry stable identities, local content bounds, clips, and independent X/Y,
-opacity, and scale motion. Features own gesture policy and animation intent. `reach_motion` samples
+opacity, and scale motion. Scale remains uniform by default; an explicit `scale_y` motion overrides
+the inherited vertical scale. Both compositors, fallback, root completion, native preview projection,
+host hit testing and native input regions use the same axis semantics. Root envelopes account for
+the maximum of both axes. Features own gesture policy and animation intent. `reach_motion` samples
 finite cubic motion against a monotonic clock for interruption and event-time hit testing; no CPU
 tick is needed to advance compositor motion. The adapter owns native visuals, drawing surfaces,
 native animation objects, and completion resources. It compares localized commands independently
@@ -432,7 +435,17 @@ Windows Composition animates the cached `InsetClip` properties; DirectCompositio
 rectangle clip, mapping right/bottom insets to native edge coordinates. Removing clipping retires
 the native clip. `reach_render_group_clip_at` provides the same event-time rectangle to CPU fallback
 and geometry consumers, and active clip motion participates in generic fallback frame demand.
-This group capability does not yet provide rounded popup-chrome resize or root-presentation clips.
+Root-presentation clipping remains unsupported.
+
+`reach_render_push_stretched_chrome` partitions fixed raster source bounds into up to nine retained
+groups. Corners retain unit scale, straight edges stretch on one axis and the center stretches on
+both. Canonical dimension motion determines patch placement and scaling about a declared anchor;
+source crops remain unchanged during resize and reversal. Geometry and source-content validation
+reject insufficient corner/shadow caps, compact destinations, text/icons and horizontal notch
+stretching before modifying the command buffer. Physical source coordinates and caps are integer
+pixels. `reach_render_stretch_patch` exposes the same pure geometry for deterministic sampling.
+This shared primitive is implemented; complete popup/section consumers and small-shape or
+horizontal-notch capabilities remain migration work. See `docs/gpu-resize-reveal-design.md`.
 
 Explicit render groups can tint their rasterized alpha coverage with four normalized RGBA motion
 channels. Windows Composition retains a surface mask, color brush and property-set expression;

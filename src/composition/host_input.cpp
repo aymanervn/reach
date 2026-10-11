@@ -72,15 +72,20 @@ reach_pointer_event reach_host_surface_pointer_event(const reach_feature_runtime
     if (geometry.presentation.retained)
     {
         const reach_render_group *group = &geometry.presentation.group;
-        float scale = group->scale.generation != 0 ? reach_motion_value(&group->scale) : 1.0f;
+        double now_seconds = reach_motion_now_seconds();
+        reach_point_f32 scale = reach_render_group_scale_at(group, now_seconds);
         float center_x = geometry.visible_bounds.x + geometry.visible_bounds.width * 0.5f;
         float center_y = geometry.visible_bounds.y + geometry.visible_bounds.height * 0.5f;
-        if (scale > 0.0f)
+        if (scale.x > 0.0f && scale.y > 0.0f)
         {
-            pointer.x = (int32_t)lroundf(
-                center_x + ((float)pointer.x - center_x - reach_motion_value(&group->x)) / scale);
-            pointer.y = (int32_t)lroundf(
-                center_y + ((float)pointer.y - center_y - reach_motion_value(&group->y)) / scale);
+            pointer.x =
+                (int32_t)lroundf(center_x + ((float)pointer.x - center_x -
+                                             reach_motion_value_at(&group->x, now_seconds)) /
+                                                scale.x);
+            pointer.y =
+                (int32_t)lroundf(center_y + ((float)pointer.y - center_y -
+                                             reach_motion_value_at(&group->y, now_seconds)) /
+                                                scale.y);
         }
         pointer.surface_relation =
             reach_rect_contains(geometry.visible_bounds, pointer.x, pointer.y)
