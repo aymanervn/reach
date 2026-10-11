@@ -1,4 +1,5 @@
 #include "settings_app.h"
+#include "reach/support/workload.h"
 
 #include "reach/core/theme.h"
 #include "reach/apps/settings/settings.h"
@@ -397,6 +398,7 @@ static void reach_settings_refresh_layout(reach_settings_app *app)
         return;
     }
     reach_rect_f32 local = {0.0f, 0.0f, app->bounds.width, app->bounds.height};
+    reach_workload_add(REACH_WORKLOAD_LAYOUTS, 1);
     app->layout = reach_settings_layout_for_bounds(local, app->theme, reach_settings_app_scale(app),
                                                    &app->model);
     reach_settings_apply_caption(app);
@@ -417,6 +419,7 @@ static reach_result reach_settings_render(reach_settings_app *app)
     input.text_alignment_leading = REACH_TEXT_ALIGNMENT_LEADING;
 
     reach_render_command_buffer_clear(&app->render_commands);
+    reach_workload_add(REACH_WORKLOAD_COMMAND_BUILDS, 1);
     reach_result result = reach_settings_build_render_commands(&input, &app->render_commands);
     if (result != REACH_OK)
     {
@@ -2866,6 +2869,7 @@ reach_result reach_settings_app_update(reach_settings_app *app, double delta_sec
     {
         return REACH_INVALID_ARGUMENT;
     }
+    reach_workload_add(REACH_WORKLOAD_APP_UPDATES, 1);
     if (reach_monitor_refresh_retry_due(&app->monitor_refresh_retry) ||
         reach_monitor_topology_confirmation_due(&app->monitor_topology))
     {

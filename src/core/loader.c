@@ -1,4 +1,5 @@
 #include "reach/core/loader.h"
+#include "reach/support/workload.h"
 
 #include <stddef.h>
 
@@ -65,6 +66,7 @@ int32_t reach_loader_update(reach_loader_model *model, double delta_seconds)
     }
 
     const float maximum_advance = 4.0f;
+    reach_workload_add(REACH_WORKLOAD_LOADER_ADVANCES, 1);
     float advance = (float)(delta_seconds / (double)model->phase_seconds);
     if (advance > maximum_advance)
     {

@@ -1,4 +1,5 @@
 #include "render_d2d_internal.h"
+#include "reach/support/workload.h"
 
 static reach_result reach_d2d_execute_command(reach_render_backend *backend,
                                               ID2D1RenderTarget *target,
@@ -136,9 +137,15 @@ reach_result reach_d2d_execute(reach_render_backend *backend,
 
     if (reach_d2d_retained_supported(backend))
     {
+        reach_workload_add(REACH_WORKLOAD_RENDER_EXECUTIONS, 1);
+        reach_workload_add(backend->compositor != nullptr ? REACH_WORKLOAD_WUC_EXECUTIONS
+                                                          : REACH_WORKLOAD_DCOMP_EXECUTIONS,
+                           1);
         return reach_d2d_sync_retained(backend, commands);
     }
 
+    reach_workload_add(REACH_WORKLOAD_RENDER_EXECUTIONS, 1);
+    reach_workload_add(REACH_WORKLOAD_FALLBACK_EXECUTIONS, 1);
     D2D1::Matrix3x2F content = D2D1::Matrix3x2F::Scale(commands->content_transform.scale_x,
                                                        commands->content_transform.scale_y) *
                                D2D1::Matrix3x2F::Translation(commands->content_transform.offset_x,

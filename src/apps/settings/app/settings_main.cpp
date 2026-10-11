@@ -8,6 +8,7 @@
 
 #include "settings_app.h"
 #include "reach/core/frame_clock.h"
+#include "reach/support/workload.h"
 #include "reach/adapters/windows/frame_wait.h"
 
 #include "reach/protocol/reach_service_protocol.h"
@@ -188,6 +189,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
     }
 
     (void)SetCurrentProcessExplicitAppUserModelID(L"Reach.Settings");
+    reach_workload_session workload("settings");
     HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
     if (FAILED(hr))
     {
@@ -238,6 +240,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
         DWORD wait_result = reach_windows_frame_wait(
             frame_timer, waits, 2, wait_ms,
             needed_frame_before_wait ? frame_clock.next_frame_seconds : -1.0);
+        reach_workload_add(REACH_WORKLOAD_WAKEUPS, 1);
         if (wait_result == WAIT_OBJECT_0)
         {
             break;

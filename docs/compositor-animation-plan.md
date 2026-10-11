@@ -11,6 +11,10 @@ unmeasured.
 The measurement checklist below is retained for that follow-up and is not evidence of a performance
 result.
 
+The 2026-10-11 [production GPU/CPU workload plan](gpu-workload-migration-plan.md) defines the next
+migration and final acceptance. It re-evaluates remaining hybrid paths under the approved
+benefit/complexity rule; this document remains the historical scope and verification record.
+
 Improve responsiveness and reduce CPU work by retaining drawn content and animating visual
 properties in the Windows compositor. Validate total GPU cost and memory alongside CPU savings.
 Preserve current motion, interaction, and lifecycle behavior unless a product change is explicitly

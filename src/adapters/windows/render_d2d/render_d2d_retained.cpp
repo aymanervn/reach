@@ -1,4 +1,5 @@
 #include "render_d2d_internal.h"
+#include "reach/support/workload.h"
 
 #include <algorithm>
 #include <math.h>
@@ -185,6 +186,7 @@ static HRESULT wuc_properties(reach_render_backend *backend, IInspectable *inspe
                               const reach_render_group &group, float base_x, float base_y,
                               bool preserve_repeat = false, unsigned mask = 31)
 {
+    reach_workload_add(REACH_WORKLOAD_PROPERTY_SUBMISSIONS, 1);
     ComPtr<IVisual> visual;
     HRESULT hr = inspectable->QueryInterface(IID_PPV_ARGS(&visual));
     if (SUCCEEDED(hr))
@@ -228,6 +230,7 @@ static HRESULT dcomp_properties(reach_render_backend *backend, IDCompositionVisu
                                 float base_x, float base_y, bool preserve_repeat = false,
                                 unsigned mask = 31)
 {
+    reach_workload_add(REACH_WORKLOAD_PROPERTY_SUBMISSIONS, 1);
     HRESULT hr = preserve_repeat || !(mask & 1)
                      ? S_OK
                      : visual->SetOffsetX(base_x + scalar_value(group.x, 0.0f));
@@ -390,6 +393,18 @@ static HRESULT create_layer(reach_render_backend *backend, reach_d2d_retained_la
     return hr;
 }
 
+static void record_retained_bytes(reach_render_backend *backend)
+{
+    if (!reach_workload_enabled())
+        return;
+    uint64_t bytes = 0;
+    for (const auto &layer : backend->retained_layers)
+        bytes += (uint64_t)layer.width * layer.height * 4;
+    reach_workload_adjust_retained_bytes((int64_t)bytes -
+                                         (int64_t)backend->reported_retained_bytes);
+    backend->reported_retained_bytes = bytes;
+}
+
 static HRESULT draw_layer(reach_render_backend *backend, reach_d2d_retained_layer &layer,
                           const std::vector<reach_render_command> &commands, UINT width,
                           UINT height)
@@ -444,6 +459,7 @@ static HRESULT draw_layer(reach_render_backend *backend, reach_d2d_retained_laye
     if (FAILED(hr))
         return hr;
     context->SetTransform(D2D1::Matrix3x2F::Translation((float)offset.x, (float)offset.y));
+    reach_workload_add(REACH_WORKLOAD_RASTER_PASSES, 1);
     context->Clear(D2D1::ColorF(0.0f, 0.0f, 0.0f, 0.0f));
     ID2D1DeviceContext *previous = backend->d2d_context;
     backend->d2d_context = context.Get();
@@ -457,6 +473,7 @@ static HRESULT draw_layer(reach_render_backend *backend, reach_d2d_retained_laye
     layer.width = width;
     layer.height = height;
     layer.commands = commands;
+    record_retained_bytes(backend);
     return S_OK;
 }
 
@@ -709,7 +726,7 @@ static HRESULT sync_layer(reach_render_backend *backend, reach_d2d_retained_laye
     }
     return hr;
 }
-}
+} // namespace
 
 int32_t reach_d2d_retained_supported(const reach_render_backend *backend)
 {
@@ -764,6 +781,7 @@ void reach_d2d_release_retained(reach_render_backend *backend)
         (void)backend->dcomp_visual->SetOffsetY(0.0f);
     }
     backend->retained_layers.clear();
+    record_retained_bytes(backend);
     backend->scene_visual.Reset();
     backend->dcomp_scene_visual.Reset();
     backend->scene_scale.Reset();
@@ -775,7 +793,10 @@ void reach_d2d_suspend(reach_render_backend *backend)
 {
     reach_d2d_release_retained(backend);
     if (backend != nullptr && backend->dcomp_device != nullptr)
+    {
+        reach_workload_add(REACH_WORKLOAD_DCOMP_COMMITS, 1);
         (void)backend->dcomp_device->Commit();
+    }
 }
 
 int32_t reach_d2d_presentation_complete(reach_render_backend *backend, uint64_t generation)
@@ -799,8 +820,10 @@ int32_t reach_d2d_presentation_complete(reach_render_backend *backend, uint64_t 
             settled.x.duration_seconds = settled.y.duration_seconds = 0.0;
             settled.opacity.duration_seconds = settled.scale.duration_seconds = 0.0;
             if (FAILED(dcomp_properties(backend, backend->dcomp_visual, backend->scene_scale.Get(),
-                                        backend->scene_opacity.Get(), settled, 0.0f, 0.0f)) ||
-                FAILED(backend->dcomp_device->Commit()))
+                                        backend->scene_opacity.Get(), settled, 0.0f, 0.0f)))
+                return 0;
+            reach_workload_add(REACH_WORKLOAD_DCOMP_COMMITS, 1);
+            if (FAILED(backend->dcomp_device->Commit()))
                 return 0;
         }
         if (reach_d2d_synchronize(backend) != REACH_OK)
@@ -1023,5 +1046,6 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
                 hr = end_hr;
         }
     }
+    record_retained_bytes(backend);
     return SUCCEEDED(hr) ? REACH_OK : REACH_ERROR;
 }

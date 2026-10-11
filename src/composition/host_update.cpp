@@ -1,5 +1,6 @@
 #include "host_internal.h"
 #include "reach/core/frame_clock.h"
+#include "reach/support/workload.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -135,6 +136,7 @@ static void reach_host_tick_features(reach_host *host, double delta_seconds)
             continue;
         }
         reach_feature_tick_result tick = {};
+        reach_workload_add(REACH_WORKLOAD_CAPSULE_TICKS, 1);
         desc->definition->capsule_ops->tick(desc->capsule, delta_seconds, &tick);
         reach_host_apply_feature_tick_result(host, desc, &tick);
     }
@@ -173,6 +175,7 @@ static reach_result reach_host_update_game_mode_surfaces(reach_host *host, doubl
             continue;
         }
         reach_feature_tick_result tick = {};
+        reach_workload_add(REACH_WORKLOAD_CAPSULE_TICKS, 1);
         desc->definition->capsule_ops->tick(desc->capsule, delta_seconds, &tick);
         reach_host_apply_feature_tick_result(host, desc, &tick);
     }
@@ -195,6 +198,7 @@ static reach_result reach_host_update_game_mode_surfaces(reach_host *host, doubl
                 arrange.theme = host->theme != nullptr ? host->theme : reach_theme_default();
                 arrange.monitor_bounds = bounds;
                 arrange.dpi_scale = host->layout_dpi_scale;
+                reach_workload_add(REACH_WORKLOAD_LAYOUTS, 1);
                 (void)dock_desc->definition->surface_ops->arrange(dock_desc->capsule, &arrange);
 
                 reach_feature_surface_geometry geometry = {};
@@ -231,6 +235,7 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
     {
         return REACH_INVALID_ARGUMENT;
     }
+    reach_workload_add(REACH_WORKLOAD_APP_UPDATES, 1);
     if (host->dirty.events_dispatched_this_cycle)
     {
         host->dirty.events_dispatched_this_cycle = 0;

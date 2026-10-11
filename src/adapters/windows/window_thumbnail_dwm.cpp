@@ -1,10 +1,30 @@
 #include "windows_adapters_internal.h"
+#include "reach/support/workload.h"
 
 #include <windows.h>
 
 #include <dwmapi.h>
 
 #include <new>
+
+static HRESULT reach_window_thumbnail_register(HWND destination, HWND source, HTHUMBNAIL *out)
+{
+    reach_workload_add(REACH_WORKLOAD_THUMBNAIL_REGISTRATIONS, 1);
+    return DwmRegisterThumbnail(destination, source, out);
+}
+
+static HRESULT reach_window_thumbnail_update(HTHUMBNAIL handle,
+                                             const DWM_THUMBNAIL_PROPERTIES *properties)
+{
+    reach_workload_add(REACH_WORKLOAD_DWM_UPDATES, 1);
+    return DwmUpdateThumbnailProperties(handle, properties);
+}
+
+static HRESULT reach_window_thumbnail_unregister(HTHUMBNAIL handle)
+{
+    reach_workload_add(REACH_WORKLOAD_THUMBNAIL_RELEASES, 1);
+    return DwmUnregisterThumbnail(handle);
+}
 
 typedef struct reach_window_thumbnail_entry
 {
@@ -123,7 +143,7 @@ static void reach_window_thumbnail_destroy_entry(reach_window_thumbnail_entry *e
     }
     if (entry->handle != nullptr)
     {
-        DwmUnregisterThumbnail(entry->handle);
+        reach_window_thumbnail_unregister(entry->handle);
     }
     if (entry->plane == REACH_WINDOW_THUMBNAIL_PLANE_BEHIND_TARGET && entry->destination != nullptr)
     {
@@ -198,7 +218,8 @@ static reach_result reach_window_thumbnail_create(reach_window_thumbnails *thumb
     }
 
     HTHUMBNAIL handle = nullptr;
-    if (FAILED(DwmRegisterThumbnail(destination, source_hwnd, &handle)) || handle == nullptr)
+    if (FAILED(reach_window_thumbnail_register(destination, source_hwnd, &handle)) ||
+        handle == nullptr)
     {
         if (destination != target_hwnd)
         {
@@ -210,7 +231,7 @@ static reach_result reach_window_thumbnail_create(reach_window_thumbnails *thumb
     reach_window_thumbnail_entry *entry = new (std::nothrow) reach_window_thumbnail_entry();
     if (entry == nullptr)
     {
-        DwmUnregisterThumbnail(handle);
+        reach_window_thumbnail_unregister(handle);
         if (destination != target_hwnd)
         {
             DestroyWindow(destination);
@@ -238,6 +259,7 @@ reach_window_thumbnail_set_placement(reach_window_thumbnails *thumbnails,
                                      reach_window_thumbnail_id id,
                                      const reach_window_thumbnail_placement *placement)
 {
+    reach_workload_add(REACH_WORKLOAD_NATIVE_PLACEMENT_REQUESTS, 1);
     reach_window_thumbnail_entry *entry = reach_window_thumbnail_find(thumbnails, id);
     if (entry == nullptr || placement == nullptr)
     {
@@ -415,7 +437,7 @@ reach_window_thumbnail_set_placement(reach_window_thumbnails *thumbnails,
     {
         return REACH_OK;
     }
-    if (FAILED(DwmUpdateThumbnailProperties(entry->handle, &props)))
+    if (FAILED(reach_window_thumbnail_update(entry->handle, &props)))
     {
         return REACH_ERROR;
     }
@@ -435,19 +457,19 @@ static reach_result reach_window_thumbnail_bring_to_front(reach_window_thumbnail
     }
 
     HTHUMBNAIL replacement = nullptr;
-    if (FAILED(DwmRegisterThumbnail(entry->destination, entry->source, &replacement)) ||
+    if (FAILED(reach_window_thumbnail_register(entry->destination, entry->source, &replacement)) ||
         replacement == nullptr)
     {
         return REACH_ERROR;
     }
     if (entry->properties_set &&
-        FAILED(DwmUpdateThumbnailProperties(replacement, &entry->properties)))
+        FAILED(reach_window_thumbnail_update(replacement, &entry->properties)))
     {
-        DwmUnregisterThumbnail(replacement);
+        reach_window_thumbnail_unregister(replacement);
         return REACH_ERROR;
     }
 
-    DwmUnregisterThumbnail(entry->handle);
+    reach_window_thumbnail_unregister(entry->handle);
     entry->handle = replacement;
     return REACH_OK;
 }

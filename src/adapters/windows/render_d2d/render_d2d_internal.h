@@ -136,6 +136,7 @@ struct reach_render_backend
     ComPtr<ABI::Windows::UI::Composition::ICompositionSurface> composition_surface;
     ComPtr<ABI::Windows::UI::Composition::ICompositionGraphicsDevice> composition_graphics_device;
     std::vector<reach_d2d_retained_layer> retained_layers;
+    uint64_t reported_retained_bytes = 0;
     ComPtr<ABI::Windows::UI::Composition::IContainerVisual> scene_visual;
     ComPtr<IDCompositionVisual> dcomp_scene_visual;
     ComPtr<IDCompositionScaleTransform> scene_scale;

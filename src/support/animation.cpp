@@ -1,4 +1,5 @@
 #include "reach/support/animation.h"
+#include "reach/support/workload.h"
 
 static float reach_animation_clamp01(float value)
 {
@@ -90,6 +91,7 @@ void reach_animation_manager_tick(reach_animation_manager *manager, double delta
             continue;
         }
 
+        reach_workload_add(REACH_WORKLOAD_SCALAR_ADVANCES, 1);
         track->elapsed_seconds += delta_seconds;
         float progress = track->duration_seconds > 0.0
                              ? (float)(track->elapsed_seconds / track->duration_seconds)
