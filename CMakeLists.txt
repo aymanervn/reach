@@ -145,6 +145,7 @@ add_library(reach_features STATIC
     src/features/context_menu/context_menu_interaction.cpp
     src/features/context_menu/context_menu_render.cpp
     src/features/context_menu/window_preview_layout.cpp
+    src/features/context_menu/window_preview_animation.cpp
     src/features/context_menu/window_preview_render.cpp
     src/features/common/window_preview/window_preview_layout.cpp
     src/features/dock/dock_feature.cpp

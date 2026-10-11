@@ -17,10 +17,15 @@ allows, shifting inside the monitor near either edge.
 
 Each card has a 24dp header above its preview with an ellipsized window title and a close control.
 Use the shared medium typography token, reserve the close control's space independently of hover,
-and keep the existing hover emphasis and activation/close semantics. Preview width determines
-card width; long titles never widen or distort the preview. Constrained narrow headers prioritize
-the close control and ellipsize the title. Place every control and highlight outside the native
-preview rectangle, since DWM content composites above the popup's drawn content.
+and keep the existing activation/close semantics. Hovering the preview or header highlights
+the fixed header pill and square preview border using `context_menu_hover_background` from the
+theme. The pill stays transparent at rest; the border blends into the popup background. The dark
+theme uses its darker structure shade. The title has 8dp left padding within the pill. The close
+background and glyph render at 80% of their prior size, preserving the hit area.
+Preview width determines card width; long titles never widen or distort the preview. Constrained
+narrow headers prioritize the close control and ellipsize the title. Place every control and
+theme-scaled border outside the native preview rectangle, since DWM content composites above the
+popup's drawn content.
 
 Show an icon placeholder using the icon service for minimized windows or unavailable geometry.
 Use valid cached source proportions when available, otherwise a square placeholder. Never restore
@@ -175,3 +180,10 @@ track for source, owner and page width changes. While expanding into a wider row
 and gaps uniformly fit the current width; source proportions and equal preview heights remain
 intact, returning to the nominal height when settled. Drawn controls and popup height retain their
 resolved sizes. See `docs/dock-popup-width-animation-plan.md` for the implemented scope.
+
+The aesthetic follow-up adds a separate 180ms manager-owned horizontal reflow track. Surviving
+windows retain their displayed screen positions by identity across additions, removals and
+interrupted motion, then move toward the current packed row. Headers, hit regions and native
+preview placements share those arranged positions. DPI/display changes cut to a safe layout;
+closing freezes the arranged row. The fixed hover pill and smaller close visuals use resolved
+DPI-scaled header geometry. GPU migration remains a separate change.

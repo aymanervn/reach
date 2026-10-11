@@ -5,6 +5,9 @@
 #include <math.h>
 #include <stdio.h>
 
+static constexpr float reach_preview_title_padding_dp = 8.0f;
+static constexpr float reach_preview_title_close_gap_dp = 4.0f;
+
 static reach_result reach_preview_push_text(reach_render_command_buffer *out, reach_rect_f32 rect,
                                             const uint16_t *text, reach_color color, float size,
                                             int32_t alignment)
@@ -43,36 +46,37 @@ reach_result reach_context_menu_render_previews(reach_context_menu *menu,
     for (size_t visible = 0; visible < menu->previews.count; ++visible)
     {
         const reach_context_menu_preview_card *card = &menu->previews.cards[visible];
+        reach_color highlight = reach_theme_color_alpha(
+            theme->context_menu_hover_background,
+            state->hovered_index == card->index ? reach_context_menu_hover_opacity(menu) : 0.0f);
         reach_render_command command = {};
-        if (state->hovered_index == card->index)
-        {
-            command.type = REACH_RENDER_COMMAND_RECT;
-            command.rect = state->item_slots[card->index];
-            float inset = 4.0f * scale;
-            command.rect.x -= inset;
-            command.rect.y -= inset;
-            command.rect.width += inset * 2.0f;
-            command.rect.height += inset * 2.0f;
-            command.radius = theme->radius_small * scale;
-            command.color = reach_theme_color_alpha(theme->context_menu_hover_background,
-                                                    reach_context_menu_hover_opacity(menu));
-            result = reach_render_command_buffer_push(out_commands, &command);
-            if (result != REACH_OK)
-            {
-                return result;
-            }
-        }
-        command = {};
         command.type = REACH_RENDER_COMMAND_RECT;
-        command.rect = card->preview;
-        command.color = theme->popup_background;
+        command.rect = card->header;
+        command.radius = card->header.height * 0.5f;
+        command.color = highlight;
         result = reach_render_command_buffer_push(out_commands, &command);
         if (result != REACH_OK)
         {
             return result;
         }
+        command = {};
+        command.type = REACH_RENDER_COMMAND_RECT;
+        float border = reach_theme_border_thickness(theme, scale);
+        command.rect = {card->preview.x - border, card->preview.y - border,
+                        card->preview.width + border * 2.0f, card->preview.height + border * 2.0f};
+        reach_color outline =
+            reach_theme_color_mix(theme->popup_background, highlight, highlight.a);
+        result = reach_render_push_bordered_background(
+            out_commands, &command, theme->popup_background, outline, border, nullptr, scale);
+        if (result != REACH_OK)
+        {
+            return result;
+        }
         reach_rect_f32 title = card->header;
-        title.width = fmaxf(0.0f, title.width - card->close.width - 4.0f * scale);
+        float title_padding = reach_preview_title_padding_dp * scale;
+        title.x += title_padding;
+        title.width = fmaxf(0.0f, title.width - card->close.width - title_padding -
+                                      reach_preview_title_close_gap_dp * scale);
         const uint16_t *label = state->item_titles[card->index];
         if (label[0] == 0)
         {
@@ -89,8 +93,10 @@ reach_result reach_context_menu_render_previews(reach_context_menu *menu,
             state->close_hovered_index == card->index ? reach_context_menu_close_hover(menu) : 0.0f;
         command = {};
         command.type = REACH_RENDER_COMMAND_RECT;
-        command.rect = card->close;
-        command.radius = theme->radius_small * scale;
+        command.rect = {card->close.x + card->close.width * 0.1f,
+                        card->close.y + card->close.height * 0.1f, card->close.width * 0.8f,
+                        card->close.height * 0.8f};
+        command.radius = fminf(theme->radius_small * scale, command.rect.height * 0.5f);
         command.color =
             reach_theme_color_alpha(theme->context_menu_close_background, 0.14f + 0.74f * hover);
         result = reach_render_command_buffer_push(out_commands, &command);
@@ -100,9 +106,9 @@ reach_result reach_context_menu_render_previews(reach_context_menu *menu,
         }
         command.type = REACH_RENDER_COMMAND_VECTOR_ICON;
         command.icon_id = REACH_VECTOR_ICON_CLOSE;
-        float inset = fminf(card->close.width, card->close.height) * 0.3f;
-        command.rect = {card->close.x + inset, card->close.y + inset,
-                        card->close.width - inset * 2.0f, card->close.height - inset * 2.0f};
+        float inset = fminf(command.rect.width, command.rect.height) * 0.3f;
+        command.rect = {command.rect.x + inset, command.rect.y + inset,
+                        command.rect.width - inset * 2.0f, command.rect.height - inset * 2.0f};
         command.color = theme->context_menu_close_glyph;
         result = reach_render_command_buffer_push(out_commands, &command);
         if (result != REACH_OK)
