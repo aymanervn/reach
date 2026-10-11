@@ -79,6 +79,13 @@ descriptor with one raster pass. Initial target introduction may allocate/raster
 geometry or clipping changes still update content. Hidden/source/DPI and product cost verification
 remain part of the final acceptance matrix.
 
+The animated-group-clip diagnostic adds a right-inset motion, reverses it after 30 ms, then submits
+ten identical descriptors after completion. Five runs per compositor report two changed-property
+submissions, zero raster passes and stable surface allocation; removing clipping releases the native
+clip object. Geometry tests sample all four insets at explicit absolute times, including crossed
+edges and disabled clipping. These checks verify API acceptance, ownership and canonical sampling;
+they do not establish displayed-pixel equivalence or rounded-chrome resize capability.
+
 The counters give a reproducible baseline for content reuse versus sampled visual changes. Full
 application wake/layout/native metrics, cold/warm workload cost, total CPU/GPU activity, latency,
 power, memory and instrumentation overhead still require product scenarios and system traces.

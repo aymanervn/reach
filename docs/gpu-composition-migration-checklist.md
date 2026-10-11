@@ -36,6 +36,10 @@ support expectation is explicitly resolved.
 
 - [ ] Select and verify reusable animated clipping, reveal and resize mechanisms on Windows
   Composition and DirectComposition without stretching text, icons, borders or thumbnail proportions.
+  Animated group insets are implemented on both backends, with a shared fallback/event-time clip
+  sampler. Bounded diagnostics verify reversal, unchanged raster content and native clip retirement;
+  focused geometry tests and Debug builds pass. Pixel verification, first animated reveal consumer
+  and size-dependent chrome remain pending, so this capability gate stays open.
 - [ ] Decide whether supported live-preview composition meets behavior and efficiency requirements;
   document the selected compositor or optimized hybrid design for Dock, Switcher and Stage.
 
@@ -59,7 +63,7 @@ support expectation is explicitly resolved.
   - [x] Battery press/release overlay: `d3f71dd`; obsolete scalar path removed, build/tests and both
     compositor/fallback diagnostics pass.
   - [x] Quick Settings press/release overlay uses the same shared primitive; obsolete feedback track
-    and sampled alpha removed. Build, 39 tests and native compositor/fallback diagnostics pass.
+    and sampled alpha removed (`e4c133e`). Build, 39 tests and native compositor/fallback diagnostics pass.
     Height and section expansion remain separate pending work.
 - [ ] Migrate eligible loaders/repeating effects; select efficient compositor or deadline behavior for
   carets, preserve focus resets and marquee behavior, and stop hidden repetitions.

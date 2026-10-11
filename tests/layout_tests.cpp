@@ -1,5 +1,6 @@
 #include "reach/features/common/layout.h"
 #include "reach/core/ui_layout.h"
+#include "reach/core/render_commands.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -317,8 +318,36 @@ static void test_registration_limits(void)
                 "an unknown participant is rejected");
 }
 
+static void test_animated_clip_samples_absolute_geometry(void)
+{
+    reach_render_group group = {};
+    group.has_clip = 1;
+    group.clip = {100.0f, 200.0f, 80.0f, 40.0f};
+    reach_motion_set(&group.clip_insets[REACH_RENDER_CLIP_LEFT], 10.0f);
+    reach_motion_set(&group.clip_insets[REACH_RENDER_CLIP_TOP], 2.0f);
+    reach_motion_set(&group.clip_insets[REACH_RENDER_CLIP_BOTTOM], 5.0f);
+    group.clip_insets[REACH_RENDER_CLIP_RIGHT] = {0.0f, 60.0f, 10.0, 2.0, REACH_EASING_EASE_IN_OUT,
+                                                  1};
+    reach_rect_f32 middle = reach_render_group_clip_at(&group, 11.0);
+    expect_near(middle.x, 110.0f, 0.001f, "clip samples preserve the stationary viewport origin");
+    expect_near(middle.y, 202.0f, 0.001f, "clip top inset uses the same coordinate space");
+    expect_near(middle.width, 40.0f, 0.001f,
+                "clip width follows the canonical easing at event time");
+    expect_near(middle.height, 33.0f, 0.001f,
+                "clip height combines independent top and bottom insets");
+    reach_rect_f32 final = reach_render_group_clip_at(&group, 14.0);
+    expect_near(final.width, 10.0f, 0.001f, "late clip samples clamp to the endpoint");
+    reach_motion_set(&group.clip_insets[REACH_RENDER_CLIP_RIGHT], 90.0f);
+    expect_near(reach_render_group_clip_at(&group, 14.0).width, 0.0f, 0.001f,
+                "crossed clip edges produce an empty viewport rather than negative width");
+    group.has_clip = 0;
+    expect_near(reach_render_group_clip_at(&group, 14.0).height, 0.0f, 0.001f,
+                "disabled clipping ignores retained inset descriptors");
+}
+
 int main(void)
 {
+    test_animated_clip_samples_absolute_geometry();
     test_dock_reserves_side_safe_margins();
     test_launcher_border_wraps_stable_content_geometry();
     test_resolve_orders_descending_by_layer();

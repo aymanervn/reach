@@ -13,6 +13,15 @@ extern "C"
 #define REACH_MAX_RENDER_COMMANDS (REACH_MAX_DOCK_ITEMS * 2 + REACH_MAX_DOCK_RUNNING_APPS + 16)
 #define REACH_MAX_RENDER_GROUPS (REACH_MAX_DOCK_ITEMS + 32)
 
+    typedef enum reach_render_clip_edge
+    {
+        REACH_RENDER_CLIP_LEFT,
+        REACH_RENDER_CLIP_TOP,
+        REACH_RENDER_CLIP_RIGHT,
+        REACH_RENDER_CLIP_BOTTOM,
+        REACH_RENDER_CLIP_EDGE_COUNT
+    } reach_render_clip_edge;
+
     typedef struct reach_render_group
     {
         uint64_t id;
@@ -23,6 +32,7 @@ extern "C"
         reach_motion scale;
         int32_t has_clip;
         reach_rect_f32 clip;
+        reach_motion clip_insets[REACH_RENDER_CLIP_EDGE_COUNT];
         float repeat_offset_x;
         float repeat_hold_seconds;
         float repeat_travel_seconds;
@@ -183,6 +193,7 @@ extern "C"
 
     void reach_render_command_buffer_clear(reach_render_command_buffer *buffer);
     int32_t reach_render_command_buffer_motion_active(const reach_render_command_buffer *buffer);
+    reach_rect_f32 reach_render_group_clip_at(const reach_render_group *group, double now_seconds);
     reach_result reach_render_command_buffer_begin_group(reach_render_command_buffer *buffer,
                                                          const reach_render_group *group);
     void reach_render_command_buffer_end_group(reach_render_command_buffer *buffer);

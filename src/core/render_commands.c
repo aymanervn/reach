@@ -4,8 +4,31 @@
 
 static int32_t reach_render_group_motion_active(const reach_render_group *group)
 {
+    size_t edge;
+    if (group->has_clip)
+        for (edge = 0; edge < REACH_RENDER_CLIP_EDGE_COUNT; ++edge)
+            if (reach_motion_active(&group->clip_insets[edge]))
+                return 1;
     return reach_motion_active(&group->x) || reach_motion_active(&group->y) ||
            reach_motion_active(&group->scale) || reach_motion_active(&group->opacity);
+}
+
+reach_rect_f32 reach_render_group_clip_at(const reach_render_group *group, double now_seconds)
+{
+    reach_rect_f32 clip = {0};
+    float left, top, right, bottom;
+    if (group == 0 || !group->has_clip)
+        return clip;
+    left = reach_motion_value_at(&group->clip_insets[REACH_RENDER_CLIP_LEFT], now_seconds);
+    top = reach_motion_value_at(&group->clip_insets[REACH_RENDER_CLIP_TOP], now_seconds);
+    right = reach_motion_value_at(&group->clip_insets[REACH_RENDER_CLIP_RIGHT], now_seconds);
+    bottom = reach_motion_value_at(&group->clip_insets[REACH_RENDER_CLIP_BOTTOM], now_seconds);
+    clip = group->clip;
+    clip.x += left;
+    clip.y += top;
+    clip.width = fmaxf(0.0f, clip.width - left - right);
+    clip.height = fmaxf(0.0f, clip.height - top - bottom);
+    return clip;
 }
 
 int32_t reach_render_command_buffer_motion_active(const reach_render_command_buffer *buffer)
