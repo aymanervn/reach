@@ -437,6 +437,14 @@ the native clip. `reach_render_group_clip_at` provides the same event-time recta
 and geometry consumers, and active clip motion participates in generic fallback frame demand.
 Root-presentation clipping remains unsupported.
 
+`reach_motion_clamp` bounds a derived motion while retaining its canonical event time, easing,
+generation and completion deadline. Affine mappings transform its limits as well as its endpoints.
+CPU sampling applies the limits; `reach_motion_compile_at` provides up to four cubic/constant
+segments at easing and bound crossings for both native renderers. Native keyframes end at bounded
+values, and fixed-cap dimension normalization preserves the same limits. Retargeting samples the
+bounded visible value before starting a new ordinary intent. This shared curve capability preserves
+delayed/saturated section fades; complete reveal consumer integration remains migration work.
+
 `reach_render_push_stretched_chrome` partitions fixed raster source bounds into up to nine retained
 groups. Corners retain unit scale, straight edges stretch on one axis and the center stretches on
 both. Canonical dimension motion determines patch placement and scaling about a declared anchor;

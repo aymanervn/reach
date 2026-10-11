@@ -428,6 +428,34 @@ static void test_stretch_geometry_preserves_caps_and_anchor(void)
         expect_true(reach_render_stretch_patch(&source, &stretch, 0, &patch) ==
                         REACH_INVALID_ARGUMENT,
                     "unsupported compact geometry is rejected instead of squeezing corners");
+        reach_motion_start_at(&stretch.width, 0, 300 * dpi, 2, REACH_EASING_EASE_IN_OUT, 10);
+        stretch.width = reach_motion_clamp(&stretch.width, 120 * dpi, 240 * dpi);
+        reach_motion_start_at(&stretch.height, 40 * dpi, 220 * dpi, 2, REACH_EASING_EASE_OUT, 10);
+        stretch.height = reach_motion_clamp(&stretch.height, 100 * dpi, 180 * dpi);
+        reach_motion_set(&source.y, 50 * dpi);
+        source.y = reach_motion_clamp(&source.y, 10 * dpi, 20 * dpi);
+        expect_true(reach_render_stretch_patch(&source, &stretch, 4, &patch) == REACH_OK,
+                    "bounded dimensions validate their visible sizes");
+        for (double now : {10.0, 10.5, 11.0, 12.0})
+        {
+            reach_point_f32 scale = reach_render_group_scale_at(&patch, now);
+            float height = reach_motion_value_at(&stretch.height, now);
+            expect_near(patch.bounds.width * scale.x,
+                        reach_motion_value_at(&stretch.width, now) - stretch.left - stretch.right,
+                        0.001f, "bounded width scales retain their limits after normalization");
+            expect_near(patch.bounds.height * scale.y, height - stretch.top - stretch.bottom,
+                        0.001f, "bounded height scales retain their limits after normalization");
+            expect_near(patch.bounds.y + reach_motion_value_at(&patch.y, now),
+                        20 * dpi - (height - source.bounds.height) + stretch.top, 0.001f,
+                        "bounded dimension placement preserves the source offset and anchor");
+        }
+        reach_motion_set(&stretch.width, 500 * dpi);
+        stretch.width = reach_motion_clamp(&stretch.width, 120 * dpi, 120 * dpi);
+        reach_motion_set(&stretch.height, 500 * dpi);
+        stretch.height = reach_motion_clamp(&stretch.height, 100 * dpi, 100 * dpi);
+        expect_true(reach_render_stretch_patch(&source, &stretch, 4, &patch) == REACH_OK &&
+                        patch.scale.to == 1.0f && patch.scale_y.to == 1.0f,
+                    "bounded constant dimensions keep exact unit scale at every DPI");
     }
     reach_render_group group = {};
     reach_motion_set(&group.scale, 2);

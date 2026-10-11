@@ -60,6 +60,12 @@ support expectation is explicitly resolved.
   - [x] Add explicit event-time start/retarget/active/crossing APIs and affine motion derivation;
     popup and Launcher presentation properties now share one timestamp. Focused non-UI tests cover
     retarget continuity, affine sampling and endpoint deadlines. The scalar manager remains pending.
+  - [x] Add shared bounded affine motion and native piecewise compilation for section reveals.
+    Preserve delayed fade/early saturation, negative affine mapping, event-time retarget and owner
+    deadlines. Both native renderers, fallback, root endpoints/envelopes and fixed-cap normalization
+    consume the limits; the old adapter-local compiler is removed. Debug builds, all 39 tests and
+    five full native runs per backend plus HWND fallback pass. Complete Quick Settings
+    integration and displayed-pixel/product-performance acceptance remain pending.
 - [ ] Separate content/layout invalidation, compositor submission, native placement and input updates
   in both application loops; pure compositor motion must not request periodic application frames.
 - [ ] Verify completion, stale-generation rejection, hide/reset and supported fallback semantics on

@@ -74,11 +74,110 @@ static void test_motion_crossing_preserves_endpoint_deadlines(void)
     }
 }
 
+static void test_bounded_motion_preserves_reveal_and_retarget(void)
+{
+    reach_motion progress = {};
+    reach_motion_start_at(&progress, 0.0f, 1.0f, 2.0, REACH_EASING_EASE_OUT, 10.0);
+    reach_motion fade = reach_motion_affine(&progress, 1.0f / 0.65f, -0.10f / 0.65f);
+    fade = reach_motion_clamp(&fade, 0.0f, 1.0f);
+    reach_motion offset = reach_motion_affine(&fade, -4.0f, 4.0f);
+    expect(fade.started_seconds == progress.started_seconds &&
+               fade.duration_seconds == progress.duration_seconds &&
+               fade.generation == progress.generation && offset.minimum == 0.0f &&
+               offset.maximum == 4.0f,
+           "bounded reveal and negative affine offset share the original timeline");
+    for (int sample = 0; sample <= 100; ++sample)
+    {
+        double now = 10.0 + sample * 0.02;
+        float expected =
+            fminf(1.0f, fmaxf(0.0f, (reach_motion_value_at(&progress, now) - 0.10f) / 0.65f));
+        expect(fabsf(reach_motion_value_at(&fade, now) - expected) < 0.000001f &&
+                   fabsf(reach_motion_value_at(&offset, now) - (1.0f - expected) * 4.0f) <
+                       0.000002f,
+               "bounded reveal preserves its delayed fade, early saturation and slide");
+    }
+    double crossing = reach_motion_time_to_value_at(&fade, 1.0f, 10.0);
+    expect(crossing > 0.0 && crossing < 2.0 &&
+               fabsf(reach_motion_value_at(&fade, 10.0 + crossing) - 1.0f) < 0.000001f &&
+               reach_motion_time_to_value_at(&fade, 1.0f, 11.9) == 0.0 &&
+               reach_motion_deadline(&fade) == reach_motion_deadline(&progress),
+           "visual saturation does not shorten the owner completion deadline");
+    float interrupted = reach_motion_value_at(&fade, 10.4);
+    reach_motion_animate_to_at(&fade, 0.0f, 0.3, REACH_EASING_EASE_IN_OUT, 10.4);
+    expect(fade.from == interrupted && !fade.has_limits &&
+               reach_motion_value_at(&fade, 10.4) == interrupted,
+           "retarget starts from the bounded visible value and clears derived limits");
+    reach_motion nested = reach_motion_clamp(&offset, 8.0f, 10.0f);
+    expect(reach_motion_value_at(&nested, 10.5) == 8.0f && nested.minimum == 8.0f &&
+               nested.maximum == 8.0f,
+           "successive disjoint clamps collapse to the visible constant");
+}
+
+static void test_motion_compilation_matches_cpu_sampling(void)
+{
+    for (int easing = REACH_EASING_EASE_IN; easing <= REACH_EASING_EASE_IN_OUT; ++easing)
+    {
+        for (int direction = 0; direction < 2; ++direction)
+        {
+            reach_motion source = {};
+            reach_motion_start_at(&source, direction ? 1.4f : -0.2f, direction ? -0.2f : 1.4f, 2.0,
+                                  (reach_easing)easing, 10.0);
+            reach_motion curves[3] = {source, reach_motion_clamp(&source, 0.0f, 1.0f),
+                                      reach_motion_clamp(&source, 0.5f, 0.5f)};
+            curves[1] = reach_motion_affine(&curves[1], -4.0f, 4.0f);
+            for (const reach_motion &curve : curves)
+            {
+                const double submission_times[] = {0.0, 0.3, 1.0, 1.9};
+                for (double elapsed : submission_times)
+                {
+                    reach_motion_segment segments[REACH_MOTION_MAX_SEGMENTS] = {};
+                    size_t count = reach_motion_compile_at(&curve, 10.0 + elapsed, segments);
+                    expect(count > 0 && count <= REACH_MOTION_MAX_SEGMENTS &&
+                               segments[0].start == 0.0 &&
+                               fabs(segments[count - 1].end - (2.0 - elapsed)) < 0.000001,
+                           "native polynomial segments preserve remaining owner duration");
+                    for (size_t index = 0; index < count; ++index)
+                    {
+                        const reach_motion_segment &segment = segments[index];
+                        expect(index == 0 || segment.start == segments[index - 1].end,
+                               "compiled segments have no timeline gaps");
+                        for (int sample = 0; sample <= 20; ++sample)
+                        {
+                            double dt = (segment.end - segment.start) * sample / 20.0;
+                            double actual = segment.value + segment.linear * dt +
+                                            segment.quadratic * dt * dt +
+                                            segment.cubic * dt * dt * dt;
+                            float expected =
+                                reach_motion_value_at(&curve, 10.0 + elapsed + segment.start + dt);
+                            expect(fabs(actual - expected) < 0.000003,
+                                   "native polynomial samples match bounded CPU motion");
+                        }
+                        expect(fabsf(segment.end_value -
+                                     reach_motion_value_at(&curve, 10.0 + elapsed + segment.end)) <
+                                   0.000003f,
+                               "native keyframes use the bounded segment endpoint");
+                    }
+                    expect(segments[count - 1].end_value == reach_motion_value_at(&curve, 12.0),
+                           "native final keyframe is the exact bounded endpoint");
+                }
+            }
+        }
+    }
+    reach_motion motion = {};
+    reach_motion_set(&motion, 1.0f);
+    reach_motion_segment segments[REACH_MOTION_MAX_SEGMENTS] = {};
+    expect(reach_motion_compile_at(&motion, 0.0, segments) == 0 &&
+               reach_motion_compile_at(nullptr, 0.0, segments) == 0,
+           "static and absent motion submit no native curve");
+}
+
 int main(void)
 {
     test_motion_retarget_uses_one_event_time();
     test_motion_affine_preserves_the_physical_timeline();
     test_motion_crossing_preserves_endpoint_deadlines();
+    test_bounded_motion_preserves_reveal_and_retarget();
+    test_motion_compilation_matches_cpu_sampling();
     const uint16_t empty[] = {0};
     const uint16_t alpha[] = {'A', 'l', 'p', 'h', 'a', 0};
     const uint16_t alpha_copy[] = {'A', 'l', 'p', 'h', 'a', 0};

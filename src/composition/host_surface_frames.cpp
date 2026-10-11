@@ -648,9 +648,15 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
         const reach_render_group *group = &geometry.presentation.group;
         reach_motion y_scale = reach_render_group_y_scale(group);
         if (group->scale.generation != 0)
-            maximum_scale = fmaxf(maximum_scale, fmaxf(group->scale.from, group->scale.to));
+            maximum_scale = fmaxf(
+                maximum_scale,
+                fmaxf(reach_motion_value_at(&group->scale, group->scale.started_seconds),
+                      reach_motion_value_at(&group->scale, reach_motion_deadline(&group->scale))));
         if (y_scale.generation != 0)
-            maximum_scale = fmaxf(maximum_scale, fmaxf(y_scale.from, y_scale.to));
+            maximum_scale =
+                fmaxf(maximum_scale,
+                      fmaxf(reach_motion_value_at(&y_scale, y_scale.started_seconds),
+                            reach_motion_value_at(&y_scale, reach_motion_deadline(&y_scale))));
         shadow_pad.left *= maximum_scale;
         shadow_pad.top *= maximum_scale;
         shadow_pad.right *= maximum_scale;
