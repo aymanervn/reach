@@ -1,6 +1,7 @@
 #include "reach/features/switcher.h"
 #include "reach/features/common/presentation.h"
 #include "reach/support/animation.h"
+#include "reach/features/common/window_preview_layout.h"
 
 #include "switcher_common.h"
 
@@ -595,25 +596,6 @@ reach_result reach_switcher_thumbnail_at(const reach_switcher *switcher, size_t 
     return REACH_OK;
 }
 
-static size_t reach_switcher_fit_end(const float *widths, size_t count, size_t start, float room,
-                                     float gap, float *out_width)
-{
-    size_t end = start;
-    float width = 0.0f;
-    while (end < count && end - start < REACH_SWITCHER_VISIBLE_MAX)
-    {
-        float next = width + (end > start ? gap : 0.0f) + widths[end];
-        if (end > start && next > room + 0.01f)
-        {
-            break;
-        }
-        width = next;
-        ++end;
-    }
-    *out_width = width;
-    return end;
-}
-
 static int32_t reach_switcher_update_layout(reach_switcher *switcher,
                                             const reach_switcher_layout *layout)
 {
@@ -660,7 +642,6 @@ int32_t reach_switcher_arrange(reach_switcher *switcher, const reach_switcher_ar
     float room = fmaxf(0.0f, ctx->monitor_bounds.width - padding * 4.0f - border * 2.0f);
     float aspects[REACH_MAX_OPEN_WINDOWS] = {};
     int32_t preview_visible[REACH_MAX_OPEN_WINDOWS] = {};
-    float widest = 1.0f;
     for (size_t index = 0; index < state->window_count; ++index)
     {
         reach_rect_f32 frame = {};
@@ -668,13 +649,14 @@ int32_t reach_switcher_arrange(reach_switcher *switcher, const reach_switcher_ar
                             switcher->windows, state->windows[index], &frame) == REACH_OK &&
                         isfinite(frame.width) && isfinite(frame.height) && frame.width > 0.0f &&
                         frame.height > 0.0f;
-        aspects[index] = valid ? frame.width / frame.height : 1.0f;
-        widest = fmaxf(widest, aspects[index]);
+        aspects[index] = reach_window_preview_aspect(frame);
         const reach_window_snapshot *window =
             reach_window_tracking_window_by_id(switcher->windows, state->windows[index]);
         preview_visible[index] = valid && window != nullptr && !window->minimized;
     }
-    float height = fminf(REACH_SWITCHER_PREVIEW_HEIGHT * scale, room / widest);
+    float height = reach_window_preview_height(aspects, state->window_count,
+                                               REACH_SWITCHER_PREVIEW_HEIGHT * scale,
+                                               REACH_SWITCHER_PREVIEW_HEIGHT * scale, room);
     float widths[REACH_MAX_OPEN_WINDOWS] = {};
     for (size_t index = 0; index < state->window_count; ++index)
     {
@@ -688,12 +670,17 @@ int32_t reach_switcher_arrange(reach_switcher *switcher, const reach_switcher_ar
     {
         start = state->selected_index;
     }
-    float row_width = 0.0f;
-    size_t end = reach_switcher_fit_end(widths, state->window_count, start, room, gap, &row_width);
+    reach_window_preview_range range = reach_window_preview_pack(
+        widths, state->window_count, start, REACH_SWITCHER_VISIBLE_MAX, room, gap);
+    size_t end = range.end;
+    float row_width = range.width;
     while (state->selected_index >= end && end < state->window_count)
     {
         ++start;
-        end = reach_switcher_fit_end(widths, state->window_count, start, room, gap, &row_width);
+        range = reach_window_preview_pack(widths, state->window_count, start,
+                                          REACH_SWITCHER_VISIBLE_MAX, room, gap);
+        end = range.end;
+        row_width = range.width;
     }
     while (start > 0 && end - start < REACH_SWITCHER_VISIBLE_MAX &&
            row_width + gap + widths[start - 1] <= room)
@@ -725,9 +712,7 @@ int32_t reach_switcher_arrange(reach_switcher *switcher, const reach_switcher_ar
     layout.count = state->visible_count;
     layout.scale = scale;
     float fit =
-        row_width > 0.0f
-            ? fminf(1.0f, fmaxf(0.0f, bounds.width - padding * 2.0f - border * 2.0f) / row_width)
-            : 1.0f;
+        reach_window_preview_row_scale(row_width, bounds.width - padding * 2.0f - border * 2.0f);
     float x = (bounds.width - row_width * fit) * 0.5f;
     float y = border + padding + height * (1.0f - fit) * 0.5f;
     for (size_t visible = 0; visible < layout.count; ++visible)

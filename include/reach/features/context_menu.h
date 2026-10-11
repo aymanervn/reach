@@ -9,7 +9,8 @@
 #include "reach/core/theme.h"
 #include "reach/features/feature_capsule.h"
 #include "reach/features/common/popup.h"
-#include "reach/ports/text_measure.h"
+#include "reach/services/window_tracking.h"
+#include "reach/services/icon_service.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -28,12 +29,14 @@ extern "C"
         size_t target_index;
         reach_rect_f32 bounds;
         reach_rect_f32 item_viewport;
-        reach_rect_f32 item_slots[REACH_CONTEXT_MENU_MAX_ITEMS];
+        reach_rect_f32 item_slots[REACH_MENU_MAX_WINDOWS];
         uint32_t item_commands[REACH_CONTEXT_MENU_MAX_ITEMS];
         uint32_t item_icon_ids[REACH_CONTEXT_MENU_MAX_ITEMS];
-        uintptr_t item_windows[REACH_CONTEXT_MENU_MAX_ITEMS];
-        uint16_t item_titles[REACH_CONTEXT_MENU_MAX_ITEMS][260];
+        uintptr_t item_windows[REACH_MENU_MAX_WINDOWS];
+        uint16_t item_titles[REACH_MENU_MAX_WINDOWS][260];
         size_t item_count;
+        size_t visible_start;
+        size_t visible_count;
         size_t hovered_index;
         size_t close_hovered_index;
         float dpi_scale;
@@ -48,18 +51,27 @@ extern "C"
         float notch_anchor_x;
     } reach_context_menu_state;
 
-    typedef struct reach_context_menu_window_entry
-    {
-        uintptr_t window;
-        const uint16_t *title;
-    } reach_context_menu_window_entry;
-
     typedef struct reach_context_menu reach_context_menu;
 
     reach_result reach_context_menu_create(reach_context_menu **out_menu);
     void reach_context_menu_destroy(reach_context_menu *menu);
 
     const reach_feature_capsule_ops *reach_context_menu_capsule_ops(void);
+
+    void reach_context_menu_attach_services(reach_context_menu *menu,
+                                            reach_window_tracking *windows,
+                                            reach_icon_service *icons);
+    void reach_context_menu_touch_icons(reach_context_menu *menu, int32_t icon_size_px);
+    void reach_context_menu_notify_windows_changed(reach_context_menu *menu,
+                                                   reach_feature_tick_result *out);
+    void reach_context_menu_refresh_window_list(reach_context_menu *menu,
+                                                const reach_menu_request *request);
+    int32_t reach_context_menu_window_list_page(reach_context_menu *menu, int32_t direction);
+    size_t reach_context_menu_preview_generation(const reach_context_menu *menu);
+    size_t reach_context_menu_thumbnail_count(const reach_context_menu *menu);
+    reach_result reach_context_menu_thumbnail_at(const reach_context_menu *menu, size_t index,
+                                                 reach_window_id *out_window,
+                                                 reach_rect_f32 *out_destination);
 
     int32_t reach_context_menu_is_open(const reach_context_menu *menu);
     void reach_context_menu_force_close(reach_context_menu *menu);
@@ -83,24 +95,21 @@ extern "C"
         float pointer_y;
         const uint32_t *item_commands;
         size_t item_count;
-        const reach_context_menu_window_entry *window_entries;
-        size_t window_entry_count;
-        reach_text_measure_port text_measure;
-
         const reach_menu_request *request;
     } reach_context_menu_open_context;
 
     void reach_context_menu_open_power(reach_context_menu *menu,
                                        const reach_context_menu_open_context *ctx);
 
-    void reach_context_menu_reanchor(reach_context_menu *menu,
-                                     const reach_context_menu_open_context *ctx);
+    int32_t reach_context_menu_reanchor(reach_context_menu *menu,
+                                        const reach_context_menu_open_context *ctx);
     void reach_context_menu_open_for_item(reach_context_menu *menu, size_t target_index,
                                           const reach_context_menu_open_context *ctx);
     void reach_context_menu_open_window_list(reach_context_menu *menu, size_t target_index,
                                              const reach_context_menu_open_context *ctx);
 
 #define REACH_CONTEXT_MENU_NO_TARGET ((size_t)-1)
+#define REACH_CONTEXT_MENU_NO_ITEM ((size_t)-1)
 
     int32_t reach_context_menu_window_list_is_open(const reach_context_menu *menu);
     size_t reach_context_menu_window_list_target(const reach_context_menu *menu);
@@ -124,6 +133,7 @@ extern "C"
     {
         const reach_theme *theme;
         float dpi_scale;
+        int32_t icon_size_px;
     } reach_context_menu_render_context;
 
     reach_result

@@ -55,35 +55,6 @@ static reach_context_menu_item_style reach_context_menu_style_for_command(const 
     return style;
 }
 
-static void reach_context_menu_push_close_button(const reach_context_menu_render_input *input,
-                                                 const reach_context_menu_metrics *metrics,
-                                                 reach_rect_f32 item, size_t index, float alpha,
-                                                 reach_render_command_buffer *out_commands)
-{
-    reach_rect_f32 button = reach_context_menu_close_button_rect(metrics, item, input->dpi_scale);
-    float hover = input->close_hovered_index == index ? input->close_hover : 0.0f;
-
-    reach_render_command backing = {};
-    backing.type = REACH_RENDER_COMMAND_RECT;
-    backing.rect = button;
-    backing.radius = button.height * 0.5f;
-    backing.color = reach_theme_color_alpha(input->theme->context_menu_close_background,
-                                            (0.14f + 0.74f * hover) * alpha);
-    reach_render_command_buffer_push(out_commands, &backing);
-
-    float inset = button.width * metrics->close_glyph_inset_ratio;
-    reach_render_command glyph = {};
-    glyph.type = REACH_RENDER_COMMAND_VECTOR_ICON;
-    glyph.icon_id = REACH_VECTOR_ICON_CLOSE;
-    glyph.rect.x = button.x + inset;
-    glyph.rect.y = button.y + inset;
-    glyph.rect.width = button.width - inset * 2.0f;
-    glyph.rect.height = button.height - inset * 2.0f;
-    glyph.color = reach_theme_color_alpha(input->theme->context_menu_close_glyph,
-                                          (0.72f + 0.28f * hover) * alpha);
-    reach_render_command_buffer_push(out_commands, &glyph);
-}
-
 reach_result reach_context_menu_build_render_commands(const reach_context_menu_render_input *input,
                                                       reach_render_command_buffer *out_commands)
 {
@@ -93,7 +64,7 @@ reach_result reach_context_menu_build_render_commands(const reach_context_menu_r
         return REACH_INVALID_ARGUMENT;
     }
 
-    const reach_context_menu_metrics *metrics = reach_context_menu_metrics_for(input->window_list);
+    const reach_context_menu_metrics *metrics = &reach_context_menu_popup_metrics;
 
     reach_render_command_buffer_clear(out_commands);
     reach_render_command command = {};
@@ -110,16 +81,6 @@ reach_result reach_context_menu_build_render_commands(const reach_context_menu_r
         return popup_result;
     }
 
-    float hover_opacity = input->window_list ? input->hover_opacity : 1.0f;
-    if (hover_opacity < 0.0f)
-    {
-        hover_opacity = 0.0f;
-    }
-    if (hover_opacity > 1.0f)
-    {
-        hover_opacity = 1.0f;
-    }
-
     reach_render_command_buffer_set_scissor(out_commands, input->item_viewport);
 
     for (size_t index = 0; index < input->item_count; ++index)
@@ -129,13 +90,12 @@ reach_result reach_context_menu_build_render_commands(const reach_context_menu_r
             reach_context_menu_style_for_command(input->theme, input->item_commands[index]);
         reach_color foreground = style.foreground;
 
-        if (!input->window_list && input->hovered_index == index && hover_opacity > 0.01f)
+        if (input->hovered_index == index)
         {
             command = {};
             command.type = REACH_RENDER_COMMAND_RECT;
             command.rect = item;
             command.color = style.hover_background;
-            command.color.a *= hover_opacity;
             command.radius = reach_context_menu_scale(input, input->theme->radius_small);
             reach_render_command_buffer_push(out_commands, &command);
             if (style.use_hover_foreground)
@@ -161,13 +121,7 @@ reach_result reach_context_menu_build_render_commands(const reach_context_menu_r
 
         float text_left = reach_context_menu_scale(input, has_icon ? metrics->icon_text_inset
                                                                    : metrics->text_leading_inset);
-        float trailing_inset = metrics->text_trailing_inset;
-        if (input->window_list && input->hovered_index == index)
-        {
-            trailing_inset +=
-                (metrics->text_trailing_inset_with_close - trailing_inset) * hover_opacity;
-        }
-        float text_right = reach_context_menu_scale(input, trailing_inset);
+        float text_right = reach_context_menu_scale(input, metrics->text_trailing_inset);
 
         command = {};
         command.type = REACH_RENDER_COMMAND_TEXT;
@@ -180,16 +134,8 @@ reach_result reach_context_menu_build_render_commands(const reach_context_menu_r
         command.text_alignment = input->text_alignment_leading;
         command.text_ellipsis = 1;
         reach_copy_utf16(command.text, 260,
-                         input->window_list && input->item_titles != nullptr
-                             ? input->item_titles[index]
-                             : reach_context_menu_command_text(input->item_commands[index]));
+                         reach_context_menu_command_text(input->item_commands[index]));
         reach_render_command_buffer_push(out_commands, &command);
-
-        if (input->window_list && input->hovered_index == index && hover_opacity > 0.01f)
-        {
-            reach_context_menu_push_close_button(input, metrics, item, index, hover_opacity,
-                                                 out_commands);
-        }
     }
 
     reach_render_command_buffer_clear_scissor(out_commands);
@@ -206,6 +152,10 @@ reach_result reach_context_menu_append_render_commands(reach_context_menu *menu,
         return REACH_INVALID_ARGUMENT;
     }
 
+    if (menu->state.window_list_open)
+    {
+        return reach_context_menu_render_previews(menu, ctx, out_commands);
+    }
     const reach_context_menu_state *state = reach_context_menu_state_ptr(menu);
 
     reach_context_menu_render_input input = {};
@@ -215,12 +165,6 @@ reach_result reach_context_menu_append_render_commands(reach_context_menu *menu,
     input.item_slots = state->item_slots;
     input.item_commands = state->item_commands;
     input.item_icon_ids = state->item_icon_ids;
-    input.item_titles = state->item_titles;
-    input.power_menu = state->power_open;
-    input.window_list = state->window_list_open;
-    input.hover_opacity = reach_context_menu_hover_opacity(menu);
-    input.close_hovered_index = state->close_hovered_index;
-    input.close_hover = reach_context_menu_close_hover(menu);
     input.item_count = state->item_count;
     input.hovered_index = state->hovered_index;
     input.notch_center_x = state->notch_anchor_x - state->bounds.x;
