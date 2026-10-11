@@ -71,16 +71,6 @@ reach_result reach_battery_append_render_commands(const reach_battery *battery,
     reach_ui_toggle_render(out_commands, state->saver_toggle, &toggle_style,
                            reach_battery_model_saver_effective(&state->model) ? 1.0f : 0.0f);
 
-    float press_feedback = reach_battery_press_feedback_value(battery);
-    if (press_feedback > 0.0f)
-    {
-        reach_render_command overlay = {};
-        overlay.type = REACH_RENDER_COMMAND_RECT;
-        overlay.rect = state->saver_row;
-        overlay.radius = theme->radius_small * scale;
-        overlay.color = {0.0f, 0.0f, 0.0f, 0.12f * press_feedback};
-        (void)reach_render_command_buffer_push(out_commands, &overlay);
-    }
-
-    return REACH_OK;
+    return reach_ui_feedback_render(out_commands, 1, state->saver_row, theme->radius_small * scale,
+                                    {0.0f, 0.0f, 0.0f, 0.12f}, &battery->press_feedback);
 }

@@ -55,6 +55,21 @@ Verification source, launcher, JSONL samples and report:
 UI tests. Wall timings are retained in the raw samples but are not product latency measurements;
 hidden windows, Debug compilation and the deliberate hold make that inference invalid.
 
+The diagnostic also drives the real Battery capsule's pointer down/cancellation and render
+production, with only the popup's opening transition disabled to isolate feedback. Five runs on
+each compositor produce two render executions (press and cancellation), zero new raster passes,
+two group-property submissions and zero scalar-manager advances after cold content creation.
+Capsule frame demand remains false during press, release and after force-close. A separate hidden
+HWND render target verifies fallback sampling and both final endpoints: four explicit executions
+(the two input submissions and their final samples), four raster passes and no scalar-manager
+advances. The command buffer reports active motion only until its deadline.
+
+This verifies the consumer's descriptor/submission path and fallback lifecycle. It does not verify
+displayed pixels, live product input, DWM workload, total memory or power. The retained Battery
+scene's estimate in the diagnostic is 86,688 bytes; the feedback layer adds a fixed surface whose
+cost must be included in the final product comparison. Do not infer zero GPU work from zero raster
+passes or use the deliberate message-pump hold as product latency.
+
 The counters give a reproducible baseline for content reuse versus sampled visual changes. Full
 application wake/layout/native metrics, cold/warm workload cost, total CPU/GPU activity, latency,
 power, memory and instrumentation overhead still require product scenarios and system traces.
