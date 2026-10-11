@@ -12,6 +12,7 @@ void reach_d2d_destroy(reach_render_backend *backend)
     reach_d2d_clear_icon_cache(backend);
     reach_d2d_clear_shadow_cache(backend);
     reach_d2d_release_shadow_bake_context(backend);
+    reach_d2d_release_retained(backend);
 
     if (backend->d2d_context != nullptr)
     {
@@ -41,7 +42,6 @@ void reach_d2d_destroy(reach_render_backend *backend)
     }
 
     backend->composition_surface.Reset();
-    backend->animated_text_layer = {};
     backend->composition_graphics_device.Reset();
     backend->swap_chain_visual.Reset();
     backend->backdrop_visual.Reset();
@@ -103,8 +103,9 @@ static void reach_d2d_release_composition_target_state(reach_render_backend *bac
         return;
     }
 
+    reach_d2d_release_retained(backend);
+
     backend->composition_surface.Reset();
-    backend->animated_text_layer = {};
     backend->composition_graphics_device.Reset();
     backend->swap_chain_visual.Reset();
     backend->backdrop_visual.Reset();
@@ -211,6 +212,9 @@ reach_result reach_windows_create_d2d_render_backend(reach_platform_window *wind
     out_port->ops.begin_frame = reach_d2d_begin_frame;
     out_port->ops.end_frame = reach_d2d_end_frame;
     out_port->ops.synchronize = reach_d2d_synchronize;
+    out_port->ops.retained_supported = reach_d2d_retained_supported;
+    out_port->ops.presentation_complete = reach_d2d_presentation_complete;
+    out_port->ops.suspend = reach_d2d_suspend;
     out_port->ops.execute = reach_d2d_execute;
     out_port->ops.release_icon = reach_d2d_release_icon_cache_entry;
     out_port->ops.set_ui_font = reach_d2d_set_ui_font;
@@ -281,6 +285,9 @@ reach_result reach_windows_create_dcomp_render_backend(reach_platform_window *wi
     out_port->ops.begin_frame = reach_d2d_begin_frame;
     out_port->ops.end_frame = reach_d2d_end_frame;
     out_port->ops.synchronize = reach_d2d_synchronize;
+    out_port->ops.retained_supported = reach_d2d_retained_supported;
+    out_port->ops.presentation_complete = reach_d2d_presentation_complete;
+    out_port->ops.suspend = reach_d2d_suspend;
     out_port->ops.execute = reach_d2d_execute;
     out_port->ops.release_icon = reach_d2d_release_icon_cache_entry;
     out_port->ops.set_ui_font = reach_d2d_set_ui_font;

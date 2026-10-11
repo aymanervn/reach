@@ -140,8 +140,82 @@ void reach_d2d_set_ui_font(reach_render_backend *backend, int32_t use_bundled_fo
     {
         return;
     }
+    if (backend->use_bundled_font == (use_bundled_font ? 1 : 0))
+        return;
+    backend->text_layouts.clear();
+    backend->text_formats.clear();
+    backend->retained_layers.clear();
     backend->use_bundled_font = use_bundled_font ? 1 : 0;
     backend->ui_font_family[0] = 0;
+}
+
+static HRESULT reach_d2d_cached_layout(reach_render_backend *backend, const wchar_t *text,
+                                       float size, int32_t weight, float width, float height,
+                                       int32_t alignment, int32_t paragraph, int32_t ellipsis,
+                                       IDWriteTextLayout **out)
+{
+    for (size_t index = 0; index < backend->text_layouts.size(); ++index)
+    {
+        auto &entry = backend->text_layouts[index];
+        if (entry.text == text && entry.size == size && entry.weight == weight &&
+            entry.width == width && entry.height == height && entry.alignment == alignment &&
+            entry.paragraph == paragraph && entry.ellipsis == ellipsis)
+        {
+            auto hit = std::move(entry);
+            backend->text_layouts.erase(backend->text_layouts.begin() + index);
+            backend->text_layouts.push_back(std::move(hit));
+            return backend->text_layouts.back().layout.CopyTo(out);
+        }
+    }
+    ComPtr<IDWriteTextFormat> format;
+    for (const auto &entry : backend->text_formats)
+        if (entry.size == size && entry.weight == weight && entry.alignment == alignment &&
+            entry.paragraph == paragraph && entry.ellipsis == ellipsis)
+            format = entry.format;
+    HRESULT hr = S_OK;
+    if (format == nullptr)
+    {
+        hr = backend->text_factory->CreateTextFormat(
+            reach_d2d_ui_font_family(backend), reach_d2d_ui_font_collection(backend),
+            (DWRITE_FONT_WEIGHT)weight, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, size,
+            L"", &format);
+        if (SUCCEEDED(hr))
+            hr = format->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
+        if (SUCCEEDED(hr))
+            hr = format->SetTextAlignment((DWRITE_TEXT_ALIGNMENT)alignment);
+        if (SUCCEEDED(hr))
+            hr = format->SetParagraphAlignment((DWRITE_PARAGRAPH_ALIGNMENT)paragraph);
+        if (SUCCEEDED(hr) && ellipsis)
+        {
+            ComPtr<IDWriteInlineObject> sign;
+            hr = backend->text_factory->CreateEllipsisTrimmingSign(format.Get(), &sign);
+            DWRITE_TRIMMING trimming = {DWRITE_TRIMMING_GRANULARITY_CHARACTER, 0, 0};
+            if (SUCCEEDED(hr))
+                hr = format->SetTrimming(&trimming, sign.Get());
+        }
+        if (SUCCEEDED(hr))
+        {
+            if (backend->text_formats.size() >= 32)
+                backend->text_formats.erase(backend->text_formats.begin());
+            backend->text_formats.push_back({size, weight, alignment, paragraph, ellipsis, format});
+        }
+    }
+    ComPtr<IDWriteTextLayout> layout;
+    if (SUCCEEDED(hr))
+        hr = backend->text_factory->CreateTextLayout(text, (UINT32)wcslen(text), format.Get(),
+                                                     width, height, &layout);
+    if (SUCCEEDED(hr))
+    {
+        if (wcslen(text) <= 1024)
+        {
+            if (backend->text_layouts.size() >= 128)
+                backend->text_layouts.erase(backend->text_layouts.begin());
+            backend->text_layouts.push_back(
+                {text, size, width, height, weight, alignment, paragraph, ellipsis, layout});
+        }
+        hr = layout.CopyTo(out);
+    }
+    return hr;
 }
 
 reach_result reach_d2d_measure_text(void *context, const uint16_t *text, float text_size,
@@ -164,20 +238,10 @@ reach_result reach_d2d_measure_text(void *context, const uint16_t *text, float t
 
     const DWRITE_FONT_WEIGHT weight =
         text_weight > 0 ? static_cast<DWRITE_FONT_WEIGHT>(text_weight) : DWRITE_FONT_WEIGHT_NORMAL;
-    IDWriteTextFormat *format = nullptr;
-    HRESULT hr = backend->text_factory->CreateTextFormat(
-        reach_d2d_ui_font_family(backend), reach_d2d_ui_font_collection(backend), weight,
-        DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, text_size, L"", &format);
-    if (FAILED(hr) || format == nullptr)
-    {
-        return REACH_ERROR;
-    }
-
-    (void)format->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
     IDWriteTextLayout *layout = nullptr;
-    hr = backend->text_factory->CreateTextLayout(value, length, format, 1000000.0f,
-                                                 text_size * 4.0f, &layout);
-    format->Release();
+    HRESULT hr = reach_d2d_cached_layout(backend, value, text_size, weight, 1000000.0f,
+                                         text_size * 4.0f, DWRITE_TEXT_ALIGNMENT_LEADING,
+                                         DWRITE_PARAGRAPH_ALIGNMENT_NEAR, 0, &layout);
     if (FAILED(hr) || layout == nullptr)
     {
         return REACH_ERROR;
@@ -197,6 +261,11 @@ reach_result reach_d2d_measure_text(void *context, const uint16_t *text, float t
 
 void reach_d2d_release_fonts(reach_render_backend *backend)
 {
+    if (backend != nullptr)
+    {
+        backend->text_layouts.clear();
+        backend->text_formats.clear();
+    }
     if (backend == nullptr)
     {
         return;
@@ -321,55 +390,17 @@ reach_result reach_d2d_draw_text_to_target(reach_render_backend *backend, ID2D1R
         return REACH_INVALID_ARGUMENT;
     }
 
-    IDWriteTextFormat *format = nullptr;
+    IDWriteTextLayout *layout = nullptr;
     ID2D1SolidColorBrush *brush = nullptr;
-
-    DWRITE_FONT_WEIGHT weight = command->text_weight > 0
-                                    ? static_cast<DWRITE_FONT_WEIGHT>(command->text_weight)
-                                    : DWRITE_FONT_WEIGHT_NORMAL;
-
-    float text_size = command->text_size > 0.0f ? command->text_size : REACH_TEXT_SIZE_MEDIUM;
-
-    HRESULT hr = backend->text_factory->CreateTextFormat(
-        reach_d2d_ui_font_family(backend), reach_d2d_ui_font_collection(backend), weight,
-        DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, text_size, L"", &format);
-
-    if (SUCCEEDED(hr))
-    {
-        DWRITE_TEXT_ALIGNMENT alignment = DWRITE_TEXT_ALIGNMENT_CENTER;
-        if (command->text_alignment == REACH_TEXT_ALIGNMENT_LEADING)
-        {
-            alignment = DWRITE_TEXT_ALIGNMENT_LEADING;
-        }
-        else if (command->text_alignment == REACH_TEXT_ALIGNMENT_CENTER)
-        {
-            alignment = DWRITE_TEXT_ALIGNMENT_CENTER;
-        }
-        else if (command->text_alignment == REACH_TEXT_ALIGNMENT_TRAILING)
-        {
-            alignment = DWRITE_TEXT_ALIGNMENT_TRAILING;
-        }
-
-        (void)format->SetTextAlignment(alignment);
-        (void)format->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
-        (void)format->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
-
-        if (command->text_ellipsis)
-        {
-            IDWriteInlineObject *ellipsis = nullptr;
-            HRESULT trim_hr = backend->text_factory->CreateEllipsisTrimmingSign(format, &ellipsis);
-
-            if (SUCCEEDED(trim_hr))
-            {
-                DWRITE_TRIMMING trimming = {};
-                trimming.granularity = DWRITE_TRIMMING_GRANULARITY_CHARACTER;
-
-                (void)format->SetTrimming(&trimming, ellipsis);
-                ellipsis->Release();
-            }
-        }
-    }
-
+    int32_t alignment =
+        command->text_alignment == REACH_TEXT_ALIGNMENT_LEADING    ? DWRITE_TEXT_ALIGNMENT_LEADING
+        : command->text_alignment == REACH_TEXT_ALIGNMENT_TRAILING ? DWRITE_TEXT_ALIGNMENT_TRAILING
+                                                                   : DWRITE_TEXT_ALIGNMENT_CENTER;
+    HRESULT hr = reach_d2d_cached_layout(
+        backend, text, command->text_size > 0.0f ? command->text_size : REACH_TEXT_SIZE_MEDIUM,
+        command->text_weight > 0 ? command->text_weight : DWRITE_FONT_WEIGHT_NORMAL,
+        command->rect.width, command->rect.height, alignment, DWRITE_PARAGRAPH_ALIGNMENT_CENTER,
+        command->text_ellipsis, &layout);
     if (SUCCEEDED(hr))
     {
         hr = target->CreateSolidColorBrush(reach_d2d_color(command->color), &brush);
@@ -377,21 +408,13 @@ reach_result reach_d2d_draw_text_to_target(reach_render_backend *backend, ID2D1R
 
     if (FAILED(hr))
     {
-        if (format != nullptr)
-        {
-            format->Release();
-        }
+        if (layout != nullptr)
+            layout->Release();
         return REACH_ERROR;
     }
-
-    D2D1_RECT_F rect =
-        D2D1::RectF(command->rect.x, command->rect.y, command->rect.x + command->rect.width,
-                    command->rect.y + command->rect.height);
-
-    target->DrawText(text, static_cast<UINT32>(wcslen(text)), format, rect, brush);
-
+    target->DrawTextLayout(D2D1::Point2F(command->rect.x, command->rect.y), layout, brush);
     brush->Release();
-    format->Release();
+    layout->Release();
 
     return REACH_OK;
 }

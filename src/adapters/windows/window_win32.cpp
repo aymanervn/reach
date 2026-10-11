@@ -30,6 +30,7 @@ struct reach_platform_window
     reach_rect_f32 input_regions[REACH_PLATFORM_WINDOW_MAX_INPUT_REGIONS];
     size_t input_region_count;
     int input_regions_active;
+    reach_platform_window_input_presentation input_presentation;
     int input_passthrough;
 };
 
@@ -198,10 +199,28 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
         {
             POINT point = {GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
             ScreenToClient(hwnd, &point);
+            float point_x = (float)point.x;
+            float point_y = (float)point.y;
+            const reach_platform_window_input_presentation *presentation =
+                &window->input_presentation;
+            if (presentation->bounds.width > 0.0f)
+            {
+                float scale = presentation->scale.generation
+                                  ? reach_motion_value(&presentation->scale)
+                                  : 1.0f;
+                if (scale <= 0.0f)
+                    return HTTRANSPARENT;
+                float center_x = presentation->bounds.x + presentation->bounds.width * 0.5f;
+                float center_y = presentation->bounds.y + presentation->bounds.height * 0.5f;
+                point_x =
+                    center_x + (point_x - center_x - reach_motion_value(&presentation->x)) / scale;
+                point_y =
+                    center_y + (point_y - center_y - reach_motion_value(&presentation->y)) / scale;
+            }
             for (size_t index = 0; index < window->input_region_count; ++index)
             {
-                if (reach_platform_window_rect_contains(window->input_regions[index],
-                                                        (float)point.x, (float)point.y))
+                if (reach_platform_window_rect_contains(window->input_regions[index], point_x,
+                                                        point_y))
                 {
                     return HTCLIENT;
                 }
@@ -309,8 +328,7 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
         return DefWindowProcW(hwnd, message, wparam, lparam);
     case WM_DEVICECHANGE:
         reach_windows_request_desktop_environment_sync();
-        if (window != nullptr &&
-            (wparam == DBT_DEVNODES_CHANGED || wparam == DBT_CONFIGCHANGED))
+        if (window != nullptr && (wparam == DBT_DEVNODES_CHANGED || wparam == DBT_CONFIGCHANGED))
         {
             reach_ui_event event = {};
             event.type = REACH_UI_EVENT_MONITOR_TOPOLOGY_HINT;
@@ -1094,6 +1112,16 @@ static reach_result reach_platform_window_set_input_regions(reach_platform_windo
     return REACH_OK;
 }
 
+static reach_result reach_platform_window_set_input_presentation(
+    reach_platform_window *window, const reach_platform_window_input_presentation *presentation)
+{
+    if (window == nullptr)
+        return REACH_INVALID_ARGUMENT;
+    window->input_presentation =
+        presentation != nullptr ? *presentation : reach_platform_window_input_presentation{};
+    return REACH_OK;
+}
+
 static reach_result reach_platform_window_set_input_passthrough(reach_platform_window *window,
                                                                 int32_t enabled)
 {
@@ -1231,6 +1259,7 @@ reach_result reach_windows_create_platform_window(reach_surface_role role,
     out_port->ops.post_event = reach_platform_window_post_event;
     out_port->ops.set_input_passthrough = reach_platform_window_set_input_passthrough;
     out_port->ops.set_input_regions = reach_platform_window_set_input_regions;
+    out_port->ops.set_input_presentation = reach_platform_window_set_input_presentation;
     out_port->ops.destroy = reach_platform_window_destroy;
     return REACH_OK;
 }

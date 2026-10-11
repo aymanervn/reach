@@ -138,17 +138,18 @@ float reach_top_bar_tray_item_current_x(const reach_top_bar *top_bar, size_t ind
     {
         return 0.0f;
     }
-    size_t track = reach_top_bar_tray_item_x_animation_id(index);
-    return reach_animation_manager_active(&top_bar->manager, track)
-               ? reach_animation_manager_value(&top_bar->manager, track)
+    if (top_bar->state.tray_items[index].id == top_bar->tray_drag.item_id &&
+        reach_motion_active(&top_bar->tray_drag.snap))
+        return reach_motion_value(&top_bar->tray_drag.snap);
+    return reach_motion_active(&top_bar->tray_x[index])
+               ? reach_motion_value(&top_bar->tray_x[index])
                : top_bar->state.layout.tray_icons[index].x;
 }
 
 size_t reach_top_bar_tray_dragged_index(const reach_top_bar *top_bar)
 {
     return top_bar != nullptr && (reach_draggable_tracking(&top_bar->tray_drag.gesture) ||
-                                  reach_animation_manager_active(&top_bar->manager,
-                                                                 REACH_TOP_BAR_ANIM_TRAY_DRAG_SNAP))
+                                  reach_motion_active(&top_bar->tray_drag.snap))
                ? reach_top_bar_inline_tray_index(top_bar, top_bar->tray_drag.item_id)
                : REACH_TOP_BAR_MAX_TRAY_ICONS;
 }
@@ -242,17 +243,16 @@ static void reach_top_bar_move_tray_item(reach_top_bar *top_bar, size_t source, 
 
     for (size_t index = 0; index < top_bar->state.tray_item_count; ++index)
     {
-        size_t track = reach_top_bar_tray_item_x_animation_id(index);
         float target_x = top_bar->state.layout.tray_icons[index].x;
         if (top_bar->state.tray_items[index].id == top_bar->tray_drag.item_id)
         {
-            reach_animation_manager_reset(&top_bar->manager, track);
+            reach_motion_set(&top_bar->tray_x[index], target_x);
             continue;
         }
         float start_x = reach_top_bar_tray_x_snapshot_find(
             &snapshot, top_bar->state.tray_items[index].id, target_x);
-        reach_animation_manager_start(&top_bar->manager, track, start_x, target_x, 0.12,
-                                      REACH_EASING_EASE_IN_OUT);
+        reach_motion_start(&top_bar->tray_x[index], start_x, target_x, 0.12,
+                           REACH_EASING_EASE_IN_OUT);
     }
 }
 
@@ -264,11 +264,12 @@ static void reach_top_bar_tray_drag_begin(reach_top_bar *top_bar, size_t index, 
     {
         return;
     }
+    float item_x = reach_top_bar_tray_item_current_x(top_bar, index);
     reach_draggable_begin(&top_bar->tray_drag.gesture, target, x, y);
     top_bar->tray_drag.item_id = top_bar->state.tray_items[index].id;
-    top_bar->tray_drag.grab_offset_x = (float)x - top_bar->state.layout.tray_icons[index].x;
-    top_bar->tray_drag.x = top_bar->state.layout.tray_icons[index].x;
-    reach_animation_manager_reset(&top_bar->manager, REACH_TOP_BAR_ANIM_TRAY_DRAG_SNAP);
+    top_bar->tray_drag.x = item_x;
+    top_bar->tray_drag.grab_offset_x = (float)x - top_bar->tray_drag.x;
+    reach_motion_set(&top_bar->tray_drag.snap, top_bar->tray_drag.x);
 }
 
 static int32_t reach_top_bar_tray_drag_end(reach_top_bar *top_bar)
@@ -282,9 +283,9 @@ static int32_t reach_top_bar_tray_drag_end(reach_top_bar *top_bar)
     size_t index = reach_top_bar_inline_tray_index(top_bar, top_bar->tray_drag.item_id);
     if (moved && index < top_bar->state.layout.tray_icon_count)
     {
-        reach_animation_manager_start(
-            &top_bar->manager, REACH_TOP_BAR_ANIM_TRAY_DRAG_SNAP, top_bar->tray_drag.x,
-            top_bar->state.layout.tray_icons[index].x, 0.12, REACH_EASING_EASE_IN_OUT);
+        reach_motion_start(&top_bar->tray_drag.snap, top_bar->tray_drag.x,
+                           top_bar->state.layout.tray_icons[index].x, 0.12,
+                           REACH_EASING_EASE_IN_OUT);
     }
     else
     {

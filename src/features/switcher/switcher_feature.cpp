@@ -189,7 +189,7 @@ static void reach_switcher_capsule_tick(void *capsule, double delta_seconds,
     if (out != nullptr && transition_changed)
     {
         out->redraw = 1;
-        out->request_update = reach_feature_transition_active(&switcher->surface_transition);
+        out->request_update = reach_feature_transition_needs_update(&switcher->surface_transition);
     }
     if (out != nullptr && reach_switcher_width_animation_active(switcher))
     {
@@ -205,8 +205,9 @@ static int32_t reach_switcher_capsule_is_open(const void *capsule)
 static int32_t reach_switcher_capsule_needs_frame(const void *capsule)
 {
     const reach_switcher *switcher = static_cast<const reach_switcher *>(capsule);
-    return switcher != nullptr && (reach_feature_transition_active(&switcher->surface_transition) ||
-                                   reach_switcher_width_animation_active(switcher));
+    return switcher != nullptr &&
+           (reach_feature_transition_needs_update(&switcher->surface_transition) ||
+            reach_switcher_width_animation_active(switcher));
 }
 
 static int32_t reach_switcher_capsule_presentation_visible(const void *capsule)

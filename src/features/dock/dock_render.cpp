@@ -103,8 +103,7 @@ static void reach_dock_push_running_indicator(const reach_dock_render_input *inp
 
 static void reach_dock_push_item(const reach_dock_render_input *input,
                                  reach_render_command_buffer *commands, size_t index,
-                                 float override_box_x, int32_t use_override, float icon_box_size,
-                                 float icon_box_radius)
+                                 float icon_box_size, float icon_box_radius)
 {
     const reach_theme *theme = input->theme;
     const reach_dock_layout *layout = input->layout;
@@ -127,13 +126,14 @@ static void reach_dock_push_item(const reach_dock_render_input *input,
         fallback_initial = item->fallback_initial != 0 ? item->fallback_initial : '?';
     }
     reach_rect_f32 icon_box = reach_dock_icon_box_for_slot(layout->app_slots[index], icon_box_size);
-    if (use_override)
+    if (input->item_motion != nullptr)
     {
-        icon_box.x = override_box_x;
-    }
-    else if (index < input->item_box_x_count)
-    {
-        icon_box.x = input->item_box_x[index];
+        reach_render_group group = {};
+        group.id = input->model->items[index].key;
+        group.bounds = icon_box;
+        group.bounds.height = layout->bounds.height - icon_box.y;
+        group.x = input->item_motion[index];
+        reach_render_command_buffer_begin_group(commands, &group);
     }
     if (reveal < 1.0f)
     {
@@ -181,6 +181,8 @@ static void reach_dock_push_item(const reach_dock_render_input *input,
                                        theme->dock_background, input->click_feedback_opacity,
                                        reach_dock_metrics_values.click_feedback_min_opacity);
     }
+    if (input->item_motion != nullptr)
+        reach_render_command_buffer_end_group(commands);
 }
 
 static reach_result reach_dock_push_background(const reach_dock_render_input *input,
@@ -247,14 +249,13 @@ reach_result reach_dock_build_render_commands(const reach_dock_render_input *inp
     {
         if (index != input->dragged_render_index)
         {
-            reach_dock_push_item(input, out_commands, index, 0.0f, 0, icon_box_size,
-                                 icon_box_radius);
+            reach_dock_push_item(input, out_commands, index, icon_box_size, icon_box_radius);
         }
     }
     if (input->dragged_render_index < layout->app_slot_count)
     {
-        reach_dock_push_item(input, out_commands, input->dragged_render_index, input->dragged_box_x,
-                             1, icon_box_size, icon_box_radius);
+        reach_dock_push_item(input, out_commands, input->dragged_render_index, icon_box_size,
+                             icon_box_radius);
     }
 
     return REACH_OK;
@@ -269,7 +270,6 @@ float reach_dock_item_current_x(reach_dock *dock, const reach_theme *theme,
     }
 
     reach_dock_state *state = reach_dock_state_mut(dock);
-    reach_animation_manager *manager = reach_dock_manager(dock);
 
     if (index >= state->model.item_count || index >= layout->app_slot_count)
     {
@@ -277,19 +277,18 @@ float reach_dock_item_current_x(reach_dock *dock, const reach_theme *theme,
     }
 
     if ((reach_draggable_tracking(&state->drag.gesture) ||
-         reach_animation_manager_active(manager, REACH_DOCK_ANIM_DRAG_SNAP)) &&
+         reach_motion_active(&state->drag.snap)) &&
         state->drag.key != 0 && reach_dock_item_key_at(&state->model, index) == state->drag.key)
     {
-        return reach_animation_manager_active(manager, REACH_DOCK_ANIM_DRAG_SNAP)
-                   ? reach_animation_manager_value(manager, REACH_DOCK_ANIM_DRAG_SNAP)
-                   : state->drag.x;
+        return reach_motion_active(&state->drag.snap) ? reach_motion_value(&state->drag.snap)
+                                                      : state->drag.x;
     }
 
     const float slot_x = reach_dock_slot_box_x(theme, layout, index);
     uint32_t item_key = reach_dock_item_key_at(&state->model, index);
     if (state->item_x_valid[index] && item_key != 0 && state->item_x_keys[index] == item_key)
     {
-        return slot_x + reach_animation_manager_value(manager, reach_dock_item_animation_id(index));
+        return slot_x + reach_motion_value(&state->item_x[index]);
     }
 
     return slot_x;
@@ -308,24 +307,33 @@ reach_result reach_dock_append_render_commands(reach_dock *dock,
     reach_dock_state *state = reach_dock_state_mut(dock);
     reach_animation_manager *manager = reach_dock_manager(dock);
 
-    float item_box_x[REACH_MAX_DOCK_ITEMS] = {};
+    reach_motion item_motion[REACH_MAX_DOCK_ITEMS] = {};
     float item_reveal[REACH_MAX_DOCK_ITEMS] = {};
     for (size_t index = 0; index < ctx->layout->app_slot_count && index < REACH_MAX_DOCK_ITEMS;
          ++index)
     {
-        item_box_x[index] = reach_dock_item_current_x(dock, ctx->theme, ctx->layout, index);
+        item_motion[index] = state->item_x[index];
+        if (reach_dock_item_key_at(&state->model, index) == state->drag.key &&
+            (reach_draggable_tracking(&state->drag.gesture) ||
+             reach_motion_active(&state->drag.snap)))
+        {
+            item_motion[index] = state->drag.snap;
+            if (reach_draggable_tracking(&state->drag.gesture))
+            {
+                item_motion[index].from = item_motion[index].to = state->drag.x;
+                item_motion[index].duration_seconds = 0.0;
+            }
+            float slot_x = reach_dock_slot_box_x(ctx->theme, ctx->layout, index);
+            item_motion[index].from -= slot_x;
+            item_motion[index].to -= slot_x;
+        }
         item_reveal[index] = reach_dock_item_reveal(dock, index);
     }
 
     size_t dragged_render_index =
-        (reach_draggable_tracking(&state->drag.gesture) ||
-         reach_animation_manager_active(manager, REACH_DOCK_ANIM_DRAG_SNAP))
+        (reach_draggable_tracking(&state->drag.gesture) || reach_motion_active(&state->drag.snap))
             ? reach_dock_feature_model_find_item_key(&state->model, state->drag.key)
             : REACH_MAX_DOCK_ITEMS;
-    float dragged_x = reach_animation_manager_active(manager, REACH_DOCK_ANIM_DRAG_SNAP)
-                          ? reach_animation_manager_value(manager, REACH_DOCK_ANIM_DRAG_SNAP)
-                          : state->drag.x;
-
     reach_dock_render_item render_items[REACH_MAX_DOCK_ITEMS] = {};
     for (size_t index = 0; index < state->model.item_count && index < REACH_MAX_DOCK_ITEMS; ++index)
     {
@@ -354,13 +362,11 @@ reach_result reach_dock_append_render_commands(reach_dock *dock,
     input.model = &state->model;
     input.render_items = render_items;
     input.render_item_count = REACH_MAX_DOCK_ITEMS;
-    input.item_box_x = item_box_x;
-    input.item_box_x_count = REACH_MAX_DOCK_ITEMS;
+    input.item_motion = item_motion;
     input.item_reveal = item_reveal;
     input.item_reveal_count = REACH_MAX_DOCK_ITEMS;
     input.focused_window = ctx->focused_window;
     input.dragged_render_index = dragged_render_index;
-    input.dragged_box_x = dragged_x;
     input.click_feedback_index = reach_pressable_feedback_index(&state->pressable);
     reach_pressable_feedback_style feedback = {};
     feedback.animations = manager;

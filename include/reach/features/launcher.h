@@ -39,8 +39,6 @@ extern "C"
 
     int32_t reach_launcher_arrange(reach_launcher *launcher,
                                    const reach_launcher_arrange_context *ctx);
-    void reach_launcher_set_pointer_transform(reach_launcher *launcher,
-                                              reach_transform_f32 transform);
 
     int32_t reach_launcher_set_open(reach_launcher *launcher, int32_t open);
     void reach_launcher_surface_hidden(reach_launcher *launcher);
@@ -85,7 +83,6 @@ extern "C"
         reach_scrollbar_drag launcher_scrollbar_drag;
 
         reach_text_edit launcher_text_edit;
-        double launcher_caret_blink_seconds;
         int32_t launcher_caret_visible;
     };
 

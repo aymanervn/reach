@@ -178,6 +178,10 @@ policy for the semantic actions it reports.
 Quick Settings owns tile, slider, output-device, expansion, drag/capture, release,
 and cancellation behavior through the same hook. Composition translates its
 semantic actions into audio and system-control calls and retains popup policy.
+Brightness and master sound share the pill layout and renderer, the common progress-bar renderer,
+and the level-from-X calculation. Brightness contributes a row only when its service capability is
+available. The retained Windows renderer localizes mandatory clipped-fill masks together with
+their geometry, independently of optional image clipping.
 Quick Settings also attaches the system-status service directly (the
 launcher→search precedent): snapshot take/apply runs inside the capsule
 (`reach_quick_settings_process_changes`); its pending service work folds into
@@ -356,15 +360,42 @@ background, border, screen inset, app clearance, and input-region composition wi
 controls. Now Playing is not a
 separate feature: its private UI subfeature lives inside the top bar and consumes
 the shared Now Playing service, leaving room for a future standalone music feature
-to consume the same stable service independently. It renders one bold line and emits one
-animated-text command when that line overruns its slot. Windows Composition draws the text once,
-caches the clipped layer, and owns the repeating motion, so Now Playing never keeps the host frame
-loop awake. A renderer without that capability draws the command as static clipped text; there is
-no CPU animation fallback. A hide transition redraws once to remove the compositor layer before
-the position-only bar animation continues, so an off-screen or game-mode bar neither asks for host
-frames nor retains visible compositor work. Its transport controls keep their dedicated actions; a
-pressable release on the remaining card opens the snapshot's source application through the shared
-`OPEN_TARGET` action.
+to consume the same stable service independently. Its bold title is ordinary text inside a retained
+render group with a compositor clip and repeating X motion when the line overruns its slot. Windows
+Composition and DirectComposition share ordered retained-group ownership; the renderer without
+composition draws the title as static clipped text. Hidden groups are detached and released.
+Transport controls retain their dedicated actions, and a pressable release on the remaining card
+opens the snapshot's source application through the shared `OPEN_TARGET` action.
+
+Retained render groups carry stable identities, local content bounds, clips, and independent X/Y,
+opacity, and scale motion. Features own gesture policy and animation intent. `reach_motion` samples
+finite cubic motion against a monotonic clock for interruption and event-time hit testing; no CPU
+tick is needed to advance compositor motion. The adapter owns native visuals, drawing surfaces,
+native animation objects, and completion resources. It compares localized commands independently
+of presentation properties, preserves painter order by splitting static runs around explicit
+groups, and releases the superseded swap chain after constructing the retained scene. Surfaces
+are bounded to 128 MiB per renderer and 16,384 pixels per dimension. Retired groups are removed
+before replacements are allocated. Processed cover artwork uses a 24-entry, 16 MiB cache, while
+ordinary text and measurement share 32 text formats and 128 layouts with bounded string lengths.
+Font changes, icon retirement, and backend destruction invalidate dependent entries.
+
+Top Bar tray and Dock icon groups use stable item identities. Pointer events publish direct
+positions, reordered neighbours and released items run compositor motion, and a stationary drag
+does not request frames. Dock insertion/removal fitting and Now Playing width changes still own
+CPU layout; unaffected item and control groups reuse their rasterized content. Bar reveal and
+Stage's native thumbnail synchronization keep their existing CPU geometry paths.
+
+Shared popup transitions, Launcher presentation, and System HUD publish a retained surface
+presentation and an absolute lifecycle deadline. The generic runtime applies the presentation to
+the complete scene, including backdrop, chrome, and shadows, inside a stable native envelope.
+Both host hit testing and native input regions sample the same motion on pointer events.
+Windows Composition uses scoped-batch completion keyed to the current presentation generation;
+callbacks wake the existing message loop and stale generations cannot finish a newer close.
+DirectComposition reconciles final properties in one commit and synchronizes the compositor before
+close delivery. HUD's fixed lifetime uses its deadline independently of completion, so the hold
+requires no animation frames and another action restarts the complete lifetime. Launcher caret
+blinking also uses a deadline. Renderers without composition sample the same finite group contract
+in a duration-limited CPU fallback; repeating marquee motion remains static there.
 
 Text-dependent layout consumes `reach_text_measure_port`. The DirectWrite renderer supplies the
 implementation with the same font family, size, and weight used for drawing; features retain only

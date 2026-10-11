@@ -112,6 +112,7 @@ struct reach_settings_app
 {
     reach_platform_window_port window;
     reach_render_backend_port renderer;
+    int32_t nav_fallback_active;
     reach_monitor_port monitors;
     reach_power_session_port power_session;
     reach_windows_update_port windows_update;
@@ -2870,9 +2871,10 @@ reach_result reach_settings_app_update(reach_settings_app *app, double delta_sec
     {
         app->monitor_refresh_retry.scheduled = 0;
         app->monitor_topology.confirmation_scheduled = 0;
-        int32_t redraw = app->monitor_topology.hint_active
-                             ? reach_settings_reconcile_topology_hint(app)
-                             : reach_settings_refresh_monitors(app) != REACH_MONITOR_TOPOLOGY_FAILED;
+        int32_t redraw =
+            app->monitor_topology.hint_active
+                ? reach_settings_reconcile_topology_hint(app)
+                : reach_settings_refresh_monitors(app) != REACH_MONITOR_TOPOLOGY_FAILED;
         if (redraw)
         {
             reach_settings_refresh_bounds(app);
@@ -2988,10 +2990,6 @@ reach_result reach_settings_app_update(reach_settings_app *app, double delta_sec
     {
         app->dirty = 1;
     }
-    if (reach_settings_model_tick_nav_selection(&app->model, delta_seconds))
-    {
-        app->dirty = 1;
-    }
     if (reach_settings_model_tick_display_animations(&app->model, delta_seconds))
     {
         app->dirty = 1;
@@ -3000,6 +2998,12 @@ reach_result reach_settings_app_update(reach_settings_app *app, double delta_sec
     {
         app->dirty = 1;
     }
+    int32_t nav_fallback = reach_motion_active(&app->model.nav_selection) &&
+                           (app->renderer.ops.retained_supported == nullptr ||
+                            !app->renderer.ops.retained_supported(app->renderer.backend));
+    if (nav_fallback || app->nav_fallback_active)
+        app->dirty = 1;
+    app->nav_fallback_active = nav_fallback;
     if (app->dirty)
     {
         reach_settings_refresh_bounds(app);
@@ -3061,7 +3065,11 @@ int32_t reach_settings_app_needs_frame(const reach_settings_app *app)
     reach_settings_update_worker *worker =
         const_cast<reach_settings_update_worker *>(&app->update_worker);
     std::lock_guard<std::mutex> lock(worker->mutex);
-    return app->dirty || reach_busy || startup_busy || worker->pending || worker->in_flight ||
+    return app->nav_fallback_active ||
+           (reach_motion_active(&app->model.nav_selection) &&
+            (app->renderer.ops.retained_supported == nullptr ||
+             !app->renderer.ops.retained_supported(app->renderer.backend))) ||
+           app->dirty || reach_busy || startup_busy || worker->pending || worker->in_flight ||
            worker->completed || app->update_worker.progress_state.load() != 0 ||
            app->model.update_scrollbar.offset != app->model.update_scrollbar.target ||
            app->model.startup_scrollbar.offset != app->model.startup_scrollbar.target ||
@@ -3072,7 +3080,6 @@ int32_t reach_settings_app_needs_frame(const reach_settings_app *app)
            reach_settings_model_startup_animations_active(&app->model) ||
            reach_settings_model_power_animations_active(&app->model) ||
            reach_settings_model_button_press_active(&app->model) ||
-           reach_settings_model_nav_selection_active(&app->model) ||
            reach_settings_model_display_animations_active(&app->model) ||
            reach_settings_model_top_bar_animations_active(&app->model) ||
            app->model.power_focused_timer >= 0 || app->model.account_focused_field >= 0 ||

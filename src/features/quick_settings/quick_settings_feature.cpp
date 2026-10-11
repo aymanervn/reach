@@ -911,8 +911,8 @@ static void reach_quick_settings_capsule_tick(void *capsule, double delta_second
                        reach_animation_manager_any_active(&quick_settings->animations));
         out->relayout = changes.relayout;
         out->request_update = changes.request_update ||
-                              (quick_settings != nullptr &&
-                               reach_feature_transition_active(&quick_settings->popup_transition));
+                              (quick_settings != nullptr && reach_feature_transition_needs_update(
+                                                                &quick_settings->popup_transition));
     }
 }
 
@@ -935,7 +935,7 @@ static int32_t reach_quick_settings_capsule_needs_frame(const void *capsule)
     {
         return 0;
     }
-    return reach_feature_transition_active(&quick_settings->popup_transition) ||
+    return reach_feature_transition_needs_update(&quick_settings->popup_transition) ||
            reach_animation_manager_any_active(&quick_settings->animations) ||
            (quick_settings->status != nullptr &&
             (reach_system_status_audio_pending(quick_settings->status) ||

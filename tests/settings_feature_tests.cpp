@@ -99,39 +99,36 @@ static void test_navigation_pages(void)
                 "first nav item is Wi-Fi");
     expect_true(nav[7].page == REACH_SETTINGS_PAGE_UPDATE && equals_ascii(nav[7].label, "Updates"),
                 "last nav item is Updates");
-    expect_true(reach_animation_manager_value(&model->nav_selection_animation, 0) == 0.0f &&
-                    !reach_settings_model_nav_selection_active(model.get()),
+    expect_true(reach_motion_value(&model->nav_selection) == 0.0f &&
+                    !reach_motion_active(&model->nav_selection),
                 "navigation indicator starts settled on Wi-Fi");
 
     reach_settings_model_select_page(model.get(), REACH_SETTINGS_PAGE_UPDATE);
     expect_true(model->selected_page == REACH_SETTINGS_PAGE_UPDATE,
                 "page state updates immediately");
-    expect_true(reach_animation_manager_target(&model->nav_selection_animation, 0) == 7.0f &&
-                    reach_settings_model_nav_selection_active(model.get()),
+    expect_true(model->nav_selection.to == 7.0f && reach_motion_active(&model->nav_selection),
                 "page selection starts the navigation indicator animation");
-    expect_true(reach_settings_model_tick_nav_selection(model.get(), 0.11),
-                "navigation indicator tick reports activity");
-    float interrupted_position = reach_animation_manager_value(&model->nav_selection_animation, 0);
+    model->nav_selection.started_seconds -= 0.11;
+    float interrupted_position = reach_motion_value(&model->nav_selection);
     expect_true(interrupted_position > 0.0f && interrupted_position < 7.0f,
                 "navigation indicator travels between rows");
 
     reach_settings_model_select_page(model.get(), REACH_SETTINGS_PAGE_ACCOUNT);
-    expect_true(reach_animation_manager_value(&model->nav_selection_animation, 0) ==
-                        interrupted_position &&
-                    reach_animation_manager_target(&model->nav_selection_animation, 0) == 2.0f,
+    expect_true(fabsf(model->nav_selection.from - interrupted_position) < 0.01f &&
+                    model->nav_selection.to == 2.0f,
                 "navigation indicator retargets from its current position");
-    double retarget_elapsed = model->nav_selection_track.elapsed_seconds;
+    double retarget_elapsed = model->nav_selection.started_seconds;
     reach_settings_model_select_page(model.get(), REACH_SETTINGS_PAGE_ACCOUNT);
-    expect_true(model->nav_selection_track.elapsed_seconds == retarget_elapsed,
+    expect_true(model->nav_selection.started_seconds == retarget_elapsed,
                 "selecting the current page does not restart the indicator");
-    reach_settings_model_tick_nav_selection(model.get(), 1.0);
-    expect_true(reach_animation_manager_value(&model->nav_selection_animation, 0) == 2.0f &&
-                    !reach_settings_model_nav_selection_active(model.get()),
+    model->nav_selection.started_seconds -= 1.0;
+    expect_true(reach_motion_value(&model->nav_selection) == 2.0f &&
+                    !reach_motion_active(&model->nav_selection),
                 "navigation indicator settles on its destination");
 
     reach_settings_model_select_page(model.get(), (reach_settings_page)99);
     expect_true(model->selected_page == REACH_SETTINGS_PAGE_ACCOUNT &&
-                    reach_animation_manager_value(&model->nav_selection_animation, 0) == 2.0f,
+                    reach_motion_value(&model->nav_selection) == 2.0f,
                 "invalid page selection is ignored");
 }
 static void test_model_and_interaction(void)

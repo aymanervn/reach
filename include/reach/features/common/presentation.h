@@ -3,7 +3,7 @@
 
 #include "reach/core/theme.h"
 #include "reach/features/feature_capsule.h"
-#include "reach/support/animation.h"
+#include "reach/support/motion.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -18,8 +18,9 @@ extern "C"
 
     typedef struct reach_feature_transition
     {
-        reach_animation_manager animations;
-        reach_animation_track tracks[2];
+        reach_motion y;
+        reach_motion opacity;
+        double completion_seconds;
         double open_seconds;
         double close_seconds;
         float dpi_scale;
@@ -37,6 +38,7 @@ extern "C"
     int32_t reach_feature_transition_tick(reach_feature_transition *transition,
                                           double delta_seconds);
     int32_t reach_feature_transition_active(const reach_feature_transition *transition);
+    int32_t reach_feature_transition_needs_update(const reach_feature_transition *transition);
     int32_t reach_feature_transition_visible(const reach_feature_transition *transition);
     void reach_feature_transition_presentation(const reach_feature_transition *transition,
                                                reach_feature_surface_geometry *geometry);

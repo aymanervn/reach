@@ -118,17 +118,17 @@ static void reach_dock_drag_begin(reach_dock *dock, size_t index, int32_t x, int
         return;
     }
 
+    float box_x = reach_dock_item_current_x(dock, ctx->theme, ctx->layout, index);
     uint32_t key = reach_dock_item_key_at(&state->model, index);
     uint64_t target = (uint64_t)key;
     reach_draggable_begin(&state->drag.gesture, target, x, y);
     state->drag.target_index = index;
     state->drag.key = key;
 
-    float box_x = reach_dock_slot_box_x(ctx->theme, ctx->layout, index);
     state->drag.grab_offset_x = (float)x - (ctx->layout->bounds.x + box_x);
 
     state->drag.x = box_x;
-    reach_animation_manager_reset(reach_dock_manager(dock), REACH_DOCK_ANIM_DRAG_SNAP);
+    reach_motion_set(&state->drag.snap, state->drag.x);
 }
 
 void reach_dock_item_press(reach_dock *dock, size_t index, int32_t x, int32_t y,
@@ -231,14 +231,14 @@ void reach_dock_drag_end(reach_dock *dock, const reach_dock_interaction_context 
     {
         float target_x = reach_dock_slot_box_x(ctx->theme, ctx->layout, target_index);
 
-        reach_animation_manager_start(reach_dock_manager(dock), REACH_DOCK_ANIM_DRAG_SNAP,
-                                      state->drag.x, target_x, 0.12, REACH_EASING_EASE_IN_OUT);
+        reach_motion_start(&state->drag.snap, state->drag.x, target_x, 0.12,
+                           REACH_EASING_EASE_IN_OUT);
     }
     else
     {
         state->drag.target_index = REACH_MAX_DOCK_ITEMS;
         state->drag.key = {};
-        reach_animation_manager_reset(reach_dock_manager(dock), REACH_DOCK_ANIM_DRAG_SNAP);
+        reach_motion_set(&state->drag.snap, state->drag.x);
     }
 
     if (moved && dragged_pinned && target_pinned_index != REACH_MAX_DOCK_ITEMS)

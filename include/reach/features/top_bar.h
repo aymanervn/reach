@@ -91,20 +91,12 @@ extern "C"
         REACH_TOP_BAR_ANIM_Y = 0,
         REACH_TOP_BAR_ANIM_POWER_HOVER,
         REACH_TOP_BAR_ANIM_FEEDBACK_OPACITY,
-        REACH_TOP_BAR_ANIM_TRAY_DRAG_SNAP,
         REACH_TOP_BAR_ANIM_NOW_PLAYING_WIDTH,
         REACH_TOP_BAR_ANIM_CURRENT_APP_WIDTH,
         REACH_TOP_BAR_ANIM_TRAY_WIDTH,
         REACH_TOP_BAR_ANIM_QUICK_SETTINGS_WIDTH,
-        REACH_TOP_BAR_ANIM_TRAY_ITEM_X_BASE,
-        REACH_TOP_BAR_ANIM_COUNT = REACH_TOP_BAR_ANIM_TRAY_ITEM_X_BASE +
-            REACH_TOP_BAR_MAX_TRAY_ICONS
+        REACH_TOP_BAR_ANIM_COUNT
     };
-
-    static inline size_t reach_top_bar_tray_item_x_animation_id(size_t index)
-    {
-        return REACH_TOP_BAR_ANIM_TRAY_ITEM_X_BASE + index;
-    }
 
     enum reach_top_bar_feedback_slot
     {

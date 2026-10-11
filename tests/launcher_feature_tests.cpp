@@ -187,10 +187,10 @@ int main()
     failed += expect_close(geometry.envelope_bounds.y, expansion_layout.bounds.y);
     failed +=
         expect_close(geometry.envelope_bounds.height, expansion_layout.envelope_bounds.height);
-    failed += expect(geometry.presentation.managed == 1);
-    failed += expect_close(geometry.presentation.opacity, 0.0f);
-    failed += expect_close(geometry.presentation.y_offset, 8.0f);
-    failed += expect_close(geometry.presentation.scale, 1.08f);
+    failed += expect(geometry.presentation.retained == 1);
+    failed += expect_close(geometry.presentation.group.opacity.from, 0.0f);
+    failed += expect_close(geometry.presentation.group.y.from, 8.0f);
+    failed += expect_close(geometry.presentation.group.scale.from, 1.08f);
     failed += expect_close(geometry.presentation.max_scale, 1.08f);
 
     reach_feature_tick_result tick = {};
@@ -198,18 +198,21 @@ int main()
     capsule_ops->surface_geometry(capsule, &geometry);
     failed += expect(geometry.visible_bounds.height > expansion_layout.search_box.height &&
                      geometry.visible_bounds.height < expansion_layout.bounds.height);
-    failed += expect(geometry.presentation.opacity > 0.0f && geometry.presentation.opacity < 1.0f);
-    failed +=
-        expect(geometry.presentation.y_offset > 0.0f && geometry.presentation.y_offset < 8.0f);
-    failed += expect(geometry.presentation.scale > 1.0f && geometry.presentation.scale < 1.08f);
+    double middle = geometry.presentation.group.opacity.started_seconds + 0.08;
+    float opacity = reach_motion_value_at(&geometry.presentation.group.opacity, middle);
+    float offset = reach_motion_value_at(&geometry.presentation.group.y, middle);
+    float scale = reach_motion_value_at(&geometry.presentation.group.scale, middle);
+    failed += expect(opacity > 0.0f && opacity < 1.0f);
+    failed += expect(offset > 0.0f && offset < 8.0f);
+    failed += expect(scale > 1.0f && scale < 1.08f);
     failed += expect(tick.redraw == 1);
     tick = {};
     capsule_ops->tick(capsule, 0.16, &tick);
     capsule_ops->surface_geometry(capsule, &geometry);
     failed += expect_close(geometry.visible_bounds.height, expansion_layout.bounds.height);
-    failed += expect_close(geometry.presentation.opacity, 1.0f);
-    failed += expect_close(geometry.presentation.y_offset, 0.0f);
-    failed += expect_close(geometry.presentation.scale, 1.0f);
+    failed += expect_close(geometry.presentation.group.opacity.to, 1.0f);
+    failed += expect_close(geometry.presentation.group.y.to, 0.0f);
+    failed += expect_close(geometry.presentation.group.scale.to, 1.0f);
 
     float result_row_height =
         expansion_layout.search_result_items.height / (float)state->model.result_count;
@@ -257,10 +260,9 @@ int main()
     tick = {};
     capsule_ops->tick(capsule, 0.06, &tick);
     capsule_ops->surface_geometry(capsule, &geometry);
-    failed += expect(geometry.presentation.opacity > 0.0f && geometry.presentation.opacity < 1.0f);
-    failed +=
-        expect(geometry.presentation.y_offset > 0.0f && geometry.presentation.y_offset < 8.0f);
-    failed += expect(geometry.presentation.scale > 1.0f && geometry.presentation.scale < 1.08f);
+    failed += expect_close(geometry.presentation.group.opacity.to, 0.0f);
+    failed += expect_close(geometry.presentation.group.y.to, 8.0f);
+    failed += expect_close(geometry.presentation.group.scale.to, 1.08f);
     tick = {};
     capsule_ops->tick(capsule, 0.12, &tick);
     failed += expect(capsule_ops->needs_frame(capsule) == 0);

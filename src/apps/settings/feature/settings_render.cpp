@@ -36,14 +36,6 @@ static void append_number(uint16_t *destination, size_t capacity, size_t value)
     }
 }
 
-static reach_rect_f32 reach_settings_lerp_rect(reach_rect_f32 from, reach_rect_f32 to,
-                                               float progress)
-{
-    return {from.x + (to.x - from.x) * progress, from.y + (to.y - from.y) * progress,
-            from.width + (to.width - from.width) * progress,
-            from.height + (to.height - from.height) * progress};
-}
-
 static void render_nav_selection_indicator(const reach_settings_render_input *input,
                                            reach_render_command_buffer *commands,
                                            const reach_settings_nav_item *items, size_t nav_count)
@@ -55,22 +47,14 @@ static void render_nav_selection_indicator(const reach_settings_render_input *in
 
     size_t available_count =
         input->layout->nav_item_count < nav_count ? input->layout->nav_item_count : nav_count;
-    float position = reach_animation_manager_value(&input->model->nav_selection_animation, 0);
-    float maximum_position = (float)(available_count - 1);
-    if (position < 0.0f)
-    {
-        position = 0.0f;
-    }
-    if (position > maximum_position)
-    {
-        position = maximum_position;
-    }
-
-    size_t from_index = (size_t)position;
-    size_t to_index = from_index + 1 < available_count ? from_index + 1 : from_index;
-    reach_rect_f32 indicator = reach_settings_lerp_rect(input->layout->nav_items[from_index].bounds,
-                                                        input->layout->nav_items[to_index].bounds,
-                                                        position - (float)from_index);
+    reach_rect_f32 indicator = input->layout->nav_items[0].bounds;
+    float pitch = available_count > 1 ? input->layout->nav_items[1].bounds.y - indicator.y : 0.0f;
+    reach_render_group group = {};
+    group.id = 1;
+    group.bounds = indicator;
+    group.y = input->model->nav_selection;
+    group.y.from *= pitch;
+    group.y.to *= pitch;
 
     reach_theme_accent accent = items[0].accent;
     for (size_t index = 0; index < available_count; ++index)
@@ -83,8 +67,13 @@ static void render_nav_selection_indicator(const reach_settings_render_input *in
     }
     reach_color color = reach_settings_color_with_alpha(
         reach_theme_accent_color(input->theme, accent), input->theme->accent_tint_alpha);
+    if (reach_render_command_buffer_begin_group(commands, &group) != REACH_OK)
+    {
+        return;
+    }
     reach_settings_push_rect(commands, indicator,
                              reach_settings_scale(input, input->theme->radius_small), color);
+    reach_render_command_buffer_end_group(commands);
 }
 
 static void build_metadata_text(const reach_windows_update_item *update, uint16_t *text,

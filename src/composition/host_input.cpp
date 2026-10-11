@@ -63,11 +63,37 @@ reach_pointer_event reach_host_surface_pointer_event(const reach_feature_runtime
                 ? REACH_POINTER_SURFACE_INSIDE
                 : REACH_POINTER_SURFACE_OUTSIDE;
     }
+    reach_feature_surface_geometry geometry = {};
+    if (desc->definition->capsule_ops != nullptr &&
+        desc->definition->capsule_ops->surface_geometry != nullptr)
+    {
+        desc->definition->capsule_ops->surface_geometry(desc->capsule, &geometry);
+    }
+    if (geometry.presentation.retained)
+    {
+        const reach_render_group *group = &geometry.presentation.group;
+        float scale = group->scale.generation != 0 ? reach_motion_value(&group->scale) : 1.0f;
+        float center_x = geometry.visible_bounds.x + geometry.visible_bounds.width * 0.5f;
+        float center_y = geometry.visible_bounds.y + geometry.visible_bounds.height * 0.5f;
+        if (scale > 0.0f)
+        {
+            pointer.x = (int32_t)lroundf(
+                center_x + ((float)pointer.x - center_x - reach_motion_value(&group->x)) / scale);
+            pointer.y = (int32_t)lroundf(
+                center_y + ((float)pointer.y - center_y - reach_motion_value(&group->y)) / scale);
+        }
+        pointer.surface_relation =
+            reach_rect_contains(geometry.visible_bounds, pointer.x, pointer.y)
+                ? REACH_POINTER_SURFACE_INSIDE
+                : REACH_POINTER_SURFACE_OUTSIDE;
+    }
     if (desc->definition->surface.cls == REACH_SURFACE_CLASS_POPUP && desc->surface != nullptr &&
         desc->surface->bounds_valid)
     {
-        pointer.x -= (int32_t)desc->surface->last_bounds.x;
-        pointer.y -= (int32_t)desc->surface->last_bounds.y;
+        pointer.x -= (int32_t)(geometry.presentation.retained ? geometry.visible_bounds.x
+                                                              : desc->surface->last_bounds.x);
+        pointer.y -= (int32_t)(geometry.presentation.retained ? geometry.visible_bounds.y
+                                                              : desc->surface->last_bounds.y);
     }
     return pointer;
 }

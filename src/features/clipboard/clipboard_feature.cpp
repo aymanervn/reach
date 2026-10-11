@@ -403,7 +403,7 @@ static void reach_clipboard_capsule_tick(void *capsule, double delta_seconds,
     if (out != nullptr && transition_changed)
     {
         out->redraw = 1;
-        out->request_update = reach_feature_transition_active(&clipboard->surface_transition);
+        out->request_update = reach_feature_transition_needs_update(&clipboard->surface_transition);
     }
     if (out != nullptr && reach_clipboard_tick_scroll(clipboard, delta_seconds))
     {
@@ -449,7 +449,7 @@ static int32_t reach_clipboard_capsule_needs_frame(const void *capsule)
     {
         return 0;
     }
-    return reach_feature_transition_active(&clipboard->surface_transition) ||
+    return reach_feature_transition_needs_update(&clipboard->surface_transition) ||
            reach_clipboard_feature_any_animation_active(clipboard) ||
            clipboard->state.scrollbar_drag.active;
 }

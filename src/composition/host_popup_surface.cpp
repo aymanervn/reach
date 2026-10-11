@@ -3,8 +3,7 @@
 reach_result reach_host_render_popup_surface(reach_host *host, reach_surface_id surface_id,
                                              reach_surface_runtime *surface, reach_rect_f32 bounds,
                                              float notch_anchor_x, int32_t notch_side,
-                                             const reach_render_command_buffer *content_commands,
-                                             float opacity)
+                                             const reach_render_command_buffer *content_commands)
 {
     if (host == nullptr || surface == nullptr || surface->renderer.ops.begin_frame == nullptr)
     {
@@ -31,6 +30,18 @@ reach_result reach_host_render_popup_surface(reach_host *host, reach_surface_id 
 
     if (content_commands != nullptr)
     {
+        commands->group_count = content_commands->group_count;
+        for (size_t index = 0; index < commands->group_count; ++index)
+        {
+            commands->groups[index] = content_commands->groups[index];
+        }
+        commands->has_presentation = content_commands->has_presentation;
+        commands->presentation = content_commands->presentation;
+        if (content_commands->has_presentation)
+        {
+            reach_render_command_buffer_set_content_transform(
+                commands, content_commands->content_rect, content_commands->content_transform);
+        }
         for (size_t index = 0; index < content_commands->count; ++index)
         {
             result = reach_render_command_buffer_push(commands, &content_commands->commands[index]);
@@ -40,8 +51,6 @@ reach_result reach_host_render_popup_surface(reach_host *host, reach_surface_id 
             }
         }
     }
-
-    reach_render_command_buffer_multiply_opacity(commands, opacity);
 
     result = surface->renderer.ops.begin_frame(surface->renderer.backend);
     if (result != REACH_OK)

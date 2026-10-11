@@ -19,13 +19,14 @@ extern "C"
         reach_rect_f32 last_bounds;
         int32_t bounds_valid;
         int32_t activated;
-        int32_t transition_input_region_active;
-        float last_transition_scale;
-        int32_t transition_scale_valid;
         int32_t native_visibility_invalidated;
         uint64_t close_handoff_request_id;
         int32_t close_handoff_pending;
         uint32_t dirty_flags;
+        reach_rect_f32 render_content_rect;
+        reach_transform_f32 render_transform;
+        int32_t retained_presentation;
+        int32_t fallback_animation_active;
     } reach_surface_runtime;
 
     void reach_surface_runtime_init(reach_surface_runtime *runtime);

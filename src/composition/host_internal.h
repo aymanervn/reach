@@ -48,9 +48,6 @@ typedef struct reach_host_surface_presentation_frame
     reach_rect_f32 window_bounds;
     reach_rect_f32 content_rect;
     reach_transform_f32 render_transform;
-    reach_transform_f32 pointer_transform;
-    float scale;
-    int32_t scale_envelope_active;
 } reach_host_surface_presentation_frame;
 
 typedef enum reach_surface_class
@@ -312,7 +309,6 @@ typedef struct reach_feature_surface_ops
     reach_result (*append_render_commands)(void *capsule, const reach_feature_surface_context *ctx,
                                            reach_render_command_buffer *out_commands);
     int32_t (*layout_anchor)(const void *capsule, reach_feature_layout_anchor *out);
-    void (*set_pointer_transform)(void *capsule, reach_transform_f32 transform);
     const reach_feature_native_overlay_ops *native_overlay;
 } reach_feature_surface_ops;
 
@@ -742,7 +738,7 @@ reach_result reach_host_apply_window_state(reach_platform_window_port *window,
                                            int32_t *out_changed);
 reach_host_surface_presentation_frame reach_host_surface_presentation_frame_compute(
     reach_rect_f32 target_bounds, reach_rect_f32 envelope_bounds, reach_shadow_pad shadow_pad,
-    float y_offset, float scale, float max_scale);
+    reach_rect_f32 translation_bounds, float max_scale);
 void reach_host_finish_surface_presentations(reach_host *host);
 
 reach_pointer_event reach_host_surface_pointer_event(const reach_feature_runtime *desc,
@@ -760,8 +756,7 @@ void reach_host_on_registered_surface_event(void *user, const reach_ui_event *ev
 reach_result reach_host_render_popup_surface(reach_host *host, reach_surface_id surface_id,
                                              reach_surface_runtime *surface, reach_rect_f32 bounds,
                                              float notch_anchor_x, int32_t notch_side,
-                                             const reach_render_command_buffer *content_commands,
-                                             float opacity);
+                                             const reach_render_command_buffer *content_commands);
 
 void reach_host_sync_popup_mouse_hook(reach_host *host);
 void reach_host_close_transient_surfaces(reach_host *host, int32_t restore_focus);

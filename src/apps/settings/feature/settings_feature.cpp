@@ -35,8 +35,7 @@ void reach_settings_model_init(reach_settings_model *model)
     }
     memset(model, 0, sizeof(*model));
     model->selected_page = REACH_SETTINGS_PAGE_WIFI;
-    reach_animation_manager_init(&model->nav_selection_animation, &model->nav_selection_track, 1);
-    reach_animation_manager_set(&model->nav_selection_animation, 0, 0.0f);
+    reach_motion_set(&model->nav_selection, 0.0f);
     model->update_page_state = REACH_SETTINGS_UPDATE_NOT_SCANNED;
     model->reach_update_state = REACH_SETTINGS_REACH_UPDATE_IDLE;
     {
@@ -124,24 +123,9 @@ void reach_settings_model_select_page(reach_settings_model *model, reach_setting
         return;
     }
     model->selected_page = page;
-    reach_animation_manager_animate_to(&model->nav_selection_animation, 0, target_index,
-                                       reach_settings_nav_selection_duration_seconds,
-                                       REACH_EASING_EASE_IN_OUT);
-}
-
-int32_t reach_settings_model_tick_nav_selection(reach_settings_model *model, double delta_seconds)
-{
-    if (model == nullptr || !reach_animation_manager_any_active(&model->nav_selection_animation))
-    {
-        return 0;
-    }
-    reach_animation_manager_tick(&model->nav_selection_animation, delta_seconds);
-    return 1;
-}
-
-int32_t reach_settings_model_nav_selection_active(const reach_settings_model *model)
-{
-    return model != nullptr && reach_animation_manager_any_active(&model->nav_selection_animation);
+    reach_motion_animate_to(&model->nav_selection, target_index,
+                            reach_settings_nav_selection_duration_seconds,
+                            REACH_EASING_EASE_IN_OUT);
 }
 
 float reach_settings_model_button_press_value(const reach_settings_model *model, int32_t hit_type)

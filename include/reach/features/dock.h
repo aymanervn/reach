@@ -97,14 +97,12 @@ extern "C"
         const reach_dock_feature_model *model;
         const reach_dock_render_item *render_items;
         size_t render_item_count;
-        const float *item_box_x;
-        size_t item_box_x_count;
+        const reach_motion *item_motion;
 
         const float *item_reveal;
         size_t item_reveal_count;
         uintptr_t focused_window;
         size_t dragged_render_index;
-        float dragged_box_x;
         size_t click_feedback_index;
         float click_feedback_opacity;
         size_t trigger_feedback_index;
@@ -150,17 +148,10 @@ extern "C"
     enum reach_dock_animation_id
     {
         REACH_DOCK_ANIM_Y = 0,
-        REACH_DOCK_ANIM_DRAG_SNAP,
         REACH_DOCK_ANIM_FEEDBACK_OPACITY,
-        REACH_DOCK_ANIM_ITEM_X_BASE,
-        REACH_DOCK_ANIM_SLOT_BASE = REACH_DOCK_ANIM_ITEM_X_BASE + REACH_MAX_DOCK_ITEMS,
+        REACH_DOCK_ANIM_SLOT_BASE,
         REACH_DOCK_ANIM_COUNT = REACH_DOCK_ANIM_SLOT_BASE + REACH_DOCK_SLOT_CAPACITY
     };
-
-    static inline size_t reach_dock_item_animation_id(size_t index)
-    {
-        return REACH_DOCK_ANIM_ITEM_X_BASE + index;
-    }
 
     typedef struct reach_dock reach_dock;
 
@@ -278,6 +269,7 @@ extern "C"
         uint32_t key;
         float grab_offset_x;
         float x;
+        reach_motion snap;
     } reach_dock_drag_state;
 
     typedef struct reach_dock_state
@@ -290,6 +282,7 @@ extern "C"
         reach_dock_drag_state drag;
         size_t hovered_item;
 
+        reach_motion item_x[REACH_MAX_DOCK_ITEMS];
         int32_t item_x_valid[REACH_MAX_DOCK_ITEMS];
         uint32_t item_x_keys[REACH_MAX_DOCK_ITEMS];
         int32_t items_changed;
