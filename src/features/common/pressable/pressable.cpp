@@ -2,33 +2,7 @@
 
 static int32_t reach_pressable_feedback_valid(const reach_pressable_feedback_style *feedback)
 {
-    return feedback != nullptr &&
-           ((feedback->motion != nullptr && feedback->animations == nullptr) ||
-            (feedback->motion == nullptr && feedback->animations != nullptr &&
-             feedback->track < feedback->animations->track_count));
-}
-
-static void reach_pressable_feedback_set(const reach_pressable_feedback_style *feedback,
-                                         float value)
-{
-    if (feedback->motion != nullptr)
-        reach_motion_set(feedback->motion, value);
-    else
-        reach_animation_manager_set(feedback->animations, feedback->track, value);
-}
-
-static int32_t reach_pressable_feedback_active(const reach_pressable_feedback_style *feedback)
-{
-    return feedback->motion != nullptr
-               ? reach_motion_active(feedback->motion)
-               : reach_animation_manager_active(feedback->animations, feedback->track);
-}
-
-static float reach_pressable_feedback_sample(const reach_pressable_feedback_style *feedback)
-{
-    return feedback->motion != nullptr
-               ? reach_motion_value(feedback->motion)
-               : reach_animation_manager_value(feedback->animations, feedback->track);
+    return feedback != nullptr && feedback->motion != nullptr;
 }
 
 static void reach_pressable_result_init(reach_pressable_result *out)
@@ -51,16 +25,11 @@ static int32_t reach_pressable_feedback_animate(reach_pressable *pressable, floa
     }
     if (seconds <= 0.0)
     {
-        reach_pressable_feedback_set(feedback, target);
-    }
-    else if (feedback->motion != nullptr)
-    {
-        reach_motion_animate_to(feedback->motion, target, seconds, easing);
+        reach_motion_set(feedback->motion, target);
     }
     else
     {
-        reach_animation_manager_animate_to(feedback->animations, feedback->track, target, seconds,
-                                           easing);
+        reach_motion_animate_to(feedback->motion, target, seconds, easing);
     }
     return 1;
 }
@@ -101,7 +70,7 @@ void reach_pressable_reset(reach_pressable *pressable,
     }
     if (reach_pressable_feedback_valid(feedback))
     {
-        reach_pressable_feedback_set(feedback, 0.0f);
+        reach_motion_set(feedback->motion, 0.0f);
     }
     reach_pressable_init(pressable);
 }
@@ -259,25 +228,16 @@ void reach_pressable_settle_feedback(reach_pressable *pressable,
 {
     if (pressable == nullptr || pressable->feedback_index == REACH_PRESSABLE_FEEDBACK_NONE ||
         pressable->tracking || pressable->armed || pressable->feedback_latched ||
-        !reach_pressable_feedback_valid(feedback) || reach_pressable_feedback_active(feedback) ||
-        reach_pressable_feedback_sample(feedback) > 0.001f)
+        !reach_pressable_feedback_valid(feedback) || reach_motion_active(feedback->motion) ||
+        reach_motion_value(feedback->motion) > 0.001f)
     {
         return;
     }
-    reach_pressable_feedback_set(feedback, 0.0f);
+    reach_motion_set(feedback->motion, 0.0f);
     pressable->feedback_index = REACH_PRESSABLE_FEEDBACK_NONE;
 }
 
 size_t reach_pressable_feedback_index(const reach_pressable *pressable)
 {
     return pressable != nullptr ? pressable->feedback_index : REACH_PRESSABLE_FEEDBACK_NONE;
-}
-
-float reach_pressable_feedback_value(const reach_pressable *pressable,
-                                     const reach_pressable_feedback_style *feedback)
-{
-    return pressable != nullptr && pressable->feedback_index != REACH_PRESSABLE_FEEDBACK_NONE &&
-                   reach_pressable_feedback_valid(feedback)
-               ? reach_pressable_feedback_sample(feedback)
-               : 0.0f;
 }

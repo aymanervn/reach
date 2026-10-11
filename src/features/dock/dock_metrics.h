@@ -12,7 +12,6 @@ struct reach_dock_metrics
     float running_indicator_focused_alpha;
     float running_indicator_unfocused_alpha;
 
-    float click_feedback_min_opacity;
     float reorder_neighbor_threshold_ratio;
 };
 
@@ -27,7 +26,6 @@ static constexpr reach_dock_metrics reach_dock_make_metrics()
     metrics.running_indicator_focused_alpha = 1.0f;
     metrics.running_indicator_unfocused_alpha = 0.5f;
 
-    metrics.click_feedback_min_opacity = 0.001f;
     metrics.reorder_neighbor_threshold_ratio = 0.25f;
 
     return metrics;

@@ -451,7 +451,7 @@ timer or reporting worker is added. Retained-surface bytes are an estimate, not 
 system CPU/GPU, power and presentation latency require independent measurement. See
 `docs/gpu-workload-baseline.md`.
 
-Shared pressable feedback can publish absolute-time motion directly. Battery retains one fixed
+Shared pressable feedback publishes absolute-time motion through a single motion pointer. Battery retains one fixed
 saver-row overlay through `reach_ui_feedback_render`; Quick Settings uses the same primitive for
 its current pressed target, including output-row scissoring. Press and release events publish an
 opacity descriptor. Each capsule owns capture and original-target activation, resets feedback on
@@ -464,6 +464,12 @@ model keeps original-target identity and retires settled feedback at the next in
 schedules all command-buffer motion only when retained rendering is unavailable, including one
 final endpoint frame. No button-feedback scalar manager, per-tick advancement or compositor frame
 demand remains. Target introduction, layout, enabled state and theme changes still redraw content.
+
+Dock and Top Bar press feedback emits a separate flat retained group, copying item placement
+for moving icons. Shared UI feedback owns the group descriptor; the icon helper retains its
+original alpha-mask tint, while trigger and overflow glyphs use RGBA tint. Press feedback no longer
+owns scalar tracks, sampled render values, capsule frame demand or bar content-frame blockers.
+Original-target capture and context-feedback latching still use the shared pressable contract.
 
 Top Bar tray and Dock icon groups use stable item identities. Pointer events publish direct
 positions, reordered neighbours and released items run compositor motion, and a stationary drag
@@ -799,8 +805,8 @@ Retained render groups also publish four animated clip insets. Both Windows back
 clip objects and submit changed edges without regenerating unchanged content; unsupported targets
 sample the same descriptor. Battery, Quick Settings and tray popup press feedback publish
 absolute-time motion into retained opacity layers. Those feedback effects no longer own scalar
-tracks or capsule frame demand. The shared pressable manager/track path remains a migration bridge
-for other consumers. Broader resize, color feedback and native-layout migrations remain pending in
+tracks or capsule frame demand. The shared pressable scalar bridge has been removed.
+Broader resize, color feedback and native-layout migrations remain pending in
 the [GPU migration checklist](gpu-composition-migration-checklist.md).
 Layout definitions can also reserve a top or bottom edge. A consumer that opts into reserved
 bounds receives the remaining rectangle through the generic surface context; Stage uses this

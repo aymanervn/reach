@@ -81,6 +81,11 @@ support expectation is explicitly resolved.
     Debug builds, 39 tests and bounded native/fallback diagnostics pass at 100%, 125% and 200%
     geometry scales. GPU color-matrix and fallback coverage readback pass. Displayed compositor
     pixels, live input and total product cost remain part of final acceptance.
+  - [x] Dock and Top Bar press/release feedback uses retained opacity or RGBA tint. Feedback
+    shares item movement descriptors in separate flat groups; scalar feedback tracks, sampled
+    alpha/colors, frame blockers and the final shared pressable scalar bridge are removed.
+    Debug builds, 39 tests and five bounded capsule runs per compositor plus HWND fallback pass.
+    Native cancellation reuses content; live pixels, icon/DPI churn and product cost remain pending.
 - [ ] Migrate eligible loaders/repeating effects; select efficient compositor or deadline behavior for
   carets, preserve focus resets and marquee behavior, and stop hidden repetitions.
 

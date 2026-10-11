@@ -70,8 +70,7 @@ reach_pressable_feedback_style reach_top_bar_pressable_feedback(reach_top_bar *t
     reach_pressable_feedback_style feedback = {};
     if (top_bar != nullptr)
     {
-        feedback.animations = reach_top_bar_manager(top_bar);
-        feedback.track = REACH_TOP_BAR_ANIM_FEEDBACK_OPACITY;
+        feedback.motion = &top_bar->press_feedback;
         feedback.pressed_value = 0.50f;
         feedback.press_seconds = 0.055;
         feedback.release_seconds = 0.055;

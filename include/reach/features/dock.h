@@ -104,7 +104,7 @@ extern "C"
         uintptr_t focused_window;
         size_t dragged_render_index;
         size_t click_feedback_index;
-        float click_feedback_opacity;
+        const reach_motion *click_feedback;
         size_t trigger_feedback_index;
         int32_t text_alignment_center;
         float dpi_scale;
@@ -149,7 +149,6 @@ extern "C"
     enum reach_dock_animation_id
     {
         REACH_DOCK_ANIM_Y = 0,
-        REACH_DOCK_ANIM_FEEDBACK_OPACITY,
         REACH_DOCK_ANIM_SLOT_BASE,
         REACH_DOCK_ANIM_COUNT = REACH_DOCK_ANIM_SLOT_BASE + REACH_DOCK_SLOT_CAPACITY
     };

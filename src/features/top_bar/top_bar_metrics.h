@@ -89,8 +89,6 @@ struct reach_top_bar_metrics
 
     float battery_width;
     float battery_low_percent;
-
-    float click_feedback_min_opacity;
 };
 
 static constexpr reach_top_bar_metrics reach_top_bar_make_metrics()
@@ -147,8 +145,6 @@ static constexpr reach_top_bar_metrics reach_top_bar_make_metrics()
 
     metrics.battery_width = 46.0f;
     metrics.battery_low_percent = 15.0f;
-
-    metrics.click_feedback_min_opacity = 0.001f;
 
     return metrics;
 }

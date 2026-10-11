@@ -14,11 +14,10 @@ static void expect_true(int32_t condition, const char *message)
     }
 }
 
-static reach_pressable_feedback_style feedback_style(reach_animation_manager *manager)
+static reach_pressable_feedback_style feedback_style(reach_motion *motion)
 {
     reach_pressable_feedback_style style = {};
-    style.animations = manager;
-    style.track = 0;
+    style.motion = motion;
     style.pressed_value = 0.5f;
     style.press_seconds = 0.055;
     style.release_seconds = 0.055;
@@ -29,10 +28,8 @@ static reach_pressable_feedback_style feedback_style(reach_animation_manager *ma
 
 static void test_release_on_original_target_activates(void)
 {
-    reach_animation_track track = {};
-    reach_animation_manager manager = {};
-    reach_animation_manager_init(&manager, &track, 1);
-    reach_pressable_feedback_style feedback = feedback_style(&manager);
+    reach_motion motion = {};
+    reach_pressable_feedback_style feedback = feedback_style(&motion);
     reach_pressable pressable = {};
     reach_pressable_init(&pressable);
 
@@ -89,36 +86,31 @@ static void test_retained_feedback_retargets_and_resets(void)
 
 static void test_leave_temporarily_disarms_click(void)
 {
-    reach_animation_track track = {};
-    reach_animation_manager manager = {};
-    reach_animation_manager_init(&manager, &track, 1);
-    reach_pressable_feedback_style feedback = feedback_style(&manager);
+    reach_motion motion = {};
+    reach_pressable_feedback_style feedback = feedback_style(&motion);
     reach_pressable pressable = {};
     reach_pressable_init(&pressable);
     reach_pressable_result result = {};
     reach_pressable_press(&pressable, REACH_POINTER_BUTTON_PRIMARY, 11, 2, &feedback, &result);
-    reach_animation_manager_tick(&manager, 1.0);
+    motion.started_seconds = reach_motion_now_seconds() - motion.duration_seconds;
 
     reach_pressable_update(&pressable, REACH_PRESSABLE_TARGET_NONE, &result);
     expect_true(!reach_pressable_armed(&pressable), "leaving disarms the target");
     expect_true(reach_pressable_tracking(&pressable), "leaving retains the active sequence");
     expect_true(result.capture == 0, "leaving retains pointer capture until release");
-    expect_true(reach_animation_manager_value(&manager, 0) == feedback.pressed_value,
+    expect_true(reach_motion_value(&motion) == feedback.pressed_value,
                 "leaving keeps feedback pressed on the original target");
 
     reach_pressable_release(&pressable, REACH_POINTER_BUTTON_PRIMARY, 12, &feedback, &result);
     expect_true(!result.activated, "release away from the original target does not activate");
     expect_true(result.capture == -1, "release away ends the sequence");
-    expect_true(reach_animation_manager_target(&manager, 0) == 0.0f,
-                "release away starts feedback release");
+    expect_true(motion.to == 0.0f, "release away starts feedback release");
 }
 
 static void test_reentering_the_original_target_rearms(void)
 {
-    reach_animation_track track = {};
-    reach_animation_manager manager = {};
-    reach_animation_manager_init(&manager, &track, 1);
-    reach_pressable_feedback_style feedback = feedback_style(&manager);
+    reach_motion motion = {};
+    reach_pressable_feedback_style feedback = feedback_style(&motion);
     reach_pressable pressable = {};
     reach_pressable_init(&pressable);
     reach_pressable_result result = {};
@@ -129,11 +121,10 @@ static void test_reentering_the_original_target_rearms(void)
     reach_pressable_settle_feedback(&pressable, &feedback);
     expect_true(reach_pressable_feedback_index(&pressable) == 4,
                 "feedback identity survives while the pointer remains held away");
-    expect_true(reach_animation_manager_target(&manager, 0) == feedback.pressed_value,
-                "feedback remains pressed while held away");
+    expect_true(motion.to == feedback.pressed_value, "feedback remains pressed while held away");
     reach_pressable_update(&pressable, 13, &result);
     expect_true(reach_pressable_armed(&pressable), "returning to the original target rearms it");
-    expect_true(reach_animation_manager_target(&manager, 0) == feedback.pressed_value,
+    expect_true(motion.to == feedback.pressed_value,
                 "returning preserves uninterrupted feedback on the original target");
     reach_pressable_release(&pressable, REACH_POINTER_BUTTON_PRIMARY, 13, &feedback, &result);
     expect_true(result.activated && result.activated_target == 13,
@@ -156,10 +147,8 @@ static void test_drag_start_disarms_before_release(void)
 
 static void test_cancel_clears_feedback_and_capture(void)
 {
-    reach_animation_track track = {};
-    reach_animation_manager manager = {};
-    reach_animation_manager_init(&manager, &track, 1);
-    reach_pressable_feedback_style feedback = feedback_style(&manager);
+    reach_motion motion = {};
+    reach_pressable_feedback_style feedback = feedback_style(&motion);
     reach_pressable pressable = {};
     reach_pressable_init(&pressable);
     reach_pressable_result result = {};
@@ -168,8 +157,7 @@ static void test_cancel_clears_feedback_and_capture(void)
     expect_true(!reach_pressable_tracking(&pressable) && !reach_pressable_armed(&pressable),
                 "cancel clears press state");
     expect_true(result.capture == -1, "cancel releases pointer capture");
-    expect_true(reach_animation_manager_target(&manager, 0) == 0.0f,
-                "cancel starts feedback release");
+    expect_true(motion.to == 0.0f, "cancel starts feedback release");
 }
 
 static void test_release_requires_the_pressed_button(void)
