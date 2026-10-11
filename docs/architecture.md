@@ -751,8 +751,9 @@ notification, while the HUD keeps its copied display text for the rest of its in
 Per-frame layout resolves in dependency order in `reach_host_update`, and every capsule owns its
 own geometry: the Dock and the Launcher each compute their layout inside `arrange` during the frame
 pass. Capsules also own feature-specific presentation animation. Launcher keeps its offset,
-opacity, and proportional scale tracks beside its results-expansion track in the Launcher animation
-manager. Popup capsules, Clipboard, and Switcher embed the shared
+opacity, and proportional scale as `reach_motion` descriptors; its results expansion still uses
+the scalar manager. Related presentation properties share one absolute event timestamp. Popup
+capsules, Clipboard, and Switcher embed the shared
 `features/common/presentation` transition, which owns direction, timing, reversal, and close
 visibility. Their geometry publishes only generic presentation values;
 composition applies managed opacity to the complete rendered command buffer and, for scaled
@@ -778,6 +779,13 @@ drawn commands, including shadow and retained envelope offsets. It samples retai
 centered scale, and opacity from the existing motion clock. Switcher requests frames only through
 its active transition or width animation; settled DWM content updates independently. Stage keeps
 its capsule-owned exact placement and synchronized close semantics.
+Retained render groups also publish four animated clip insets. Both Windows backends retain their
+clip objects and submit changed edges without regenerating unchanged content; unsupported targets
+sample the same descriptor. Battery, Quick Settings and tray popup press feedback publish
+absolute-time motion into retained opacity layers. Those feedback effects no longer own scalar
+tracks or capsule frame demand. The shared pressable manager/track path remains a migration bridge
+for other consumers. Broader resize, color feedback and native-layout migrations remain pending in
+the [GPU migration checklist](gpu-composition-migration-checklist.md).
 Layout definitions can also reserve a top or bottom edge. A consumer that opts into reserved
 bounds receives the remaining rectangle through the generic surface context; Stage uses this
 contract after Dock and top bar arrangement rather than reading either feature directly.
