@@ -151,6 +151,7 @@ struct reach_render_backend
     int32_t has_scene_presentation;
     ComPtr<ABI::Windows::UI::Composition::ICompositionScopedBatch> presentation_batch;
     EventRegistrationToken presentation_token = {};
+    ComPtr<ABI::Windows::Foundation::IAsyncAction> presentation_commit;
     std::shared_ptr<std::atomic<uint64_t>> presentation_completed;
     uint64_t submitted_presentation_generation = 0;
     uint64_t reconciled_presentation_generation = 0;

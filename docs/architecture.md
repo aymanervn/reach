@@ -494,10 +494,15 @@ Shared popup transitions, Launcher presentation, and System HUD publish a retain
 presentation and an absolute lifecycle deadline. The generic runtime applies the presentation to
 the complete scene, including backdrop, chrome, and shadows, inside a stable native envelope.
 Both host hit testing and native input regions sample the same motion on pointer events.
-Windows Composition uses scoped-batch completion keyed to the current presentation generation;
-callbacks wake the existing message loop and stale generations cannot finish a newer close.
-DirectComposition reconciles final properties in one commit and synchronizes the compositor before
-close delivery. HUD's fixed lifetime uses its deadline independently of completion, so the hold
+Windows Composition uses scoped-batch completion keyed to the current presentation generation.
+Completion waits for all canonical root motions; changing any root motion retires old completion
+ownership and aggregates the current remaining curves. A hidden or occluded target can defer its
+animation callback: after the canonical deadline, the adapter submits final properties once, awaits
+`RequestCommitAsync` through a weak-lifetime callback, then synchronizes before close delivery.
+Callbacks wake the existing message loop; retarget/reset retire the pending commit and stale
+generations cannot finish newer motion. The runtime already waits on the capsule deadline, so
+this reconciliation adds no timer or periodic application frames. DirectComposition retains its
+one endpoint commit and compositor synchronization before close delivery. HUD's fixed lifetime uses its deadline independently of completion, so the hold
 requires no animation frames and another action restarts the complete lifetime. Launcher caret
 blinking also uses a deadline. Renderers without composition sample the same finite group contract
 in a duration-limited CPU fallback; repeating marquee motion remains static there.

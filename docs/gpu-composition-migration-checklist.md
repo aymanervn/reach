@@ -63,6 +63,13 @@ support expectation is explicitly resolved.
     39 tests and bounded native diagnostics pass on both compositors and the HWND fallback.
     See the workload baseline for evidence and the remaining visual/performance acceptance.
 
+  - [x] Resolve WUC completion deferred by occlusion: wait for every canonical root motion, then
+    reconcile final properties with one asynchronous commit and synchronization if the batch is
+    pending. Component retarget/reset retire old completion ownership. Existing runtime deadline
+    waking is reused; no timer/frame loop added. Debug builds, 39 tests and five full native runs
+    per backend pass without exclusions; unoccluded native verification also passes. Broader
+    failure/recreation, displayed-pixel and product-performance acceptance remain pending.
+
 ## 4. Feedback and repetition
 
 - [ ] Migrate eligible hover, press, selection and close feedback across Context Menu, Battery, tray,
