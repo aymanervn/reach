@@ -48,6 +48,10 @@ extern "C"
     uint64_t reach_quick_settings_press_feedback_target(const reach_quick_settings *quick_settings);
     reach_motion
     reach_quick_settings_press_feedback_motion(const reach_quick_settings *quick_settings);
+    reach_quick_settings_layout reach_quick_settings_layout_for_expansion_scaled(
+        reach_rect_f32 content_bounds, const reach_theme *theme,
+        const reach_quick_settings_model *model, float output_devices_expansion,
+        float app_volumes_expansion, float dpi_scale);
 #ifdef __cplusplus
 }
 #endif

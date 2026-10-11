@@ -312,3 +312,43 @@ This establishes hierarchy execution, source reuse and bounded node lifetime. Co
 Settings paint/layout/input integration, displayed compositor pixels and total product efficiency
 remain pending. Native opacity acts on retained surfaces; preserving existing per-command fading
 still requires appropriate paint partitioning when commands overlap.
+
+## Quick Settings retained sections
+
+The output-device and app-volume scalar tracks are removed. Canonical section parents own clip,
+shared bounded opacity and four-DP slide; an independent parent moves following controls. Leaves
+cache each paint separately, preserving overlapping panel/track/fill/thumb alpha. Semantic source
+IDs keep unchanged titles and chevrons cached during retirement. Pointer input samples one time and
+excludes clipped/transparent rows; cleanup uses one deadline. Height remains a scalar/frame driver.
+
+Current evidence: `build-qs-text-phase-shared.log`, `test-qs-text-phase.log`, and
+`probe-qs-sections-final.log`; isolated Debug builds, all 39 tests, architecture/format/whitespace
+and five full native runs per backend plus HWND fallback pass with no pixel-comparator exclusion.
+The actual maximum-membership capsule uses two reversal/retirement executions, zero native raster
+passes, seven property submissions and no section scalar advances/periodic frame demand. Post-
+retirement retained bytes are 377,760 at 100% DPI. The new pure batch-preflight test verifies atomic
+ownership assignment and pixel-aligned glyph padding. Native WUC sampler getters and both backends'
+text metadata confirm source-baseline compensation/nearest sampling for unscaled vertical text.
+Scaling, horizontal movement, repeated content and parents with descendants keep linear sampling.
+
+The ignored GPU source-composition comparison uses the committed former renderer as its reference.
+Open/closed endpoints at 100/125/150/200% DPI differ by at most one channel value; partially clipped
+saturated reveals and geometry-AA-off controls differ by at most two. Intermediate command order,
+geometry, dimensions, effective clips and color intent match the former renderer. A fractional-DPI
+text sampling mismatch was fixed using cached DirectWrite baseline phase, without another timer,
+clock, reraster path or layout loop.
+
+Moving a cached bitmap filters shape edges differently from rerasterizing vector edges at each
+position. The mid-fade comparison therefore retains its separate bounded filtering check and manual
+inspection; it does not silently broaden endpoint tolerance. At 100% a fallback SVG AA fringe differs
+by at most 7 channel values across 12 channels above the strict endpoint tolerance; at 200% a rounded
+track/fill edge differs by 3 across 2 channels. At 125%, after text correction, the fractional shape
+edge maximum is 34, with mean error 0.036248 across the whole image and 4,046 channels above the
+endpoint tolerance. The sampled images were inspected: geometry, content and clipping remain
+consistent, with transient edge-filter differences. Intermediate mean channel error must stay below
+0.05 and differing channels below 2% of pixel count; geometry/color/clip assertions remain separate
+and strict. These checks validate this migration mechanism, not all product configurations.
+
+`qs-retained.png` and `qs-reference.png` are offscreen sampled images, not displayed WUC/DC captures.
+Live pixels, other themes/fonts, source/input churn, high refresh and total product cost remain in
+final acceptance. Complete popup height/scroll/monitor/native-input integration is still pending.

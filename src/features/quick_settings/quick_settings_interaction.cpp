@@ -6,7 +6,8 @@
 
 static int reach_quick_settings_point_in_rect(reach_rect_f32 rect, float x, float y)
 {
-    return x >= rect.x && x <= rect.x + rect.width && y >= rect.y && y <= rect.y + rect.height;
+    return rect.width > 0.0f && rect.height > 0.0f && x >= rect.x && x <= rect.x + rect.width &&
+           y >= rect.y && y <= rect.y + rect.height;
 }
 
 static float reach_quick_settings_level_for_slider_line(reach_rect_f32 slider_line, float x)
@@ -228,6 +229,9 @@ reach_quick_settings_begin_slider_gesture_if_hit(reach_quick_settings *quick_set
     }
     reach_quick_settings_state *state = reach_quick_settings_state_mut(quick_settings);
 
+    if (!reach_quick_settings_point_in_rect(
+            reach_quick_settings_state_ptr(quick_settings)->content_bounds, (float)x, (float)y))
+        return action;
     reach_quick_settings_hit_result hit =
         reach_quick_settings_hit_test(&state->layout, &state->model, (float)x, (float)y);
     action = reach_quick_settings_action_for_hit(hit);

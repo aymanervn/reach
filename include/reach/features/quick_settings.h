@@ -124,8 +124,9 @@ extern "C"
         reach_quick_settings_layout layout;
         reach_theme theme;
         float dpi_scale;
-        float output_devices_expansion;
-        float app_volumes_expansion;
+        reach_motion output_devices_expansion;
+        reach_motion app_volumes_expansion;
+        reach_rect_f32 viewport;
         reach_text_measure_port text_measure;
         uint64_t press_feedback_target;
         reach_motion press_feedback;
@@ -205,8 +206,8 @@ extern "C"
         reach_rect_f32 bounds;
         reach_rect_f32 target_bounds;
         reach_rect_f32 content_bounds;
-        float output_devices_expansion;
-        float app_volumes_expansion;
+        reach_motion output_devices_expansion;
+        reach_motion app_volumes_expansion;
         float scroll_offset;
         float scroll_max;
         float notch_anchor_x;

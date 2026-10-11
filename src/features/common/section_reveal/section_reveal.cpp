@@ -1,5 +1,13 @@
 #include "reach/features/common/section_reveal.h"
 
+#include <math.h>
+
+reach_motion reach_section_reveal_opacity(const reach_motion *progress)
+{
+    reach_motion opacity = reach_motion_affine(progress, 1.0f / 0.65f, -0.10f / 0.65f);
+    return reach_motion_clamp(&opacity, 0.0f, 1.0f);
+}
+
 void reach_section_reveal_apply(reach_render_command_buffer *buffer, size_t first_command,
                                 float progress, float maximum_y_offset)
 {

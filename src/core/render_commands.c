@@ -504,3 +504,77 @@ reach_result reach_render_command_buffer_push(reach_render_command_buffer *buffe
     buffer->count += 1;
     return REACH_OK;
 }
+
+static int32_t reach_render_retained_command_bounds(const reach_render_command *command,
+                                                    reach_rect_f32 *out_bounds)
+{
+    if (!isfinite(command->rect.x) || !isfinite(command->rect.y) ||
+        !isfinite(command->rect.width) || !isfinite(command->rect.height) ||
+        command->rect.width < 0.0f || command->rect.height < 0.0f ||
+        !isfinite(command->text_size) || !isfinite(command->stroke_width))
+        return 0;
+    float padding = command->type == REACH_RENDER_COMMAND_TEXT
+                        ? command->text_size
+                        : fmaxf(1.0f, command->stroke_width * 0.5f + 1.0f);
+    if (command->type == REACH_RENDER_COMMAND_SHADOW)
+    {
+        reach_shadow shadow = {command->shadow_offset_x, command->shadow_offset_y,
+                               command->blur_radius, command->color};
+        padding = reach_theme_shadow_extent(&shadow, 1.0f);
+    }
+    if (!isfinite(padding) || padding < 0.0f)
+        return 0;
+    reach_rect_f32 bounds = {floorf(command->rect.x - padding), floorf(command->rect.y - padding),
+                             0, 0};
+    bounds.width = ceilf(command->rect.x + command->rect.width + padding) - bounds.x;
+    bounds.height = ceilf(command->rect.y + command->rect.height + padding) - bounds.y;
+    if (!isfinite(bounds.x) || !isfinite(bounds.y) || !isfinite(bounds.width) ||
+        !isfinite(bounds.height) || bounds.width <= 0 || bounds.height <= 0 ||
+        bounds.width > 16384 || bounds.height > 16384)
+        return 0;
+    *out_bounds = bounds;
+    return 1;
+}
+
+reach_result reach_render_retain_commands(reach_render_command_buffer *buffer, size_t first_command,
+                                          uint64_t first_group_id, uint64_t parent_id,
+                                          const reach_motion *opacity, const reach_motion *y)
+{
+    if (buffer == 0 || opacity == 0 || y == 0 || first_command > buffer->count ||
+        buffer->count > REACH_MAX_RENDER_COMMANDS || buffer->current_group_id != 0)
+        return REACH_INVALID_ARGUMENT;
+    size_t count = buffer->count - first_command;
+    if (buffer->group_count > REACH_MAX_RENDER_GROUPS ||
+        count > REACH_MAX_RENDER_GROUPS - buffer->group_count)
+        return REACH_ERROR;
+    if (first_group_id == 0 || first_group_id >= UINT64_C(0x8000000000000000) ||
+        count > UINT64_C(0x8000000000000000) - first_group_id)
+        return REACH_INVALID_ARGUMENT;
+    for (size_t index = 0; index < count; ++index)
+    {
+        const reach_render_command *command = &buffer->commands[first_command + index];
+        reach_render_group group = {0};
+        group.id = first_group_id + index;
+        group.parent_id = parent_id;
+        if (command->group_id != 0 ||
+            !reach_render_retained_command_bounds(command, &group.bounds) ||
+            reach_render_command_buffer_check_group(buffer, &group) != REACH_OK)
+            return REACH_INVALID_ARGUMENT;
+    }
+    for (size_t index = 0; index < count; ++index)
+    {
+        reach_render_command *command = &buffer->commands[first_command + index];
+        reach_render_group group = {0};
+        group.id = first_group_id + index;
+        group.parent_id = parent_id;
+        (void)reach_render_retained_command_bounds(command, &group.bounds);
+        group.opacity = *opacity;
+        group.y = *y;
+        reach_result result = reach_render_command_buffer_begin_group(buffer, &group);
+        if (result != REACH_OK)
+            return result;
+        command->group_id = group.id;
+        reach_render_command_buffer_end_group(buffer);
+    }
+    return REACH_OK;
+}

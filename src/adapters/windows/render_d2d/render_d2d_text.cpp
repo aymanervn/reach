@@ -371,6 +371,22 @@ static const wchar_t *reach_d2d_ui_font_family(reach_render_backend *backend)
     return backend->ui_font_family;
 }
 
+static HRESULT reach_d2d_command_text_layout(reach_render_backend *backend,
+                                             const reach_render_command *command,
+                                             IDWriteTextLayout **out_layout)
+{
+    int32_t alignment =
+        command->text_alignment == REACH_TEXT_ALIGNMENT_LEADING    ? DWRITE_TEXT_ALIGNMENT_LEADING
+        : command->text_alignment == REACH_TEXT_ALIGNMENT_TRAILING ? DWRITE_TEXT_ALIGNMENT_TRAILING
+                                                                   : DWRITE_TEXT_ALIGNMENT_CENTER;
+    return reach_d2d_cached_layout(
+        backend, (const wchar_t *)command->text,
+        command->text_size > 0 ? command->text_size : REACH_TEXT_SIZE_MEDIUM,
+        command->text_weight > 0 ? command->text_weight : DWRITE_FONT_WEIGHT_NORMAL,
+        command->rect.width, command->rect.height, alignment, DWRITE_PARAGRAPH_ALIGNMENT_CENTER,
+        command->text_ellipsis, out_layout);
+}
+
 reach_result reach_d2d_draw_text_to_target(reach_render_backend *backend, ID2D1RenderTarget *target,
                                            const reach_render_command *command)
 {
@@ -384,23 +400,9 @@ reach_result reach_d2d_draw_text_to_target(reach_render_backend *backend, ID2D1R
         return REACH_ERROR;
     }
 
-    const wchar_t *text = reinterpret_cast<const wchar_t *>(command->text);
-    if (text == nullptr)
-    {
-        return REACH_INVALID_ARGUMENT;
-    }
-
     IDWriteTextLayout *layout = nullptr;
     ID2D1SolidColorBrush *brush = nullptr;
-    int32_t alignment =
-        command->text_alignment == REACH_TEXT_ALIGNMENT_LEADING    ? DWRITE_TEXT_ALIGNMENT_LEADING
-        : command->text_alignment == REACH_TEXT_ALIGNMENT_TRAILING ? DWRITE_TEXT_ALIGNMENT_TRAILING
-                                                                   : DWRITE_TEXT_ALIGNMENT_CENTER;
-    HRESULT hr = reach_d2d_cached_layout(
-        backend, text, command->text_size > 0.0f ? command->text_size : REACH_TEXT_SIZE_MEDIUM,
-        command->text_weight > 0 ? command->text_weight : DWRITE_FONT_WEIGHT_NORMAL,
-        command->rect.width, command->rect.height, alignment, DWRITE_PARAGRAPH_ALIGNMENT_CENTER,
-        command->text_ellipsis, &layout);
+    HRESULT hr = reach_d2d_command_text_layout(backend, command, &layout);
     if (SUCCEEDED(hr))
     {
         hr = target->CreateSolidColorBrush(reach_d2d_color(command->color), &brush);
@@ -585,4 +587,24 @@ reach_result reach_d2d_draw_textbox(reach_render_backend *backend,
 
     layout->Release();
     return REACH_OK;
+}
+
+int32_t reach_d2d_text_raster_phase(reach_render_backend *backend,
+                                    const reach_render_command *command, float *out_y)
+{
+    if (backend == nullptr || command == nullptr || out_y == nullptr || command->text[0] == 0)
+        return 0;
+    ComPtr<IDWriteTextLayout> layout;
+    HRESULT hr = reach_d2d_command_text_layout(backend, command, &layout);
+    if (FAILED(hr))
+        return 0;
+    DWRITE_TEXT_METRICS metrics = {};
+    DWRITE_LINE_METRICS line = {};
+    UINT32 count = 0;
+    if (FAILED(layout->GetMetrics(&metrics)) || FAILED(layout->GetLineMetrics(&line, 1, &count)) ||
+        count != 1)
+        return 0;
+    float baseline = command->rect.y + metrics.top + line.baseline;
+    *out_y = baseline - roundf(baseline);
+    return 1;
 }

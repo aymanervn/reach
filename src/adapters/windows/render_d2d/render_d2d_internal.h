@@ -114,6 +114,10 @@ struct reach_d2d_retained_layer
     UINT height = 0;
     bool initialized = false;
     bool has_children = false;
+    bool text_phase_valid = false;
+    bool text_pixel_aligned = false;
+    float text_raster_phase_y = 0.0f;
+    float text_presentation_phase_y = 0.0f;
     reach_point_f32 parent_origin = {};
 };
 
@@ -253,6 +257,8 @@ reach_result reach_d2d_draw_arc_stroke(ID2D1RenderTarget *target,
 reach_result reach_d2d_draw_clipped_rounded_rect(ID2D1RenderTarget *target,
                                                  const reach_render_command *command);
 
+int32_t reach_d2d_text_raster_phase(reach_render_backend *backend,
+                                    const reach_render_command *command, float *out_y);
 reach_result reach_d2d_draw_text(reach_render_backend *backend,
                                  const reach_render_command *command);
 reach_result reach_d2d_draw_text_to_target(reach_render_backend *backend, ID2D1RenderTarget *target,
