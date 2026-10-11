@@ -112,7 +112,9 @@ struct reach_d2d_retained_layer
     ComPtr<IDCompositionColorMatrixEffect> dcomp_tint;
     UINT width = 0;
     UINT height = 0;
-    int32_t seen = 0;
+    bool initialized = false;
+    bool has_children = false;
+    reach_point_f32 parent_origin = {};
 };
 
 struct reach_render_backend

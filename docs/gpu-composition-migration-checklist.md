@@ -46,6 +46,12 @@ support expectation is explicitly resolved.
     input/native projection share the axis contract. Debug builds, 39 tests and bounded native
     growth/reversal plus four-DPI pixel comparison pass; complete feature consumers, displayed
     compositor pixels and the remaining small/notched-width capabilities stay pending.
+  - [x] Support retained viewport/content hierarchy with shared event-time geometry.
+    Empty parents use existing native visuals without raster allocation; content movement,
+    stationary inner clips and ancestor motion compose without a new clock. Preserve painter
+    order and validate parent ownership; reparenting and parent-content retirement reuse children.
+    Debug builds, all 39 tests and five full native runs per backend plus HWND fallback pass.
+    Complete Quick Settings integration and displayed-pixel/product acceptance remain pending.
 - [ ] Decide whether supported live-preview composition meets behavior and efficiency requirements;
   document the selected compositor or optimized hybrid design for Dock, Switcher and Stage.
   - [x] Select the existing DWM port with retained Reach visuals and active-only native motion.

@@ -201,6 +201,9 @@ reach_result reach_d2d_execute(reach_render_backend *backend,
         return reach_d2d_sync_retained(backend, commands);
     }
 
+    if (reach_render_command_buffer_validate_groups(commands) != REACH_OK)
+        return REACH_INVALID_ARGUMENT;
+
     reach_workload_add(REACH_WORKLOAD_RENDER_EXECUTIONS, 1);
     reach_workload_add(REACH_WORKLOAD_FALLBACK_EXECUTIONS, 1);
     D2D1::Matrix3x2F content = D2D1::Matrix3x2F::Scale(commands->content_transform.scale_x,
@@ -226,31 +229,26 @@ reach_result reach_d2d_execute(reach_render_backend *backend,
     for (size_t index = 0; index < commands->count && outcome == REACH_OK; ++index)
     {
         reach_render_command command = commands->commands[index];
-        const reach_render_group *group = nullptr;
-        for (size_t at = 0; at < commands->group_count; ++at)
-            if (command.group_id == commands->groups[at].id)
-                group = &commands->groups[at];
+        const reach_render_group *group =
+            reach_render_command_buffer_group(commands, command.group_id);
         target->SetTransform(content * root);
-        if (group != nullptr && group->has_clip)
+        reach_rect_f32 clip = {};
+        bool has_clip = reach_render_command_buffer_group_clip_at(commands, command.group_id,
+                                                                  now_seconds, &clip) != 0;
+        if (has_clip)
         {
-            reach_rect_f32 clip = reach_render_group_clip_at(group, now_seconds);
             target->PushAxisAlignedClip(
                 D2D1::RectF(clip.x, clip.y, clip.x + clip.width, clip.y + clip.height),
                 D2D1_ANTIALIAS_MODE_ALIASED);
         }
-        float opacity = root_opacity;
-        if (group != nullptr)
-        {
-            reach_point_f32 scale = reach_render_group_scale_at(group, now_seconds);
-            D2D1::Matrix3x2F local =
-                D2D1::Matrix3x2F::Scale(scale.x, scale.y,
-                                        D2D1::Point2F(group->bounds.x, group->bounds.y)) *
-                D2D1::Matrix3x2F::Translation(reach_motion_value_at(&group->x, now_seconds),
-                                              reach_motion_value_at(&group->y, now_seconds));
-            target->SetTransform(local * content * root);
-            if (group->opacity.generation)
-                opacity *= reach_motion_value_at(&group->opacity, now_seconds);
-        }
+        reach_transform_f32 transform =
+            reach_render_command_buffer_group_transform_at(commands, command.group_id, now_seconds);
+        D2D1::Matrix3x2F local =
+            D2D1::Matrix3x2F::Scale(transform.scale_x, transform.scale_y) *
+            D2D1::Matrix3x2F::Translation(transform.offset_x, transform.offset_y);
+        target->SetTransform(local * content * root);
+        float opacity = root_opacity * reach_render_command_buffer_group_opacity_at(
+                                           commands, command.group_id, now_seconds);
         if (group != nullptr && group->has_tint)
         {
             size_t end = index + 1;
@@ -259,7 +257,7 @@ reach_result reach_d2d_execute(reach_render_backend *backend,
             outcome =
                 reach_d2d_execute_tinted_group(backend, target, *group, commands->commands + index,
                                                end - index, opacity, now_seconds);
-            if (group->has_clip)
+            if (has_clip)
                 target->PopAxisAlignedClip();
             index = end - 1;
             continue;
@@ -279,7 +277,7 @@ reach_result reach_d2d_execute(reach_render_backend *backend,
             outcome = reach_d2d_execute_command(backend, target, &command);
         if (scissor)
             target->PopAxisAlignedClip();
-        if (group != nullptr && group->has_clip)
+        if (has_clip)
             target->PopAxisAlignedClip();
     }
     target->SetTransform(D2D1::Matrix3x2F::Identity());

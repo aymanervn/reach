@@ -1,6 +1,6 @@
 # GPU resize and reveal
 
-Status: fixed-cap chrome and animated group insets implemented; complete feature consumers and the
+Status: fixed-cap chrome, bounded curves, viewport/content hierarchy and animated group insets implemented; complete feature consumers and the
 remaining compact-shape/notched-width capabilities are pending. This does not close the migration
 capability or final performance gates.
 
@@ -57,6 +57,38 @@ negative affine mapping, retarget continuity and native polynomials against CPU 
 submission/reversal diagnostics cover movement, opacity and clip edges on both compositors and
 finite HWND fallback. Complete section viewport/content integration and displayed compositor pixels
 remain pending; this curve capability alone does not migrate Quick Settings.
+
+## Viewport and content hierarchy
+
+A render group can declare `parent_id` without introducing another renderer or animation owner.
+Every group's source geometry remains in the same feature coordinate space. Its content transform
+moves its own raster and descendants; its clip remains stationary relative to that group's parent.
+An outer content viewport, following-row movement and an inner reveal viewport can therefore nest,
+while leaf content slides independently. `reach_render_command_buffer_group_transform_at`,
+`reach_render_command_buffer_group_clip_at` and `reach_render_command_buffer_group_opacity_at`
+provide the matching event-time CPU geometry and inherited opacity.
+
+Both backends retain the hierarchy using existing container/content visuals. Empty parent nodes
+allocate no drawing surface. Raster content is compared and cached independently of parent motion;
+reparenting updates native ownership and coordinate origins without repainting unchanged sources.
+A parent can acquire or retire its own raster while retaining children. Native Multiply opacity
+applies inherited alpha to individual retained surfaces; consumers must still partition overlapping
+paint when preserving per-command alpha, rather than flattening an entire reveal into one bitmap.
+DirectComposition's [opacity modes](https://learn.microsoft.com/en-us/windows/win32/api/dcomp/nf-dcomp-idcompositionvisual2-setopacitymode)
+and [child ordering](https://learn.microsoft.com/en-us/windows/win32/api/dcomp/nf-dcomp-idcompositionvisual-addvisual)
+define those semantics. Windows Composition uses ordinary container/sprite visuals, with no
+flattening LayerVisual introduced.
+
+Parents must be declared before children with finite positive bounds. Subtrees occupy contiguous
+painter-order ranges; a parent's own raster precedes its children. Validation rejects cycles,
+missing owners, repeated/interleaved ranges and parent coverage tint before either renderer mutates
+native ownership. Tint remains a leaf coverage capability. Root presentation cannot have a parent.
+`reach_render_command_buffer_check_group` preflights individual declarations and fixed-cap batches,
+so invalid parent references cannot silently append ungrouped chrome commands.
+
+This capability supports independent viewport/content motion. Complete section paint partitioning,
+popup geometry/monitor constraints, deadline reconciliation and input integration remain consumer
+work, and displayed compositor pixels remain part of final acceptance.
 
 ## Validation and limits
 

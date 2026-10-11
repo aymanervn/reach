@@ -437,6 +437,18 @@ the native clip. `reach_render_group_clip_at` provides the same event-time recta
 and geometry consumers, and active clip motion participates in generic fallback frame demand.
 Root-presentation clipping remains unsupported.
 
+Groups can declare `parent_id`; source geometry stays in feature coordinates, while each content
+transform moves its raster and descendants. A group's clip is stationary within its parent, so
+viewports and independently moving contents can nest. CPU geometry helpers compose ancestor
+transforms, intersect viewports and sample inherited opacity at one event time. Both native
+backends reuse existing container/content visuals; empty parents allocate no raster, and reparenting
+changes ownership/origins without repainting unchanged content. Native opacity multiplies retained
+surfaces; overlapping per-command paint still requires consumer partitioning. Parents precede
+children in declarations, subtrees are contiguous and parent raster content precedes descendants.
+Both execution paths validate ownership/order before native mutation. Coverage tint remains a leaf
+capability, and root presentation has no parent. Fixed-cap batch preflight uses the same declaration
+checks. Complete popup/section integration remains migration work.
+
 `reach_motion_clamp` bounds a derived motion while retaining its canonical event time, easing,
 generation and completion deadline. Affine mappings transform its limits as well as its endpoints.
 CPU sampling applies the limits; `reach_motion_compile_at` provides up to four cubic/constant

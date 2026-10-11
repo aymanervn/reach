@@ -34,6 +34,7 @@ extern "C"
     typedef struct reach_render_group
     {
         uint64_t id;
+        uint64_t parent_id;
         reach_rect_f32 bounds;
         reach_motion x;
         reach_motion y;
@@ -217,6 +218,18 @@ extern "C"
 
     void reach_render_command_buffer_clear(reach_render_command_buffer *buffer);
     int32_t reach_render_command_buffer_motion_active(const reach_render_command_buffer *buffer);
+    reach_result
+    reach_render_command_buffer_validate_groups(const reach_render_command_buffer *buffer);
+    const reach_render_group *
+    reach_render_command_buffer_group(const reach_render_command_buffer *buffer, uint64_t id);
+    reach_transform_f32
+    reach_render_command_buffer_group_transform_at(const reach_render_command_buffer *buffer,
+                                                   uint64_t id, double now_seconds);
+    float reach_render_command_buffer_group_opacity_at(const reach_render_command_buffer *buffer,
+                                                       uint64_t id, double now_seconds);
+    int32_t reach_render_command_buffer_group_clip_at(const reach_render_command_buffer *buffer,
+                                                      uint64_t id, double now_seconds,
+                                                      reach_rect_f32 *out_clip);
     reach_rect_f32 reach_render_group_clip_at(const reach_render_group *group, double now_seconds);
     reach_color reach_render_group_tint_at(const reach_render_group *group, double now_seconds);
     reach_motion reach_render_group_y_scale(const reach_render_group *group);
@@ -231,6 +244,8 @@ extern "C"
                                                     const reach_render_command *commands,
                                                     size_t command_count);
     reach_result reach_render_command_buffer_begin_group(reach_render_command_buffer *buffer,
+                                                         const reach_render_group *group);
+    reach_result reach_render_command_buffer_check_group(const reach_render_command_buffer *buffer,
                                                          const reach_render_group *group);
     void reach_render_command_buffer_end_group(reach_render_command_buffer *buffer);
     reach_result reach_render_command_buffer_push(reach_render_command_buffer *buffer,
