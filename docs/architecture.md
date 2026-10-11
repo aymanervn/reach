@@ -283,6 +283,18 @@ supply drawn chrome, native placements and pointer retention. Closing freezes th
 presentation starts at its target width, and monitor/DPI changes cut to the newly constrained
 layout. This remains CPU layout through the existing frame path; no new compositor capability is
 introduced.
+Source changes with surviving visible windows also start a private 180ms reflow progress track.
+Context Menu captures each survivor's current screen X by window identity, then interpolates
+toward the packed row as width motion continues. A new source enters from a small horizontal
+offset. Complete previews stay inside the current viewport; headers, close controls and hit
+regions move with their preview. Interrupted changes capture the displayed positions again,
+while initial presentation, disjoint pages and monitor/DPI changes use the constrained layout
+directly. Closing freezes arranged positions and retires the reflow track. Hovering anywhere
+on a card highlights its fixed header pill and square thumbnail border with the shared
+`context_menu_hover_background` theme color. The dark theme uses its darker structure shade.
+The title has 8dp left padding; the close control renders at 80% of its hit-region dimensions
+without moving the title on hover. The theme-scaled outline sits outside native preview bounds
+and uses the shared bordered-background renderer so DWM content cannot obscure it.
 Each thumbnail relationship declares its destination at creation. Runtime teardown releases only
 that surface's IDs, and adapter entries retain stable addresses and support simultaneous targets,
 including overlapping Stage and Switcher presentations. Adapter destruction releases all remaining

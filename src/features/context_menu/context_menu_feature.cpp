@@ -105,6 +105,7 @@ void reach_context_menu_force_close(reach_context_menu *menu)
         menu->pressable_identity = 0;
         menu->state.open = 0;
         reach_animation_manager_reset(&menu->animations, REACH_CONTEXT_MENU_ANIM_WIDTH);
+        reach_context_menu_stop_preview_reflow(menu);
         reach_feature_transition_reset(&menu->popup_transition);
     }
 }
@@ -179,6 +180,7 @@ int32_t reach_context_menu_set_open(reach_context_menu *menu, int32_t open)
     menu->state.open = 0;
     if (menu->state.window_list_open)
     {
+        reach_context_menu_stop_preview_reflow(menu);
         reach_animation_manager_set(&menu->animations, REACH_CONTEXT_MENU_ANIM_WIDTH,
                                     menu->state.bounds.width);
     }
@@ -217,6 +219,7 @@ void reach_context_menu_reset(reach_context_menu *menu)
     reach_animation_manager_set(&menu->animations, REACH_CONTEXT_MENU_ANIM_HOVER, 0.0f);
     reach_animation_manager_set(&menu->animations, REACH_CONTEXT_MENU_ANIM_CLOSE_HOVER, 0.0f);
     reach_animation_manager_reset(&menu->animations, REACH_CONTEXT_MENU_ANIM_WIDTH);
+    reach_context_menu_stop_preview_reflow(menu);
     reach_feature_transition_reset(&menu->popup_transition);
 }
 
@@ -370,6 +373,7 @@ void reach_context_menu_open_power(reach_context_menu *menu,
     state->power_open = 1;
     state->window_list_open = 0;
     reach_animation_manager_reset(&menu->animations, REACH_CONTEXT_MENU_ANIM_WIDTH);
+    reach_context_menu_stop_preview_reflow(menu);
     menu->previews = {};
     ++menu->preview_generation;
     reach_context_menu_place(state, ctx, reach_context_menu_power_popup_width * ctx->dpi_scale,
@@ -493,6 +497,7 @@ void reach_context_menu_open_for_item(reach_context_menu *menu, size_t target_in
     state->power_open = 0;
     state->window_list_open = 0;
     reach_animation_manager_reset(&menu->animations, REACH_CONTEXT_MENU_ANIM_WIDTH);
+    reach_context_menu_stop_preview_reflow(menu);
     menu->previews = {};
     ++menu->preview_generation;
     menu->request = ctx->request != nullptr ? *ctx->request : reach_menu_request{};

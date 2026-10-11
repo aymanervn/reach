@@ -595,7 +595,7 @@ static void expect_preview_animation_geometry(const reach_context_menu *menu)
         {
             expect_near(rect.width / rect.height,
                         reach_window_preview_aspect(preview_frames[window - 1]), 0.001f,
-                        "width animation preserves source proportions");
+                        "animated previews preserve source proportions");
         }
     }
 }
@@ -695,6 +695,106 @@ static void test_preview_width_animation_retarget_and_reset(void)
     reach_window_tracking_destroy(windows);
 }
 
+static float preview_screen_x(const reach_context_menu *menu, reach_window_id source)
+{
+    for (size_t index = 0; index < reach_context_menu_thumbnail_count(menu); ++index)
+    {
+        reach_window_id window = 0;
+        reach_rect_f32 rect = {};
+        reach_context_menu_thumbnail_at(menu, index, &window, &rect);
+        if (window == source)
+        {
+            return rect.x;
+        }
+    }
+    expect_true(0, "the requested preview source is published");
+    return 0.0f;
+}
+
+static void test_preview_reflow_preserves_surviving_sources(void)
+{
+    reset_preview_windows(3);
+    preview_frames[0] = {0, 0, 600, 1200};
+    preview_frames[2] = {0, 0, 2400, 900};
+    reach_window_manager_port port = {};
+    port.ops.window_count = preview_count;
+    port.ops.window_at = preview_at;
+    port.ops.frame_bounds = preview_frame;
+    reach_window_tracking *windows = nullptr;
+    reach_window_tracking_create(port, &windows);
+    reach_window_tracking_refresh(windows, nullptr);
+    reach_context_menu *menu = nullptr;
+    reach_context_menu_create(&menu);
+    reach_context_menu_attach_services(menu, windows, nullptr);
+    reach_menu_request request = {};
+    request.window_count = 3;
+    for (size_t index = 0; index < request.window_count; ++index)
+    {
+        request.windows[index].window = index + 1;
+    }
+    reach_context_menu_open_context ctx = {};
+    ctx.theme = reach_theme_default();
+    ctx.monitor = {0, 0, 1920, 1080};
+    ctx.dpi_scale = 1.0f;
+    ctx.anchored = 1;
+    ctx.drop_direction = REACH_POPUP_DROP_UP;
+    ctx.anchor_button = {940, 1000, 40, 40};
+    ctx.bar_edge_y = 1000;
+    ctx.request = &request;
+    reach_context_menu_open_window_list(menu, 0, &ctx);
+    advance_preview_layout(menu, &ctx, 0.2);
+    float initial = preview_screen_x(menu, 3);
+    reach_context_menu_window_list_remove(menu, 2);
+    expect_near(preview_screen_x(menu, 3), initial, 0.01f,
+                "removing a middle source preserves the survivor's displayed position");
+    size_t generation = reach_context_menu_preview_generation(menu);
+    advance_preview_layout(menu, &ctx, 0.06);
+    float moving = preview_screen_x(menu, 3);
+    expect_true(moving < initial, "a survivor moves into the removed source's space over time");
+    expect_true(reach_context_menu_preview_generation(menu) == generation,
+                "reflow frames preserve native source membership");
+    expect_preview_animation_geometry(menu);
+    request.anchored = ctx.anchored;
+    request.anchor_button = ctx.anchor_button;
+    request.bar_edge_y = ctx.bar_edge_y;
+    request.drop_direction = ctx.drop_direction;
+    reach_context_menu_refresh_window_list(menu, &request);
+    expect_near(preview_screen_x(menu, 3), moving, 0.01f,
+                "an addition during reflow retargets from the survivor's current position");
+    reach_context_menu_reanchor(menu, &ctx);
+    expect_near(preview_screen_x(menu, 3), moving, 0.01f,
+                "arranging twice without ticking does not advance or restart reflow");
+    for (size_t frame = 0; frame < 12; ++frame)
+    {
+        advance_preview_layout(menu, &ctx, 0.016);
+        expect_preview_animation_geometry(menu);
+    }
+    expect_near(preview_screen_x(menu, 3), initial, 0.01f,
+                "interrupted reflow settles back to the original packed row");
+    reach_context_menu_window_list_remove(menu, 2);
+    advance_preview_layout(menu, &ctx, 0.04);
+    float closing = preview_screen_x(menu, 3);
+    reach_context_menu_set_open(menu, 0);
+    advance_preview_layout(menu, &ctx, 0.2);
+    expect_near(preview_screen_x(menu, 3), closing, 0.01f,
+                "closing freezes the currently arranged preview position");
+    reach_context_menu_force_close(menu);
+    reach_context_menu_open_window_list(menu, 0, &ctx);
+    expect_near(preview_screen_x(menu, 3), initial, 0.01f,
+                "fresh presentation retires previous reflow origins");
+    reach_context_menu_window_list_remove(menu, 2);
+    advance_preview_layout(menu, &ctx, 0.04);
+    ctx.dpi_scale = 1.5f;
+    reach_context_menu_reanchor(menu, &ctx);
+    float constrained = preview_screen_x(menu, 3);
+    advance_preview_layout(menu, &ctx, 0.2);
+    expect_near(preview_screen_x(menu, 3), constrained, 0.01f,
+                "a DPI cut clears stale reflow origins and width motion");
+    expect_preview_animation_geometry(menu);
+    reach_context_menu_destroy(menu);
+    reach_window_tracking_destroy(windows);
+}
+
 int main(void)
 {
     test_window_list_holds_the_pointer_across_the_gap();
@@ -704,6 +804,7 @@ int main(void)
     test_preview_geometry_and_paging_across_dpi();
     test_preview_membership_refresh_and_reanchor();
     test_preview_width_animation_retarget_and_reset();
+    test_preview_reflow_preserves_surviving_sources();
     test_capsule_owns_popup_pointer_policy();
     return failures == 0 ? 0 : 1;
 }

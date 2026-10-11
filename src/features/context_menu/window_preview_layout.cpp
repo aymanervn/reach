@@ -267,8 +267,7 @@ int32_t reach_context_menu_arrange_previews(reach_context_menu *menu,
         state->item_slots[index] = {x, y, width, state->item_height};
         const reach_context_menu_preview_card *previous = &menu->previews.cards[visible];
         membership_changed |= card->window != previous->window || card->live != previous->live;
-        changed |=
-            !reach_rect_equal(card->preview, previous->preview) || card->index != previous->index;
+        changed |= card->index != previous->index;
         x += width + gap * fit;
     }
     if (overflow)
@@ -283,6 +282,13 @@ int32_t reach_context_menu_arrange_previews(reach_context_menu *menu,
         {
             layout.next = {border + padding + row_width - header, footer_y, header, header};
         }
+    }
+    reach_context_menu_reflow_previews(menu, &layout, before,
+                                       monitor_changed || scale != previous_scale);
+    for (size_t index = 0; index < layout.count; ++index)
+    {
+        changed |=
+            !reach_rect_equal(layout.cards[index].preview, menu->previews.cards[index].preview);
     }
     changed |= !reach_rect_equal(layout.previous, menu->previews.previous) ||
                !reach_rect_equal(layout.next, menu->previews.next);

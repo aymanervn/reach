@@ -52,6 +52,7 @@ enum
     REACH_CONTEXT_MENU_ANIM_HOVER = 0,
     REACH_CONTEXT_MENU_ANIM_CLOSE_HOVER,
     REACH_CONTEXT_MENU_ANIM_WIDTH,
+    REACH_CONTEXT_MENU_ANIM_REFLOW,
     REACH_CONTEXT_MENU_ANIM_COUNT
 };
 
@@ -78,6 +79,12 @@ typedef struct reach_context_menu_preview_layout
     size_t page_index;
 } reach_context_menu_preview_layout;
 
+typedef struct reach_context_menu_preview_origin
+{
+    reach_window_id window;
+    float screen_x;
+} reach_context_menu_preview_origin;
+
 struct reach_context_menu
 {
     reach_context_menu_state state;
@@ -94,7 +101,15 @@ struct reach_context_menu
     reach_context_menu_preview_layout previews;
     reach_context_menu_open_context preview_context;
     size_t preview_generation;
+    reach_context_menu_preview_origin preview_origins[REACH_MENU_MAX_WINDOWS];
+    size_t preview_origin_count;
 };
+
+void reach_context_menu_stop_preview_reflow(reach_context_menu *menu);
+void reach_context_menu_reflow_previews(reach_context_menu *menu,
+                                        reach_context_menu_preview_layout *layout,
+                                        reach_rect_f32 previous_bounds,
+                                        int32_t constraints_changed);
 
 int32_t reach_context_menu_arrange_previews(reach_context_menu *menu,
                                             const reach_context_menu_open_context *ctx);
