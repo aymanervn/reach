@@ -36,7 +36,6 @@ enum
     REACH_STAGE_ANIMATION_DESKTOP_PROGRESS,
     REACH_STAGE_ANIMATION_REFLOW,
     REACH_STAGE_ANIMATION_DEPARTURE,
-    REACH_STAGE_ANIMATION_CLOSE_HOVER,
     REACH_STAGE_ANIMATION_BACKDROP,
     REACH_STAGE_ANIMATION_RETARGET,
     REACH_STAGE_ANIMATION_COUNT
@@ -52,6 +51,7 @@ struct reach_stage
     reach_animation_manager animations;
     reach_animation_track animation_tracks[REACH_STAGE_ANIMATION_COUNT];
     reach_stage_state state;
+    reach_motion close_hover;
     reach_pressable pressable;
     size_t pressable_generation;
 

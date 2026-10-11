@@ -3,6 +3,7 @@
 #include "stage_common.h"
 
 #include "reach/core/typography.h"
+#include "reach/features/common/ui_controls.h"
 
 static reach_color reach_stage_rgba(float r, float g, float b, float a)
 {
@@ -150,16 +151,22 @@ static reach_result reach_stage_push_close_button(reach_stage *stage,
     button.x -= ctx->bounds.x;
     button.y -= ctx->bounds.y;
 
-    float hover = state->close_hover_index == index ? state->close_hover : 0.0f;
+    const reach_motion *hover = state->close_hover_index == index ? &stage->close_hover : nullptr;
     const reach_theme *theme = ctx->theme;
     reach_render_command backing = {};
     backing.type = REACH_RENDER_COMMAND_RECT;
     backing.rect = button;
     backing.radius = button.width * 0.5f;
-    backing.color = reach_theme_color_mix(theme->stage_close_background,
-                                          theme->stage_close_hover_background, hover);
-    backing.color.a *= alpha;
+    reach_color background = theme->stage_close_background;
+    reach_color hover_background = theme->stage_close_hover_background;
+    background.a *= alpha;
+    hover_background.a *= alpha;
+    int32_t retained = reach_ui_color_feedback_begin(out_commands, tile->window, button, background,
+                                                     hover_background, hover);
+    backing.color = retained ? reach_color{1, 1, 1, 1} : background;
     reach_result result = reach_render_command_buffer_push(out_commands, &backing);
+    if (retained)
+        reach_render_command_buffer_end_group(out_commands);
     if (result != REACH_OK)
     {
         return result;
@@ -173,10 +180,18 @@ static reach_result reach_stage_push_close_button(reach_stage *stage,
     glyph.rect.y = button.y + inset;
     glyph.rect.width = button.width - inset * 2.0f;
     glyph.rect.height = button.height - inset * 2.0f;
-    glyph.color =
-        reach_theme_color_mix(theme->stage_close_glyph, theme->stage_close_hover_glyph, hover);
-    glyph.color.a *= alpha;
-    return reach_render_command_buffer_push(out_commands, &glyph);
+    reach_color foreground = theme->stage_close_glyph;
+    reach_color hover_foreground = theme->stage_close_hover_glyph;
+    foreground.a *= alpha;
+    hover_foreground.a *= alpha;
+    retained =
+        reach_ui_color_feedback_begin(out_commands, tile->window | UINT64_C(0x4000000000000000),
+                                      button, foreground, hover_foreground, hover);
+    glyph.color = retained ? reach_color{1, 1, 1, 1} : foreground;
+    result = reach_render_command_buffer_push(out_commands, &glyph);
+    if (retained)
+        reach_render_command_buffer_end_group(out_commands);
+    return result;
 }
 
 static reach_result reach_stage_push_tile_header(reach_stage *stage,

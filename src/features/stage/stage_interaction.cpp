@@ -171,17 +171,20 @@ void reach_stage_handle_pointer(void *capsule, const reach_pointer_event *event,
 
         size_t close_index = 0;
         int32_t close_hit = reach_stage_close_button_at_point(stage, point, &close_index);
+        float close_target = close_hit ? 1.0f : 0.0f;
+        int32_t close_changed = (close_hit && state->close_hover_index != close_index) ||
+                                stage->close_hover.to != close_target ||
+                                reach_motion_active(&stage->close_hover);
         if (close_hit)
         {
             state->close_hover_index = close_index;
         }
-
-        reach_animation_manager_animate_to(
-            &stage->animations, REACH_STAGE_ANIMATION_CLOSE_HOVER, close_hit ? 1.0f : 0.0f,
-            reach_stage_close_hover_seconds(), REACH_EASING_EASE_OUT);
+        if (close_changed)
+            reach_motion_animate_to(&stage->close_hover, close_target,
+                                    reach_stage_close_hover_seconds(), REACH_EASING_EASE_OUT);
 
         out->handled = 1;
-        out->redraw = changed;
+        out->redraw |= changed || close_changed;
         return;
     }
 
@@ -233,9 +236,8 @@ void reach_stage_handle_pointer(void *capsule, const reach_pointer_event *event,
             out->action.index = index;
             out->action.window = state->tiles[index].window;
             reach_stage_depart_tile(stage, index);
-            reach_animation_manager_animate_to(
-                &stage->animations, REACH_STAGE_ANIMATION_CLOSE_HOVER, 0.0f,
-                reach_stage_close_hover_seconds(), REACH_EASING_EASE_OUT);
+            reach_motion_animate_to(&stage->close_hover, 0.0f, reach_stage_close_hover_seconds(),
+                                    REACH_EASING_EASE_OUT);
             return;
         }
 
@@ -269,9 +271,9 @@ void reach_stage_handle_pointer(void *capsule, const reach_pointer_event *event,
         out->handled = was_tracking;
         out->redraw |= state->has_hover;
         state->has_hover = 0;
-        reach_animation_manager_animate_to(&stage->animations, REACH_STAGE_ANIMATION_CLOSE_HOVER,
-                                           0.0f, reach_stage_close_hover_seconds(),
-                                           REACH_EASING_EASE_OUT);
+        out->redraw |= stage->close_hover.to != 0.0f || reach_motion_active(&stage->close_hover);
+        reach_motion_animate_to(&stage->close_hover, 0.0f, reach_stage_close_hover_seconds(),
+                                REACH_EASING_EASE_OUT);
         return;
     }
 

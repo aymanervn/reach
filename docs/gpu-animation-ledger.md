@@ -65,7 +65,7 @@ are evaluated independently from the animation's active lifetime.
 | Stage desktop progress | `REACH_STAGE_ANIMATION_DESKTOP_PROGRESS`; `stage_layout.cpp` | Scalar/native / desktop thumbnail geometry | Enter/close | Capability decision: desktop source and ordering semantics. |
 | Stage reflow | `REACH_STAGE_ANIMATION_REFLOW`; `stage_layout.cpp` | Scalar/native / source rearrangement | Membership changes | Capability decision: stable sources and shared motion. |
 | Stage departure | `REACH_STAGE_ANIMATION_DEPARTURE`; `stage_layout.cpp` | Scalar/native / departing content | Removed source exit | Capability decision: retiring source lifetime and geometry. |
-| Stage close hover | `REACH_STAGE_ANIMATION_CLOSE_HOVER`; Stage render | Scalar / close feedback | Hover enter/leave | Migrate: shared retained feedback independently of native geometry. |
+| Stage close hover | `reach_stage::close_hover`; shared UI RGBA tint | Retained color / separate background and glyph coverage | Hover enter/leave | Implemented: pointer events submit canonical motion independently of geometry ticks; scalar enum/state sampling removed. Theme RGBA, presence alpha and reversal preserved. Bounded native/fallback checks pass; global WUC completion and final acceptance remain pending. |
 | Stage backdrop | `REACH_STAGE_ANIMATION_BACKDROP`; Stage render | Scalar / backdrop alpha | Presentation/close | Migrate: retained opacity independently of preview decision. |
 | Stage retarget | `REACH_STAGE_ANIMATION_RETARGET`; `stage_layout.cpp` | Scalar/native / interrupted landing correction | Close retarget | Capability decision: preserve verified landing choreography. |
 
