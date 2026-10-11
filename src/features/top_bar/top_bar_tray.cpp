@@ -750,7 +750,7 @@ reach_result reach_top_bar_append_tray_render_commands(reach_top_bar *top_bar,
             result = reach_push_icon_press_feedback_motion(
                 out_commands, 1, item != nullptr && item->icon_id != 0 ? icon_rect : slot,
                 icon_box_radius, item != nullptr ? item->icon_id : 0,
-                ctx->theme->bar_tray_background, &popup_state->press_feedback);
+                ctx->theme->bar_tray_background, &popup_state->press_feedback, nullptr);
             if (result != REACH_OK)
                 return result;
         }

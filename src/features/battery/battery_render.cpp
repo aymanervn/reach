@@ -72,5 +72,5 @@ reach_result reach_battery_append_render_commands(const reach_battery *battery,
                            reach_battery_model_saver_effective(&state->model) ? 1.0f : 0.0f);
 
     return reach_ui_feedback_render(out_commands, 1, state->saver_row, theme->radius_small * scale,
-                                    {0.0f, 0.0f, 0.0f, 0.12f}, &battery->press_feedback);
+                                    {0.0f, 0.0f, 0.0f, 0.12f}, &battery->press_feedback, nullptr);
 }

@@ -615,8 +615,8 @@ reach_quick_settings_push_press_feedback(const reach_quick_settings_render_input
     {
         reach_render_command_buffer_set_scissor(commands, input->layout.output_devices_clip);
     }
-    reach_result result =
-        reach_ui_feedback_render(commands, 1, bounds, radius, overlay, &input->press_feedback);
+    reach_result result = reach_ui_feedback_render(commands, 1, bounds, radius, overlay,
+                                                   &input->press_feedback, nullptr);
     if (clip_output_row)
     {
         reach_render_command_buffer_clear_scissor(commands);

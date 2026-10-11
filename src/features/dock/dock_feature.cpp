@@ -38,6 +38,7 @@ struct reach_dock
     reach_animation_manager manager;
     reach_animation_track tracks[REACH_DOCK_ANIM_COUNT];
     reach_dock_state state;
+    reach_motion press_feedback;
 
     reach_dock_slot slots[REACH_DOCK_SLOT_CAPACITY];
     uint16_t slot_order[REACH_DOCK_SLOT_CAPACITY];
@@ -121,13 +122,17 @@ reach_dock_state *reach_dock_state_mut(reach_dock *animations)
     return animations != nullptr ? &animations->state : nullptr;
 }
 
+const reach_motion *reach_dock_press_feedback(const reach_dock *dock)
+{
+    return dock != nullptr ? &dock->press_feedback : nullptr;
+}
+
 static reach_pressable_feedback_style reach_dock_pressable_feedback(reach_dock *dock)
 {
     reach_pressable_feedback_style feedback = {};
     if (dock != nullptr)
     {
-        feedback.animations = &dock->manager;
-        feedback.track = REACH_DOCK_ANIM_FEEDBACK_OPACITY;
+        feedback.motion = &dock->press_feedback;
         feedback.pressed_value = 0.50f;
         feedback.press_seconds = 0.055;
         feedback.release_seconds = 0.055;
@@ -159,6 +164,7 @@ reach_result reach_dock_create(reach_dock **out_animations)
     animations->state.drag.target_index = REACH_MAX_DOCK_ITEMS;
     animations->state.hovered_item = REACH_MAX_DOCK_ITEMS;
     reach_pressable_init(&animations->state.pressable);
+    reach_motion_set(&animations->press_feedback, 0.0f);
     *out_animations = animations;
     return REACH_OK;
 }
@@ -186,18 +192,11 @@ static void reach_dock_tick(reach_dock *animations, double delta_seconds,
     reach_dock_state *state = &animations->state;
     reach_animation_manager *manager = &animations->manager;
 
-    int32_t feedback_was_active =
-        reach_animation_manager_active(manager, REACH_DOCK_ANIM_FEEDBACK_OPACITY);
     int32_t slots_were_animating = reach_dock_slots_animating(animations);
 
     reach_animation_manager_tick(manager, delta_seconds);
 
     int32_t redraw = 0;
-    if (feedback_was_active ||
-        reach_animation_manager_active(manager, REACH_DOCK_ANIM_FEEDBACK_OPACITY))
-    {
-        redraw = 1;
-    }
 
     reach_pressable_feedback_style feedback = reach_dock_pressable_feedback(animations);
     reach_pressable_settle_feedback(&state->pressable, &feedback);
@@ -965,9 +964,7 @@ static reach_bar_reveal_animation reach_dock_bar_animation(const void *capsule)
     animation.position_animating =
         reach_animation_manager_active(&dock->manager, REACH_DOCK_ANIM_Y);
     animation.animated_y = reach_animation_manager_value(&dock->manager, REACH_DOCK_ANIM_Y);
-    animation.content_animating =
-        reach_dock_slots_animating(dock) ||
-        reach_animation_manager_active(&dock->manager, REACH_DOCK_ANIM_FEEDBACK_OPACITY);
+    animation.content_animating = reach_dock_slots_animating(dock);
     return animation;
 }
 

@@ -78,6 +78,7 @@ reach_result reach_top_bar_create(reach_top_bar **out_top_bar)
 
     reach_animation_manager_init(&top_bar->manager, top_bar->tracks, REACH_TOP_BAR_ANIM_COUNT);
     reach_pressable_init(&top_bar->state.pressable);
+    reach_motion_set(&top_bar->press_feedback, 0.0f);
     reach_top_bar_reset_tray_drag(top_bar);
     *out_top_bar = top_bar;
     return REACH_OK;
@@ -1203,7 +1204,6 @@ static reach_bar_reveal_animation reach_top_bar_bar_animation(const void *capsul
     animation.animated_y = reach_animation_manager_value(&top_bar->manager, REACH_TOP_BAR_ANIM_Y);
     animation.content_animating =
         reach_animation_manager_active(&top_bar->manager, REACH_TOP_BAR_ANIM_POWER_HOVER) ||
-        reach_animation_manager_active(&top_bar->manager, REACH_TOP_BAR_ANIM_FEEDBACK_OPACITY) ||
         reach_top_bar_width_animation_active(top_bar);
     return animation;
 }
@@ -1304,17 +1304,13 @@ static void reach_top_bar_capsule_tick(void *capsule, double delta_seconds,
         out->relayout = 1;
     }
     reach_animation_manager *manager = &top_bar->manager;
-    int32_t feedback_was_active =
-        reach_animation_manager_active(manager, REACH_TOP_BAR_ANIM_FEEDBACK_OPACITY);
     int32_t power_hover_was_active =
         reach_animation_manager_active(manager, REACH_TOP_BAR_ANIM_POWER_HOVER);
 
     int32_t width_was_active = reach_top_bar_width_animation_active(top_bar);
     reach_animation_manager_tick(manager, delta_seconds);
 
-    int32_t redraw = feedback_was_active ||
-                     reach_animation_manager_active(manager, REACH_TOP_BAR_ANIM_FEEDBACK_OPACITY) ||
-                     power_hover_was_active ||
+    int32_t redraw = power_hover_was_active ||
                      reach_animation_manager_active(manager, REACH_TOP_BAR_ANIM_POWER_HOVER);
 
     if (width_was_active || reach_top_bar_width_animation_active(top_bar))
@@ -1350,7 +1346,6 @@ static int32_t reach_top_bar_capsule_needs_frame(const void *capsule)
     }
     return reach_animation_manager_active(&top_bar->manager, REACH_TOP_BAR_ANIM_Y) ||
            reach_animation_manager_active(&top_bar->manager, REACH_TOP_BAR_ANIM_POWER_HOVER) ||
-           reach_animation_manager_active(&top_bar->manager, REACH_TOP_BAR_ANIM_FEEDBACK_OPACITY) ||
            reach_top_bar_width_animation_active(top_bar) ||
            reach_top_bar_bluetooth_absence_pending(top_bar);
 }

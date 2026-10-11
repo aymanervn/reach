@@ -7,6 +7,8 @@ reach_dock_state *reach_dock_state_mut(reach_dock *dock);
 reach_icon_service *reach_dock_icons(reach_dock *dock);
 reach_window_tracking *reach_dock_windows(reach_dock *dock);
 
+const reach_motion *reach_dock_press_feedback(const reach_dock *dock);
+
 float reach_dock_item_reveal(reach_dock *dock, size_t item_index);
 
 float reach_dock_slot_box_x(const reach_theme *theme, const reach_dock_layout *layout,

@@ -5,6 +5,9 @@
 #include "dock_common.h"
 #include "dock_metrics.h"
 #include "reach/features/common/icon_feedback.h"
+#include "reach/features/common/ui_controls.h"
+
+static const uint64_t REACH_DOCK_FEEDBACK_GROUP_ID = UINT64_C(0x4000000000000000);
 #include "reach/core/typography.h"
 
 static uint16_t reach_dock_item_fallback_initial(const reach_dock_item_model *item)
@@ -126,9 +129,9 @@ static void reach_dock_push_item(const reach_dock_render_input *input,
         fallback_initial = item->fallback_initial != 0 ? item->fallback_initial : '?';
     }
     reach_rect_f32 icon_box = reach_dock_icon_box_for_slot(layout->app_slots[index], icon_box_size);
+    reach_render_group group = {};
     if (input->item_motion != nullptr)
     {
-        reach_render_group group = {};
         group.id = input->model->items[index].key;
         group.bounds = icon_box;
         group.bounds.height = layout->bounds.height - icon_box.y;
@@ -175,14 +178,13 @@ static void reach_dock_push_item(const reach_dock_render_input *input,
         reach_dock_push_running_indicator(input, commands, index, icon_box);
     }
 
-    if (input->click_feedback_index == index)
-    {
-        reach_push_icon_press_feedback(commands, icon_box, icon_box_radius, icon.id,
-                                       theme->dock_background, input->click_feedback_opacity,
-                                       reach_dock_metrics_values.click_feedback_min_opacity);
-    }
     if (input->item_motion != nullptr)
         reach_render_command_buffer_end_group(commands);
+    if (input->click_feedback_index == index)
+        (void)reach_push_icon_press_feedback_motion(
+            commands, REACH_DOCK_FEEDBACK_GROUP_ID, icon_box, icon_box_radius, icon.id,
+            theme->dock_background, input->click_feedback,
+            input->item_motion != nullptr ? &group : nullptr);
 }
 
 static reach_result reach_dock_push_background(const reach_dock_render_input *input,
@@ -210,15 +212,14 @@ static void reach_dock_push_trigger_button(const reach_dock_render_input *input,
     reach_rect_f32 trigger_box =
         reach_dock_icon_box_for_slot(input->layout->trigger_button, icon_box_size);
 
-    reach_color glyph = theme->system_glyph;
-    if (input->click_feedback_index == input->trigger_feedback_index &&
-        input->click_feedback_opacity > reach_dock_metrics_values.click_feedback_min_opacity)
-    {
-        glyph =
-            reach_theme_color_mix(glyph, theme->bar_click_feedback, input->click_feedback_opacity);
-    }
-
-    reach_dock_push_vector_icon(commands, trigger_box, REACH_VECTOR_ICON_MENU, glyph);
+    int32_t feedback = input->click_feedback_index == input->trigger_feedback_index &&
+                       reach_ui_color_feedback_begin(
+                           commands, REACH_DOCK_FEEDBACK_GROUP_ID, trigger_box, theme->system_glyph,
+                           theme->bar_click_feedback, input->click_feedback);
+    reach_dock_push_vector_icon(commands, trigger_box, REACH_VECTOR_ICON_MENU,
+                                feedback ? reach_color{1, 1, 1, 1} : theme->system_glyph);
+    if (feedback)
+        reach_render_command_buffer_end_group(commands);
 }
 
 reach_result reach_dock_build_render_commands(const reach_dock_render_input *input,
@@ -305,7 +306,6 @@ reach_result reach_dock_append_render_commands(reach_dock *dock,
     }
 
     reach_dock_state *state = reach_dock_state_mut(dock);
-    reach_animation_manager *manager = reach_dock_manager(dock);
 
     reach_motion item_motion[REACH_MAX_DOCK_ITEMS] = {};
     float item_reveal[REACH_MAX_DOCK_ITEMS] = {};
@@ -368,10 +368,7 @@ reach_result reach_dock_append_render_commands(reach_dock *dock,
     input.focused_window = ctx->focused_window;
     input.dragged_render_index = dragged_render_index;
     input.click_feedback_index = reach_pressable_feedback_index(&state->pressable);
-    reach_pressable_feedback_style feedback = {};
-    feedback.animations = manager;
-    feedback.track = REACH_DOCK_ANIM_FEEDBACK_OPACITY;
-    input.click_feedback_opacity = reach_pressable_feedback_value(&state->pressable, &feedback);
+    input.click_feedback = reach_dock_press_feedback(dock);
     input.trigger_feedback_index = REACH_DOCK_FEEDBACK_TRIGGER;
     input.text_alignment_center = REACH_TEXT_ALIGNMENT_CENTER;
     input.dpi_scale = ctx->dpi_scale;

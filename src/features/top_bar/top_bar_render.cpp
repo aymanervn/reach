@@ -4,6 +4,9 @@
 #include "top_bar_metrics.h"
 #include "top_bar_now_playing.h"
 #include "reach/features/common/icon_feedback.h"
+#include "reach/features/common/ui_controls.h"
+
+static const uint64_t REACH_TOP_BAR_FEEDBACK_GROUP_ID = UINT64_C(0x4000000000000000);
 
 typedef struct reach_top_bar_render_input
 {
@@ -36,7 +39,7 @@ typedef struct reach_top_bar_render_input
     int32_t battery_charging;
     float power_hover;
     size_t click_feedback_index;
-    float click_feedback_opacity;
+    const reach_motion *click_feedback;
     reach_motion tray_motion[REACH_TOP_BAR_MAX_TRAY_ICONS];
     size_t tray_dragged_index;
 } reach_top_bar_render_input;
@@ -136,13 +139,13 @@ static void reach_top_bar_push_power_button(const reach_top_bar_render_input *in
         reach_top_bar_center_square(power_box, power_box.height * metrics.power_glyph_scale),
         REACH_VECTOR_ICON_POWER, theme->system_glyph);
 
-    if (input->click_feedback_index == REACH_TOP_BAR_FEEDBACK_POWER_BUTTON &&
-        input->click_feedback_opacity > metrics.click_feedback_min_opacity)
+    if (input->click_feedback_index == REACH_TOP_BAR_FEEDBACK_POWER_BUTTON)
     {
-        reach_top_bar_push_rect(
-            commands, power_box,
-            reach_theme_color_alpha(theme->bar_click_feedback, input->click_feedback_opacity),
-            power_box.height * 0.5f);
+        reach_render_command_buffer_end_group(commands);
+        (void)reach_ui_feedback_render(commands, REACH_TOP_BAR_FEEDBACK_GROUP_ID, power_box,
+                                       power_box.height * 0.5f,
+                                       reach_theme_color_alpha(theme->bar_click_feedback, 1.0f),
+                                       input->click_feedback, nullptr);
     }
 }
 
@@ -167,14 +170,12 @@ static void reach_top_bar_push_button_feedback_colored(const reach_top_bar_rende
                                                        reach_rect_f32 button, size_t feedback_slot,
                                                        reach_color color)
 {
-    if (input->click_feedback_index != feedback_slot ||
-        input->click_feedback_opacity <= reach_top_bar_metrics_values.click_feedback_min_opacity)
-    {
+    if (input->click_feedback_index != feedback_slot)
         return;
-    }
-    reach_top_bar_push_rect(commands, button,
-                            reach_theme_color_alpha(color, input->click_feedback_opacity),
-                            button.height * 0.5f);
+    reach_render_command_buffer_end_group(commands);
+    color.a = 1.0f;
+    (void)reach_ui_feedback_render(commands, REACH_TOP_BAR_FEEDBACK_GROUP_ID, button,
+                                   button.height * 0.5f, color, input->click_feedback, nullptr);
 }
 
 static void reach_top_bar_push_button_feedback(const reach_top_bar_render_input *input,
@@ -244,16 +245,12 @@ static void reach_top_bar_push_tray_item(const reach_top_bar_render_input *input
         reach_render_command_buffer_push(commands, &icon);
     }
 
-    if (input->click_feedback_index != REACH_TOP_BAR_FEEDBACK_TRAY_BASE + index)
-    {
-        reach_render_command_buffer_end_group(commands);
-        return;
-    }
-    reach_push_icon_press_feedback(commands, slot, slot.height * 0.5f,
-                                   input->tray_items[index].icon_id,
-                                   input->theme->bar_tray_background, input->click_feedback_opacity,
-                                   metrics.click_feedback_min_opacity);
     reach_render_command_buffer_end_group(commands);
+    if (input->click_feedback_index == REACH_TOP_BAR_FEEDBACK_TRAY_BASE + index)
+        (void)reach_push_icon_press_feedback_motion(
+            commands, REACH_TOP_BAR_FEEDBACK_GROUP_ID, slot, slot.height * 0.5f,
+            input->tray_items[index].icon_id, input->theme->bar_tray_background,
+            input->click_feedback, &group);
 }
 
 static void reach_top_bar_push_tray(const reach_top_bar_render_input *input,
@@ -290,17 +287,19 @@ static void reach_top_bar_push_tray(const reach_top_bar_render_input *input,
     }
 
     reach_rect_f32 overflow = layout->tray_overflow_button;
-    reach_color glyph = input->theme->system_glyph;
-    if (input->click_feedback_index == REACH_TOP_BAR_FEEDBACK_TRAY_OVERFLOW &&
-        input->click_feedback_opacity > metrics.click_feedback_min_opacity)
-    {
-        glyph = reach_theme_color_mix(glyph, input->theme->bar_tray_background,
-                                      input->click_feedback_opacity);
-    }
-    reach_top_bar_push_vector_icon(
-        commands,
-        reach_top_bar_center_square(overflow, overflow.height * metrics.tray_overflow_glyph_scale),
-        input->tray_popup_open ? REACH_VECTOR_ICON_ARROW_UP : REACH_VECTOR_ICON_ARROW_DOWN, glyph);
+    reach_rect_f32 glyph =
+        reach_top_bar_center_square(overflow, overflow.height * metrics.tray_overflow_glyph_scale);
+    int32_t feedback =
+        input->click_feedback_index == REACH_TOP_BAR_FEEDBACK_TRAY_OVERFLOW &&
+        reach_ui_color_feedback_begin(commands, REACH_TOP_BAR_FEEDBACK_GROUP_ID, glyph,
+                                      input->theme->system_glyph, input->theme->bar_tray_background,
+                                      input->click_feedback);
+    reach_top_bar_push_vector_icon(commands, glyph,
+                                   input->tray_popup_open ? REACH_VECTOR_ICON_ARROW_UP
+                                                          : REACH_VECTOR_ICON_ARROW_DOWN,
+                                   feedback ? reach_color{1, 1, 1, 1} : input->theme->system_glyph);
+    if (feedback)
+        reach_render_command_buffer_end_group(commands);
 }
 
 static void reach_top_bar_push_stat(const reach_top_bar_render_input *input,
@@ -553,8 +552,7 @@ reach_result reach_top_bar_append_render_commands(reach_top_bar *top_bar,
     input.power_hover =
         reach_animation_manager_value(&top_bar->manager, REACH_TOP_BAR_ANIM_POWER_HOVER);
     input.click_feedback_index = reach_pressable_feedback_index(&state->pressable);
-    reach_pressable_feedback_style feedback = reach_top_bar_pressable_feedback(top_bar);
-    input.click_feedback_opacity = reach_pressable_feedback_value(&state->pressable, &feedback);
+    input.click_feedback = &top_bar->press_feedback;
     for (size_t index = 0; index < state->layout.tray_icon_count; ++index)
     {
         input.tray_motion[index] = top_bar->tray_x[index];

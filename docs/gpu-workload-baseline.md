@@ -118,6 +118,18 @@ pixels. Both readback checks pass. Native WUC expression/mask submission succeed
 compositor pixels, live Settings input, actual DPI/theme changes, and total CPU/GPU/memory cost
 remain pending. Geometry scales alone do not establish product DPI acceptance.
 
+Dock and Top Bar diagnostics drive public capsule pointer/cancellation paths and command
+production with a local pinned application, no real shell icon, and translucent diagnostic theme
+colors. Five runs on each compositor verify Dock trigger and Top Bar Settings-button cancellation
+need one execution/property submission, zero raster passes and zero scalar advances. Dock item
+cancellation also ends its drag sequence: two property submissions update the item placement and
+feedback together, with zero raster passes or scalar advancement. Feedback copies the item X
+descriptor, uses flat groups and closes group ownership before returning. Held press/release
+request no periodic capsule frames; reset stops feedback. The HWND fallback executes the same
+three cases with one raster pass per cancellation. Overlay commands preserve the old rule that
+feedback alpha replaces theme alpha. Actual shell-icon/DPI churn, dragging/reordering live pixels
+and total product cost still require final acceptance. Existing diagnostics continue to pass.
+
 The counters give a reproducible baseline for content reuse versus sampled visual changes. Full
 application wake/layout/native metrics, cold/warm workload cost, total CPU/GPU activity, latency,
 power, memory and instrumentation overhead still require product scenarios and system traces.

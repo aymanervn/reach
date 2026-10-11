@@ -15,20 +15,32 @@ static void reach_ui_push_rect(reach_render_command_buffer *commands, reach_rect
     (void)reach_render_command_buffer_push(commands, &command);
 }
 
-reach_result reach_ui_feedback_render(reach_render_command_buffer *commands, uint64_t id,
-                                      reach_rect_f32 bounds, float radius, reach_color color,
-                                      const reach_motion *opacity)
+reach_result reach_ui_feedback_begin(reach_render_command_buffer *commands, uint64_t id,
+                                     reach_rect_f32 bounds, const reach_motion *opacity,
+                                     const reach_render_group *placement)
 {
     if (commands == nullptr || opacity == nullptr)
         return REACH_INVALID_ARGUMENT;
-    reach_render_group group = {};
+    reach_render_group group = placement != nullptr ? *placement : reach_render_group{};
     group.id = id;
-    group.bounds = bounds;
+    if (placement == nullptr)
+    {
+        group.bounds = bounds;
+        reach_motion_set(&group.scale, 1.0f);
+    }
+    group.has_tint = 0;
     group.opacity = *opacity;
     if (group.opacity.generation == 0)
         reach_motion_set(&group.opacity, reach_motion_value(opacity));
-    reach_motion_set(&group.scale, 1.0f);
-    reach_result result = reach_render_command_buffer_begin_group(commands, &group);
+    return reach_render_command_buffer_begin_group(commands, &group);
+}
+
+reach_result reach_ui_feedback_render(reach_render_command_buffer *commands, uint64_t id,
+                                      reach_rect_f32 bounds, float radius, reach_color color,
+                                      const reach_motion *opacity,
+                                      const reach_render_group *placement)
+{
+    reach_result result = reach_ui_feedback_begin(commands, id, bounds, opacity, placement);
     if (result != REACH_OK)
         return result;
     reach_render_command overlay = {};
@@ -57,9 +69,9 @@ static void reach_ui_push_text(reach_render_command_buffer *commands, reach_rect
     (void)reach_render_command_buffer_push(commands, &command);
 }
 
-static int32_t reach_ui_begin_color_feedback(reach_render_command_buffer *commands, uint64_t id,
-                                             reach_rect_f32 bounds, reach_color from,
-                                             reach_color to, const reach_motion *pressed)
+int32_t reach_ui_color_feedback_begin(reach_render_command_buffer *commands, uint64_t id,
+                                      reach_rect_f32 bounds, reach_color from, reach_color to,
+                                      const reach_motion *pressed)
 {
     if (pressed == nullptr)
         return 0;
@@ -93,14 +105,14 @@ void reach_ui_button_render(reach_render_command_buffer *commands, reach_rect_f3
                                            background.b * darken, background.a};
     const reach_motion *feedback = enabled || style->has_pressed_colors ? pressed : nullptr;
     int32_t retained =
-        reach_ui_begin_color_feedback(commands, feedback_id, bounds, background, target, feedback);
+        reach_ui_color_feedback_begin(commands, feedback_id, bounds, background, target, feedback);
     reach_color white = {1.0f, 1.0f, 1.0f, 1.0f};
     reach_ui_push_rect(commands, bounds, style->radius, retained ? white : background);
     if (retained)
         reach_render_command_buffer_end_group(commands);
     reach_color text = enabled ? style->text : style->disabled_text;
     retained = style->has_pressed_colors &&
-               reach_ui_begin_color_feedback(commands, feedback_id + 1, bounds, text,
+               reach_ui_color_feedback_begin(commands, feedback_id + 1, bounds, text,
                                              style->pressed_text, feedback);
     reach_ui_push_text(commands, bounds, label, style->text_size, style->text_weight,
                        REACH_TEXT_ALIGNMENT_CENTER, retained ? white : text);

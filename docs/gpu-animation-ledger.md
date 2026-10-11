@@ -37,11 +37,11 @@ are evaluated independently from the animation's active lifetime.
 | Owner/effect | Source symbol and consumer | Driver / changing work | Active lifetime | Initial disposition and reason |
 | --- | --- | --- | --- | --- |
 | Dock reveal Y | `REACH_DOCK_ANIM_Y`; `reach_dock_bar_update_visibility`, shared bar visibility | Scalar/native window geometry | Reveal/hide to target | Capability decision: physical HWND and pushed-window geometry remain necessary; evaluate drawn motion separately. |
-| Dock press feedback | `REACH_DOCK_ANIM_FEEDBACK_OPACITY`; `reach_dock_append_render_commands` | Scalar / overlay alpha | Press, disarm, release fade | Migrate: fixed overlay content can use retained opacity. |
+| Dock press feedback | `reach_dock::press_feedback`; shared pressable and UI/icon feedback | Retained opacity / trigger RGBA tint | Press, disarm, release fade | Implemented: scalar track, sampled alpha and frame blocker removed. Flat feedback groups share item movement descriptors. Build/tests and bounded compositor/fallback diagnostics pass; final visual/performance acceptance remains open. |
 | Dock insertion/removal slots | `REACH_DOCK_ANIM_SLOT_BASE`; `reach_dock_slot_reveal` | Scalar / packed widths, presence and capacity layout | Slot target changes, including departing sources | Migrate: retain item content and animate eligible geometry; reconcile capacity constraints explicitly. |
 | Top Bar reveal Y | `REACH_TOP_BAR_ANIM_Y`; `reach_top_bar_build_layout` | Scalar/native window push | Reveal/hide to target | Capability decision: preserve common physical displacement; separate visual work. |
 | Top Bar power hover | `REACH_TOP_BAR_ANIM_POWER_HOVER`; `reach_top_bar_append_render_commands` | Scalar / hover chrome | Enter/leave fade | Migrate: reusable fixed feedback. |
-| Top Bar press feedback | `REACH_TOP_BAR_ANIM_FEEDBACK_OPACITY`; shared pressable | Scalar / overlay alpha | Press/release fade | Migrate: shared retained feedback. |
+| Top Bar press feedback | `reach_top_bar::press_feedback`; shared UI/icon feedback | Retained opacity / overflow RGBA tint | Press/release fade | Implemented: scalar track, sampled alpha/colors and feedback frame demand removed. Tray feedback inherits item movement. Bounded native/fallback diagnostics pass; power hover and widths remain separate pending consumers. |
 | Now Playing width | `REACH_TOP_BAR_ANIM_NOW_PLAYING_WIDTH`; `reach_top_bar_build_layout` | Scalar / content and bar geometry | Visibility/content target change | Migrate: shared retained resize and positioning without stretching content. |
 | Current app width | `REACH_TOP_BAR_ANIM_CURRENT_APP_WIDTH`; `reach_top_bar_build_layout` | Scalar / text-sized geometry | Identity/title target change | Migrate: target metrics and retained positioning. |
 | Tray width | `REACH_TOP_BAR_ANIM_TRAY_WIDTH`; `reach_top_bar_build_layout` | Scalar / tray/bar geometry | Membership target change | Migrate: retain stable icon identities. |
@@ -186,10 +186,10 @@ sampled alpha render function and feedback frame predicate are removed. A shared
 intent. Original-target arming, capture, cancellation and hide resets are preserved. Focused
 pressable logic tests cover descriptor generation, cancellation and target retirement.
 
-The pressable style temporarily accepts either its existing manager/track or one motion pointer,
-and rejects ambiguous ownership. Migrated Battery, Quick Settings, tray popup and Settings buttons use only motion. Remaining legacy styles
-are enumerated above; remove the manager/track style fields and dispatch branches when those consumers
-migrate. This bridge is migration work, not an accepted final parallel animation design.
+All pressable feedback now uses one `reach_motion` pointer. The final Dock/Top Bar consumers
+removed the temporary manager/track style fields, scalar dispatch branches and sampled-value API.
+Input capture, arming, cancellation, drag blocking and context-feedback latching remain owned by
+shared pressable intent; renderers consume its descriptor without scalar advancement.
 
 Quick Settings removes its press-feedback scalar enum/track and sampled opacity from render input.
 It publishes the descriptor to the shared overlay, preserves output-row scissoring and the existing
@@ -199,8 +199,7 @@ their CPU work does not justify leaving the feedback animation on the CPU.
 
 Tray popup feedback also removes its sole scalar track, manager accessor and composition
 position-frame blocker. Its icon-tint helper keeps the original command content and animates
-retained opacity; fallback rectangles use the shared UI feedback helper. The scalar icon helper
-remains only for Dock and Top Bar until those consumers migrate. Canonical explicit-time and affine
+retained opacity; fallback rectangles use the shared UI feedback helper. The scalar icon helper was subsequently removed with Dock and Top Bar feedback migration. Canonical explicit-time and affine
 motion helpers landed in `18153ae`; tray feedback landed in `6845768`, with Debug build, full tests
 and bounded native verification. Supported preview design is recorded in `426d6e2`.
 
@@ -212,3 +211,9 @@ opacity-effect groups. The fallback tints aggregate coverage once, including ove
 replacing command colors independently. It samples all group/presentation properties at one frame
 time. Settings schedules generic command-buffer fallback motion with a final endpoint frame;
 feedback retirement happens on the next input, with no compositor feedback ticks.
+
+Dock and Top Bar feedback owns one auxiliary flat group per active target, copying item placement
+where needed. This preserves painter order and alignment without nested render groups. Trigger
+and overflow glyphs use shared RGBA tint; ordinary controls and icon tint use retained opacity.
+Legacy overlay alpha replaces theme alpha, preserved explicitly in the retained command. Remaining
+width/slot/hover scalar tracks are independently pending and do not advance migrated press feedback.
