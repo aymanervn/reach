@@ -593,10 +593,38 @@ static void test_group_hierarchy_rejects_ambiguous_ownership_and_order(void)
                 "missing command owners are rejected on both execution paths");
 }
 
+static void test_retained_command_preflight_preserves_batch_atomicity(void)
+{
+    auto storage = std::make_unique<reach_render_command_buffer>();
+    reach_render_command_buffer &buffer = *storage;
+    reach_render_command command = {};
+    command.type = REACH_RENDER_COMMAND_TEXT;
+    command.rect = {10.5f, 20.5f, 80, 16};
+    command.text_size = 14;
+    reach_render_command_buffer_push(&buffer, &command);
+    command.rect.x = NAN;
+    reach_render_command_buffer_push(&buffer, &command);
+    reach_motion opacity = {}, y = {};
+    reach_motion_set(&opacity, 0.5f);
+    expect_true(reach_render_retain_commands(&buffer, 0, 10, 0, &opacity, &y) ==
+                        REACH_INVALID_ARGUMENT &&
+                    buffer.group_count == 0 && buffer.commands[0].group_id == 0,
+                "invalid source geometry cannot partially assign retained paint owners");
+    buffer.commands[1].rect.x = 10.5f;
+    expect_true(reach_render_retain_commands(&buffer, 0, 10, 0, &opacity, &y) == REACH_OK &&
+                    buffer.group_count == 2 && buffer.commands[0].group_id == 10 &&
+                    buffer.commands[1].group_id == 11,
+                "overlapping commands retain independent alpha surfaces");
+    const reach_rect_f32 &bounds = buffer.groups[0].bounds;
+    expect_true(bounds.x == -4 && bounds.y == 6 && bounds.width == 109 && bounds.height == 45,
+                "text source padding is pixel aligned and contains glyph overhang");
+}
+
 int main(void)
 {
     test_stretch_geometry_preserves_caps_and_anchor();
     test_group_hierarchy_samples_one_geometry_timeline();
+    test_retained_command_preflight_preserves_batch_atomicity();
     test_group_hierarchy_rejects_ambiguous_ownership_and_order();
     test_retained_tint_samples_one_timeline();
     test_animated_clip_samples_absolute_geometry();

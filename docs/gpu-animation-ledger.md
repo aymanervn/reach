@@ -58,8 +58,8 @@ are evaluated independently from the animation's active lifetime.
 | Clipboard height | `REACH_CLIPBOARD_ANIMATION_HEIGHT`; `reach_clipboard_feature_animate_layout_value` | Scalar / surface and viewport | Content/constraint changes | Migrate: reusable retained resize. |
 | Clipboard item width | `REACH_CLIPBOARD_ANIMATION_ITEM_WIDTH`; Clipboard animated layout | Scalar / item geometry | Content/constraint changes | Migrate: target layout and retained movement/reveal. |
 | Quick Settings height | `REACH_QUICK_SETTINGS_ANIMATION_HEIGHT`; `reach_quick_settings_tick` | Scalar / popup chrome | Section/content target changes | Migrate: shared resize. |
-| Output-device expansion | `REACH_QUICK_SETTINGS_ANIMATION_OUTPUT_DEVICES_EXPANSION`; Quick Settings layout/render | Scalar / section height, reveal and following content | Expand/collapse | Migrate: shared retained section reveal. |
-| App-volume expansion | `REACH_QUICK_SETTINGS_ANIMATION_APP_VOLUMES_EXPANSION`; Quick Settings layout/render | Scalar / section height, reveal and following content | Expand/collapse | Migrate: same section capability. |
+| Output-device expansion | `state.output_devices_expansion`; Quick Settings retained section parents/leaves | Retained / clip, shared fade/slide, following content and chevrons | Expand/collapse | Implemented: scalar track removed, event-time input and one cleanup deadline; native/fallback and DPI/source-pixel checks pass. Popup height and final product acceptance remain pending. |
+| App-volume expansion | `state.app_volumes_expansion`; Quick Settings retained section parents/leaves | Retained / clip, shared fade/slide and label/chevron crossfades | Expand/collapse | Implemented: same retained contract; scalar track and section-only frame demand removed. Popup height and final product acceptance remain pending. |
 | Quick Settings press feedback | `reach_quick_settings::press_feedback`; shared pressable and `reach_ui_feedback_render` | Retained motion / fixed target overlay | Press/release fade | Implemented: direct absolute-time intent, no feedback scalar advancement/frame demand; native compositor and HWND fallback verification pass. Final visual/performance acceptance remains open. |
 | Stage tile progress | `REACH_STAGE_ANIMATION_PROGRESS`; `stage_layout.cpp` | Scalar/native / geometry and close landing | Enter/close | Capability decision: preserve synchronized native close. |
 | Stage desktop progress | `REACH_STAGE_ANIMATION_DESKTOP_PROGRESS`; `stage_layout.cpp` | Scalar/native / desktop thumbnail geometry | Enter/close | Capability decision: desktop source and ordering semantics. |
@@ -194,7 +194,7 @@ shared pressable intent; renderers consume its descriptor without scalar advance
 Quick Settings removes its press-feedback scalar enum/track and sampled opacity from render input.
 It publishes the descriptor to the shared overlay, preserves output-row scissoring and the existing
 target/capture policy, and allocates content on target introduction or geometry changes. Retained
-release changes no raster content. Its height and section expansion tracks remain listed separately;
+release changes no raster content. Its height track remains pending; section expansions now use retained motion and a cleanup deadline;
 their CPU work does not justify leaving the feedback animation on the CPU.
 
 Tray popup feedback also removes its sole scalar track, manager accessor and composition

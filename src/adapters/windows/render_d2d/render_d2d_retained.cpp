@@ -839,9 +839,22 @@ static void localize(reach_render_command &command, reach_rect_f32 bounds)
     }
 }
 
+static bool text_snap_transform(const reach_render_group &group)
+{
+    auto unit = [](const reach_motion &motion)
+    {
+        return motion.generation == 0 ||
+               (motion.duration_seconds <= 0 ? reach_motion_value_at(&motion, 0) == 1
+                                             : motion.from == 1 && motion.to == 1);
+    };
+    return unit(group.scale) && unit(reach_render_group_y_scale(&group)) &&
+           (group.x.generation == 0 || (group.x.from == 0 && group.x.to == 0)) &&
+           group.repeat_travel_seconds <= 0;
+}
+
 static HRESULT sync_layer(reach_render_backend *backend, reach_d2d_retained_layer &layer,
                           const reach_render_group &group, const reach_render_command *commands,
-                          size_t count, reach_point_f32 parent_origin)
+                          size_t count, reach_point_f32 parent_origin, bool allow_text_snap)
 {
     if (!isfinite(group.bounds.width) || !isfinite(group.bounds.height) ||
         group.bounds.width > 16384.0f || group.bounds.height > 16384.0f)
@@ -864,6 +877,7 @@ static HRESULT sync_layer(reach_render_backend *backend, reach_d2d_retained_laye
         width != layer.width || height != layer.height || local.size() != layer.commands.size() ||
         (!local.empty() && memcmp(local.data(), layer.commands.data(),
                                   local.size() * sizeof(reach_render_command)) != 0);
+    bool surface_recreated = content_changed && (width != layer.width || height != layer.height);
     HRESULT hr = S_OK;
     if (content_changed && count != 0)
         hr = draw_layer(backend, layer, local, width, height);
@@ -881,13 +895,38 @@ static HRESULT sync_layer(reach_render_backend *backend, reach_d2d_retained_laye
             record_retained_bytes(backend);
         }
     }
-    bool geometry_changed = !initialized || memcmp(&group, &layer.group, sizeof(group)) != 0 ||
+    if (content_changed)
+    {
+        layer.text_raster_phase_y = 0.0f;
+        layer.text_phase_valid =
+            count == 1 && local[0].type == REACH_RENDER_COMMAND_TEXT &&
+            reach_d2d_text_raster_phase(backend, &local[0], &layer.text_raster_phase_y);
+    }
+    bool text_pixel_aligned = allow_text_snap && layer.text_phase_valid;
+    float text_phase_y = text_pixel_aligned ? layer.text_raster_phase_y : 0.0f;
+    bool text_sampling_changed = text_pixel_aligned != layer.text_pixel_aligned;
+    bool text_phase_changed = text_phase_y != layer.text_presentation_phase_y;
+    if (SUCCEEDED(hr) && count != 0 &&
+        (text_sampling_changed ||
+         (surface_recreated && text_pixel_aligned && backend->compositor != nullptr)))
+    {
+        reach_workload_add(REACH_WORKLOAD_PROPERTY_SUBMISSIONS, 1);
+        hr = backend->compositor != nullptr
+                 ? layer.surface_brush->put_BitmapInterpolationMode(
+                       text_pixel_aligned ? CompositionBitmapInterpolationMode_NearestNeighbor
+                                          : CompositionBitmapInterpolationMode_Linear)
+                 : layer.dcomp_visual->SetBitmapInterpolationMode(
+                       text_pixel_aligned ? DCOMPOSITION_BITMAP_INTERPOLATION_MODE_NEAREST_NEIGHBOR
+                                          : DCOMPOSITION_BITMAP_INTERPOLATION_MODE_LINEAR);
+    }
+    bool geometry_changed = !initialized || text_phase_changed || text_sampling_changed ||
+                            memcmp(&group, &layer.group, sizeof(group)) != 0 ||
                             parent_origin.x != layer.parent_origin.x ||
                             parent_origin.y != layer.parent_origin.y;
     float anchor_x = group.has_clip ? group.clip.x : group.bounds.x;
     float anchor_y = group.has_clip ? group.clip.y : group.bounds.y;
     float base_x = group.bounds.x - anchor_x;
-    float base_y = group.bounds.y - anchor_y;
+    float base_y = group.bounds.y - anchor_y + text_phase_y;
     float old_base_x = layer.group.has_clip ? layer.group.bounds.x - layer.group.clip.x : 0.0f;
     bool repeat_changed = layer.group.repeat_offset_x != group.repeat_offset_x ||
                           layer.group.repeat_hold_seconds != group.repeat_hold_seconds ||
@@ -895,7 +934,13 @@ static HRESULT sync_layer(reach_render_backend *backend, reach_d2d_retained_laye
                           old_base_x != base_x ||
                           (content_changed && group.repeat_travel_seconds > 0.0f);
     bool preserve_repeat = group.repeat_travel_seconds > 0.0f && !repeat_changed;
-    unsigned mask = property_mask(group, layer.group, base_x, base_y, initialized);
+    reach_render_group previous = layer.group;
+    if (previous.has_clip)
+        previous.bounds.y += layer.text_presentation_phase_y;
+    float comparison_y = group.has_clip ? base_y : 0.0f;
+    unsigned mask = property_mask(group, previous, base_x, comparison_y, initialized);
+    if (text_phase_changed)
+        mask |= 2;
     if (layer.group.repeat_travel_seconds > 0.0f && group.repeat_travel_seconds <= 0.0f)
         mask |= 1;
     if (SUCCEEDED(hr) && geometry_changed && backend->compositor != nullptr)
@@ -940,6 +985,8 @@ static HRESULT sync_layer(reach_render_backend *backend, reach_d2d_retained_laye
     {
         layer.group = group;
         layer.parent_origin = parent_origin;
+        layer.text_pixel_aligned = text_pixel_aligned;
+        layer.text_presentation_phase_y = text_phase_y;
         layer.initialized = true;
     }
     return hr;
@@ -1289,8 +1336,23 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
             const reach_render_group &parent = plan_for(plan.group.parent_id)->group;
             origin = {parent.bounds.x, parent.bounds.y};
         }
+        bool allow_text_snap =
+            (!commands->has_presentation || text_snap_transform(commands->presentation)) &&
+            (commands->content_transform.scale_x == 1 &&
+             commands->content_transform.scale_y == 1) &&
+            text_snap_transform(plan.group) &&
+            std::none_of(plans.begin(), plans.end(), [&](const retained_plan &candidate)
+                         { return candidate.group.parent_id == plan.group.id; });
+        uint64_t ancestor_id = plan.group.parent_id;
+        while (ancestor_id != 0 && allow_text_snap)
+        {
+            const reach_render_group &ancestor = plan_for(ancestor_id)->group;
+            allow_text_snap = text_snap_transform(ancestor);
+            ancestor_id = ancestor.parent_id;
+        }
         if (SUCCEEDED(hr))
-            hr = sync_layer(backend, *found, plan.group, plan.commands, plan.count, origin);
+            hr = sync_layer(backend, *found, plan.group, plan.commands, plan.count, origin,
+                            allow_text_snap);
         if (FAILED(hr))
             return REACH_ERROR;
     }

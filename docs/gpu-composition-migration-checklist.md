@@ -143,6 +143,13 @@ support expectation is explicitly resolved.
   notches, corners, shadows, monitor constraints and input alignment.
 - [ ] Migrate Launcher results, Quick Settings sections, Clipboard sizing and Settings expandable rows,
   including eligible smooth viewport scrolling identified in the ledger.
+  - [x] Migrate Quick Settings section reveals, following content and label/chevron crossfades.
+    Remove both section scalar tracks and sampled render values. Retained parents share curves;
+    individual paint sources preserve overlap and stable control identity. Event-time input includes
+    the slide and visible clips; one deadline retires content. Debug builds, 39 tests and five full
+    native runs per backend plus fallback pass, including maximum membership and DPI/source-pixel
+    checks. Endpoint limits stay strict; intermediate bitmap filtering is explicitly bounded and
+    inspected. Popup height/scroll/monitor integration and final product acceptance remain open.
 - [ ] Migrate Top Bar control widths and Dock insertion, removal, reorder and capacity fitting;
   verify existing compositor consumers as well as newly migrated paths.
 - [ ] Migrate Dock popup width/reflow and Switcher width fitting using the selected preview design;

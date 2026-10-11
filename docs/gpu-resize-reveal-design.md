@@ -133,3 +133,26 @@ caps and an unchanged-width notch. Remove its scalar/tick/render paths as the wh
 Preserve independently moving section viewports and content, following-row placement and event-time
 input. Launcher, Clipboard, Settings, bar controls and native-preview surfaces follow with their
 specific compact, notch, constraint and lifetime requirements; do not copy feature implementations.
+
+## Quick Settings section consumer
+
+Output-device and app-volume sections use canonical retained progress. Following controls have an
+independent movement parent; each section retains its own clip and shared delayed/saturated fade
+and four-DP slide. Individual command leaves preserve panel, slider-track/fill/thumb and glyph paint
+order/alpha without duplicating curves per leaf. Semantic ID ranges preserve unchanged title and
+chevron sources when section content retires. The output-row press overlay keeps its independent
+viewport and feedback semantics. Input samples progress and slide at one event time, excludes
+transparent/clipped regions and constrains slider starts to the visible content area. Cleanup wakes
+at one section deadline; no section-only scalar advancement or periodic frame demand remains.
+
+Source composition matches the previous renderer's endpoints at 100/125/150/200% DPI within one
+channel level; partially clipped saturated reveals and geometry-AA-off controls stay within two.
+Intermediate commands match geometry, clip rectangles and color intent. Bitmap filtering during
+fractional movement differs from rerasterizing vector edges at each position; this is recorded
+separately from geometry/endpoint checks. Baseline-compensated text sampling avoids the observed
+half-pixel text softness at 125% DPI. The bounded intermediate comparison and manual offscreen
+inspection retain the ordinary linear filter for shape edges. This does not establish displayed
+WUC/DC pixels, all fonts/themes, high-refresh behavior or final total-product efficiency.
+
+Popup height still uses its scalar track and requests frames. Complete height/scroll/monitor and
+native-input integration remains the next consumer step; the broader resize/reveal gate stays open.

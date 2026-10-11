@@ -437,6 +437,15 @@ the native clip. `reach_render_group_clip_at` provides the same event-time recta
 and geometry consumers, and active clip motion participates in generic fallback frame demand.
 Root-presentation clipping remains unsupported.
 
+`reach_render_retain_commands` gives individual paint commands independent cached source groups,
+preserving overlapping paint when ancestor opacity changes. It validates the complete batch before
+assigning owners and provides pixel-aligned source padding. Single-line text leaves can preserve
+DirectWrite's baseline phase with nearest sampling during unscaled vertical movement; phase is
+cached with source content, while scaling, horizontal motion, repetition and parent content keep
+ordinary linear sampling. Both native backends share this source metadata and update placement or
+sampling without adding a frame loop. Fractional bitmap translation still filters shape edges;
+endpoint fidelity and intermediate geometry/color/clip fidelity are verified separately.
+
 Groups can declare `parent_id`; source geometry stays in feature coordinates, while each content
 transform moves its raster and descendants. A group's clip is stationary within its parent, so
 viewports and independently moving contents can nest. CPU geometry helpers compose ancestor
@@ -861,6 +870,11 @@ clip objects and submit changed edges without regenerating unchanged content; un
 sample the same descriptor. Battery, Quick Settings and tray popup press feedback publish
 absolute-time motion into retained opacity layers. Those feedback effects no longer own scalar
 tracks or capsule frame demand. The shared pressable scalar bridge has been removed.
+Quick Settings's output-device/app-volume reveals, following-row movement and title/chevron
+crossfades now publish retained motion. Each section parent shares its fade and slide while
+individual paint leaves preserve overlapping alpha. Source layout is stable; pointer events sample
+current geometry and slide before hit testing. One deadline retires closing section content, and
+force-close clears motion. The popup-height scalar path remains pending.
 Broader resize, color feedback and native-layout migrations remain pending in
 the [GPU migration checklist](gpu-composition-migration-checklist.md).
 Layout definitions can also reserve a top or bottom edge. A consumer that opts into reserved

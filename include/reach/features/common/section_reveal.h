@@ -12,6 +12,7 @@ extern "C"
 
     void reach_section_reveal_apply(reach_render_command_buffer *buffer, size_t first_command,
                                     float progress, float maximum_y_offset);
+    reach_motion reach_section_reveal_opacity(const reach_motion *progress);
 
 #ifdef __cplusplus
 }
