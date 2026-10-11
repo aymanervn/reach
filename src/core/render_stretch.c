@@ -188,9 +188,8 @@ reach_result reach_render_push_stretched_chrome(reach_render_command_buffer *buf
         if (patches[index].bounds.width <= 0.0f || patches[index].bounds.height <= 0.0f)
             continue;
         ++patch_count;
-        for (at = 0; at < buffer->group_count; ++at)
-            if (buffer->groups[at].id == patches[index].id)
-                return REACH_INVALID_ARGUMENT;
+        if (reach_render_command_buffer_check_group(buffer, &patches[index]) != REACH_OK)
+            return REACH_INVALID_ARGUMENT;
     }
     if (patch_count > REACH_MAX_RENDER_GROUPS - buffer->group_count ||
         command_count * patch_count > REACH_MAX_RENDER_COMMANDS - buffer->count)

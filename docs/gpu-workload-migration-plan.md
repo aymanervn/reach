@@ -41,7 +41,7 @@ This map comes from docs and consumer searches. Phase 1 completes the per-animat
 | Area | Current state and remaining work |
 | --- | --- |
 | Animation support | The manager advances scalar tracks from frame deltas. `reach_motion` supplies absolute-time curves and generations. Unify timing, retarget and lifecycle semantics. |
-| Renderer | Both Windows backends retain X/Y, opacity, uniform or independent axis scale, animated clips, bounded affine curves, tint and marquee movement. Both backends share the cubic/constant segment compiler. Fixed-cap chrome preserves source rasters while resizing; feature consumers and remaining small/notched-width capabilities are pending. |
+| Renderer | Both Windows backends retain X/Y, opacity, uniform or independent axis scale, animated clips, bounded affine curves, tint and marquee movement. Both backends share the cubic/constant segment compiler and retained viewport/content hierarchy with event-time CPU geometry. Empty parent nodes allocate no raster. Fixed-cap chrome preserves source rasters while resizing; feature consumers and remaining small/notched-width capabilities are pending. |
 | Runtime | Reach and Settings have retained presentation/deadlines. Remaining predicates can request layout/render frames solely to advance values. |
 | Already migrated | Shared popup and Launcher presentation, System HUD, Settings selector, Dock/tray reorder and snap, marquee. Preserve and measure these paths. |
 | Shared feedback | Context Menu pill/outline/close and command rows, Battery, tray popup, Clipboard, Quick Settings, Dock/Top Bar and Settings controls. |

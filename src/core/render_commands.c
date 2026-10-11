@@ -82,6 +82,169 @@ int32_t reach_render_command_buffer_motion_active(const reach_render_command_buf
     return 0;
 }
 
+const reach_render_group *
+reach_render_command_buffer_group(const reach_render_command_buffer *buffer, uint64_t id)
+{
+    size_t index;
+    if (buffer == 0 || id == 0 || buffer->group_count > REACH_MAX_RENDER_GROUPS)
+        return 0;
+    for (index = 0; index < buffer->group_count; ++index)
+        if (buffer->groups[index].id == id)
+            return &buffer->groups[index];
+    return 0;
+}
+
+reach_result reach_render_command_buffer_validate_groups(const reach_render_command_buffer *buffer)
+{
+    size_t index, other, active_count = 0;
+    size_t active[REACH_MAX_RENDER_GROUPS], path[REACH_MAX_RENDER_GROUPS];
+    int32_t closed[REACH_MAX_RENDER_GROUPS] = {0};
+    int32_t drawn[REACH_MAX_RENDER_GROUPS] = {0};
+    int32_t descendants_drawn[REACH_MAX_RENDER_GROUPS] = {0};
+    if (buffer == 0 || buffer->group_count > REACH_MAX_RENDER_GROUPS ||
+        buffer->count > REACH_MAX_RENDER_COMMANDS ||
+        (buffer->has_presentation && buffer->presentation.parent_id != 0))
+        return REACH_INVALID_ARGUMENT;
+    for (index = 0; index < buffer->group_count; ++index)
+    {
+        const reach_render_group *group = &buffer->groups[index];
+        if (group->id == 0 || (group->id & UINT64_C(0x8000000000000000)) != 0)
+            return REACH_INVALID_ARGUMENT;
+        for (other = 0; other < index; ++other)
+            if (buffer->groups[other].id == group->id)
+                return REACH_INVALID_ARGUMENT;
+        if (group->parent_id != 0)
+        {
+            const reach_render_group *parent =
+                reach_render_command_buffer_group(buffer, group->parent_id);
+            if (parent == 0 || (size_t)(parent - buffer->groups) >= index || parent->has_tint ||
+                !isfinite(parent->bounds.x) || !isfinite(parent->bounds.y) ||
+                !isfinite(parent->bounds.width) || !isfinite(parent->bounds.height) ||
+                parent->bounds.width <= 0.0f || parent->bounds.height <= 0.0f)
+                return REACH_INVALID_ARGUMENT;
+        }
+    }
+    for (index = 0; index < buffer->count;)
+    {
+        uint64_t id = buffer->commands[index].group_id;
+        const reach_render_group *group = reach_render_command_buffer_group(buffer, id);
+        size_t depth = 0, common = 0, end = index + 1;
+        if (id != 0 && group == 0)
+            return REACH_INVALID_ARGUMENT;
+        while (group != 0)
+        {
+            path[depth++] = (size_t)(group - buffer->groups);
+            group = reach_render_command_buffer_group(buffer, group->parent_id);
+        }
+        for (other = 0; other < depth / 2; ++other)
+        {
+            size_t swap = path[other];
+            path[other] = path[depth - other - 1];
+            path[depth - other - 1] = swap;
+        }
+        while (common < depth && common < active_count && path[common] == active[common])
+            ++common;
+        for (other = common; other < active_count; ++other)
+            closed[active[other]] = 1;
+        for (other = common; other < depth; ++other)
+            if (closed[path[other]])
+                return REACH_INVALID_ARGUMENT;
+        if (depth != 0)
+        {
+            size_t leaf = path[depth - 1];
+            if (drawn[leaf] || descendants_drawn[leaf])
+                return REACH_INVALID_ARGUMENT;
+            drawn[leaf] = 1;
+            for (other = 0; other + 1 < depth; ++other)
+                descendants_drawn[path[other]] = 1;
+        }
+        for (other = 0; other < depth; ++other)
+            active[other] = path[other];
+        active_count = depth;
+        while (end < buffer->count && buffer->commands[end].group_id == id)
+            ++end;
+        index = end;
+    }
+    return REACH_OK;
+}
+
+reach_transform_f32
+reach_render_command_buffer_group_transform_at(const reach_render_command_buffer *buffer,
+                                               uint64_t id, double now_seconds)
+{
+    reach_transform_f32 result = {1.0f, 1.0f, 0.0f, 0.0f};
+    const reach_render_group *group = reach_render_command_buffer_group(buffer, id);
+    size_t depth = 0;
+    while (group != 0 && depth++ < buffer->group_count)
+    {
+        reach_point_f32 scale = reach_render_group_scale_at(group, now_seconds);
+        result.offset_x = result.offset_x * scale.x + group->bounds.x * (1.0f - scale.x) +
+                          reach_motion_value_at(&group->x, now_seconds);
+        result.offset_y = result.offset_y * scale.y + group->bounds.y * (1.0f - scale.y) +
+                          reach_motion_value_at(&group->y, now_seconds);
+        result.scale_x *= scale.x;
+        result.scale_y *= scale.y;
+        group = reach_render_command_buffer_group(buffer, group->parent_id);
+    }
+    return result;
+}
+
+float reach_render_command_buffer_group_opacity_at(const reach_render_command_buffer *buffer,
+                                                   uint64_t id, double now_seconds)
+{
+    float opacity = 1.0f;
+    const reach_render_group *group = reach_render_command_buffer_group(buffer, id);
+    size_t depth = 0;
+    while (group != 0 && depth++ < buffer->group_count)
+    {
+        if (group->opacity.generation != 0)
+            opacity *= reach_motion_value_at(&group->opacity, now_seconds);
+        group = reach_render_command_buffer_group(buffer, group->parent_id);
+    }
+    return opacity;
+}
+
+int32_t reach_render_command_buffer_group_clip_at(const reach_render_command_buffer *buffer,
+                                                  uint64_t id, double now_seconds,
+                                                  reach_rect_f32 *out_clip)
+{
+    int32_t has_clip = 0;
+    size_t depth = 0;
+    const reach_render_group *group = reach_render_command_buffer_group(buffer, id);
+    if (out_clip == 0)
+        return 0;
+    while (group != 0 && depth++ < buffer->group_count)
+    {
+        if (group->has_clip)
+        {
+            reach_rect_f32 clip = reach_render_group_clip_at(group, now_seconds);
+            reach_transform_f32 transform = reach_render_command_buffer_group_transform_at(
+                buffer, group->parent_id, now_seconds);
+            float x = clip.x * transform.scale_x + transform.offset_x;
+            float y = clip.y * transform.scale_y + transform.offset_y;
+            float far_x = (clip.x + clip.width) * transform.scale_x + transform.offset_x;
+            float far_y = (clip.y + clip.height) * transform.scale_y + transform.offset_y;
+            clip.x = fminf(x, far_x);
+            clip.y = fminf(y, far_y);
+            clip.width = fabsf(far_x - x);
+            clip.height = fabsf(far_y - y);
+            if (has_clip)
+            {
+                float right = fminf(out_clip->x + out_clip->width, clip.x + clip.width);
+                float bottom = fminf(out_clip->y + out_clip->height, clip.y + clip.height);
+                clip.x = fmaxf(out_clip->x, clip.x);
+                clip.y = fmaxf(out_clip->y, clip.y);
+                clip.width = fmaxf(0.0f, right - clip.x);
+                clip.height = fmaxf(0.0f, bottom - clip.y);
+            }
+            *out_clip = clip;
+            has_clip = 1;
+        }
+        group = reach_render_command_buffer_group(buffer, group->parent_id);
+    }
+    return has_clip;
+}
+
 static void reach_copy_text(uint16_t *dst, size_t dst_count, const uint16_t *src)
 {
     size_t index = 0;
@@ -124,7 +287,7 @@ void reach_render_command_buffer_clear(reach_render_command_buffer *buffer)
     }
 }
 
-reach_result reach_render_command_buffer_begin_group(reach_render_command_buffer *buffer,
+reach_result reach_render_command_buffer_check_group(const reach_render_command_buffer *buffer,
                                                      const reach_render_group *group)
 {
     size_t index;
@@ -137,6 +300,25 @@ reach_result reach_render_command_buffer_begin_group(reach_render_command_buffer
     for (index = 0; index < buffer->group_count; ++index)
         if (buffer->groups[index].id == group->id)
             return REACH_INVALID_ARGUMENT;
+    if (group->parent_id != 0)
+    {
+        const reach_render_group *parent =
+            reach_render_command_buffer_group(buffer, group->parent_id);
+        if (parent == 0 || parent->has_tint || !isfinite(parent->bounds.x) ||
+            !isfinite(parent->bounds.y) || !isfinite(parent->bounds.width) ||
+            !isfinite(parent->bounds.height) || parent->bounds.width <= 0.0f ||
+            parent->bounds.height <= 0.0f)
+            return REACH_INVALID_ARGUMENT;
+    }
+    return REACH_OK;
+}
+
+reach_result reach_render_command_buffer_begin_group(reach_render_command_buffer *buffer,
+                                                     const reach_render_group *group)
+{
+    reach_result result = reach_render_command_buffer_check_group(buffer, group);
+    if (result != REACH_OK)
+        return result;
     buffer->groups[buffer->group_count++] = *group;
     buffer->current_group_id = group->id;
     return REACH_OK;

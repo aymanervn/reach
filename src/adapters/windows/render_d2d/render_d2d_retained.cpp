@@ -597,6 +597,8 @@ static HRESULT create_layer(reach_render_backend *backend, reach_d2d_retained_la
         hr = backend->dcomp_device->CreateScaleTransform(&layer.dcomp_scale);
     if (SUCCEEDED(hr))
         hr = layer.dcomp_visual->SetTransform(layer.dcomp_scale.Get());
+    if (SUCCEEDED(hr))
+        hr = layer.dcomp_visual->SetOpacityMode(DCOMPOSITION_OPACITY_MODE_MULTIPLY);
     return hr;
 }
 
@@ -839,29 +841,49 @@ static void localize(reach_render_command &command, reach_rect_f32 bounds)
 
 static HRESULT sync_layer(reach_render_backend *backend, reach_d2d_retained_layer &layer,
                           const reach_render_group &group, const reach_render_command *commands,
-                          size_t count)
+                          size_t count, reach_point_f32 parent_origin)
 {
     if (!isfinite(group.bounds.width) || !isfinite(group.bounds.height) ||
         group.bounds.width > 16384.0f || group.bounds.height > 16384.0f)
         return E_INVALIDARG;
-    UINT width = (UINT)std::max(1.0f, ceilf(group.bounds.width));
-    UINT height = (UINT)std::max(1.0f, ceilf(group.bounds.height));
+    UINT width = count != 0 ? (UINT)std::max(1.0f, ceilf(group.bounds.width)) : 0;
+    UINT height = count != 0 ? (UINT)std::max(1.0f, ceilf(group.bounds.height)) : 0;
     uint64_t bytes = (uint64_t)width * height * 4;
     for (const auto &other : backend->retained_layers)
         if (&other != &layer)
             bytes += (uint64_t)other.width * other.height * 4;
     if (bytes > UINT64_C(128) * 1024 * 1024)
         return E_OUTOFMEMORY;
-    std::vector<reach_render_command> local(commands, commands + count);
+    std::vector<reach_render_command> local;
+    if (count != 0)
+        local.assign(commands, commands + count);
     for (auto &command : local)
         localize(command, group.bounds);
-    bool initialized = layer.width != 0 && layer.height != 0;
+    bool initialized = layer.initialized;
     bool content_changed =
         width != layer.width || height != layer.height || local.size() != layer.commands.size() ||
         (!local.empty() && memcmp(local.data(), layer.commands.data(),
                                   local.size() * sizeof(reach_render_command)) != 0);
-    HRESULT hr = content_changed ? draw_layer(backend, layer, local, width, height) : S_OK;
-    bool geometry_changed = memcmp(&group, &layer.group, sizeof(group)) != 0;
+    HRESULT hr = S_OK;
+    if (content_changed && count != 0)
+        hr = draw_layer(backend, layer, local, width, height);
+    else if (content_changed)
+    {
+        hr = backend->compositor != nullptr ? layer.visual->put_Brush(nullptr)
+                                            : layer.dcomp_visual->SetContent(nullptr);
+        if (SUCCEEDED(hr))
+        {
+            layer.surface.Reset();
+            layer.surface_brush.Reset();
+            layer.dcomp_surface.Reset();
+            layer.commands.clear();
+            layer.width = layer.height = 0;
+            record_retained_bytes(backend);
+        }
+    }
+    bool geometry_changed = !initialized || memcmp(&group, &layer.group, sizeof(group)) != 0 ||
+                            parent_origin.x != layer.parent_origin.x ||
+                            parent_origin.y != layer.parent_origin.y;
     float anchor_x = group.has_clip ? group.clip.x : group.bounds.x;
     float anchor_y = group.has_clip ? group.clip.y : group.bounds.y;
     float base_x = group.bounds.x - anchor_x;
@@ -884,9 +906,11 @@ static HRESULT sync_layer(reach_render_backend *backend, reach_d2d_retained_laye
         if (SUCCEEDED(hr))
             hr = layer.visual.As(&visual);
         if (SUCCEEDED(hr))
-            hr = container->put_Offset({anchor_x, anchor_y, 0.0f});
+            hr = container->put_Offset(
+                {anchor_x - parent_origin.x, anchor_y - parent_origin.y, 0.0f});
         if (SUCCEEDED(hr))
-            hr = visual->put_Size({(float)width, (float)height});
+            hr = visual->put_Size({count != 0 ? (float)width : group.bounds.width,
+                                   count != 0 ? (float)height : group.bounds.height});
         if (SUCCEEDED(hr) && group.has_clip)
         {
             hr = container->put_Size({group.clip.width, group.clip.height});
@@ -897,9 +921,9 @@ static HRESULT sync_layer(reach_render_backend *backend, reach_d2d_retained_laye
     }
     else if (SUCCEEDED(hr) && geometry_changed)
     {
-        hr = layer.dcomp_container->SetOffsetX(anchor_x);
+        hr = layer.dcomp_container->SetOffsetX(anchor_x - parent_origin.x);
         if (SUCCEEDED(hr))
-            hr = layer.dcomp_container->SetOffsetY(anchor_y);
+            hr = layer.dcomp_container->SetOffsetY(anchor_y - parent_origin.y);
         if (SUCCEEDED(hr) && mask != 0)
             hr = dcomp_properties(backend, layer.dcomp_visual.Get(), layer.dcomp_scale.Get(), group,
                                   base_x, base_y, preserve_repeat, mask);
@@ -915,7 +939,8 @@ static HRESULT sync_layer(reach_render_backend *backend, reach_d2d_retained_laye
     if (SUCCEEDED(hr))
     {
         layer.group = group;
-        layer.seen = 1;
+        layer.parent_origin = parent_origin;
+        layer.initialized = true;
     }
     return hr;
 }
@@ -1125,6 +1150,8 @@ reach_result reach_d2d_presentation_complete(reach_render_backend *backend, uint
 reach_result reach_d2d_sync_retained(reach_render_backend *backend,
                                      const reach_render_command_buffer *commands)
 {
+    if (reach_render_command_buffer_validate_groups(commands) != REACH_OK)
+        return REACH_INVALID_ARGUMENT;
     HRESULT hr = create_scene(backend);
     if (FAILED(hr))
     {
@@ -1166,87 +1193,147 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
         if (SUCCEEDED(hr))
             hr = backend->dcomp_scene_visual->SetTransform(matrix);
     }
-    std::vector<uint64_t> active_ids;
-    for (size_t index = 0; index < commands->count;)
+    struct retained_plan
     {
-        uint64_t id = commands->commands[index].group_id;
-        active_ids.push_back(id != 0 ? id : UINT64_C(0x8000000000000000) | (uint64_t)(index + 1));
-        size_t end = index + 1;
-        while (end < commands->count && commands->commands[end].group_id == id)
-            ++end;
-        index = end;
-    }
-    backend->retained_layers.erase(
-        std::remove_if(backend->retained_layers.begin(), backend->retained_layers.end(),
-                       [&](const reach_d2d_retained_layer &layer)
-                       {
-                           return std::find(active_ids.begin(), active_ids.end(), layer.id) ==
-                                  active_ids.end();
-                       }),
-        backend->retained_layers.end());
-    for (auto &layer : backend->retained_layers)
-        layer.seen = 0;
-    for (size_t index = 0; index < commands->count && SUCCEEDED(hr);)
+        reach_render_group group;
+        const reach_render_command *commands = nullptr;
+        size_t count = 0;
+    };
+    std::vector<retained_plan> plans;
+    auto plan_for = [&](uint64_t id)
+    {
+        return std::find_if(plans.begin(), plans.end(),
+                            [&](const retained_plan &plan) { return plan.group.id == id; });
+    };
+    for (size_t index = 0; index < commands->count;)
     {
         const reach_render_command &first = commands->commands[index];
         size_t end = index + 1;
+        while (end < commands->count && commands->commands[end].group_id == first.group_id)
+            ++end;
         reach_render_group group = {};
-        group.id = first.group_id;
-        if (group.id != 0)
-        {
-            while (end < commands->count && commands->commands[end].group_id == group.id)
-                ++end;
-            auto found = std::find_if(commands->groups, commands->groups + commands->group_count,
-                                      [&](const reach_render_group &candidate)
-                                      { return candidate.id == group.id; });
-            if (found == commands->groups + commands->group_count)
-                return REACH_INVALID_ARGUMENT;
-            group = *found;
-            if (group.bounds.width <= 0.0f || group.bounds.height <= 0.0f)
-                group.bounds = run_bounds(commands->commands + index, end - index);
-        }
+        if (first.group_id != 0)
+            group = *reach_render_command_buffer_group(commands, first.group_id);
         else
-        {
-            while (end < commands->count && commands->commands[end].group_id == 0)
-                ++end;
             group.id = UINT64_C(0x8000000000000000) | (uint64_t)(index + 1);
-            group.bounds = run_bounds(commands->commands + index, end - index);
-        }
         if (group.bounds.width <= 0.0f || group.bounds.height <= 0.0f)
+            group.bounds = run_bounds(commands->commands + index, end - index);
+        if (group.bounds.width > 0.0f && group.bounds.height > 0.0f)
         {
-            index = end;
-            continue;
+            std::vector<const reach_render_group *> parents;
+            const reach_render_group *parent =
+                reach_render_command_buffer_group(commands, group.parent_id);
+            while (parent != nullptr)
+            {
+                parents.push_back(parent);
+                parent = reach_render_command_buffer_group(commands, parent->parent_id);
+            }
+            for (auto at = parents.rbegin(); at != parents.rend(); ++at)
+                if (plan_for((*at)->id) == plans.end())
+                    plans.push_back({**at});
+            auto existing = plan_for(group.id);
+            if (existing == plans.end())
+                plans.push_back({group, commands->commands + index, end - index});
+            else
+            {
+                existing->group = group;
+                existing->commands = commands->commands + index;
+                existing->count = end - index;
+            }
         }
+        index = end;
+    }
+    for (auto &layer : backend->retained_layers)
+    {
+        if (layer.has_children)
+        {
+            if (backend->compositor != nullptr)
+            {
+                ComPtr<IContainerVisual> content;
+                ComPtr<IVisualCollection> descendants;
+                hr = layer.visual.As(&content);
+                if (SUCCEEDED(hr))
+                    hr = content->get_Children(&descendants);
+                if (SUCCEEDED(hr))
+                    hr = descendants->RemoveAll();
+            }
+            else
+                hr = layer.dcomp_visual->RemoveAllVisuals();
+            if (FAILED(hr))
+                return REACH_ERROR;
+        }
+        layer.has_children = false;
+    }
+    backend->retained_layers.erase(std::remove_if(backend->retained_layers.begin(),
+                                                  backend->retained_layers.end(),
+                                                  [&](const reach_d2d_retained_layer &layer)
+                                                  { return plan_for(layer.id) == plans.end(); }),
+                                   backend->retained_layers.end());
+    for (const retained_plan &plan : plans)
+    {
         auto found = std::find_if(backend->retained_layers.begin(), backend->retained_layers.end(),
                                   [&](const reach_d2d_retained_layer &layer)
-                                  { return layer.id == group.id; });
+                                  { return layer.id == plan.group.id; });
         if (found == backend->retained_layers.end())
         {
             if (backend->retained_layers.size() >= REACH_MAX_RENDER_GROUPS * 2 + 1)
                 return REACH_ERROR;
             backend->retained_layers.emplace_back();
             found = backend->retained_layers.end() - 1;
-            found->id = group.id;
+            found->id = plan.group.id;
             hr = create_layer(backend, *found);
         }
-        if (SUCCEEDED(hr))
-            hr = sync_layer(backend, *found, group, commands->commands + index, end - index);
-        if (SUCCEEDED(hr) && children != nullptr)
+        reach_point_f32 origin = {};
+        if (plan.group.parent_id != 0)
         {
-            ComPtr<IVisual> visual;
-            hr = found->container.As(&visual);
-            if (SUCCEEDED(hr))
-                hr = children->InsertAtTop(visual.Get());
+            const reach_render_group &parent = plan_for(plan.group.parent_id)->group;
+            origin = {parent.bounds.x, parent.bounds.y};
         }
-        else if (SUCCEEDED(hr))
-            hr = backend->dcomp_scene_visual->AddVisual(found->dcomp_container.Get(), FALSE,
-                                                        nullptr);
-        index = end;
+        if (SUCCEEDED(hr))
+            hr = sync_layer(backend, *found, plan.group, plan.commands, plan.count, origin);
+        if (FAILED(hr))
+            return REACH_ERROR;
     }
-    backend->retained_layers.erase(
-        std::remove_if(backend->retained_layers.begin(), backend->retained_layers.end(),
-                       [](const reach_d2d_retained_layer &layer) { return !layer.seen; }),
-        backend->retained_layers.end());
+    for (const retained_plan &plan : plans)
+    {
+        auto found = std::find_if(backend->retained_layers.begin(), backend->retained_layers.end(),
+                                  [&](const reach_d2d_retained_layer &layer)
+                                  { return layer.id == plan.group.id; });
+        reach_d2d_retained_layer *parent = nullptr;
+        if (plan.group.parent_id != 0)
+        {
+            auto owner =
+                std::find_if(backend->retained_layers.begin(), backend->retained_layers.end(),
+                             [&](const reach_d2d_retained_layer &layer)
+                             { return layer.id == plan.group.parent_id; });
+            parent = &*owner;
+            parent->has_children = true;
+        }
+        if (backend->compositor != nullptr)
+        {
+            ComPtr<IVisualCollection> siblings = children;
+            ComPtr<IContainerVisual> owner;
+            ComPtr<IVisual> visual;
+            if (parent != nullptr)
+            {
+                hr = parent->visual.As(&owner);
+                if (SUCCEEDED(hr))
+                    hr = owner->get_Children(&siblings);
+            }
+            if (SUCCEEDED(hr))
+                hr = found->container.As(&visual);
+            if (SUCCEEDED(hr))
+                hr = siblings->InsertAtTop(visual.Get());
+        }
+        else
+        {
+            IDCompositionVisual2 *owner =
+                parent != nullptr ? parent->dcomp_visual.Get() : backend->dcomp_scene_visual.Get();
+            hr = owner->AddVisual(found->dcomp_container.Get(), FALSE, nullptr);
+        }
+        if (FAILED(hr))
+            return REACH_ERROR;
+    }
     reach_render_group presentation =
         commands->has_presentation ? commands->presentation : reach_render_group{};
     if (SUCCEEDED(hr) &&

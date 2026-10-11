@@ -281,3 +281,34 @@ chrome readback.
 
 These results verify shared curve execution and content reuse, not displayed compositor pixels,
 complete Quick Settings integration or total product efficiency. Those acceptance gates remain open.
+
+## Retained viewport/content hierarchy
+
+`reach_render_group::parent_id` connects existing native container/content visuals. Source geometry
+stays in feature coordinates; independent ancestor movement, stationary inner viewports and content
+motion compose on the native tree. Shared CPU helpers sample the corresponding geometry, clips and
+inherited opacity. Ownership/order validation runs before either execution path changes the tree.
+Empty parents allocate no raster. Reparenting reuses leaf pixels, and parent content can acquire or
+retire its own surface without destroying children. The old flat-only layer assembly and its `seen`
+bookkeeping are removed; one planned hierarchy assembles both flat and nested groups.
+
+Evidence: isolated Debug builds, all 39 tests, architecture/format/whitespace checks pass
+(`build-group-hierarchy-accepted.log`, `test-group-hierarchy-accepted.log`). Two focused pure geometry
+checks cover independent axes, parent origins, nested clip intersection, inherited opacity and
+ambiguous ownership/painter-order rejection. Declaration preflight also protects fixed-cap batch
+atomicity when a parent is missing.
+
+Five full bounded native runs per compositor plus HWND fallback pass
+(`probe-group-hierarchy-accepted.log`, failures=0). The nested reveal/reversal has two empty parents
+and one 80x40 leaf: three render executions, zero native raster passes, eight changed property
+submissions and 12,800 retained bytes. The unchanged endpoint check submits no properties. The
+fallback samples three finite raster frames with no native submissions. Additional checks reparent
+an actively animated child, verify its WUC parent identity, retire the unused middle node, let the
+outer parent acquire/retire a raster while preserving its child, and release every node on hide.
+Both empty parent surfaces remain absent. The full existing feedback, root-completion/error and
+four-DPI chrome diagnostics continue to pass.
+
+This establishes hierarchy execution, source reuse and bounded node lifetime. Complete Quick
+Settings paint/layout/input integration, displayed compositor pixels and total product efficiency
+remain pending. Native opacity acts on retained surfaces; preserving existing per-command fading
+still requires appropriate paint partitioning when commands overlap.

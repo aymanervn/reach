@@ -5,6 +5,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <initializer_list>
+#include <memory>
 
 static int failures;
 
@@ -468,9 +469,135 @@ static void test_stretch_geometry_preserves_caps_and_anchor(void)
                 "explicit vertical scale overrides uniform inheritance");
 }
 
+static void test_group_hierarchy_samples_one_geometry_timeline(void)
+{
+    auto storage = std::make_unique<reach_render_command_buffer>();
+    reach_render_command_buffer &buffer = *storage;
+    reach_render_group outer = {};
+    outer.id = 1;
+    outer.bounds = {10, 10, 300, 200};
+    outer.has_clip = 1;
+    outer.clip = {10, 10, 180, 120};
+    reach_motion_set(&outer.scale, 1.2f);
+    reach_motion_set(&outer.scale_y, 0.8f);
+    reach_motion_set(&outer.opacity, 0.8f);
+    reach_motion_start_at(&outer.y, 0, 20, 2, REACH_EASING_EASE_OUT, 10);
+    expect_true(reach_render_command_buffer_begin_group(&buffer, &outer) == REACH_OK,
+                "outer viewport can be declared without raster content");
+    reach_render_command_buffer_end_group(&buffer);
+    reach_render_group section = {};
+    section.id = 2;
+    section.parent_id = 1;
+    section.bounds = {20, 20, 150, 100};
+    section.has_clip = 1;
+    section.clip = {20, 20, 100, 80};
+    reach_motion_set(&section.opacity, 0.5f);
+    reach_motion_start_at(&section.x, 10, 25, 2, REACH_EASING_EASE_IN_OUT, 10);
+    reach_motion_start_at(&section.y, 0, 40, 2, REACH_EASING_EASE_IN_OUT, 10);
+    expect_true(reach_render_command_buffer_begin_group(&buffer, &section) == REACH_OK,
+                "section viewport belongs to the moving content parent");
+    reach_render_command_buffer_end_group(&buffer);
+    reach_render_group leaf = {};
+    leaf.id = 3;
+    leaf.parent_id = 2;
+    leaf.bounds = {25, 25, 50, 30};
+    leaf.has_clip = 1;
+    leaf.clip = {25, 25, 60, 50};
+    reach_motion_set(&leaf.opacity, 0.7f);
+    reach_motion_start_at(&leaf.y, 8, 0, 2, REACH_EASING_EASE_OUT, 10);
+    expect_true(reach_render_command_buffer_begin_group(&buffer, &leaf) == REACH_OK,
+                "leaf content has motion independent of its section viewport");
+    reach_render_command command = {};
+    command.type = REACH_RENDER_COMMAND_RECT;
+    command.rect = leaf.bounds;
+    expect_true(reach_render_command_buffer_push(&buffer, &command) == REACH_OK,
+                "hierarchical geometry includes real command ownership");
+    reach_render_command_buffer_end_group(&buffer);
+    expect_true(reach_render_command_buffer_validate_groups(&buffer) == REACH_OK,
+                "ordered hierarchy is valid");
+    for (double now : {10.0, 10.3, 11.0, 12.0})
+    {
+        float outer_y = reach_motion_value_at(&outer.y, now);
+        float section_x = reach_motion_value_at(&section.x, now);
+        float section_y = reach_motion_value_at(&section.y, now);
+        float leaf_y = reach_motion_value_at(&leaf.y, now);
+        reach_transform_f32 transform =
+            reach_render_command_buffer_group_transform_at(&buffer, leaf.id, now);
+        expect_near(25 * transform.scale_x + transform.offset_x, 10 + (25 + section_x - 10) * 1.2f,
+                    0.001f, "nested X movement preserves each parent origin");
+        expect_near(25 * transform.scale_y + transform.offset_y,
+                    10 + (25 + leaf_y + section_y - 10) * 0.8f + outer_y, 0.001f,
+                    "nested Y movement sums independent absolute curves before parent scaling");
+        expect_near(reach_render_command_buffer_group_opacity_at(&buffer, leaf.id, now),
+                    0.8f * 0.5f * 0.7f, 0.000001f,
+                    "descendant opacity includes every ancestor exactly once");
+        reach_rect_f32 clip = {};
+        expect_true(reach_render_command_buffer_group_clip_at(&buffer, leaf.id, now, &clip),
+                    "ancestor viewports contribute to the effective clip");
+        float left = 10 + (25 + section_x - 10) * 1.2f;
+        float top = 10 + (25 + section_y - 10) * 0.8f + outer_y;
+        float right = fminf(left + 60 * 1.2f, 22 + 100 * 1.2f);
+        float bottom = fminf(top + 50 * 0.8f, fminf(18 + outer_y + 80 * 0.8f, 130));
+        expect_near(clip.x, left, 0.001f, "section clip follows parent movement");
+        expect_near(clip.y, top, 0.001f, "content slide does not move its own viewport");
+        expect_near(clip.width, right - left, 0.001f,
+                    "nested clips intersect in surface coordinates");
+        expect_near(clip.height, bottom - top, 0.001f,
+                    "outer viewport remains fixed during reveal");
+    }
+}
+
+static void test_group_hierarchy_rejects_ambiguous_ownership_and_order(void)
+{
+    auto storage = std::make_unique<reach_render_command_buffer>();
+    reach_render_command_buffer &buffer = *storage;
+    reach_render_group groups[4] = {};
+    for (size_t index = 0; index < 4; ++index)
+    {
+        groups[index].id = index + 1;
+        groups[index].bounds = {0, 0, 100, 100};
+        groups[index].parent_id = index == 1 || index == 2 ? 1 : 0;
+        expect_true(reach_render_command_buffer_begin_group(&buffer, &groups[index]) == REACH_OK,
+                    "parents precede their children in declarations");
+        reach_render_command_buffer_end_group(&buffer);
+    }
+    reach_render_command command = {};
+    command.type = REACH_RENDER_COMMAND_RECT;
+    command.rect = {0, 0, 20, 20};
+    buffer.commands[0] = buffer.commands[1] = buffer.commands[2] = command;
+    buffer.commands[0].group_id = 2;
+    buffer.commands[1].group_id = 3;
+    buffer.commands[2].group_id = 4;
+    buffer.count = 3;
+    expect_true(reach_render_command_buffer_validate_groups(&buffer) == REACH_OK,
+                "siblings form one contiguous subtree before the next root");
+    buffer.commands[1].group_id = 4;
+    buffer.commands[2].group_id = 3;
+    expect_true(reach_render_command_buffer_validate_groups(&buffer) == REACH_INVALID_ARGUMENT,
+                "interleaved subtrees cannot silently change painter order");
+    buffer.commands[1].group_id = 1;
+    buffer.count = 2;
+    expect_true(reach_render_command_buffer_validate_groups(&buffer) == REACH_INVALID_ARGUMENT,
+                "parent raster content cannot be painted after its descendants");
+    buffer.count = 1;
+    buffer.groups[0].parent_id = 2;
+    expect_true(reach_render_command_buffer_validate_groups(&buffer) == REACH_INVALID_ARGUMENT,
+                "forward references and cycles are rejected before native mutation");
+    buffer.groups[0].parent_id = 0;
+    buffer.groups[0].has_tint = 1;
+    expect_true(reach_render_command_buffer_validate_groups(&buffer) == REACH_INVALID_ARGUMENT,
+                "coverage tint cannot be inherited through a parent viewport");
+    buffer.groups[0].has_tint = 0;
+    buffer.commands[0].group_id = 99;
+    expect_true(reach_render_command_buffer_validate_groups(&buffer) == REACH_INVALID_ARGUMENT,
+                "missing command owners are rejected on both execution paths");
+}
+
 int main(void)
 {
     test_stretch_geometry_preserves_caps_and_anchor();
+    test_group_hierarchy_samples_one_geometry_timeline();
+    test_group_hierarchy_rejects_ambiguous_ownership_and_order();
     test_retained_tint_samples_one_timeline();
     test_animated_clip_samples_absolute_geometry();
     test_dock_reserves_side_safe_margins();
