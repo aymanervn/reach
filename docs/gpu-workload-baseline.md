@@ -105,6 +105,8 @@ power, memory and instrumentation overhead still require product scenarios and s
   initialization sites around 396/621). Explicit `/EHsc` removed initial exception warnings but
   did not resolve the optimizer failure. An explicit byte-clear rewrite with compile-time layout
   guards also failed at the same optimizer location; that unsuccessful source change was removed.
+  A subsequent isolated `/O2 /Ob1` build still failed at line 396. Standard `/Ob2` flags were
+  restored in the isolated cache; no compiler workaround was added to product source.
   Debug Reach and Settings compile and all 39 tests pass.
   Resolve optimized-build verification separately before claiming production performance results.
 - Windows Performance Recorder exposes CPU, GPU and DesktopComposition profiles, but starting

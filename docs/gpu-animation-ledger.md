@@ -187,8 +187,8 @@ intent. Original-target arming, capture, cancellation and hide resets are preser
 pressable logic tests cover descriptor generation, cancellation and target retirement.
 
 The pressable style temporarily accepts either its existing manager/track or one motion pointer,
-and rejects ambiguous ownership. Migrated Battery and Quick Settings use only motion. Remaining legacy styles are
-enumerated above; remove the manager/track style fields and dispatch branches when those consumers
+and rejects ambiguous ownership. Migrated Battery, Quick Settings and tray popup use only motion. Remaining legacy styles
+are enumerated above; remove the manager/track style fields and dispatch branches when those consumers
 migrate. This bridge is migration work, not an accepted final parallel animation design.
 
 Quick Settings removes its press-feedback scalar enum/track and sampled opacity from render input.
@@ -196,3 +196,10 @@ It publishes the descriptor to the shared overlay, preserves output-row scissori
 target/capture policy, and allocates content on target introduction or geometry changes. Retained
 release changes no raster content. Its height and section expansion tracks remain listed separately;
 their CPU work does not justify leaving the feedback animation on the CPU.
+
+Tray popup feedback also removes its sole scalar track, manager accessor and composition
+position-frame blocker. Its icon-tint helper keeps the original command content and animates
+retained opacity; fallback rectangles use the shared UI feedback helper. The scalar icon helper
+remains only for Dock and Top Bar until those consumers migrate. Canonical explicit-time and affine
+motion helpers landed in `18153ae`; tray feedback landed in `6845768`, with Debug build, full tests
+and bounded native verification. Supported preview design is recorded in `426d6e2`.
