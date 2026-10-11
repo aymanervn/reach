@@ -26,6 +26,7 @@ support expectation is explicitly resolved.
   loaders, carets, direct timers, native synchronization, hidden and idle behavior.
 - [x] Create a per-effect ledger recording ownership, driver, invalidation, lifetime and GPU/CPU
   disposition; require a specific rationale and evidence for each retained CPU visual path.
+  Inventory, ledger and opt-in workload counters: `754de91`; isolated Debug build and 39 tests pass.
 - [ ] Establish repeatable baseline measurements for application wakeups, layout, command production,
   rasterization, presents, native updates, total Reach/Settings plus DWM CPU/GPU cost, latency, power
   and memory; establish variation and regression thresholds before comparison.
@@ -45,6 +46,10 @@ support expectation is explicitly resolved.
   in both application loops; pure compositor motion must not request periodic application frames.
 - [ ] Verify completion, stale-generation rejection, hide/reset and supported fallback semantics on
   both backends; land one complete consumer and remove its obsolete tick/redraw path.
+  - [x] Migrate Battery press feedback end to end using shared pressable intent and a retained
+    opacity layer; remove its scalar track, tick, sampled render value and frame demand. Build,
+    39 tests and bounded native diagnostics pass on both compositors and the HWND fallback.
+    See the workload baseline for evidence and the remaining visual/performance acceptance.
 
 ## 4. Feedback and repetition
 

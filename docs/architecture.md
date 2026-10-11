@@ -435,6 +435,12 @@ timer or reporting worker is added. Retained-surface bytes are an estimate, not 
 system CPU/GPU, power and presentation latency require independent measurement. See
 `docs/gpu-workload-baseline.md`.
 
+Shared pressable feedback can publish absolute-time motion directly. Battery retains one fixed
+saver-row overlay through `reach_ui_feedback_render`; press and release events change only its
+opacity descriptor. Its capsule owns capture and original-target activation, resets feedback on
+hide, and requests no periodic frames for feedback. The existing generic fallback samples the
+same command-buffer motion until its deadline when retained rendering is unavailable.
+
 Top Bar tray and Dock icon groups use stable item identities. Pointer events publish direct
 positions, reordered neighbours and released items run compositor motion, and a stationary drag
 does not request frames. Dock insertion/removal fitting and Now Playing width changes still own

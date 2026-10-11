@@ -52,6 +52,41 @@ static void test_release_on_original_target_activates(void)
     expect_true(!reach_pressable_tracking(&pressable), "release ends pointer tracking");
 }
 
+static void test_retained_feedback_retargets_and_resets(void)
+{
+    reach_motion motion = {};
+    reach_pressable_feedback_style feedback = feedback_style(nullptr);
+    feedback.motion = &motion;
+    reach_pressable pressable = {};
+    reach_pressable_init(&pressable);
+    reach_pressable_result result = {};
+    reach_pressable_press(&pressable, REACH_POINTER_BUTTON_PRIMARY, 41, 2, &feedback, &result);
+    expect_true(result.redraw && result.capture == 1 && motion.to == feedback.pressed_value,
+                "retained feedback submits its press without changing capture policy");
+    uint64_t press_generation = motion.generation;
+    motion.started_seconds = reach_motion_now_seconds() - motion.duration_seconds;
+    reach_pressable_update(&pressable, REACH_PRESSABLE_TARGET_NONE, &result);
+    expect_true(!reach_pressable_armed(&pressable) && motion.to == feedback.pressed_value,
+                "retained feedback remains on the original target while disarmed");
+    reach_pressable_cancel(&pressable, &feedback, &result);
+    expect_true(result.redraw && result.capture == -1 && motion.to == 0.0f &&
+                    motion.from == feedback.pressed_value && motion.generation > press_generation,
+                "cancel retargets the current retained value with a new generation");
+    reach_pressable_settle_feedback(&pressable, &feedback);
+    expect_true(reach_pressable_feedback_index(&pressable) == 2,
+                "feedback identity survives its release motion");
+    motion.started_seconds = reach_motion_now_seconds() - motion.duration_seconds;
+    reach_pressable_settle_feedback(&pressable, &feedback);
+    expect_true(reach_pressable_feedback_index(&pressable) == REACH_PRESSABLE_FEEDBACK_NONE,
+                "completed retained feedback retires its target without ticks");
+    reach_pressable_press(&pressable, REACH_POINTER_BUTTON_PRIMARY, 43, 3, &feedback, &result);
+    uint64_t reset_generation = motion.generation;
+    reach_pressable_reset(&pressable, &feedback);
+    expect_true(!reach_pressable_tracking(&pressable) && !reach_motion_active(&motion) &&
+                    motion.to == 0.0f && motion.generation > reset_generation,
+                "hide reset cancels retained feedback and invalidates its submitted generation");
+}
+
 static void test_leave_temporarily_disarms_click(void)
 {
     reach_animation_track track = {};
@@ -206,6 +241,7 @@ static void test_horizontal_reorder_uses_neighbor_thresholds(void)
 int main(void)
 {
     test_release_on_original_target_activates();
+    test_retained_feedback_retargets_and_resets();
     test_leave_temporarily_disarms_click();
     test_reentering_the_original_target_rearms();
     test_drag_start_disarms_before_release();

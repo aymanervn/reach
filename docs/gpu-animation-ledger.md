@@ -46,7 +46,7 @@ are evaluated independently from the animation's active lifetime.
 | Tray width | `REACH_TOP_BAR_ANIM_TRAY_WIDTH`; `reach_top_bar_build_layout` | Scalar / tray/bar geometry | Membership target change | Migrate: retain stable icon identities. |
 | Quick Settings control width | `REACH_TOP_BAR_ANIM_QUICK_SETTINGS_WIDTH`; `reach_top_bar_build_layout` | Scalar / control/bar geometry | System-state target change | Migrate: shared width capability. |
 | Tray popup feedback | `REACH_TOP_BAR_TRAY_ANIM_FEEDBACK`; `reach_top_bar_tray_tick` | Scalar / press overlay | Press/release fade | Migrate: shared retained feedback; popup presentation is separate. |
-| Battery press feedback | `REACH_BATTERY_ANIMATION_PRESS_FEEDBACK`; `reach_battery_append_render_commands` | Scalar / saver-row overlay | Press/release fade | Migrate: fixed-content opacity; suitable first complete consumer. |
+| Battery press feedback | `reach_battery::press_feedback`; `reach_battery_append_render_commands` | Retained motion / fixed saver-row overlay | Press/release fade | Implemented: shared pressable absolute-time intent and retained opacity; no capsule feedback ticks/frame demand. HWND fallback samples published motion. Native operation-count verification passed; final visual/performance acceptance remains open. |
 | Launcher results expansion | `REACH_LAUNCHER_ANIMATION_RESULTS_EXPANSION`; `reach_launcher_capsule_tick` | Scalar / results height and reveal | Results enter/leave | Migrate: endpoint layout, animated clip and eligible chrome. |
 | Context Menu item/header hover | `REACH_CONTEXT_MENU_ANIM_HOVER`; menu and window-preview rendering | Scalar / row/pill/preview border | Hover enter/leave, identity switch | Migrate: theme-preserving retained feedback. |
 | Context Menu close hover | `REACH_CONTEXT_MENU_ANIM_CLOSE_HOVER`; preview close rendering | Scalar / close feedback | Close target enter/leave | Migrate: retain fixed close content. |
@@ -177,4 +177,15 @@ feature effects. Future changes must update this ledger and resolve newly discov
 Baseline source build: `cmake --build build/switcher-previews -j 4` passed on 2026-10-11, including
 Reach, Settings and architecture checks. `ctest --test-dir build/switcher-previews --output-on-failure
 -j 4` passed all 39 tests. This proves build/test health only, not runtime workload efficiency.
-No consumer migration or performance acceptance is checked off by this inventory.
+Inventory commit: `754de91`. Performance acceptance is not checked off by this inventory.
+
+Battery feedback is the first migrated consumer. Its scalar enum/storage, per-tick advancement,
+sampled alpha render function and feedback frame predicate are removed. A shared
+`reach_ui_feedback_render` retains a fixed overlay while pressable events publish `reach_motion`
+intent. Original-target arming, capture, cancellation and hide resets are preserved. Focused
+pressable logic tests cover descriptor generation, cancellation and target retirement.
+
+The pressable style temporarily accepts either its existing manager/track or one motion pointer,
+and rejects ambiguous ownership. Migrated Battery uses only motion. Remaining legacy styles are
+enumerated above; remove the manager/track style fields and dispatch branches when those consumers
+migrate. This bridge is migration work, not an accepted final parallel animation design.

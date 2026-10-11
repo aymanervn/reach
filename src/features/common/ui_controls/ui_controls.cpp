@@ -15,6 +15,32 @@ static void reach_ui_push_rect(reach_render_command_buffer *commands, reach_rect
     (void)reach_render_command_buffer_push(commands, &command);
 }
 
+reach_result reach_ui_feedback_render(reach_render_command_buffer *commands, uint64_t id,
+                                      reach_rect_f32 bounds, float radius, reach_color color,
+                                      const reach_motion *opacity)
+{
+    if (commands == nullptr || opacity == nullptr)
+        return REACH_INVALID_ARGUMENT;
+    reach_render_group group = {};
+    group.id = id;
+    group.bounds = bounds;
+    group.opacity = *opacity;
+    if (group.opacity.generation == 0)
+        reach_motion_set(&group.opacity, reach_motion_value(opacity));
+    reach_motion_set(&group.scale, 1.0f);
+    reach_result result = reach_render_command_buffer_begin_group(commands, &group);
+    if (result != REACH_OK)
+        return result;
+    reach_render_command overlay = {};
+    overlay.type = REACH_RENDER_COMMAND_RECT;
+    overlay.rect = bounds;
+    overlay.radius = radius;
+    overlay.color = color;
+    result = reach_render_command_buffer_push(commands, &overlay);
+    reach_render_command_buffer_end_group(commands);
+    return result;
+}
+
 static void reach_ui_push_text(reach_render_command_buffer *commands, reach_rect_f32 rect,
                                const uint16_t *text, float size, int32_t weight, int32_t alignment,
                                reach_color color)

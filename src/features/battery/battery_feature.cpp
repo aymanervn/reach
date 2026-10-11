@@ -8,8 +8,7 @@ static const uint64_t REACH_BATTERY_PRESSABLE_TARGET_SAVER = 1;
 static reach_pressable_feedback_style reach_battery_pressable_feedback(reach_battery *battery)
 {
     reach_pressable_feedback_style feedback = {};
-    feedback.animations = battery != nullptr ? &battery->animations : nullptr;
-    feedback.track = REACH_BATTERY_ANIMATION_PRESS_FEEDBACK;
+    feedback.motion = battery != nullptr ? &battery->press_feedback : nullptr;
     feedback.pressed_value = 1.0f;
     feedback.press_seconds = 0.055;
     feedback.release_seconds = 0.10;
@@ -26,17 +25,6 @@ static void reach_battery_reset_pressable(reach_battery *battery)
     }
     reach_pressable_feedback_style feedback = reach_battery_pressable_feedback(battery);
     reach_pressable_reset(&battery->pressable, &feedback);
-}
-
-float reach_battery_press_feedback_value(const reach_battery *battery)
-{
-    if (battery == nullptr)
-    {
-        return 0.0f;
-    }
-    reach_battery *mutable_battery = const_cast<reach_battery *>(battery);
-    reach_pressable_feedback_style feedback = reach_battery_pressable_feedback(mutable_battery);
-    return reach_pressable_feedback_value(&battery->pressable, &feedback);
 }
 
 const reach_battery_state *reach_battery_state_ptr(const reach_battery *battery)
@@ -351,14 +339,11 @@ static void reach_battery_capsule_tick(void *capsule, double delta_seconds,
         out->redraw = 1;
     }
 
-    int32_t animations_were_active = reach_animation_manager_any_active(&battery->animations);
-    reach_animation_manager_tick(&battery->animations, delta_seconds);
     int32_t popup_changed =
         reach_feature_transition_tick(&battery->popup_transition, delta_seconds);
     reach_pressable_feedback_style feedback = reach_battery_pressable_feedback(battery);
     reach_pressable_settle_feedback(&battery->pressable, &feedback);
-    if (animations_were_active || reach_animation_manager_any_active(&battery->animations) ||
-        popup_changed)
+    if (popup_changed)
     {
         out->redraw = 1;
     }
@@ -387,8 +372,7 @@ static int32_t reach_battery_capsule_needs_frame(const void *capsule)
     const reach_battery *battery = static_cast<const reach_battery *>(capsule);
     return battery != nullptr &&
            (reach_feature_transition_needs_update(&battery->popup_transition) ||
-            (battery->state.open && (battery->state.model.saver_pending ||
-                                     reach_animation_manager_any_active(&battery->animations))));
+            (battery->state.open && battery->state.model.saver_pending));
 }
 
 static int32_t reach_battery_capsule_presentation_visible(const void *capsule)
@@ -576,8 +560,6 @@ reach_result reach_battery_create(reach_battery **out_battery)
     {
         return REACH_ERROR;
     }
-    reach_animation_manager_init(&battery->animations, battery->animation_tracks,
-                                 REACH_BATTERY_ANIMATION_COUNT);
     reach_feature_transition_init(&battery->popup_transition, REACH_FEATURE_TRANSITION_FROM_ABOVE);
     reach_pressable_init(&battery->pressable);
     reach_battery_reset(battery);

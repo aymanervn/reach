@@ -6,6 +6,7 @@
 
 #include "reach/core/ui_events.h"
 #include "reach/support/animation.h"
+#include "reach/support/motion.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -18,6 +19,7 @@ extern "C"
     typedef struct reach_pressable_feedback_style
     {
         reach_animation_manager *animations;
+        reach_motion *motion;
         size_t track;
         float pressed_value;
         double press_seconds;
