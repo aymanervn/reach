@@ -205,17 +205,23 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
                 &window->input_presentation;
             if (presentation->bounds.width > 0.0f)
             {
-                float scale = presentation->scale.generation
-                                  ? reach_motion_value(&presentation->scale)
-                                  : 1.0f;
-                if (scale <= 0.0f)
+                double now_seconds = reach_motion_now_seconds();
+                float scale_x = presentation->scale.generation
+                                    ? reach_motion_value_at(&presentation->scale, now_seconds)
+                                    : 1.0f;
+                float scale_y = presentation->scale_y.generation
+                                    ? reach_motion_value_at(&presentation->scale_y, now_seconds)
+                                    : scale_x;
+                if (scale_x <= 0.0f || scale_y <= 0.0f)
                     return HTTRANSPARENT;
                 float center_x = presentation->bounds.x + presentation->bounds.width * 0.5f;
                 float center_y = presentation->bounds.y + presentation->bounds.height * 0.5f;
-                point_x =
-                    center_x + (point_x - center_x - reach_motion_value(&presentation->x)) / scale;
-                point_y =
-                    center_y + (point_y - center_y - reach_motion_value(&presentation->y)) / scale;
+                point_x = center_x + (point_x - center_x -
+                                      reach_motion_value_at(&presentation->x, now_seconds)) /
+                                         scale_x;
+                point_y = center_y + (point_y - center_y -
+                                      reach_motion_value_at(&presentation->y, now_seconds)) /
+                                         scale_y;
             }
             for (size_t index = 0; index < window->input_region_count; ++index)
             {

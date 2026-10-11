@@ -4,6 +4,7 @@
 
 #include <math.h>
 #include <stdio.h>
+#include <initializer_list>
 
 static int failures;
 
@@ -366,8 +367,82 @@ static void test_retained_tint_samples_one_timeline(void)
                 "disabled tint does not change content");
 }
 
+static void test_stretch_geometry_preserves_caps_and_anchor(void)
+{
+    for (float dpi : {1.0f, 1.25f, 1.5f, 2.0f})
+    {
+        reach_render_group source = {};
+        source.id = 20;
+        source.bounds = {0, 0, 120 * dpi, 100 * dpi};
+        reach_render_stretch stretch = {};
+        stretch.left = stretch.right = 20 * dpi;
+        stretch.top = stretch.bottom = 24 * dpi;
+        stretch.anchor_x = 0.5f;
+        stretch.anchor_y = 1;
+        reach_motion_start_at(&stretch.width, 120 * dpi, 260 * dpi, 2, REACH_EASING_EASE_IN_OUT,
+                              10);
+        reach_motion_start_at(&stretch.height, 100 * dpi, 200 * dpi, 2, REACH_EASING_EASE_OUT, 10);
+        for (double now : {10.0, 10.5, 11.0, 12.0})
+        {
+            float width = reach_motion_value_at(&stretch.width, now);
+            float height = reach_motion_value_at(&stretch.height, now);
+            float left = -(width - source.bounds.width) * 0.5f;
+            float top = -(height - source.bounds.height);
+            for (size_t index = 0; index < 9; ++index)
+            {
+                reach_render_group patch = {};
+                expect_true(reach_render_stretch_patch(&source, &stretch, index, &patch) ==
+                                REACH_OK,
+                            "valid stretch geometry derives every patch");
+                reach_point_f32 scale = reach_render_group_scale_at(&patch, now);
+                size_t column = index % 3, row = index / 3;
+                float expected_x = column == 0   ? left
+                                   : column == 1 ? left + stretch.left
+                                                 : left + width - stretch.right;
+                float expected_y = row == 0   ? top
+                                   : row == 1 ? top + stretch.top
+                                              : top + height - stretch.bottom;
+                expect_near(patch.bounds.x + reach_motion_value_at(&patch.x, now), expected_x,
+                            0.001f, "every column shares the same moving anchor");
+                expect_near(patch.bounds.y + reach_motion_value_at(&patch.y, now), expected_y,
+                            0.001f, "every row keeps the bottom anchor fixed");
+                expect_near(patch.bounds.width * scale.x,
+                            column == 0   ? stretch.left
+                            : column == 2 ? stretch.right
+                                          : width - stretch.left - stretch.right,
+                            0.001f, "stretching preserves fixed horizontal caps");
+                expect_near(patch.bounds.height * scale.y,
+                            row == 0   ? stretch.top
+                            : row == 2 ? stretch.bottom
+                                       : height - stretch.top - stretch.bottom,
+                            0.001f, "stretching preserves fixed vertical caps");
+            }
+        }
+        reach_render_group patch = {};
+        reach_motion_set(&stretch.width, source.bounds.width);
+        reach_motion_set(&stretch.height, source.bounds.height);
+        expect_true(reach_render_stretch_patch(&source, &stretch, 4, &patch) == REACH_OK &&
+                        patch.scale.to == 1.0f && patch.scale_y.to == 1.0f,
+                    "unstretched axes remain exactly unit scale at every DPI");
+        reach_motion_set(&stretch.width, stretch.left + stretch.right);
+        expect_true(reach_render_stretch_patch(&source, &stretch, 0, &patch) ==
+                        REACH_INVALID_ARGUMENT,
+                    "unsupported compact geometry is rejected instead of squeezing corners");
+    }
+    reach_render_group group = {};
+    reach_motion_set(&group.scale, 2);
+    expect_near(reach_render_group_scale_at(&group, 10).y, 2, 0.001f,
+                "existing uniform scale still supplies both axes");
+    reach_motion_set(&group.scale_y, 1);
+    expect_near(reach_render_group_scale_at(&group, 10).x, 2, 0.001f,
+                "independent vertical scaling preserves horizontal intent");
+    expect_near(reach_render_group_scale_at(&group, 10).y, 1, 0.001f,
+                "explicit vertical scale overrides uniform inheritance");
+}
+
 int main(void)
 {
+    test_stretch_geometry_preserves_caps_and_anchor();
     test_retained_tint_samples_one_timeline();
     test_animated_clip_samples_absolute_geometry();
     test_dock_reserves_side_safe_margins();

@@ -478,9 +478,9 @@ static HRESULT wuc_properties(reach_render_backend *backend, IInspectable *inspe
     }
     if (SUCCEEDED(hr))
     {
-        float scale = scalar_value(group.scale, 1.0f);
+        reach_point_f32 scale = reach_render_group_scale_at(&group, reach_motion_now_seconds());
         if (mask & 24)
-            hr = visual->put_Scale({scale, scale, 1.0f});
+            hr = visual->put_Scale({scale.x, scale.y, 1.0f});
     }
     reach_motion x = group.x;
     x.from += base_x;
@@ -497,7 +497,7 @@ static HRESULT wuc_properties(reach_render_backend *backend, IInspectable *inspe
     if (SUCCEEDED(hr) && (mask & 8))
         hr = wuc_motion(backend, inspectable, L"Scale.X", group.scale);
     if (SUCCEEDED(hr) && (mask & 16))
-        hr = wuc_motion(backend, inspectable, L"Scale.Y", group.scale);
+        hr = wuc_motion(backend, inspectable, L"Scale.Y", reach_render_group_y_scale(&group));
     return hr;
 }
 
@@ -520,8 +520,9 @@ static HRESULT dcomp_properties(reach_render_backend *backend, IDCompositionVisu
     if (SUCCEEDED(hr) && (mask & 8))
         hr = scale->SetScaleX(scalar_value(group.scale, 1.0f));
     if (SUCCEEDED(hr) && (mask & 16))
-        hr = scale->SetScaleY(scalar_value(group.scale, 1.0f));
-    reach_motion motions[5] = {group.x, group.y, group.opacity, group.scale, group.scale};
+        hr = scale->SetScaleY(scalar_value(reach_render_group_y_scale(&group), 1.0f));
+    reach_motion motions[5] = {group.x, group.y, group.opacity, group.scale,
+                               reach_render_group_y_scale(&group)};
     motions[0].from += base_x;
     motions[0].to += base_x;
     motions[1].from += base_y;
@@ -573,7 +574,11 @@ static unsigned property_mask(const reach_render_group &group, const reach_rende
     if (memcmp(&group.opacity, &previous.opacity, sizeof(reach_motion)) != 0)
         mask |= 4;
     if (memcmp(&group.scale, &previous.scale, sizeof(reach_motion)) != 0)
-        mask |= 24;
+        mask |= 8;
+    reach_motion y = reach_render_group_y_scale(&group);
+    reach_motion previous_y_scale = reach_render_group_y_scale(&previous);
+    if (memcmp(&y, &previous_y_scale, sizeof(reach_motion)) != 0)
+        mask |= 16;
     return mask;
 }
 
@@ -1089,7 +1094,8 @@ reach_result reach_d2d_presentation_complete(reach_render_backend *backend, uint
     if (reach_motion_active_at(&backend->scene_presentation.opacity, now_seconds) ||
         reach_motion_active_at(&backend->scene_presentation.x, now_seconds) ||
         reach_motion_active_at(&backend->scene_presentation.y, now_seconds) ||
-        reach_motion_active_at(&backend->scene_presentation.scale, now_seconds))
+        reach_motion_active_at(&backend->scene_presentation.scale, now_seconds) ||
+        reach_motion_active_at(&backend->scene_presentation.scale_y, now_seconds))
         return REACH_OK;
     if (backend->reconciled_presentation_generation == generation)
     {
@@ -1137,6 +1143,7 @@ reach_result reach_d2d_presentation_complete(reach_render_backend *backend, uint
     reach_render_group settled = backend->scene_presentation;
     settled.x.duration_seconds = settled.y.duration_seconds = 0.0;
     settled.opacity.duration_seconds = settled.scale.duration_seconds = 0.0;
+    settled.scale_y.duration_seconds = 0.0;
     if (backend->compositor != nullptr)
     {
         HRESULT hr = wuc_properties(backend, backend->root_visual.Get(), settled, 0.0f, 0.0f);
@@ -1322,7 +1329,9 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
             memcmp(&presentation.x, &backend->scene_presentation.x, sizeof(reach_motion)) != 0 ||
             memcmp(&presentation.y, &backend->scene_presentation.y, sizeof(reach_motion)) != 0 ||
             memcmp(&presentation.scale, &backend->scene_presentation.scale, sizeof(reach_motion)) !=
-                0;
+                0 ||
+            memcmp(&presentation.scale_y, &backend->scene_presentation.scale_y,
+                   sizeof(reach_motion)) != 0;
         if (animation_changed)
         {
             if (backend->presentation_batch != nullptr)

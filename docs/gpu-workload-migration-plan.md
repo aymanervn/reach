@@ -41,7 +41,7 @@ This map comes from docs and consumer searches. Phase 1 completes the per-animat
 | Area | Current state and remaining work |
 | --- | --- |
 | Animation support | The manager advances scalar tracks from frame deltas. `reach_motion` supplies absolute-time curves and generations. Unify timing, retarget and lifecycle semantics. |
-| Renderer | Both Windows backends retain ordered groups for X/Y, opacity, uniform scale and marquee movement. Clip/size are static; changed commands or dimensions rerasterize groups. |
+| Renderer | Both Windows backends retain X/Y, opacity, uniform or independent axis scale, animated clips, tint and marquee movement. Fixed-cap chrome preserves source rasters while resizing; feature consumers and remaining small/notched-width capabilities are pending. |
 | Runtime | Reach and Settings have retained presentation/deadlines. Remaining predicates can request layout/render frames solely to advance values. |
 | Already migrated | Shared popup and Launcher presentation, System HUD, Settings selector, Dock/tray reorder and snap, marquee. Preserve and measure these paths. |
 | Shared feedback | Context Menu pill/outline/close and command rows, Battery, tray popup, Clipboard, Quick Settings, Dock/Top Bar and Settings controls. |
@@ -131,6 +131,12 @@ This preserves unscaled content while changing its viewport. Bounded reversal/re
 geometry checks pass; displayed pixels, section reveal integration and chrome resize remain open.
 Insets alone cannot preserve moving rounded corners, borders, notches and shadows. Resolve those
 through a shared chrome mechanism before migrating width/height consumers; keep this gate pending.
+
+The implemented fixed-cap primitive and its limits are described in the
+[resize/reveal design](gpu-resize-reveal-design.md). It reuses cached retained groups with independent
+axis scale, supports unchanged-width notches and validates corner/shadow caps before submission.
+Complete section/popup migration, small shapes, horizontal notch behavior and displayed product
+acceptance still keep the broader capability gate open.
 
 ### 3. Unify animation intent and runtime scheduling
 

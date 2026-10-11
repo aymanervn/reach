@@ -106,6 +106,7 @@ add_library(reach_core STATIC
     src/core/ui_state.c
     src/core/ui_layout.c
     src/core/render_commands.c
+    src/core/render_stretch.c
     src/core/runtime_policy.c
     src/core/startup_apps.c
     src/core/theme.c
