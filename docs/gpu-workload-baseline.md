@@ -95,7 +95,9 @@ power, memory and instrumentation overhead still require product scenarios and s
 - The isolated optimized MSVC build reaches an internal compiler error `C1001` in the existing
   `src/adapters/windows/window_management/reach_service_shared_state_win32.cpp` (aggregate
   initialization sites around 396/621). Explicit `/EHsc` removed initial exception warnings but
-  did not resolve the optimizer failure. Debug Reach and Settings compile and all 39 tests pass.
+  did not resolve the optimizer failure. An explicit byte-clear rewrite with compile-time layout
+  guards also failed at the same optimizer location; that unsuccessful source change was removed.
+  Debug Reach and Settings compile and all 39 tests pass.
   Resolve optimized-build verification separately before claiming production performance results.
 - Windows Performance Recorder exposes CPU, GPU and DesktopComposition profiles, but starting
   the combined recording failed with `0xc5585011`, "Failed to enable the policy to profile system

@@ -81,6 +81,7 @@ static void reach_launcher_set_surface_animation_open(reach_launcher *launcher, 
         return;
     }
     int32_t target_open = open ? 1 : 0;
+    double now = reach_motion_now_seconds();
     launcher->surface_target_open = target_open;
     if (target_open)
     {
@@ -91,21 +92,21 @@ static void reach_launcher_set_surface_animation_open(reach_launcher *launcher, 
             reach_motion_set(&launcher->surface_opacity, 0.0f);
             reach_motion_set(&launcher->surface_scale, REACH_LAUNCHER_SURFACE_SCALE);
         }
-        reach_motion_animate_to(&launcher->surface_y, 0.0f, launcher->surface_open_seconds,
-                                REACH_EASING_EASE_OUT);
-        reach_motion_animate_to(&launcher->surface_opacity, 1.0f, launcher->surface_open_seconds,
-                                REACH_EASING_EASE_OUT);
-        reach_motion_animate_to(&launcher->surface_scale, 1.0f, launcher->surface_open_seconds,
-                                REACH_EASING_EASE_OUT);
+        reach_motion_animate_to_at(&launcher->surface_y, 0.0f, launcher->surface_open_seconds,
+                                   REACH_EASING_EASE_OUT, now);
+        reach_motion_animate_to_at(&launcher->surface_opacity, 1.0f, launcher->surface_open_seconds,
+                                   REACH_EASING_EASE_OUT, now);
+        reach_motion_animate_to_at(&launcher->surface_scale, 1.0f, launcher->surface_open_seconds,
+                                   REACH_EASING_EASE_OUT, now);
     }
     else if (launcher->surface_visible)
     {
-        reach_motion_animate_to(&launcher->surface_y, REACH_LAUNCHER_SURFACE_OFFSET,
-                                launcher->surface_close_seconds, REACH_EASING_EASE_IN);
-        reach_motion_animate_to(&launcher->surface_opacity, 0.0f, launcher->surface_close_seconds,
-                                REACH_EASING_EASE_IN);
-        reach_motion_animate_to(&launcher->surface_scale, REACH_LAUNCHER_SURFACE_SCALE,
-                                launcher->surface_close_seconds, REACH_EASING_EASE_IN);
+        reach_motion_animate_to_at(&launcher->surface_y, REACH_LAUNCHER_SURFACE_OFFSET,
+                                   launcher->surface_close_seconds, REACH_EASING_EASE_IN, now);
+        reach_motion_animate_to_at(&launcher->surface_opacity, 0.0f,
+                                   launcher->surface_close_seconds, REACH_EASING_EASE_IN, now);
+        reach_motion_animate_to_at(&launcher->surface_scale, REACH_LAUNCHER_SURFACE_SCALE,
+                                   launcher->surface_close_seconds, REACH_EASING_EASE_IN, now);
     }
     launcher->surface_deadline = reach_motion_deadline(&launcher->surface_opacity);
     double y_deadline = reach_motion_deadline(&launcher->surface_y);

@@ -283,8 +283,7 @@ static HRESULT sync_clip(reach_render_backend *backend, reach_d2d_retained_layer
         if (edge == REACH_RENDER_CLIP_RIGHT || edge == REACH_RENDER_CLIP_BOTTOM)
         {
             float extent = edge == REACH_RENDER_CLIP_RIGHT ? group.clip.width : group.clip.height;
-            motion.from = extent - motion.from;
-            motion.to = extent - motion.to;
+            motion = reach_motion_affine(&motion, -1.0f, extent);
         }
         float value = reach_motion_value(&motion);
         ComPtr<IDCompositionAnimation> animation;
