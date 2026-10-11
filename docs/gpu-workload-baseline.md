@@ -256,3 +256,28 @@ scenarios and collection overhead. Establish baseline variation from at least fi
 runs and regression thresholds before comparing the migration. CPU/GPU totals include DWM and
 both relevant application processes. Pending prerequisites do not close the measurement checklist
 item; independent capability and implementation work can continue while they are resolved.
+
+## Bounded reveal curve capability
+
+The shared `reach_motion_clamp` and `reach_motion_compile_at` preserve delayed fade/early saturation,
+affine limits, reversal and owner deadlines. Both native backends use the same compiler, replacing
+the old adapter-local curve generator. Fixed-cap scale normalization, viewport edge conversion,
+root endpoint sampling and envelope geometry preserve bounds as well as endpoints.
+
+Evidence: isolated Debug builds and all 39 tests pass (`build-bounded-motion-final.log`,
+`test-bounded-motion-final.log`). Pure utility tests compare all three easings, both directions,
+intermediate submission times, negative affine mapping and constant clamps; compiled polynomial
+samples agree with CPU sampling within 0.000003. Geometry tests cover bounded placement/scales and
+exact unit constants at 100/125/150/200% DPI.
+
+The bounded native diagnostic passes five full runs on each compositor plus HWND fallback
+(`probe-bounded-motion-final.log`, failures=0). Each bounded-reveal reversal covers opacity,
+placement with a viewport-relative base offset, and a derived clip edge for each easing. Two intent
+submissions and one unchanged endpoint check produce three executions, zero native raster passes,
+four changed property submissions and 12,800 retained bytes. The identical endpoint check does not
+resubmit properties. HWND fallback produces three finite sampled raster passes and no native
+property submissions. The full suite also rechecks root completion/error handling and four-DPI
+chrome readback.
+
+These results verify shared curve execution and content reuse, not displayed compositor pixels,
+complete Quick Settings integration or total product efficiency. Those acceptance gates remain open.

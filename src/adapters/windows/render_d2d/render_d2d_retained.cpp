@@ -12,71 +12,9 @@ using namespace ABI::Windows::UI::Composition;
 using ABI::Windows::Foundation::Numerics::Vector2;
 using ABI::Windows::Foundation::Numerics::Vector3;
 
-struct motion_segment
-{
-    double start;
-    double end;
-    float value;
-    float linear;
-    float quadratic;
-    float cubic;
-};
-
 static float scalar_value(const reach_motion &motion, float fallback)
 {
     return motion.generation == 0 ? fallback : reach_motion_value(&motion);
-}
-
-static size_t motion_segments(const reach_motion &motion, motion_segment *segments)
-{
-    double elapsed = std::max(0.0, reach_motion_now_seconds() - motion.started_seconds);
-    if (motion.duration_seconds <= elapsed)
-    {
-        return 0;
-    }
-    double duration = motion.duration_seconds;
-    double span = motion.to - motion.from;
-    double split = motion.easing == REACH_EASING_EASE_IN_OUT ? duration * 0.5 : duration;
-    size_t count = 0;
-    double at = elapsed;
-    while (at < duration && count < 2)
-    {
-        double t = at / duration;
-        double end = at < split ? split : duration;
-        double a = 0.0;
-        double b = 0.0;
-        double c = 0.0;
-        double d = 0.0;
-        if (motion.easing == REACH_EASING_EASE_IN)
-        {
-            d = 1.0;
-        }
-        else if (motion.easing == REACH_EASING_EASE_OUT)
-        {
-            b = 3.0;
-            c = -3.0;
-            d = 1.0;
-        }
-        else if (t < 0.5)
-        {
-            d = 4.0;
-        }
-        else
-        {
-            a = -3.0;
-            b = 12.0;
-            c = -12.0;
-            d = 4.0;
-        }
-        segments[count++] = {at - elapsed,
-                             end - elapsed,
-                             (float)(motion.from + span * (a + b * t + c * t * t + d * t * t * t)),
-                             (float)(span * (b + 2.0 * c * t + 3.0 * d * t * t) / duration),
-                             (float)(span * (c + 3.0 * d * t) / (duration * duration)),
-                             (float)(span * d / (duration * duration * duration))};
-        at = end;
-    }
-    return count;
 }
 
 static HRESULT wuc_motion(reach_render_backend *backend, IInspectable *visual,
@@ -89,8 +27,8 @@ static HRESULT wuc_motion(reach_render_backend *backend, IInspectable *visual,
     {
         hr = WindowsCreateString(property_name, (UINT32)wcslen(property_name), &property);
     }
-    motion_segment segments[2] = {};
-    size_t count = motion_segments(motion, segments);
+    reach_motion_segment segments[REACH_MOTION_MAX_SEGMENTS] = {};
+    size_t count = reach_motion_compile_at(&motion, reach_motion_now_seconds(), segments);
     if (SUCCEEDED(hr))
     {
         hr = object->StopAnimation(property);
@@ -119,10 +57,9 @@ static HRESULT wuc_motion(reach_render_backend *backend, IInspectable *visual,
     }
     for (size_t index = 0; index < count && SUCCEEDED(hr); ++index)
     {
-        const motion_segment &segment = segments[index];
+        const reach_motion_segment &segment = segments[index];
         double dt = segment.end - segment.start;
-        float end_value = (float)(segment.value + segment.linear * dt +
-                                  segment.quadratic * dt * dt + segment.cubic * dt * dt * dt);
+        float end_value = segment.end_value;
         float distance = end_value - segment.value;
         float end_derivative =
             (float)(segment.linear + 2.0 * segment.quadratic * dt + 3.0 * segment.cubic * dt * dt);
@@ -162,8 +99,8 @@ static HRESULT wuc_motion(reach_render_backend *backend, IInspectable *visual,
 static HRESULT dcomp_motion(reach_render_backend *backend, const reach_motion &motion,
                             ComPtr<IDCompositionAnimation> *animation)
 {
-    motion_segment segments[2] = {};
-    size_t count = motion_segments(motion, segments);
+    reach_motion_segment segments[REACH_MOTION_MAX_SEGMENTS] = {};
+    size_t count = reach_motion_compile_at(&motion, reach_motion_now_seconds(), segments);
     if (count == 0)
     {
         return S_FALSE;
@@ -171,14 +108,14 @@ static HRESULT dcomp_motion(reach_render_backend *backend, const reach_motion &m
     HRESULT hr = backend->dcomp_device->CreateAnimation(animation->ReleaseAndGetAddressOf());
     for (size_t index = 0; index < count && SUCCEEDED(hr); ++index)
     {
-        const motion_segment &segment = segments[index];
+        const reach_motion_segment &segment = segments[index];
         hr = (*animation)
                  ->AddCubic(segment.start, segment.value, segment.linear, segment.quadratic,
                             segment.cubic);
     }
     if (SUCCEEDED(hr))
     {
-        hr = (*animation)->End(segments[count - 1].end, motion.to);
+        hr = (*animation)->End(segments[count - 1].end, segments[count - 1].end_value);
     }
     return hr;
 }
@@ -482,12 +419,8 @@ static HRESULT wuc_properties(reach_render_backend *backend, IInspectable *inspe
         if (mask & 24)
             hr = visual->put_Scale({scale.x, scale.y, 1.0f});
     }
-    reach_motion x = group.x;
-    x.from += base_x;
-    x.to += base_x;
-    reach_motion y = group.y;
-    y.from += base_y;
-    y.to += base_y;
+    reach_motion x = reach_motion_affine(&group.x, 1.0f, base_x);
+    reach_motion y = reach_motion_affine(&group.y, 1.0f, base_y);
     if (SUCCEEDED(hr) && !preserve_repeat && (mask & 1))
         hr = wuc_motion(backend, inspectable, L"Offset.X", x);
     if (SUCCEEDED(hr) && (mask & 2))
@@ -523,10 +456,8 @@ static HRESULT dcomp_properties(reach_render_backend *backend, IDCompositionVisu
         hr = scale->SetScaleY(scalar_value(reach_render_group_y_scale(&group), 1.0f));
     reach_motion motions[5] = {group.x, group.y, group.opacity, group.scale,
                                reach_render_group_y_scale(&group)};
-    motions[0].from += base_x;
-    motions[0].to += base_x;
-    motions[1].from += base_y;
-    motions[1].to += base_y;
+    motions[0] = reach_motion_affine(&group.x, 1.0f, base_x);
+    motions[1] = reach_motion_affine(&group.y, 1.0f, base_y);
     for (size_t index = 0; index < 5 && SUCCEEDED(hr); ++index)
     {
         if ((mask & (1u << index)) == 0 || (index == 0 && preserve_repeat))

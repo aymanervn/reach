@@ -125,7 +125,6 @@ void reach_feature_transition_presentation(const reach_feature_transition *trans
     geometry->presentation.translation_bounds = {0.0f, origin < 0.0f ? origin : 0.0f, 0.0f,
                                                  origin < 0.0f ? -origin : origin};
     geometry->presentation.group.opacity = transition->opacity;
-    geometry->presentation.group.y = transition->y;
-    geometry->presentation.group.y.from *= transition->dpi_scale;
-    geometry->presentation.group.y.to *= transition->dpi_scale;
+    geometry->presentation.group.y =
+        reach_motion_affine(&transition->y, transition->dpi_scale, 0.0f);
 }

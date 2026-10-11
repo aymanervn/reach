@@ -38,6 +38,26 @@ atlas, effect or clock systems. The additional node and submission cost is bound
 benefit for multiple surfaces. That architectural rationale still requires final product cost
 measurements; fewer raster operations alone do not prove a total GPU/CPU benefit.
 
+## Bounded reveal curves
+
+`reach_motion_clamp` bounds a derived curve without changing its owner's start, easing, generation
+or duration. Affine mapping carries and reverses its limits when needed. This preserves section
+reveal's delayed fade and early saturation: opacity is `clamp((progress - 0.10) / 0.65, 0, 1)`;
+its slide is derived from that bounded opacity, rather than raw progress.
+
+`reach_motion_compile_at` emits at most four cubic/constant segments, split at the easing midpoint
+and limit crossings. Both native backends consume that shared compiler; the old adapter-local
+compiler is removed. Native final keyframes use bounded endpoints. CPU fallback/input samples the
+same descriptor, and normalized fixed-cap scale carries its bounds without losing exact unit scale.
+Visual saturation does not shorten the owner's completion deadline. Starting or retargeting creates
+a new ordinary intent; a retarget samples the current bounded visible value and clears derived limits.
+
+Pure tests compare all three easings in both directions, mid-flight submission, constant clamps,
+negative affine mapping, retarget continuity and native polynomials against CPU samples. Native
+submission/reversal diagnostics cover movement, opacity and clip edges on both compositors and
+finite HWND fallback. Complete section viewport/content integration and displayed compositor pixels
+remain pending; this curve capability alone does not migrate Quick Settings.
+
 ## Validation and limits
 
 Source-command validation accepts rounded/notched fills and shadows. A moving axis must keep enough

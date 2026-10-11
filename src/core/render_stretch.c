@@ -15,7 +15,8 @@ static reach_motion reach_render_stretch_motion(const reach_motion *motion, floa
 
 static int32_t reach_render_stretch_fixed(const reach_motion *motion, float expected)
 {
-    return motion->generation == 0 || (motion->duration_seconds <= 0.0 && motion->to == expected);
+    return motion->generation == 0 ||
+           (motion->duration_seconds <= 0.0 && reach_motion_value_at(motion, 0.0) == expected);
 }
 
 static reach_motion reach_render_stretch_scale(const reach_motion *motion, float caps, float band)
@@ -23,8 +24,14 @@ static reach_motion reach_render_stretch_scale(const reach_motion *motion, float
     reach_motion result = *motion;
     result.from = (motion->from - caps) / band;
     result.to = (motion->to - caps) / band;
+    if (result.has_limits)
+    {
+        result.minimum = (motion->minimum - caps) / band;
+        result.maximum = (motion->maximum - caps) / band;
+    }
     if (result.from == result.to)
-        result = reach_render_stretch_motion(motion, 0.0f, result.to);
+        result = reach_render_stretch_motion(
+            motion, 0.0f, reach_motion_value_at(&result, result.started_seconds));
     return result;
 }
 
@@ -35,7 +42,12 @@ static int32_t reach_render_stretch_axis_valid(float size, float near_inset, flo
            isfinite(near_inset) && near_inset >= 0.0f && roundf(near_inset) == near_inset &&
            isfinite(far_inset) && far_inset >= 0.0f && roundf(far_inset) == far_inset &&
            near_inset + far_inset < size && motion->generation != 0 && isfinite(motion->from) &&
-           isfinite(motion->to) && fminf(motion->from, motion->to) > near_inset + far_inset &&
+           isfinite(motion->to) &&
+           (!motion->has_limits || (isfinite(motion->minimum) && isfinite(motion->maximum) &&
+                                    motion->minimum <= motion->maximum)) &&
+           fminf(reach_motion_value_at(motion, motion->started_seconds),
+                 reach_motion_value_at(motion, reach_motion_deadline(motion))) >
+               near_inset + far_inset &&
            isfinite(anchor) && anchor >= 0.0f && anchor <= 1.0f;
 }
 
@@ -73,12 +85,14 @@ reach_result reach_render_stretch_patch(const reach_render_group *source,
                          source_y[row + 1] - source_y[row]};
     factor_x = (column == 2 ? 1.0f : 0.0f) - stretch->anchor_x;
     factor_y = (row == 2 ? 1.0f : 0.0f) - stretch->anchor_y;
-    out_patch->x = reach_render_stretch_motion(&stretch->width, factor_x,
-                                               -source->bounds.width * factor_x +
-                                                   (source->x.generation ? source->x.to : 0.0f));
-    out_patch->y = reach_render_stretch_motion(&stretch->height, factor_y,
-                                               -source->bounds.height * factor_y +
-                                                   (source->y.generation ? source->y.to : 0.0f));
+    out_patch->x = reach_render_stretch_motion(
+        &stretch->width, factor_x,
+        -source->bounds.width * factor_x +
+            (source->x.generation ? reach_motion_value_at(&source->x, 0.0) : 0.0f));
+    out_patch->y = reach_render_stretch_motion(
+        &stretch->height, factor_y,
+        -source->bounds.height * factor_y +
+            (source->y.generation ? reach_motion_value_at(&source->y, 0.0) : 0.0f));
     if (column == 1)
         out_patch->scale = reach_render_stretch_scale(
             &stretch->width, stretch->left + stretch->right, out_patch->bounds.width);
@@ -109,9 +123,15 @@ static int32_t reach_render_stretch_command_valid(const reach_render_group *sour
 {
     float extent = 0.0f, top_notch = 0.0f, bottom_notch = 0.0f;
     int32_t width_changes =
-        stretch->width.from != source->bounds.width || stretch->width.to != source->bounds.width;
-    int32_t height_changes = stretch->height.from != source->bounds.height ||
-                             stretch->height.to != source->bounds.height;
+        reach_motion_value_at(&stretch->width, stretch->width.started_seconds) !=
+            source->bounds.width ||
+        reach_motion_value_at(&stretch->width, reach_motion_deadline(&stretch->width)) !=
+            source->bounds.width;
+    int32_t height_changes =
+        reach_motion_value_at(&stretch->height, stretch->height.started_seconds) !=
+            source->bounds.height ||
+        reach_motion_value_at(&stretch->height, reach_motion_deadline(&stretch->height)) !=
+            source->bounds.height;
     if (command->type != REACH_RENDER_COMMAND_RECT &&
         command->type != REACH_RENDER_COMMAND_NOTCHED_ROUNDED_RECT &&
         command->type != REACH_RENDER_COMMAND_SHADOW)
