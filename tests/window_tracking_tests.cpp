@@ -30,6 +30,7 @@ static reach_window_snapshot make_window(uintptr_t id, const char *path, const c
 static reach_window_snapshot fake_windows[REACH_MAX_OPEN_WINDOWS];
 static reach_rect_f32 fake_window_bounds[REACH_MAX_OPEN_WINDOWS];
 static size_t fake_window_count;
+static size_t frame_read_count;
 
 static size_t fake_window_count_op(const reach_window_manager *manager)
 {
@@ -68,12 +69,20 @@ static reach_result fake_outer_bounds_op(const reach_window_manager *manager,
     return REACH_ERROR;
 }
 
+static reach_result fake_frame_bounds_op(const reach_window_manager *manager,
+                                         reach_window_id window, reach_rect_f32 *out)
+{
+    ++frame_read_count;
+    return fake_outer_bounds_op(manager, window, out);
+}
+
 static reach_window_tracking *make_service(void)
 {
     reach_window_manager_port port = {};
     port.ops.window_count = fake_window_count_op;
     port.ops.window_at = fake_window_at_op;
     port.ops.outer_bounds = fake_outer_bounds_op;
+    port.ops.frame_bounds = fake_frame_bounds_op;
     reach_window_tracking *service = nullptr;
     if (reach_window_tracking_create(port, &service) != REACH_OK)
     {
@@ -364,8 +373,39 @@ static void test_identity_groups_split_without_a_bridge(void)
     reach_window_tracking_destroy(service);
 }
 
+static void test_frame_geometry_is_cached_and_publishes_resize_changes(void)
+{
+    reach_window_snapshot windows[1] = {make_window(91, "C:\\apps\\preview.exe", "")};
+    set_windows(windows, 1);
+    fake_window_bounds[0] = {30.0f, 40.0f, 800.0f, 600.0f};
+    reach_window_tracking *service = make_service();
+    reach_window_tracking_refresh_report report = {};
+    (void)reach_window_tracking_refresh(service, &report);
+    size_t reads = frame_read_count;
+    reach_rect_f32 frame = {};
+    for (size_t index = 0; index < 10; ++index)
+    {
+        expect_true(reach_window_tracking_window_frame_bounds(service, 91, &frame) == REACH_OK &&
+                        reach_rect_equal(frame, fake_window_bounds[0]),
+                    "frame geometry is available in the current snapshot");
+    }
+    expect_true(frame_read_count == reads, "snapshot reads do not query the OS frame port");
+    (void)reach_window_tracking_refresh(service, &report);
+    expect_true(!report.changed, "identical frame geometry does not publish a change");
+    fake_window_bounds[0].width = 1200.0f;
+    (void)reach_window_tracking_refresh(service, &report);
+    expect_true(report.changed && !report.items_changed && !report.icon_identity_changed,
+                "a resize publishes a window-world change without changing identity");
+    set_windows(nullptr, 0);
+    (void)reach_window_tracking_refresh(service, &report);
+    expect_true(reach_window_tracking_window_frame_bounds(service, 91, &frame) != REACH_OK,
+                "departed windows have no stale frame geometry");
+    reach_window_tracking_destroy(service);
+}
+
 int main(void)
 {
+    test_frame_geometry_is_cached_and_publishes_resize_changes();
     test_identity_rule();
     test_group_id_assignment_and_stability();
     test_empty_identity_and_shared_executable();

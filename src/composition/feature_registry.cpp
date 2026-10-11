@@ -1172,17 +1172,58 @@ static reach_result reach_switcher_surface_render(void *capsule,
 {
     reach_switcher_render_context render = {};
     render.theme = ctx->theme;
-    render.bounds = ctx->render_bounds;
-    render.dpi_scale = ctx->dpi_scale;
     render.icon_size_px = ctx->icon_size_px;
     render.text_measure = ctx->text_measure;
     return reach_switcher_append_render_commands(static_cast<reach_switcher *>(capsule), &render,
                                                  out_commands);
 }
 
+static size_t reach_switcher_native_overlay_generation(const void *capsule)
+{
+    return reach_switcher_preview_generation(static_cast<const reach_switcher *>(capsule));
+}
+
+static size_t reach_switcher_native_overlay_count(const void *capsule)
+{
+    return reach_switcher_thumbnail_count(static_cast<const reach_switcher *>(capsule));
+}
+
+static reach_result reach_switcher_native_overlay_item(const void *capsule, size_t index,
+                                                       const reach_theme *theme,
+                                                       reach_feature_native_overlay_item *out)
+{
+    (void)theme;
+    if (out == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    reach_switcher_thumbnail_placement placement = {};
+    reach_result result = reach_switcher_thumbnail_at(static_cast<const reach_switcher *>(capsule),
+                                                      index, &placement);
+    if (result != REACH_OK)
+    {
+        return result;
+    }
+    *out = {};
+    out->source = placement.window;
+    out->plane = REACH_WINDOW_THUMBNAIL_PLANE_TARGET;
+    out->placement.destination = placement.destination;
+    out->placement.opacity = 1.0f;
+    out->placement.visible = placement.visible;
+    return REACH_OK;
+}
+
+static const reach_feature_native_overlay_ops reach_switcher_native_overlay_ops = {
+    reach_switcher_native_overlay_generation,
+    reach_switcher_native_overlay_count,
+    reach_switcher_native_overlay_item,
+};
+
 static const reach_feature_surface_ops reach_switcher_surface_ops = {
     reach_switcher_surface_arrange,
     reach_switcher_surface_render,
+    nullptr,
+    &reach_switcher_native_overlay_ops,
 };
 
 static int32_t reach_clipboard_surface_arrange(void *capsule,

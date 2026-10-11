@@ -1,20 +1,18 @@
 #include "windows_adapters_internal.h"
 
-#include "reach/core/limits.h"
-
 #include <windows.h>
 
 #include <dwmapi.h>
 
 #include <new>
 
-#define REACH_WINDOW_THUMBNAIL_MAX (REACH_MAX_OPEN_WINDOWS + 1)
-
 typedef struct reach_window_thumbnail_entry
 {
+    reach_window_thumbnail_entry *next;
     reach_window_thumbnail_id id;
     HTHUMBNAIL handle;
     HWND source;
+    HWND target;
     HWND destination;
     reach_window_thumbnail_plane plane;
     COLORREF background;
@@ -27,10 +25,8 @@ typedef struct reach_window_thumbnail_entry
 
 struct reach_window_thumbnails
 {
-    HWND target;
     reach_window_thumbnail_id next_id;
-    reach_window_thumbnail_entry entries[REACH_WINDOW_THUMBNAIL_MAX];
-    size_t entry_count;
+    reach_window_thumbnail_entry *entries;
 };
 
 static const wchar_t *reach_window_thumbnail_host_class(void)
@@ -119,7 +115,7 @@ static COLORREF reach_window_thumbnail_color(reach_color color)
                reach_window_thumbnail_color_channel(color.b));
 }
 
-static void reach_window_thumbnail_release_entry(reach_window_thumbnail_entry *entry)
+static void reach_window_thumbnail_destroy_entry(reach_window_thumbnail_entry *entry)
 {
     if (entry == nullptr)
     {
@@ -134,7 +130,7 @@ static void reach_window_thumbnail_release_entry(reach_window_thumbnail_entry *e
         SetWindowLongPtrW(entry->destination, GWLP_USERDATA, 0);
         DestroyWindow(entry->destination);
     }
-    *entry = {};
+    delete entry;
 }
 
 static reach_window_thumbnail_entry *
@@ -145,11 +141,11 @@ reach_window_thumbnail_find(reach_window_thumbnails *thumbnails, reach_window_th
         return nullptr;
     }
 
-    for (size_t index = 0; index < thumbnails->entry_count; ++index)
+    for (auto *entry = thumbnails->entries; entry != nullptr; entry = entry->next)
     {
-        if (thumbnails->entries[index].id == id)
+        if (entry->id == id)
         {
-            return &thumbnails->entries[index];
+            return entry;
         }
     }
     return nullptr;
@@ -165,31 +161,8 @@ static int32_t reach_window_thumbnail_properties_equal(const DWM_THUMBNAIL_PROPE
            left->fSourceClientAreaOnly == right->fSourceClientAreaOnly;
 }
 
-static reach_result reach_window_thumbnail_set_target(reach_window_thumbnails *thumbnails,
-                                                      reach_window_id target)
-{
-    if (thumbnails == nullptr)
-    {
-        return REACH_INVALID_ARGUMENT;
-    }
-
-    HWND hwnd = reinterpret_cast<HWND>(target);
-    if (thumbnails->target == hwnd)
-    {
-        return REACH_OK;
-    }
-
-    for (size_t index = 0; index < thumbnails->entry_count; ++index)
-    {
-        reach_window_thumbnail_release_entry(&thumbnails->entries[index]);
-    }
-    thumbnails->entry_count = 0;
-    thumbnails->target = hwnd;
-    return REACH_OK;
-}
-
 static reach_result reach_window_thumbnail_create(reach_window_thumbnails *thumbnails,
-                                                  reach_window_id source,
+                                                  reach_window_id target, reach_window_id source,
                                                   reach_window_thumbnail_plane plane,
                                                   reach_window_thumbnail_id *out_id)
 {
@@ -200,7 +173,8 @@ static reach_result reach_window_thumbnail_create(reach_window_thumbnails *thumb
 
     *out_id = REACH_WINDOW_THUMBNAIL_NONE;
 
-    if (thumbnails->target == nullptr || thumbnails->entry_count >= REACH_WINDOW_THUMBNAIL_MAX ||
+    HWND target_hwnd = reinterpret_cast<HWND>(target);
+    if (target_hwnd == nullptr || !IsWindow(target_hwnd) ||
         (plane != REACH_WINDOW_THUMBNAIL_PLANE_TARGET &&
          plane != REACH_WINDOW_THUMBNAIL_PLANE_BEHIND_TARGET))
     {
@@ -208,15 +182,15 @@ static reach_result reach_window_thumbnail_create(reach_window_thumbnails *thumb
     }
 
     HWND source_hwnd = reinterpret_cast<HWND>(source);
-    if (source_hwnd == nullptr || source_hwnd == thumbnails->target || !IsWindow(source_hwnd))
+    if (source_hwnd == nullptr || source_hwnd == target_hwnd || !IsWindow(source_hwnd))
     {
         return REACH_INVALID_ARGUMENT;
     }
 
-    HWND destination = thumbnails->target;
+    HWND destination = target_hwnd;
     if (plane == REACH_WINDOW_THUMBNAIL_PLANE_BEHIND_TARGET)
     {
-        destination = reach_window_thumbnail_create_host(thumbnails->target);
+        destination = reach_window_thumbnail_create_host(target_hwnd);
         if (destination == nullptr)
         {
             return REACH_ERROR;
@@ -226,25 +200,35 @@ static reach_result reach_window_thumbnail_create(reach_window_thumbnails *thumb
     HTHUMBNAIL handle = nullptr;
     if (FAILED(DwmRegisterThumbnail(destination, source_hwnd, &handle)) || handle == nullptr)
     {
-        if (destination != thumbnails->target)
+        if (destination != target_hwnd)
         {
             DestroyWindow(destination);
         }
         return REACH_ERROR;
     }
 
-    reach_window_thumbnail_entry *entry = &thumbnails->entries[thumbnails->entry_count];
+    reach_window_thumbnail_entry *entry = new (std::nothrow) reach_window_thumbnail_entry();
+    if (entry == nullptr)
+    {
+        DwmUnregisterThumbnail(handle);
+        if (destination != target_hwnd)
+        {
+            DestroyWindow(destination);
+        }
+        return REACH_ERROR;
+    }
+    entry->next = thumbnails->entries;
+    thumbnails->entries = entry;
     entry->id = ++thumbnails->next_id;
     entry->handle = handle;
     entry->source = source_hwnd;
+    entry->target = target_hwnd;
     entry->destination = destination;
     entry->plane = plane;
     if (plane == REACH_WINDOW_THUMBNAIL_PLANE_BEHIND_TARGET)
     {
         SetWindowLongPtrW(destination, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(entry));
     }
-    thumbnails->entry_count++;
-
     *out_id = entry->id;
     return REACH_OK;
 }
@@ -283,8 +267,8 @@ reach_window_thumbnail_set_placement(reach_window_thumbnails *thumbnails,
     if (entry->plane == REACH_WINDOW_THUMBNAIL_PLANE_BEHIND_TARGET)
     {
         RECT target_rect = {};
-        if (entry->destination == nullptr || thumbnails->target == nullptr ||
-            !GetWindowRect(thumbnails->target, &target_rect))
+        if (entry->destination == nullptr || entry->target == nullptr ||
+            !GetWindowRect(entry->target, &target_rect))
         {
             return REACH_ERROR;
         }
@@ -322,7 +306,7 @@ reach_window_thumbnail_set_placement(reach_window_thumbnails *thumbnails,
             RECT current = {};
             bool bounds_changed =
                 !GetWindowRect(entry->destination, &current) || !EqualRect(&current, &target_rect);
-            bool order_changed = GetWindow(entry->destination, GW_HWNDPREV) != thumbnails->target;
+            bool order_changed = GetWindow(entry->destination, GW_HWNDPREV) != entry->target;
             if (bounds_changed || order_changed || !was_visible)
             {
                 UINT flags = SWP_NOACTIVATE | SWP_NOOWNERZORDER;
@@ -338,7 +322,7 @@ reach_window_thumbnail_set_placement(reach_window_thumbnails *thumbnails,
                 {
                     flags |= SWP_SHOWWINDOW;
                 }
-                if (!SetWindowPos(entry->destination, thumbnails->target, target_rect.left,
+                if (!SetWindowPos(entry->destination, entry->target, target_rect.left,
                                   target_rect.top, target_width, target_height, flags))
                 {
                     return REACH_ERROR;
@@ -468,21 +452,6 @@ static reach_result reach_window_thumbnail_bring_to_front(reach_window_thumbnail
     return REACH_OK;
 }
 
-static reach_result reach_window_thumbnail_destroy_all(reach_window_thumbnails *thumbnails)
-{
-    if (thumbnails == nullptr)
-    {
-        return REACH_INVALID_ARGUMENT;
-    }
-
-    for (size_t index = 0; index < thumbnails->entry_count; ++index)
-    {
-        reach_window_thumbnail_release_entry(&thumbnails->entries[index]);
-    }
-    thumbnails->entry_count = 0;
-    return REACH_OK;
-}
-
 static reach_result reach_window_thumbnail_release(reach_window_thumbnails *thumbnails,
                                                    reach_window_thumbnail_id id)
 {
@@ -491,28 +460,17 @@ static reach_result reach_window_thumbnail_release(reach_window_thumbnails *thum
         return REACH_INVALID_ARGUMENT;
     }
 
-    for (size_t index = 0; index < thumbnails->entry_count; ++index)
+    reach_window_thumbnail_entry **link = &thumbnails->entries;
+    while (*link != nullptr)
     {
-        if (thumbnails->entries[index].id != id)
+        reach_window_thumbnail_entry *entry = *link;
+        if (entry->id != id)
         {
+            link = &entry->next;
             continue;
         }
-
-        reach_window_thumbnail_release_entry(&thumbnails->entries[index]);
-        size_t last = thumbnails->entry_count - 1;
-        if (index != last)
-        {
-            thumbnails->entries[index] = thumbnails->entries[last];
-            reach_window_thumbnail_entry *moved = &thumbnails->entries[index];
-            if (moved->plane == REACH_WINDOW_THUMBNAIL_PLANE_BEHIND_TARGET &&
-                moved->destination != nullptr)
-            {
-                SetWindowLongPtrW(moved->destination, GWLP_USERDATA,
-                                  reinterpret_cast<LONG_PTR>(moved));
-            }
-        }
-        thumbnails->entries[last] = {};
-        thumbnails->entry_count--;
+        *link = entry->next;
+        reach_window_thumbnail_destroy_entry(entry);
         return REACH_OK;
     }
     return REACH_INVALID_ARGUMENT;
@@ -525,7 +483,12 @@ static void reach_window_thumbnail_destroy(reach_window_thumbnails *thumbnails)
         return;
     }
 
-    (void)reach_window_thumbnail_destroy_all(thumbnails);
+    while (thumbnails->entries != nullptr)
+    {
+        reach_window_thumbnail_entry *entry = thumbnails->entries;
+        thumbnails->entries = entry->next;
+        reach_window_thumbnail_destroy_entry(entry);
+    }
     delete thumbnails;
 }
 
@@ -555,12 +518,10 @@ reach_result reach_windows_create_window_thumbnails(reach_window_thumbnail_port 
     }
 
     out_port->thumbnails = thumbnails;
-    out_port->ops.set_target = reach_window_thumbnail_set_target;
     out_port->ops.create = reach_window_thumbnail_create;
     out_port->ops.set_placement = reach_window_thumbnail_set_placement;
     out_port->ops.bring_to_front = reach_window_thumbnail_bring_to_front;
     out_port->ops.release = reach_window_thumbnail_release;
-    out_port->ops.destroy_all = reach_window_thumbnail_destroy_all;
     out_port->ops.destroy = reach_window_thumbnail_destroy;
     return REACH_OK;
 }

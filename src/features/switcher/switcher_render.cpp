@@ -4,20 +4,11 @@
 
 #include "reach/core/typography.h"
 
-static float reach_switcher_input_scale(const reach_switcher_render_input *input, float value)
-{
-    float scale = input != nullptr && input->dpi_scale > 0.0f ? input->dpi_scale : 1.0f;
-    return value * scale;
-}
+#include <math.h>
 
 static void reach_switcher_label_for_window(uint16_t *out_label, size_t out_count,
                                             const reach_window_snapshot *window)
 {
-    if (out_label == nullptr || out_count == 0)
-    {
-        return;
-    }
-
     if (window != nullptr && window->title[0] != 0)
     {
         (void)reach_copy_utf16(out_label, out_count, window->title);
@@ -41,172 +32,107 @@ reach_result reach_switcher_append_render_commands(reach_switcher *switcher,
     {
         return REACH_INVALID_ARGUMENT;
     }
-
-    reach_switcher_state *state = reach_switcher_state_mut(switcher);
-
-    reach_switcher_model visible_model = {};
-    visible_model.window_count = state->window_count;
-    visible_model.selected_index = state->selected_index;
-    visible_model.visible_start = state->visible_start;
-    visible_model.visible_capacity = state->visible_capacity;
-    reach_switcher_update_visible_start(&visible_model);
-    state->visible_start = visible_model.visible_start;
-
-    reach_switcher_render_item items[REACH_MAX_OPEN_WINDOWS] = {};
-    for (size_t index = 0; index < state->window_count && index < REACH_MAX_OPEN_WINDOWS; ++index)
-    {
-        const reach_window_snapshot *window = reach_window_tracking_window_by_id(
-            reach_switcher_windows(switcher), state->windows[index]);
-        if (window == nullptr)
-        {
-            continue;
-        }
-        const uint16_t *runtime_path =
-            reach_application_identity_primary_runtime_path(&window->identity);
-        const uint16_t *icon_path = window->icon_ref[0] != 0 ? window->icon_ref : runtime_path;
-        if (icon_path != nullptr && icon_path[0] != 0)
-        {
-            items[index].icon_id = reach_icon_service_get(reach_switcher_icons(switcher), icon_path,
-                                                          ctx->icon_size_px);
-        }
-        reach_switcher_label_for_window(items[index].label, 260, window);
-    }
-
-    reach_switcher_render_input input = {};
-    input.theme = ctx->theme;
-    input.bounds = ctx->bounds;
-    input.model = &visible_model;
-    input.items = items;
-    input.item_count = state->window_count;
-    input.dpi_scale = state->content_scale > 0.0f ? state->content_scale : ctx->dpi_scale;
-    input.text_measure = ctx->text_measure;
-    input.text_alignment_center = REACH_TEXT_ALIGNMENT_CENTER;
-    input.text_weight_demi_bold = REACH_TEXT_WEIGHT_DEMIBOLD;
-
-    return reach_switcher_build_render_commands(&input, out_commands);
-}
-
-reach_result reach_switcher_build_render_commands(const reach_switcher_render_input *input,
-                                                  reach_render_command_buffer *out_commands)
-{
-    if (input == nullptr || input->theme == nullptr || input->model == nullptr ||
-        input->items == nullptr || out_commands == nullptr)
-    {
-        return REACH_INVALID_ARGUMENT;
-    }
-
     reach_render_command_buffer_clear(out_commands);
-
-    reach_render_command command = {};
-    float radius = reach_switcher_input_scale(input, input->theme->radius_large);
-    float padding = reach_switcher_input_scale(input, 24.0f);
-    float item_size = reach_switcher_input_scale(input, 112.0f);
-    float icon_box_size = reach_switcher_input_scale(input, 88.0f);
-    float gap = reach_switcher_input_scale(input, 14.0f);
-    float selected_inset = reach_switcher_input_scale(input, 5.0f);
-    float icon_top_offset = reach_switcher_input_scale(input, 4.0f);
-    float label_top = reach_switcher_input_scale(input, 104.0f);
-    float label_height = reach_switcher_input_scale(input, 20.0f);
-    float label_horizontal_padding = reach_switcher_input_scale(input, 6.0f);
-    float label_width = icon_box_size - label_horizontal_padding * 2.0f;
-    float label_text_size = reach_switcher_input_scale(input, REACH_TEXT_SIZE_MEDIUM);
-    const reach_theme *theme = input->theme;
-    float icon_box_radius = reach_theme_icon_box_corner_radius(theme, icon_box_size);
-    size_t visible_count = input->model->visible_capacity > 0 &&
-                                   input->model->window_count > input->model->visible_capacity
-                               ? input->model->visible_capacity
-                               : reach_switcher_visible_count(input->model->window_count);
-
-    float border_thickness = reach_theme_border_thickness(theme, input->dpi_scale);
-    reach_rect_f32 content_bounds = reach_theme_border_content_rect(
-        theme, input->dpi_scale, {0.0f, 0.0f, input->bounds.width, input->bounds.height});
-
+    const reach_switcher_layout *layout = reach_switcher_card_layout(switcher);
+    const reach_switcher_state *state = reach_switcher_state_ptr(switcher);
+    const reach_theme *theme = ctx->theme;
+    float scale = layout->scale > 0.0f ? layout->scale : 1.0f;
+    float border = reach_theme_border_thickness(theme, scale);
+    float selected_inset = REACH_SWITCHER_SELECTION_INSET * scale;
     reach_render_command shape = {};
     shape.type = REACH_RENDER_COMMAND_RECT;
-    shape.rect.width = input->bounds.width;
-    shape.rect.height = input->bounds.height;
-    shape.radius = radius;
+    shape.rect = {0.0f, 0.0f, state->bounds.width, state->bounds.height};
+    shape.radius = theme->radius_large * scale;
     reach_result result = reach_render_push_bordered_background(
-        out_commands, &shape, theme->switcher_background, theme->bar_border, border_thickness,
-        &theme->popup_shadow, input->dpi_scale);
+        out_commands, &shape, theme->switcher_background, theme->bar_border, border,
+        &theme->popup_shadow, scale);
     if (result != REACH_OK)
     {
         return result;
     }
 
-    if (visible_count > 0)
+    for (size_t index = 0; index < layout->count; ++index)
     {
-        float total_width = (float)visible_count * item_size + (float)(visible_count - 1) * gap;
-        float x = content_bounds.x + (content_bounds.width - total_width) * 0.5f;
-        if (x < content_bounds.x + padding)
+        const reach_switcher_card *card = &layout->cards[index];
+        const reach_window_snapshot *window =
+            reach_window_tracking_window_by_id(reach_switcher_windows(switcher), card->window);
+        reach_render_command command = {};
+        command.type = REACH_RENDER_COMMAND_RECT;
+        command.rect = card->preview;
+        command.color = theme->switcher_selection_background;
+        if (card->selected)
         {
-            x = content_bounds.x + padding;
+            command.rect.x -= selected_inset;
+            command.rect.y -= selected_inset;
+            command.rect.width += selected_inset * 2.0f;
+            command.rect.height += selected_inset * 2.0f;
+            command.radius = theme->radius_small * scale;
+            result = reach_render_command_buffer_push(out_commands, &command);
+            if (result != REACH_OK)
+            {
+                return result;
+            }
         }
-        float y = content_bounds.y + (content_bounds.height - item_size) * 0.5f;
-        for (size_t visible_index = 0; visible_index < visible_count; ++visible_index)
+
+        command = {};
+        command.type = REACH_RENDER_COMMAND_RECT;
+        command.rect = card->preview;
+        command.color = theme->switcher_background;
+        result = reach_render_command_buffer_push(out_commands, &command);
+        if (result != REACH_OK)
         {
-            size_t index = input->model->visible_start + visible_index;
-            if (index >= input->model->window_count || index >= input->item_count)
-            {
-                break;
-            }
-            reach_rect_f32 item = {x + (float)visible_index * (item_size + gap), y, item_size,
-                                   item_size};
-            int32_t selected = index == input->model->selected_index;
-            float box_x = item.x + (item.width - icon_box_size) * 0.5f;
-            float box_y = item.y + icon_top_offset;
-            uint64_t icon_id = input->items[index].icon_id;
+            return result;
+        }
 
-            if (selected)
-            {
-                command = {};
-                command.type = REACH_RENDER_COMMAND_RECT;
-                command.rect.x = box_x - selected_inset;
-                command.rect.y = box_y - selected_inset;
-                command.rect.width = icon_box_size + selected_inset * 2.0f;
-                command.rect.height = icon_box_size + selected_inset * 2.0f;
-                command.color = theme->switcher_selection_background;
-                command.radius = icon_box_radius + selected_inset;
-                reach_render_command_buffer_push(out_commands, &command);
-            }
-
+        if (!card->preview_visible && window != nullptr)
+        {
+            const uint16_t *runtime_path =
+                reach_application_identity_primary_runtime_path(&window->identity);
+            const uint16_t *icon_path = window->icon_ref[0] != 0 ? window->icon_ref : runtime_path;
+            uint64_t icon_id = icon_path != nullptr && icon_path[0] != 0
+                                   ? reach_icon_service_get(reach_switcher_icons(switcher),
+                                                            icon_path, ctx->icon_size_px)
+                                   : 0;
             if (icon_id != 0)
             {
+                float size = fminf(REACH_SWITCHER_FALLBACK_ICON_SIZE * scale,
+                                   fminf(card->preview.width, card->preview.height));
                 command = {};
                 command.type = REACH_RENDER_COMMAND_ICON;
-                command.rect.x = box_x;
-                command.rect.y = box_y;
-                command.rect.width = icon_box_size;
-                command.rect.height = icon_box_size;
-                command.radius = 0.0f;
-                command.color.a = 1.0f;
+                command.rect = {card->preview.x + (card->preview.width - size) * 0.5f,
+                                card->preview.y + (card->preview.height - size) * 0.5f, size, size};
                 command.icon_id = icon_id;
-                reach_render_command_buffer_push(out_commands, &command);
+                command.color.a = 1.0f;
+                result = reach_render_command_buffer_push(out_commands, &command);
+                if (result != REACH_OK)
+                {
+                    return result;
+                }
             }
+        }
 
-            if (selected)
+        if (card->selected)
+        {
+            command = {};
+            command.type = REACH_RENDER_COMMAND_TEXT;
+            command.rect = {card->preview.x,
+                            card->preview.y + card->preview.height +
+                                REACH_SWITCHER_LABEL_GAP * scale,
+                            card->preview.width, REACH_SWITCHER_LABEL_HEIGHT * scale};
+            command.color = theme->switcher_label_text;
+            command.text_weight = REACH_TEXT_WEIGHT_DEMIBOLD;
+            command.text_alignment = REACH_TEXT_ALIGNMENT_CENTER;
+            command.text_size = REACH_TEXT_SIZE_MEDIUM * scale;
+            reach_switcher_label_for_window(command.text, 260, window);
+            command.text_ellipsis =
+                reach_text_width_or_estimate(&ctx->text_measure, command.text, command.text_size,
+                                             command.text_weight, 0.62f) > command.rect.width;
+            result = reach_render_command_buffer_push(out_commands, &command);
+            if (result != REACH_OK)
             {
-                const uint16_t *label = input->items[index].label[0] != 0
-                                            ? input->items[index].label
-                                            : (const uint16_t *)L"App";
-                command = {};
-                command.type = REACH_RENDER_COMMAND_TEXT;
-                command.rect.x = box_x + label_horizontal_padding;
-                command.rect.y = item.y + label_top;
-                command.rect.width = label_width;
-                command.rect.height = label_height;
-                command.color = theme->switcher_label_text;
-                command.text_weight = input->text_weight_demi_bold;
-                command.text_alignment = input->text_alignment_center;
-                command.text_size = label_text_size;
-                command.text_ellipsis =
-                    reach_text_width_or_estimate(&input->text_measure, label, label_text_size,
-                                                 input->text_weight_demi_bold, 0.62f) > label_width;
-                reach_copy_utf16(command.text, 260, label);
-                reach_render_command_buffer_push(out_commands, &command);
+                return result;
             }
         }
     }
-
     return REACH_OK;
 }

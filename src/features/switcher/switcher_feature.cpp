@@ -1,113 +1,32 @@
 #include "reach/features/switcher.h"
 #include "reach/features/common/presentation.h"
+#include "reach/support/animation.h"
 
 #include "switcher_common.h"
 
 #include <math.h>
 #include <new>
 
-static size_t reach_switcher_min_size(size_t a, size_t b)
-{
-    return a < b ? a : b;
-}
-
-size_t reach_switcher_visible_count(size_t window_count)
-{
-    return reach_switcher_min_size(window_count, REACH_SWITCHER_VISIBLE_MAX);
-}
-
-static size_t reach_switcher_model_visible_count(const reach_switcher_model *model)
-{
-    size_t capacity = model != nullptr && model->visible_capacity > 0 ? model->visible_capacity
-                                                                      : REACH_SWITCHER_VISIBLE_MAX;
-    return model != nullptr ? reach_switcher_min_size(model->window_count, capacity) : 0;
-}
-
-static float reach_switcher_scale(float value, float dpi_scale)
-{
-    return value * (dpi_scale > 0.0f ? dpi_scale : 1.0f);
-}
-
-reach_rect_f32 reach_switcher_bounds_for_count(reach_rect_f32 monitor_bounds, size_t visible_count)
-{
-    return reach_switcher_bounds_for_count_scaled(
-        monitor_bounds, visible_count, 1.0f,
-        reach_theme_border_thickness(reach_theme_default(), 1.0f));
-}
-
-reach_rect_f32 reach_switcher_bounds_for_count_scaled(reach_rect_f32 monitor_bounds,
-                                                      size_t visible_count, float dpi_scale,
-                                                      float border_thickness)
-{
-    float padding = reach_switcher_scale(24.0f, dpi_scale);
-    float item_size = reach_switcher_scale(112.0f, dpi_scale);
-    float gap = reach_switcher_scale(14.0f, dpi_scale);
-    reach_rect_f32 bounds = {};
-    size_t count = visible_count > 0 ? visible_count : 1;
-    border_thickness = border_thickness > 0.0f ? border_thickness : 0.0f;
-    bounds.width = border_thickness * 2.0f + padding * 2.0f + (float)count * item_size +
-                   (float)(count - 1) * gap;
-    float max_width = monitor_bounds.width - reach_switcher_scale(48.0f, dpi_scale);
-    if (bounds.width > max_width)
-    {
-        bounds.width = max_width;
-    }
-    float min_width = reach_switcher_scale(280.0f, dpi_scale);
-    if (bounds.width < min_width)
-    {
-        bounds.width = monitor_bounds.width < min_width ? monitor_bounds.width : min_width;
-    }
-    bounds.height = reach_switcher_scale(184.0f, dpi_scale) + border_thickness * 2.0f;
-    float max_height = monitor_bounds.height - reach_switcher_scale(48.0f, dpi_scale);
-    if (max_height <= 0.0f)
-    {
-        max_height = monitor_bounds.height;
-    }
-    if (bounds.height > max_height)
-    {
-        bounds.height = max_height;
-    }
-    bounds.x = monitor_bounds.x + (monitor_bounds.width - bounds.width) * 0.5f;
-    bounds.y = monitor_bounds.y + (monitor_bounds.height - bounds.height) * 0.5f;
-    return bounds;
-}
-
-void reach_switcher_update_visible_start(reach_switcher_model *model)
-{
-    if (model == nullptr || model->window_count == 0)
-    {
-        if (model != nullptr)
-        {
-            model->visible_start = 0;
-        }
-        return;
-    }
-    size_t visible_count = reach_switcher_model_visible_count(model);
-    if (visible_count == 0 || visible_count >= model->window_count)
-    {
-        model->visible_start = 0;
-        return;
-    }
-    if (model->selected_index < model->visible_start)
-    {
-        model->visible_start = model->selected_index;
-    }
-    else if (model->selected_index >= model->visible_start + visible_count)
-    {
-        model->visible_start = model->selected_index - visible_count + 1;
-    }
-    size_t max_start = model->window_count - visible_count;
-    if (model->visible_start > max_start)
-    {
-        model->visible_start = max_start;
-    }
-}
-
 enum
 {
     REACH_SWITCHER_ANIMATION_WIDTH = 0,
     REACH_SWITCHER_ANIMATION_COUNT
 };
+
+typedef enum reach_switcher_action_type
+{
+    REACH_SWITCHER_ACTION_NONE = 0,
+    REACH_SWITCHER_ACTION_OPENED,
+    REACH_SWITCHER_ACTION_CHANGED,
+    REACH_SWITCHER_ACTION_CLOSED,
+    REACH_SWITCHER_ACTION_COMMITTED
+} reach_switcher_action_type;
+
+typedef struct reach_switcher_action
+{
+    reach_switcher_action_type type;
+    reach_window_id window;
+} reach_switcher_action;
 
 typedef struct reach_switcher_window_context
 {
@@ -124,6 +43,8 @@ struct reach_switcher
     reach_animation_track animation_tracks[REACH_SWITCHER_ANIMATION_COUNT];
     reach_feature_transition surface_transition;
     reach_switcher_state state;
+    reach_switcher_layout layout;
+    size_t preview_generation;
     reach_icon_service *icons;
     reach_window_tracking *windows;
 };
@@ -160,12 +81,7 @@ static reach_switcher_window_context reach_switcher_service_context(reach_switch
     return ctx;
 }
 
-const reach_switcher_state *reach_switcher_state_ptr(reach_switcher *switcher)
-{
-    return switcher != nullptr ? &switcher->state : nullptr;
-}
-
-reach_switcher_state *reach_switcher_state_mut(reach_switcher *switcher)
+const reach_switcher_state *reach_switcher_state_ptr(const reach_switcher *switcher)
 {
     return switcher != nullptr ? &switcher->state : nullptr;
 }
@@ -173,6 +89,17 @@ reach_switcher_state *reach_switcher_state_mut(reach_switcher *switcher)
 int32_t reach_switcher_is_open(const reach_switcher *switcher)
 {
     return switcher != nullptr && switcher->state.open;
+}
+
+static void reach_switcher_reset_width_animation(reach_switcher *switcher)
+{
+    reach_animation_manager_reset(&switcher->animations, REACH_SWITCHER_ANIMATION_WIDTH);
+}
+
+static int32_t reach_switcher_width_animation_active(const reach_switcher *switcher)
+{
+    return switcher != nullptr &&
+           reach_animation_manager_active(&switcher->animations, REACH_SWITCHER_ANIMATION_WIDTH);
 }
 
 static void reach_switcher_capsule_tick(void *capsule, double delta_seconds,
@@ -185,11 +112,13 @@ static void reach_switcher_capsule_tick(void *capsule, double delta_seconds,
     }
     int32_t transition_changed =
         reach_feature_transition_tick(&switcher->surface_transition, delta_seconds);
-    reach_switcher_tick(switcher, delta_seconds);
-    if (out != nullptr && transition_changed)
+    reach_animation_manager_tick(&switcher->animations, delta_seconds);
+    if (out != nullptr &&
+        (transition_changed || reach_feature_transition_active(&switcher->surface_transition)))
     {
         out->redraw = 1;
-        out->request_update = reach_feature_transition_needs_update(&switcher->surface_transition);
+        out->request_update = reach_feature_transition_active(&switcher->surface_transition) ||
+                              reach_feature_transition_needs_update(&switcher->surface_transition);
     }
     if (out != nullptr && reach_switcher_width_animation_active(switcher))
     {
@@ -206,7 +135,8 @@ static int32_t reach_switcher_capsule_needs_frame(const void *capsule)
 {
     const reach_switcher *switcher = static_cast<const reach_switcher *>(capsule);
     return switcher != nullptr &&
-           (reach_feature_transition_needs_update(&switcher->surface_transition) ||
+           (reach_feature_transition_active(&switcher->surface_transition) ||
+            reach_feature_transition_needs_update(&switcher->surface_transition) ||
             reach_switcher_width_animation_active(switcher));
 }
 
@@ -241,19 +171,6 @@ static reach_switcher_action
 reach_switcher_sync_windows_with_context(reach_switcher *switcher,
                                          const reach_switcher_window_context *ctx);
 
-reach_switcher_action reach_switcher_handle_event(reach_switcher *switcher,
-                                                  const reach_ui_event *event)
-{
-    reach_switcher_window_context ctx = reach_switcher_service_context(switcher);
-    return reach_switcher_handle_event_with_context(switcher, event, &ctx);
-}
-
-reach_switcher_action reach_switcher_sync_windows(reach_switcher *switcher)
-{
-    reach_switcher_window_context ctx = reach_switcher_service_context(switcher);
-    return reach_switcher_sync_windows_with_context(switcher, &ctx);
-}
-
 const reach_ui_event_type *reach_switcher_routed_events(size_t *out_count)
 {
     static const reach_ui_event_type events[] = {
@@ -284,10 +201,6 @@ static void reach_switcher_apply_action(reach_switcher *switcher, reach_switcher
     {
     case REACH_SWITCHER_ACTION_OPENED:
     case REACH_SWITCHER_ACTION_CLOSED:
-        out->handled = 1;
-        out->redraw = 1;
-        out->request_update = 1;
-        break;
     case REACH_SWITCHER_ACTION_CHANGED:
         out->handled = 1;
         out->redraw = 1;
@@ -314,7 +227,9 @@ static void reach_switcher_capsule_handle_event(void *capsule, const reach_ui_ev
     {
         return;
     }
-    reach_switcher_apply_action(switcher, reach_switcher_handle_event(switcher, event), out);
+    reach_switcher_window_context ctx = reach_switcher_service_context(switcher);
+    reach_switcher_apply_action(
+        switcher, reach_switcher_handle_event_with_context(switcher, event, &ctx), out);
 }
 
 int32_t reach_switcher_set_open(reach_switcher *switcher, int32_t open)
@@ -323,10 +238,7 @@ int32_t reach_switcher_set_open(reach_switcher *switcher, int32_t open)
     {
         return 0;
     }
-    reach_switcher_state *state = reach_switcher_state_mut(switcher);
-    state->open = 0;
-    state->selected_index = 0;
-    state->visible_start = 0;
+    switcher->state.open = 0;
     (void)reach_feature_transition_set_open(&switcher->surface_transition, 0);
     return 1;
 }
@@ -338,7 +250,9 @@ void reach_switcher_notify_windows_changed(reach_switcher *switcher, reach_featu
         return;
     }
     reach_capsule_event_result result = {};
-    reach_switcher_apply_action(switcher, reach_switcher_sync_windows(switcher), &result);
+    reach_switcher_window_context ctx = reach_switcher_service_context(switcher);
+    reach_switcher_apply_action(switcher, reach_switcher_sync_windows_with_context(switcher, &ctx),
+                                &result);
     out->redraw = result.redraw;
     out->request_update = result.request_update;
 }
@@ -386,30 +300,6 @@ reach_result reach_switcher_create(reach_switcher **out_switcher)
 void reach_switcher_destroy(reach_switcher *switcher)
 {
     delete switcher;
-}
-
-void reach_switcher_tick(reach_switcher *switcher, double delta_seconds)
-{
-    if (switcher == nullptr)
-    {
-        return;
-    }
-    reach_animation_manager_tick(&switcher->animations, delta_seconds);
-}
-
-void reach_switcher_reset_width_animation(reach_switcher *switcher)
-{
-    if (switcher == nullptr)
-    {
-        return;
-    }
-    reach_animation_manager_reset(&switcher->animations, REACH_SWITCHER_ANIMATION_WIDTH);
-}
-
-int32_t reach_switcher_width_animation_active(const reach_switcher *switcher)
-{
-    return switcher != nullptr &&
-           reach_animation_manager_active(&switcher->animations, REACH_SWITCHER_ANIMATION_WIDTH);
 }
 
 static int32_t reach_switcher_ctx_open_index(const reach_switcher_window_context *ctx,
@@ -507,17 +397,6 @@ static void reach_switcher_rebuild_ring(reach_switcher_state *state,
     }
 }
 
-static void reach_switcher_apply_visible_start(reach_switcher_state *state)
-{
-    reach_switcher_model model = {};
-    model.window_count = state->window_count;
-    model.selected_index = state->selected_index;
-    model.visible_start = state->visible_start;
-    model.visible_capacity = state->visible_capacity;
-    reach_switcher_update_visible_start(&model);
-    state->visible_start = model.visible_start;
-}
-
 static reach_switcher_action
 reach_switcher_handle_event_with_context(reach_switcher *switcher, const reach_ui_event *event,
                                          const reach_switcher_window_context *ctx)
@@ -536,7 +415,6 @@ reach_switcher_handle_event_with_context(reach_switcher *switcher, const reach_u
         state->selected_index = state->window_count > 1 ? 1 : 0;
         state->visible_start = 0;
         reach_switcher_reset_width_animation(switcher);
-        reach_switcher_apply_visible_start(state);
         action.type = state->open ? REACH_SWITCHER_ACTION_OPENED : REACH_SWITCHER_ACTION_CLOSED;
         return action;
     }
@@ -549,7 +427,6 @@ reach_switcher_handle_event_with_context(reach_switcher *switcher, const reach_u
     if (event->type == REACH_UI_EVENT_APP_SWITCH_NEXT && state->window_count > 0)
     {
         state->selected_index = (state->selected_index + 1) % state->window_count;
-        reach_switcher_apply_visible_start(state);
         action.type = REACH_SWITCHER_ACTION_CHANGED;
         return action;
     }
@@ -558,7 +435,6 @@ reach_switcher_handle_event_with_context(reach_switcher *switcher, const reach_u
     {
         state->selected_index =
             state->selected_index == 0 ? state->window_count - 1 : state->selected_index - 1;
-        reach_switcher_apply_visible_start(state);
         action.type = REACH_SWITCHER_ACTION_CHANGED;
         return action;
     }
@@ -633,35 +509,31 @@ reach_switcher_sync_windows_with_context(reach_switcher *switcher,
         state->selected_index = state->window_count - 1;
     }
 
-    reach_switcher_apply_visible_start(state);
     action.type = REACH_SWITCHER_ACTION_CHANGED;
     return action;
 }
 
-reach_rect_f32 reach_switcher_apply_width_animation(reach_switcher *switcher,
-                                                    int32_t transition_visible, int32_t open,
-                                                    int32_t bounds_valid, float last_bounds_width,
-                                                    reach_rect_f32 target,
-                                                    int32_t *out_request_redraw)
+static reach_rect_f32 reach_switcher_apply_width_animation(
+    reach_switcher *switcher, const reach_switcher_arrange_context *ctx, reach_rect_f32 target)
 {
-    if (switcher == nullptr || !transition_visible)
+    if (!ctx->transition_visible)
     {
         return target;
     }
 
     float animation_target =
         reach_animation_manager_target(&switcher->animations, REACH_SWITCHER_ANIMATION_WIDTH);
-    if (!bounds_valid || animation_target <= 0.0f)
+    if (!ctx->bounds_valid || animation_target <= 0.0f)
     {
         reach_animation_manager_set(&switcher->animations, REACH_SWITCHER_ANIMATION_WIDTH,
                                     target.width);
     }
-    else if (open && fabsf(animation_target - target.width) >= 0.5f)
+    else if (switcher->state.open && fabsf(animation_target - target.width) >= 0.5f)
     {
         float from = reach_switcher_width_animation_active(switcher)
                          ? reach_animation_manager_value(&switcher->animations,
                                                          REACH_SWITCHER_ANIMATION_WIDTH)
-                         : last_bounds_width;
+                         : ctx->last_bounds.width;
         reach_animation_manager_start(&switcher->animations, REACH_SWITCHER_ANIMATION_WIDTH, from,
                                       target.width, 0.18, REACH_EASING_EASE_IN_OUT);
     }
@@ -671,10 +543,6 @@ reach_rect_f32 reach_switcher_apply_width_animation(reach_switcher *switcher,
     {
         width =
             reach_animation_manager_value(&switcher->animations, REACH_SWITCHER_ANIMATION_WIDTH);
-        if (out_request_redraw != nullptr)
-        {
-            *out_request_redraw = 1;
-        }
     }
     else if (reach_animation_manager_target(&switcher->animations, REACH_SWITCHER_ANIMATION_WIDTH) >
              0.0f)
@@ -695,51 +563,184 @@ reach_rect_f32 reach_switcher_apply_width_animation(reach_switcher *switcher,
     return animated;
 }
 
+const reach_switcher_layout *reach_switcher_card_layout(const reach_switcher *switcher)
+{
+    return switcher != nullptr ? &switcher->layout : nullptr;
+}
+
+size_t reach_switcher_preview_generation(const reach_switcher *switcher)
+{
+    return switcher != nullptr ? switcher->preview_generation : 0;
+}
+
+size_t reach_switcher_thumbnail_count(const reach_switcher *switcher)
+{
+    return switcher != nullptr ? switcher->layout.count : 0;
+}
+
+reach_result reach_switcher_thumbnail_at(const reach_switcher *switcher, size_t index,
+                                         reach_switcher_thumbnail_placement *out)
+{
+    if (switcher == nullptr || out == nullptr || index >= switcher->layout.count)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    const reach_switcher_card *card = &switcher->layout.cards[index];
+    *out = {};
+    out->window = card->preview_visible ? card->window : 0;
+    out->destination = card->preview;
+    out->destination.x += switcher->state.bounds.x;
+    out->destination.y += switcher->state.bounds.y;
+    out->visible = card->preview_visible;
+    return REACH_OK;
+}
+
+static size_t reach_switcher_fit_end(const float *widths, size_t count, size_t start, float room,
+                                     float gap, float *out_width)
+{
+    size_t end = start;
+    float width = 0.0f;
+    while (end < count && end - start < REACH_SWITCHER_VISIBLE_MAX)
+    {
+        float next = width + (end > start ? gap : 0.0f) + widths[end];
+        if (end > start && next > room + 0.01f)
+        {
+            break;
+        }
+        width = next;
+        ++end;
+    }
+    *out_width = width;
+    return end;
+}
+
+static int32_t reach_switcher_update_layout(reach_switcher *switcher,
+                                            const reach_switcher_layout *layout)
+{
+    int32_t membership_changed = layout->count != switcher->layout.count;
+    int32_t changed = 0;
+    for (size_t index = 0; index < layout->count; ++index)
+    {
+        const reach_switcher_card *card = &layout->cards[index];
+        const reach_switcher_card *previous = &switcher->layout.cards[index];
+        membership_changed |=
+            card->window != previous->window || card->preview_visible != previous->preview_visible;
+        changed |= !reach_rect_equal(card->preview, previous->preview) ||
+                   card->selected != previous->selected;
+    }
+    if (membership_changed)
+    {
+        ++switcher->preview_generation;
+        changed = 1;
+    }
+    switcher->layout = *layout;
+    return changed;
+}
+
 int32_t reach_switcher_arrange(reach_switcher *switcher, const reach_switcher_arrange_context *ctx)
 {
-    if (switcher == nullptr || ctx == nullptr || ctx->theme == nullptr)
+    if (switcher == nullptr || ctx == nullptr || ctx->theme == nullptr ||
+        ctx->monitor_bounds.width <= 0.0f || ctx->monitor_bounds.height <= 0.0f)
     {
         return 0;
     }
 
+    reach_switcher_state *state = &switcher->state;
     float scale = ctx->dpi_scale > 0.0f ? ctx->dpi_scale : 1.0f;
     float base_border = reach_theme_border_thickness(ctx->theme, 1.0f);
-    float maximum_scale = ctx->monitor_bounds.height / (232.0f + base_border * 2.0f);
-    float maximum_width_scale = ctx->monitor_bounds.width / (208.0f + base_border * 2.0f);
-    if (maximum_scale > 0.0f && scale > maximum_scale)
-    {
-        scale = maximum_scale;
-    }
-    if (maximum_width_scale > 0.0f && scale > maximum_width_scale)
-    {
-        scale = maximum_width_scale;
-    }
+    float height_units = REACH_SWITCHER_PREVIEW_HEIGHT + REACH_SWITCHER_PADDING * 4.0f +
+                         REACH_SWITCHER_LABEL_GAP + REACH_SWITCHER_LABEL_HEIGHT +
+                         base_border * 2.0f;
+    scale = fminf(scale, ctx->monitor_bounds.height / height_units);
+    scale = fminf(scale, ctx->monitor_bounds.width /
+                             (REACH_SWITCHER_PADDING * 4.0f + base_border * 2.0f + 1.0f));
     float border = reach_theme_border_thickness(ctx->theme, scale);
-    float max_width = ctx->monitor_bounds.width - 48.0f * scale;
-    float item_room = max_width - border * 2.0f - 48.0f * scale;
-    size_t visible_capacity =
-        item_room > 112.0f * scale ? (size_t)((item_room + 14.0f * scale) / (126.0f * scale)) : 1;
-    if (visible_capacity > REACH_SWITCHER_VISIBLE_MAX)
+    float padding = REACH_SWITCHER_PADDING * scale;
+    float gap = REACH_SWITCHER_GAP * scale;
+    float room = fmaxf(0.0f, ctx->monitor_bounds.width - padding * 4.0f - border * 2.0f);
+    float aspects[REACH_MAX_OPEN_WINDOWS] = {};
+    int32_t preview_visible[REACH_MAX_OPEN_WINDOWS] = {};
+    float widest = 1.0f;
+    for (size_t index = 0; index < state->window_count; ++index)
     {
-        visible_capacity = REACH_SWITCHER_VISIBLE_MAX;
+        reach_rect_f32 frame = {};
+        int32_t valid = reach_window_tracking_window_frame_bounds(
+                            switcher->windows, state->windows[index], &frame) == REACH_OK &&
+                        isfinite(frame.width) && isfinite(frame.height) && frame.width > 0.0f &&
+                        frame.height > 0.0f;
+        aspects[index] = valid ? frame.width / frame.height : 1.0f;
+        widest = fmaxf(widest, aspects[index]);
+        const reach_window_snapshot *window =
+            reach_window_tracking_window_by_id(switcher->windows, state->windows[index]);
+        preview_visible[index] = valid && window != nullptr && !window->minimized;
     }
-    switcher->state.visible_capacity = visible_capacity;
-    switcher->state.content_scale = scale;
+    float height = fminf(REACH_SWITCHER_PREVIEW_HEIGHT * scale, room / widest);
+    float widths[REACH_MAX_OPEN_WINDOWS] = {};
+    for (size_t index = 0; index < state->window_count; ++index)
+    {
+        widths[index] = height * aspects[index];
+    }
+
+    size_t start = state->window_count > 0 && state->visible_start < state->window_count
+                       ? state->visible_start
+                       : 0;
+    if (state->selected_index < start)
+    {
+        start = state->selected_index;
+    }
+    float row_width = 0.0f;
+    size_t end = reach_switcher_fit_end(widths, state->window_count, start, room, gap, &row_width);
+    while (state->selected_index >= end && end < state->window_count)
+    {
+        ++start;
+        end = reach_switcher_fit_end(widths, state->window_count, start, room, gap, &row_width);
+    }
+    while (start > 0 && end - start < REACH_SWITCHER_VISIBLE_MAX &&
+           row_width + gap + widths[start - 1] <= room)
+    {
+        --start;
+        row_width += gap + widths[start];
+    }
+    state->visible_start = start;
+    state->visible_count = end - start;
 
     reach_feature_transition_configure(&switcher->surface_transition, ctx->theme, scale,
                                        REACH_FEATURE_TRANSITION_FROM_BELOW);
-    reach_rect_f32 target = reach_switcher_bounds_for_count_scaled(
-        ctx->monitor_bounds,
-        reach_switcher_min_size(switcher->state.window_count, visible_capacity), scale, border);
-    reach_rect_f32 bounds = reach_switcher_apply_width_animation(
-        switcher, ctx->transition_visible, switcher->state.open, ctx->bounds_valid,
-        ctx->last_bounds.width, target, nullptr);
-    int32_t changed = fabsf(bounds.x - switcher->state.bounds.x) >= 0.5f ||
-                      fabsf(bounds.y - switcher->state.bounds.y) >= 0.5f ||
-                      fabsf(bounds.width - switcher->state.bounds.width) >= 0.5f ||
-                      fabsf(bounds.height - switcher->state.bounds.height) >= 0.5f;
-    switcher->state.bounds = bounds;
-    return changed;
+    reach_rect_f32 target = {};
+    target.width =
+        fminf(fmaxf(row_width + padding * 2.0f + border * 2.0f, REACH_SWITCHER_MIN_WIDTH * scale),
+              ctx->monitor_bounds.width - padding * 2.0f);
+    target.height = height + padding * 2.0f +
+                    (REACH_SWITCHER_LABEL_GAP + REACH_SWITCHER_LABEL_HEIGHT) * scale +
+                    border * 2.0f;
+    target.x = ctx->monitor_bounds.x + (ctx->monitor_bounds.width - target.width) * 0.5f;
+    target.y = ctx->monitor_bounds.y + (ctx->monitor_bounds.height - target.height) * 0.5f;
+    reach_rect_f32 bounds = reach_switcher_apply_width_animation(switcher, ctx, target);
+    bounds.width = fminf(bounds.width, ctx->monitor_bounds.width - padding * 2.0f);
+    bounds.x = ctx->monitor_bounds.x + (ctx->monitor_bounds.width - bounds.width) * 0.5f;
+    int32_t changed = !reach_rect_equal(bounds, state->bounds);
+    state->bounds = bounds;
+
+    reach_switcher_layout layout = {};
+    layout.count = state->visible_count;
+    layout.scale = scale;
+    float fit =
+        row_width > 0.0f
+            ? fminf(1.0f, fmaxf(0.0f, bounds.width - padding * 2.0f - border * 2.0f) / row_width)
+            : 1.0f;
+    float x = (bounds.width - row_width * fit) * 0.5f;
+    float y = border + padding + height * (1.0f - fit) * 0.5f;
+    for (size_t visible = 0; visible < layout.count; ++visible)
+    {
+        size_t index = start + visible;
+        reach_switcher_card *card = &layout.cards[visible];
+        card->window = state->windows[index];
+        card->preview = {x, y, widths[index] * fit, height * fit};
+        card->preview_visible = preview_visible[index];
+        card->selected = index == state->selected_index;
+        x += card->preview.width + gap * fit;
+    }
+    return reach_switcher_update_layout(switcher, &layout) | changed;
 }
 
 void reach_switcher_force_close(reach_switcher *switcher)
@@ -749,9 +750,13 @@ void reach_switcher_force_close(reach_switcher *switcher)
         return;
     }
 
-    reach_switcher_state *state = reach_switcher_state_mut(switcher);
+    reach_switcher_state *state = &switcher->state;
     state->open = 0;
     state->selected_index = 0;
     state->visible_start = 0;
     reach_feature_transition_reset(&switcher->surface_transition);
+    reach_switcher_reset_width_animation(switcher);
+    switcher->layout = {};
+    state->visible_count = 0;
+    ++switcher->preview_generation;
 }

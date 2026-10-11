@@ -12,6 +12,7 @@ struct reach_window_tracking
     reach_window_manager_port window_manager;
 
     reach_window_snapshot window_sets[2][REACH_MAX_OPEN_WINDOWS];
+    reach_rect_f32 frame_sets[2][REACH_MAX_OPEN_WINDOWS];
     uint32_t group_id_sets[2][REACH_MAX_OPEN_WINDOWS];
     size_t active_set;
 
@@ -202,6 +203,26 @@ reach_window_tracking_window_by_id(const reach_window_tracking *service, uintptr
         }
     }
     return nullptr;
+}
+
+reach_result reach_window_tracking_window_frame_bounds(const reach_window_tracking *service,
+                                                       uintptr_t window_id,
+                                                       reach_rect_f32 *out_bounds)
+{
+    if (service == nullptr || out_bounds == nullptr || window_id == 0)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    *out_bounds = {};
+    for (size_t index = 0; index < service->open_window_count; ++index)
+    {
+        if (service->open_windows[index].id == window_id)
+        {
+            *out_bounds = service->frame_sets[service->active_set][index];
+            return out_bounds->width > 0.0f && out_bounds->height > 0.0f ? REACH_OK : REACH_ERROR;
+        }
+    }
+    return REACH_ERROR;
 }
 
 int32_t reach_window_tracking_window_matches_app(const reach_pinned_app_model *app,
@@ -519,6 +540,16 @@ reach_result reach_window_tracking_refresh(reach_window_tracking *service,
 
         size_t out_index = service->open_window_count++;
         service->open_windows[out_index] = snapshot;
+        reach_rect_f32 frame = {};
+        if (service->window_manager.ops.frame_bounds != nullptr)
+        {
+            if (service->window_manager.ops.frame_bounds(service->window_manager.manager,
+                                                         snapshot.id, &frame) != REACH_OK)
+            {
+                frame = {};
+            }
+        }
+        service->frame_sets[service->active_set][out_index] = frame;
     }
 
     size_t parents[REACH_MAX_OPEN_WINDOWS] = {};
@@ -626,6 +657,8 @@ reach_result reach_window_tracking_refresh(reach_window_tracking *service,
             }
 
             if (item_changed ||
+                !reach_rect_equal(service->frame_sets[service->active_set ^ 1][index],
+                                  service->frame_sets[service->active_set][index]) ||
                 old_windows[index].minimized != service->open_windows[index].minimized ||
                 old_windows[index].maximized != service->open_windows[index].maximized ||
                 old_windows[index].visible != service->open_windows[index].visible ||

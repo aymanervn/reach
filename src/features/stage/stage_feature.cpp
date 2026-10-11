@@ -980,7 +980,8 @@ static size_t reach_stage_collect_windows(reach_stage *stage, reach_stage_open_w
         }
 
         reach_rect_f32 frame = {};
-        if (reach_app_control_window_frame_bounds(stage->apps, snapshot->id, &frame) != REACH_OK ||
+        if (reach_window_tracking_window_frame_bounds(stage->windows, snapshot->id, &frame) !=
+                REACH_OK ||
             frame.width <= 0.0f || frame.height <= 0.0f)
         {
             continue;

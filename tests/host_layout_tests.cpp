@@ -61,12 +61,13 @@ static size_t render_count;
 static float observed_last_command_alpha;
 static float observed_presentation_opacity;
 static size_t thumbnail_create_count;
+static reach_window_id thumbnail_targets[256];
+static int32_t thumbnail_released[256];
 static size_t thumbnail_target_plane_create_count;
 static size_t thumbnail_behind_plane_create_count;
 static size_t thumbnail_place_count;
 static size_t thumbnail_background_place_count;
 static float thumbnail_background_alpha;
-static size_t thumbnail_destroy_count;
 static size_t thumbnail_release_count;
 static size_t thumbnail_bring_to_front_count;
 static reach_window_thumbnail_id thumbnail_front_id;
@@ -215,6 +216,15 @@ static reach_result fake_foreground_window_at(const reach_window_manager *manage
     return REACH_OK;
 }
 
+static reach_result fake_preview_frame_bounds(const reach_window_manager *manager,
+                                              reach_window_id window, reach_rect_f32 *out)
+{
+    (void)manager;
+    (void)window;
+    *out = {100.0f, 100.0f, 800.0f, 600.0f};
+    return REACH_OK;
+}
+
 static size_t fake_monitor_count(const reach_monitor_list *list)
 {
     (void)list;
@@ -232,20 +242,13 @@ static reach_window_id fake_window_id(const reach_platform_window *window)
     return (reach_window_id)(uintptr_t)window;
 }
 
-static reach_result fake_thumbnail_set_target(reach_window_thumbnails *thumbnails,
-                                              reach_window_id target)
-{
-    (void)thumbnails;
-    return target != 0 ? REACH_OK : REACH_ERROR;
-}
-
 static reach_result fake_thumbnail_create(reach_window_thumbnails *thumbnails,
-                                          reach_window_id source,
+                                          reach_window_id target, reach_window_id source,
                                           reach_window_thumbnail_plane plane,
                                           reach_window_thumbnail_id *out_id)
 {
     (void)thumbnails;
-    if (source == 0 || out_id == nullptr)
+    if (target == 0 || source == 0 || out_id == nullptr)
     {
         return REACH_INVALID_ARGUMENT;
     }
@@ -266,6 +269,8 @@ static reach_result fake_thumbnail_create(reach_window_thumbnails *thumbnails,
         return REACH_INVALID_ARGUMENT;
     }
     *out_id = ++thumbnail_create_count;
+    thumbnail_targets[*out_id] = target;
+    thumbnail_released[*out_id] = 0;
     return REACH_OK;
 }
 
@@ -274,7 +279,7 @@ static reach_result fake_thumbnail_set_placement(reach_window_thumbnails *thumbn
                                                  const reach_window_thumbnail_placement *placement)
 {
     (void)thumbnails;
-    if (id == REACH_WINDOW_THUMBNAIL_NONE || placement == nullptr)
+    if (id == REACH_WINDOW_THUMBNAIL_NONE || placement == nullptr || thumbnail_released[id])
     {
         return REACH_INVALID_ARGUMENT;
     }
@@ -288,13 +293,6 @@ static reach_result fake_thumbnail_set_placement(reach_window_thumbnails *thumbn
         thumbnail_background_place_count++;
         thumbnail_background_alpha = placement->background.a;
     }
-    return REACH_OK;
-}
-
-static reach_result fake_thumbnail_destroy_all(reach_window_thumbnails *thumbnails)
-{
-    (void)thumbnails;
-    thumbnail_destroy_count++;
     return REACH_OK;
 }
 
@@ -320,6 +318,7 @@ static reach_result fake_thumbnail_release(reach_window_thumbnails *thumbnails,
         return REACH_INVALID_ARGUMENT;
     }
     thumbnail_release_count++;
+    thumbnail_released[id] = 1;
     return REACH_OK;
 }
 
@@ -1205,12 +1204,10 @@ static void test_registered_surface_frame_syncs_native_overlay(void)
     stage->surface->renderer.ops.execute = fake_execute;
     stage->surface->dirty_flags = 1;
     host->window_thumbnails.thumbnails = reinterpret_cast<reach_window_thumbnails *>(1);
-    host->window_thumbnails.ops.set_target = fake_thumbnail_set_target;
     host->window_thumbnails.ops.create = fake_thumbnail_create;
     host->window_thumbnails.ops.set_placement = fake_thumbnail_set_placement;
     host->window_thumbnails.ops.bring_to_front = fake_thumbnail_bring_to_front;
     host->window_thumbnails.ops.release = fake_thumbnail_release;
-    host->window_thumbnails.ops.destroy_all = fake_thumbnail_destroy_all;
 
     thumbnail_create_count = 0;
     thumbnail_target_plane_create_count = 0;
@@ -1218,7 +1215,6 @@ static void test_registered_surface_frame_syncs_native_overlay(void)
     thumbnail_place_count = 0;
     thumbnail_background_place_count = 0;
     thumbnail_background_alpha = 0.0f;
-    thumbnail_destroy_count = 0;
     thumbnail_release_count = 0;
     thumbnail_bring_to_front_count = 0;
     thumbnail_front_id = REACH_WINDOW_THUMBNAIL_NONE;
@@ -1265,7 +1261,7 @@ static void test_registered_surface_frame_syncs_native_overlay(void)
     expect_true(reach_host_surface_presented(stage),
                 "Stage remains presented while the new source becomes available");
     expect_true(thumbnail_create_count == 2 && thumbnail_behind_plane_create_count == 1 &&
-                    thumbnail_destroy_count == 0,
+                    thumbnail_release_count == 0,
                 "joining a source preserves every existing native relationship");
     thumbnail_unavailable_source = 0;
     reach_feature_tick_result tick = {};
@@ -1294,20 +1290,70 @@ static void test_registered_surface_frame_syncs_native_overlay(void)
                     reach_host_feature_capsule<reach_stage>(host, REACH_SURFACE_ID_STAGE)) == 2,
                 "the closed source is removed after its reflow");
     expect_true(thumbnail_create_count == 3 && thumbnail_behind_plane_create_count == 1 &&
-                    thumbnail_release_count == 1 && thumbnail_destroy_count == 0,
+                    thumbnail_release_count == 1,
                 "settling the reflow releases only the departed app relationship");
 
-    size_t destroys_before_close = thumbnail_destroy_count;
+    reach_window_manager_port preview_port = {};
+    preview_port.ops.window_count = fake_foreground_window_count;
+    preview_port.ops.window_at = fake_foreground_window_at;
+    preview_port.ops.frame_bounds = fake_preview_frame_bounds;
+    reach_window_tracking *preview_windows = nullptr;
+    expect_true(reach_window_tracking_create(preview_port, &preview_windows) == REACH_OK,
+                "second preview consumer has window tracking");
+    observed_foreground_window = 126;
+    foreground_window_available = 1;
+    (void)reach_window_tracking_refresh(preview_windows, nullptr);
+    reach_feature_runtime *switcher = &host->feature_runtimes[REACH_SURFACE_ID_SWITCHER];
+    reach_switcher_attach_services(static_cast<reach_switcher *>(switcher->capsule), nullptr,
+                                   preview_windows);
+    switcher->surface->window.window = reinterpret_cast<reach_platform_window *>(10);
+    switcher->surface->window.ops.set_bounds = fake_set_bounds;
+    switcher->surface->window.ops.native_id = fake_window_id;
+    switcher->surface->renderer.backend = reinterpret_cast<reach_render_backend *>(1);
+    switcher->surface->renderer.ops.begin_frame = fake_begin_frame;
+    switcher->surface->renderer.ops.end_frame = fake_end_frame;
+    switcher->surface->renderer.ops.execute = fake_execute;
+    reach_ui_event begin = {};
+    begin.type = REACH_UI_EVENT_APP_SWITCH_BEGIN;
+    reach_capsule_event_result begin_result = {};
+    switcher->definition->capsule_ops->handle_event(switcher->capsule, &begin, &begin_result);
+    expect_true(reach_host_frame_registered_surface(host, switcher, &frame) == REACH_OK,
+                "another surface registers its own preview destination");
+    reach_window_thumbnail_id switcher_id = switcher->native_overlay_ids[0];
+    expect_true(switcher_id != 0 && thumbnail_targets[switcher_id] == 10,
+                "preview creation carries its owning destination");
+    reach_window_thumbnail_id stage_id = stage->native_overlay_ids[0];
+    expect_true(!thumbnail_released[stage_id] && thumbnail_targets[stage_id] == 9,
+                "second destination preserves Stage relationships");
+    switcher->surface->window.window = reinterpret_cast<reach_platform_window *>(11);
+    expect_true(reach_host_frame_registered_surface(host, switcher, &frame) == REACH_OK,
+                "a destination replacement reconciles without a generation change");
+    expect_true(thumbnail_released[switcher_id] && !thumbnail_released[stage_id],
+                "destination replacement releases only its own relationships");
+    switcher_id = switcher->native_overlay_ids[0];
+    expect_true(thumbnail_targets[switcher_id] == 11,
+                "replacement relationship belongs to the new destination");
+
+    size_t releases_before_close = thumbnail_release_count;
     reach_stage_force_close(reach_host_feature_capsule<reach_stage>(host, REACH_SURFACE_ID_STAGE));
     expect_true(reach_host_frame_registered_surface(host, stage, &frame) == REACH_OK,
                 "generic frame handles native-overlay closure");
-    expect_true(thumbnail_destroy_count == destroys_before_close + 1,
+    expect_true(thumbnail_release_count == releases_before_close + 2,
                 "generic frame releases native overlays when the capsule closes");
     expect_true(stage->native_overlay_front_source == 0 &&
                     stage->native_overlay_front_id == REACH_WINDOW_THUMBNAIL_NONE,
                 "native overlay closure clears visual front ownership");
 
+    expect_true(!thumbnail_released[switcher_id] &&
+                    reach_host_frame_registered_surface(host, switcher, &frame) == REACH_OK,
+                "closing Stage leaves the other preview consumer valid");
+    expect_true(switcher->native_overlay_ids[0] == switcher_id,
+                "the surviving consumer retains its stable relationship");
+    reach_host_release_native_overlay(host, switcher);
+    expect_true(thumbnail_released[switcher_id], "second consumer releases its own relationship");
     reach_host_destroy_registered_features(host);
+    reach_window_tracking_destroy(preview_windows);
+    foreground_window_available = 0;
 }
 
 static void test_forced_bars_hold_through_a_closing_stage(void)
@@ -1432,8 +1478,41 @@ static void test_switcher_publishes_arranged_surface_geometry(void)
     reach_switcher_destroy(switcher);
 }
 
+static void test_native_overlay_placement_follows_surface_presentation(void)
+{
+    reach_feature_surface_geometry geometry = {};
+    geometry.visible_bounds = {100.0f, 200.0f, 400.0f, 200.0f};
+    reach_feature_surface_context ctx = {};
+    reach_shadow_pad pad = {};
+    pad.left = 12.0f;
+    pad.top = 18.0f;
+    reach_window_thumbnail_placement placement = {};
+    placement.destination = {150.0f, 240.0f, 100.0f, 60.0f};
+    placement.opacity = 0.8f;
+    placement.background.a = 0.6f;
+    reach_window_thumbnail_placement resolved =
+        reach_host_native_overlay_placement(placement, &geometry, &ctx, pad, 11.0);
+    expect_true(reach_rect_equal(resolved.destination, {62.0f, 58.0f, 100.0f, 60.0f}),
+                "native placement accounts for ordinary client shadow offsets");
+    ctx.content_transform_active = 1;
+    ctx.content_rect = {30.0f, 40.0f, 400.0f, 200.0f};
+    ctx.render_transform = {1.0f, 1.0f, 30.0f, 40.0f};
+    geometry.presentation.retained = 1;
+    reach_motion_set(&geometry.presentation.group.x, 10.0f);
+    reach_motion_set(&geometry.presentation.group.y, 8.0f);
+    reach_motion_set(&geometry.presentation.group.opacity, 0.25f);
+    geometry.presentation.group.scale = {0.5f, 1.0f, 10.0, 2.0, REACH_EASING_EASE_IN_OUT, 1};
+    resolved = reach_host_native_overlay_placement(placement, &geometry, &ctx, pad, 11.0);
+    expect_true(reach_rect_equal(resolved.destination, {127.5f, 103.0f, 75.0f, 45.0f}),
+                "native placement samples the shared translation and centered scale");
+    expect_true(reach_host_scalar_equal(resolved.opacity, 0.2f) &&
+                    reach_host_scalar_equal(resolved.background.a, 0.15f),
+                "native content and helper background follow the shared opacity");
+}
+
 int main(void)
 {
+    test_native_overlay_placement_follows_surface_presentation();
     test_order_invalidation_rechains_without_replaying_visibility();
     test_app_band_surface_does_not_invalidate_topmost_order();
     test_window_manipulation_relevance_survives_unavailable_pointer();

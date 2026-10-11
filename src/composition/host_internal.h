@@ -740,6 +740,9 @@ reach_host_surface_presentation_frame reach_host_surface_presentation_frame_comp
     reach_rect_f32 target_bounds, reach_rect_f32 envelope_bounds, reach_shadow_pad shadow_pad,
     reach_rect_f32 translation_bounds, float max_scale);
 void reach_host_finish_surface_presentations(reach_host *host);
+reach_window_thumbnail_placement reach_host_native_overlay_placement(
+    reach_window_thumbnail_placement placement, const reach_feature_surface_geometry *geometry,
+    const reach_feature_surface_context *ctx, reach_shadow_pad shadow_pad, double now_seconds);
 
 reach_pointer_event reach_host_surface_pointer_event(const reach_feature_runtime *desc,
                                                      const reach_ui_event *event,

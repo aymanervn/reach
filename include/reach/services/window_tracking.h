@@ -33,6 +33,9 @@ extern "C"
                                                       uintptr_t window_id);
     const reach_window_snapshot *
     reach_window_tracking_window_by_id(const reach_window_tracking *service, uintptr_t window_id);
+    reach_result reach_window_tracking_window_frame_bounds(const reach_window_tracking *service,
+                                                           uintptr_t window_id,
+                                                           reach_rect_f32 *out_bounds);
 
     int32_t reach_window_tracking_window_matches_app(const reach_pinned_app_model *app,
                                                      const reach_window_snapshot *window);
