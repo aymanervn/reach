@@ -91,6 +91,11 @@ support expectation is explicitly resolved.
     Reset and game-mode suppression clear the motion. Debug build, 39 tests and five bounded runs
     per compositor plus HWND fallback pass, including reversal with no retained raster work.
     Displayed pixels, live DPI/theme changes and total product cost remain in final acceptance.
+  - [x] Dock preview close hover uses stable window groups and shared retained opacity. Preserve
+    alpha range, easing and pointer behavior; remove its scalar track/accessor and clear hidden motion.
+    Debug build, 39 tests and five close-hover runs per compositor plus fallback pass with no
+    retained raster work. An independent WUC root-completion probe failure remains open in the
+    workload baseline and shared runtime verification; final product acceptance is still pending.
 - [ ] Migrate eligible loaders/repeating effects; select efficient compositor or deadline behavior for
   carets, preserve focus resets and marquee behavior, and stop hidden repetitions.
 

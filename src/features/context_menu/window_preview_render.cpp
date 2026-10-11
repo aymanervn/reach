@@ -1,6 +1,7 @@
 #include "context_menu_common.h"
 
 #include "reach/core/typography.h"
+#include "reach/features/common/ui_controls.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -89,17 +90,24 @@ reach_result reach_context_menu_render_previews(reach_context_menu *menu,
         {
             return result;
         }
-        float hover =
-            state->close_hovered_index == card->index ? reach_context_menu_close_hover(menu) : 0.0f;
+        reach_motion close_hover = {};
+        reach_motion_set(&close_hover, 0.0f);
+        if (state->close_hovered_index == card->index)
+            close_hover = menu->close_hover;
+        reach_motion close_opacity = reach_motion_affine(&close_hover, 0.74f, 0.14f);
         command = {};
         command.type = REACH_RENDER_COMMAND_RECT;
         command.rect = {card->close.x + card->close.width * 0.1f,
                         card->close.y + card->close.height * 0.1f, card->close.width * 0.8f,
                         card->close.height * 0.8f};
         command.radius = fminf(theme->radius_small * scale, command.rect.height * 0.5f);
-        command.color =
-            reach_theme_color_alpha(theme->context_menu_close_background, 0.14f + 0.74f * hover);
+        command.color = reach_theme_color_alpha(theme->context_menu_close_background, 1.0f);
+        result = reach_ui_feedback_begin(out_commands, card->window, command.rect, &close_opacity,
+                                         nullptr);
+        if (result != REACH_OK)
+            return result;
         result = reach_render_command_buffer_push(out_commands, &command);
+        reach_render_command_buffer_end_group(out_commands);
         if (result != REACH_OK)
         {
             return result;

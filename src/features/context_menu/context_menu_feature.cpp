@@ -104,6 +104,8 @@ void reach_context_menu_force_close(reach_context_menu *menu)
         reach_pressable_reset(&menu->pressable, nullptr);
         menu->pressable_identity = 0;
         menu->state.open = 0;
+        menu->state.close_hovered_index = REACH_CONTEXT_MENU_NO_ITEM;
+        reach_motion_set(&menu->close_hover, 0.0f);
         reach_animation_manager_reset(&menu->animations, REACH_CONTEXT_MENU_ANIM_WIDTH);
         reach_context_menu_stop_preview_reflow(menu);
         reach_feature_transition_reset(&menu->popup_transition);
@@ -217,7 +219,7 @@ void reach_context_menu_reset(reach_context_menu *menu)
         menu->state.item_titles[index][0] = 0;
     }
     reach_animation_manager_set(&menu->animations, REACH_CONTEXT_MENU_ANIM_HOVER, 0.0f);
-    reach_animation_manager_set(&menu->animations, REACH_CONTEXT_MENU_ANIM_CLOSE_HOVER, 0.0f);
+    reach_motion_set(&menu->close_hover, 0.0f);
     reach_animation_manager_reset(&menu->animations, REACH_CONTEXT_MENU_ANIM_WIDTH);
     reach_context_menu_stop_preview_reflow(menu);
     reach_feature_transition_reset(&menu->popup_transition);
@@ -244,13 +246,6 @@ float reach_context_menu_hover_opacity(const reach_context_menu *menu)
                : 0.0f;
 }
 
-float reach_context_menu_close_hover(const reach_context_menu *menu)
-{
-    return menu != nullptr ? reach_animation_manager_value(&menu->animations,
-                                                           REACH_CONTEXT_MENU_ANIM_CLOSE_HOVER)
-                           : 0.0f;
-}
-
 int32_t reach_context_menu_set_close_hovered(reach_context_menu *menu, size_t index)
 {
     if (menu == nullptr || menu->state.close_hovered_index == index)
@@ -258,10 +253,8 @@ int32_t reach_context_menu_set_close_hovered(reach_context_menu *menu, size_t in
         return 0;
     }
     menu->state.close_hovered_index = index;
-    reach_animation_manager_animate_to(&menu->animations, REACH_CONTEXT_MENU_ANIM_CLOSE_HOVER,
-                                       index < menu->state.item_count ? 1.0f : 0.0f,
-                                       REACH_CONTEXT_MENU_CLOSE_HOVER_SECONDS,
-                                       REACH_EASING_EASE_OUT);
+    reach_motion_animate_to(&menu->close_hover, index < menu->state.item_count ? 1.0f : 0.0f,
+                            REACH_CONTEXT_MENU_CLOSE_HOVER_SECONDS, REACH_EASING_EASE_OUT);
     return 1;
 }
 

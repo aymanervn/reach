@@ -50,7 +50,6 @@ int32_t reach_context_menu_set_close_hovered(reach_context_menu *menu, size_t in
 enum
 {
     REACH_CONTEXT_MENU_ANIM_HOVER = 0,
-    REACH_CONTEXT_MENU_ANIM_CLOSE_HOVER,
     REACH_CONTEXT_MENU_ANIM_WIDTH,
     REACH_CONTEXT_MENU_ANIM_REFLOW,
     REACH_CONTEXT_MENU_ANIM_COUNT
@@ -90,6 +89,7 @@ struct reach_context_menu
     reach_context_menu_state state;
     reach_animation_manager animations;
     reach_animation_track animation_tracks[REACH_CONTEXT_MENU_ANIM_COUNT];
+    reach_motion close_hover;
     reach_feature_transition popup_transition;
     reach_pressable pressable;
     uint64_t pressable_identity;

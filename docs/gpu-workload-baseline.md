@@ -137,6 +137,20 @@ reset and game-mode suppression stop the motion. The HWND fallback samples three
 submitted frames, including the endpoint, with three raster passes. Displayed pixels, live input,
 DPI/theme changes and total product cost remain pending.
 
+Dock preview close-hover diagnostics settle unrelated header/size/presentation motion, then drive
+public close enter, exit and immediate re-entry. Five runs per compositor report three executions
+and three opacity-property submissions, zero raster passes and zero scalar advances. Held close
+hover requests no capsule frames or content updates; force-hide clears it. The HWND fallback
+executes four sampled frames, including an explicit endpoint, with four raster passes. The exit
+keeps the original immediate baseline appearance; re-entry samples the interrupted descriptor.
+
+During these runs, the independent WUC root-opacity completion check failed in all five runs:
+the submitted generation remained current but its scoped-batch callback stayed zero, also after
+a 700 ms hold and after explicitly clearing diagnostic presentation state. DirectComposition root
+completion and all close-hover checks passed. Earlier bounded runs passed that callback check;
+the cause of the changed WUC result remains unresolved. This is an open completion-verification
+finding, not evidence of native displayed-pixel or latency acceptance.
+
 The counters give a reproducible baseline for content reuse versus sampled visual changes. Full
 application wake/layout/native metrics, cold/warm workload cost, total CPU/GPU activity, latency,
 power, memory and instrumentation overhead still require product scenarios and system traces.

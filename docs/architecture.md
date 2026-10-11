@@ -474,6 +474,11 @@ Top Bar power hover publishes retained RGBA tint over fixed rounded background c
 its glyph in a separate cached group. Enter/leave retarget the canonical motion; reset and game
 mode clear it. Power hover has no scalar track, periodic capsule frame or bar frame blocker.
 
+Dock preview close buttons retain separate background groups keyed by source window identity.
+The capsule publishes affine hover opacity and keeps the glyph outside that group. Close hover
+owns no scalar track or sampled accessor; hiding/reset clears its motion. Preview header/border
+hover and width/reflow remain scalar consumers.
+
 Top Bar tray and Dock icon groups use stable item identities. Pointer events publish direct
 positions, reordered neighbours and released items run compositor motion, and a stationary drag
 does not request frames. Dock insertion/removal fitting and Now Playing width changes still own
