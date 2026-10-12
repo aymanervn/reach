@@ -20,7 +20,11 @@ reach_preview_find_card(const reach_context_menu_preview_layout *layout, reach_w
 
 void reach_context_menu_stop_preview_reflow(reach_context_menu *menu)
 {
-    reach_animation_manager_set(&menu->animations, REACH_CONTEXT_MENU_ANIM_REFLOW, 1.0f);
+    double now = reach_motion_now_seconds();
+    for (size_t index = 0; index < menu->previews.count; ++index)
+        reach_motion_set(&menu->previews.cards[index].x,
+                         reach_motion_value_at(&menu->previews.cards[index].x, now));
+    reach_motion_set(&menu->reflow, 1.0f);
     menu->preview_origin_count = 0;
 }
 
@@ -28,6 +32,7 @@ void reach_context_menu_reflow_previews(reach_context_menu *menu,
                                         reach_context_menu_preview_layout *layout,
                                         reach_rect_f32 previous_bounds, int32_t constraints_changed)
 {
+    double now = reach_motion_now_seconds();
     int32_t sources_changed = layout->count != menu->previews.count;
     size_t survivors = 0;
     for (size_t index = 0; index < layout->count; ++index)
@@ -50,40 +55,43 @@ void reach_context_menu_reflow_previews(reach_context_menu *menu,
                 reach_preview_find_card(&menu->previews, card->window);
             menu->preview_origins[index].window = card->window;
             menu->preview_origins[index].screen_x =
-                previous != nullptr ? previous_bounds.x + previous->preview.x
+                previous != nullptr ? previous_bounds.x + previous->preview.x +
+                                          reach_motion_value_at(&previous->x, now)
                                     : menu->state.bounds.x + card->preview.x +
                                           reach_preview_entry_offset_dp * menu->state.dpi_scale;
         }
-        reach_animation_manager_start(&menu->animations, REACH_CONTEXT_MENU_ANIM_REFLOW, 0.0f, 1.0f,
-                                      reach_preview_reflow_seconds, REACH_EASING_EASE_IN_OUT);
+        reach_motion_start_at(&menu->reflow, 0, 1, reach_preview_reflow_seconds,
+                              REACH_EASING_EASE_IN_OUT, now);
     }
-    float progress =
-        reach_animation_manager_value(&menu->animations, REACH_CONTEXT_MENU_ANIM_REFLOW);
-    if (progress >= 1.0f)
-    {
+    if (!reach_motion_active_at(&menu->reflow, now))
         menu->preview_origin_count = 0;
-        return;
-    }
     for (size_t index = 0; index < layout->count; ++index)
     {
         reach_context_menu_preview_card *card = &layout->cards[index];
-        float x = card->preview.x;
+        reach_motion_set(&card->x, 0);
         for (size_t origin = 0; origin < menu->preview_origin_count; ++origin)
         {
             if (menu->preview_origins[origin].window == card->window)
             {
-                float from = menu->preview_origins[origin].screen_x - menu->state.bounds.x;
-                x = from + (x - from) * progress;
+                float from =
+                    menu->preview_origins[origin].screen_x - menu->state.bounds.x - card->preview.x;
+                card->x = reach_motion_affine(&menu->reflow, -from, from);
                 break;
             }
         }
-        float left = menu->state.item_viewport.x;
+        float left = menu->state.item_viewport.x - card->preview.x;
         float right = left + menu->state.item_viewport.width - card->preview.width;
-        x = fmaxf(left, fminf(x, right));
-        float offset = x - card->preview.x;
-        card->preview.x = x;
-        card->header.x += offset;
-        card->close.x += offset;
-        menu->state.item_slots[card->index].x = x;
+        card->x = reach_motion_clamp(&card->x, left, fmaxf(left, right));
     }
+}
+
+reach_context_menu_preview_card reach_context_menu_preview_card_at(const reach_context_menu *menu,
+                                                                   size_t index, double now_seconds)
+{
+    reach_context_menu_preview_card card = menu->previews.cards[index];
+    float x = reach_motion_value_at(&card.x, now_seconds);
+    card.preview.x += x;
+    card.header.x += x;
+    card.close.x += x;
+    return card;
 }

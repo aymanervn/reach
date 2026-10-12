@@ -25,6 +25,32 @@ static reach_result reach_preview_push_text(reach_render_command_buffer *out, re
     return reach_render_command_buffer_push(out, &command);
 }
 
+static reach_result reach_preview_retain_card_sources(reach_render_command_buffer *out,
+                                                      size_t first_command, size_t first_group,
+                                                      uint64_t parent, reach_window_id window)
+{
+    for (size_t index = first_group; index < out->group_count; ++index)
+        if (out->groups[index].parent_id == 0)
+            out->groups[index].parent_id = parent;
+    size_t plain = 0;
+    for (size_t index = first_command; index < out->count; ++index)
+    {
+        if (out->commands[index].group_id != 0)
+            continue;
+        reach_render_group group = {};
+        group.id = window ^ ((UINT64_C(0x60) + plain++) << 56);
+        group.parent_id = parent;
+        if (!reach_render_retained_command_bounds(&out->commands[index], &group.bounds))
+            return REACH_ERROR;
+        reach_result result = reach_render_command_buffer_begin_group(out, &group);
+        if (result != REACH_OK)
+            return result;
+        out->commands[index].group_id = group.id;
+        reach_render_command_buffer_end_group(out);
+    }
+    return REACH_OK;
+}
+
 reach_result reach_context_menu_render_previews(reach_context_menu *menu,
                                                 const reach_context_menu_render_context *ctx,
                                                 reach_render_command_buffer *out_commands)
@@ -47,6 +73,17 @@ reach_result reach_context_menu_render_previews(reach_context_menu *menu,
     for (size_t visible = 0; visible < menu->previews.count; ++visible)
     {
         const reach_context_menu_preview_card *card = &menu->previews.cards[visible];
+        reach_render_group parent = {};
+        parent.id = card->window ^ UINT64_C(0x5000000000000000);
+        parent.bounds = {card->header.x, card->header.y, card->preview.width,
+                         card->preview.y + card->preview.height - card->header.y};
+        parent.x = card->x;
+        result = reach_render_command_buffer_begin_group(out_commands, &parent);
+        reach_render_command_buffer_end_group(out_commands);
+        if (result != REACH_OK)
+            return result;
+        size_t first_command = out_commands->count;
+        size_t first_group = out_commands->group_count;
         reach_motion hover = {};
         reach_motion_set(&hover, 0);
         if (state->hovered_index == card->index)
@@ -162,6 +199,10 @@ reach_result reach_context_menu_render_previews(reach_context_menu *menu,
                 }
             }
         }
+        result = reach_preview_retain_card_sources(out_commands, first_command, first_group,
+                                                   parent.id, card->window);
+        if (result != REACH_OK)
+            return result;
     }
     if (menu->previews.overflow)
     {

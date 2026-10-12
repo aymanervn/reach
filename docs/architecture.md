@@ -964,6 +964,18 @@ without forcing content redraw by themselves. Hide clears the cache, relationshi
 demand. Synchronized presentation continues through the existing full path. This separates native
 sampling from retained content work without feature-specific composition branches; broader layout,
 input and consumer migrations remain pending.
+Native overlay items may also publish a canonical destination rectangle. The runtime samples its
+four properties at the same timestamp as root presentation, then applies the existing client-space
+projection. Destination motion participates in active-only native demand and the terminal sample.
+
+Dock preview card reflow owns canonical progress and derives a clamped horizontal offset per stable
+window identity. A retained parent moves each card's header, border, close controls and fallback
+icon; separate cached sources preserve painter order and independent feedback. Native rectangles
+and event-time item/close hit tests sample that same offset. Retargeting starts from the survivor's
+current position; close freezes it, and constraints/reopening retire old origins. One deadline
+cleans up a completed reflow. Its scalar track, frame advancement and sampled layout-position writes
+are removed. Popup width and the associated card-size/title-fit layout remain on their existing CPU
+path pending the wider resize migration.
 Retained render groups also publish four animated clip insets. Both Windows backends retain their
 clip objects and submit changed edges without regenerating unchanged content; unsupported targets
 sample the same descriptor. Battery, Quick Settings and tray popup press feedback publish

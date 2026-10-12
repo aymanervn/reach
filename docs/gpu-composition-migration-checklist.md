@@ -279,6 +279,16 @@ support expectation is explicitly resolved.
   verify existing compositor consumers as well as newly migrated paths.
 - [ ] Migrate Dock popup width/reflow and Switcher width fitting using the selected preview design;
   preserve stable source identity, live content, equal heights, variable widths and aligned controls.
+  - [x] Migrate Dock preview horizontal reflow through retained motion and shared native destinations.
+    Stable window parents translate cached card sources; headers, borders, close controls, fallback
+    icons, DWM rectangles and event-time hit testing share canonical offsets. Remove the scalar
+    reflow track and sampled layout-position writes; preserve interruption, close-time freeze,
+    constraints, source identity and endpoint cleanup. Both builds, all 40 tests and focused native
+    checks pass, including destination-only motion with a settled root. Cached SVG differences are
+    bounded to antialias edge pixels inside close glyphs; outside and solid interiors retain the
+    original tolerance. Five full native runs per backend plus fallback checks pass in Debug/Release.
+    Popup width/card sizing,
+    live alignment and total product workload acceptance remain in the parent/broader gates.
 
 ## 6. Native responsibilities
 

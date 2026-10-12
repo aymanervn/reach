@@ -293,6 +293,8 @@ typedef struct reach_feature_native_overlay_item
     reach_window_id source;
     reach_window_thumbnail_plane plane;
     reach_window_thumbnail_placement placement;
+    int32_t has_destination_motion;
+    reach_rect_motion destination_motion;
 } reach_feature_native_overlay_item;
 
 typedef struct reach_feature_native_overlay_ops

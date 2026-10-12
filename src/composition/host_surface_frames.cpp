@@ -508,8 +508,19 @@ static reach_result reach_host_sync_native_overlay(reach_host *host, reach_featu
                 continue;
             }
         }
+        int32_t destination_active = 0;
+        if (item.has_destination_motion)
+        {
+            item.placement.destination =
+                reach_rect_motion_value_at(&item.destination_motion, now_seconds);
+            destination_active =
+                reach_motion_active_at(&item.destination_motion.x, now_seconds) ||
+                reach_motion_active_at(&item.destination_motion.y, now_seconds) ||
+                reach_motion_active_at(&item.destination_motion.width, now_seconds) ||
+                reach_motion_active_at(&item.destination_motion.height, now_seconds);
+        }
         if ((item.placement.visible || item.placement.background_visible) &&
-            reach_host_native_presentation_active(geometry, now_seconds))
+            (destination_active || reach_host_native_presentation_active(geometry, now_seconds)))
             desc->native_overlay_motion_pending = 1;
         item.placement = reach_host_native_overlay_placement(item.placement, geometry, ctx,
                                                              shadow_pad, now_seconds);

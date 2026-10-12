@@ -2,6 +2,40 @@
 
 Status: counters verified; full product performance baseline and acceptance pending.
 
+## Dock preview reflow and native body intent
+
+Horizontal card reflow now publishes canonical progress and a clamped translation for each stable
+window. Retained parents move card sources without resampling their geometry. The shared native item
+contract accepts a destination `reach_rect_motion`; runtime samples it and root presentation at one
+timestamp, projects into client coordinates and schedules only active motion plus its endpoint.
+Input samples the card offset at event time. Source changes retarget from the current survivor
+position, close freezes current offsets, and a deadline retires origins. The obsolete scalar reflow
+track and per-frame layout-position writes are removed. Width/card sizing and title fitting remain
+on the pending resize path, so these results do not claim the complete popup is frame-independent.
+
+Existing deterministic capsule checks verify removal, interrupted additions, source generation,
+settling, close freeze, reopening and DPI cuts. Owned WUC/DC checks exercise the real card renderer:
+reflow alone causes no capsule frame demand or tick invalidation, and ten unchanged submissions
+repaint/resubmit/rebuild nothing. A separate real-renderer/DWM check drives destination-only body
+motion with a settled root and verifies zero additional arrangement/commands/raster/property work,
+shared client-space endpoint sampling and terminal retirement. Both builds and all 40 tests pass.
+
+Separating the close SVG into its own cache source changes antialias coverage at edge pixels. A
+large diagnostic canvas eliminates the difference; source-local reconstruction matches the
+production localization path and exposes bounded coverage variation. The enlarged cached/reference
+glyphs were inspected. The comparison requires differences greater than two channel values to lie
+inside a close glyph at a partially covered reference edge; all other pixels, including solid
+interiors, retain the two-value limit. Edge errors stay within 32/255 across five feedback values
+and 100/125/150/200% DPI. No shared SVG rendering change or larger production canvas was introduced.
+
+Evidence is `build-{debug,release}-preview-reflow.log`, `test-{debug,release}-preview-reflow.log`,
+`probe-preview-reflow-svg-edges-debug.log` and `probe-preview-reflow-focused-release.log` under
+`build/gpu-composition-migration`. Five full native runs per backend plus fallback checks pass
+in Debug/Release (`probe-preview-reflow-{debug,release}-complete.log`). Architecture, formatting
+and whitespace checks pass. Displayed
+appearance/alignment, complete width consumers and repeated total CPU/GPU/power/memory acceptance
+remain open.
+
 ## Native root-presentation frame separation
 
 Switcher and Context Menu no longer request content frames solely to advance preview-linked popup
