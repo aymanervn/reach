@@ -38,6 +38,13 @@ support expectation is explicitly resolved.
     Release builds, all 39 Release tests, Debug builds/tests and the owned native protocol probe pass.
     Optimized compositor deduplication failures were resolved by semantic equality; full optimized
     and Debug native suites now pass. Workload capture and final acceptance remain pending.
+  - [x] Add and verify bounded read-only CPU/GPU/power/memory collection for existing process PIDs.
+    The standalone collector preserves native/PDH attribution, per-engine GPU identity, package
+    energy units, optional NVML board power, missing-data statuses and observer/system activity.
+    Ten-second Reach/DWM and unavailable-process captures, five pure accounting tests, isolated
+    Debug/Release builds, all 40 tests and architecture checks pass. See the workload baseline for
+    source contracts, overhead and evidence. Controlled repeated product baselines, variation
+    thresholds, latency and independent GPU-memory validation remain pending.
 
 ## 2. Resolve production capabilities
 

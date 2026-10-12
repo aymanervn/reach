@@ -1150,6 +1150,10 @@ target_compile_features(reach_system_controls_network_tests PRIVATE
         NAME reach_architecture_checker_tests
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_architecture_tests.py
     )
+    add_test(
+        NAME reach_workload_accounting_tests
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/measure_gpu_workload_tests.py
+    )
 endif()
 
 if(REACH_RUN_ARCHITECTURE_CHECK)
