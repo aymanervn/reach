@@ -2,6 +2,39 @@
 
 #include <math.h>
 
+static int32_t reach_render_rect_equal(reach_rect_f32 first, reach_rect_f32 second)
+{
+    return first.x == second.x && first.y == second.y && first.width == second.width &&
+           first.height == second.height;
+}
+
+int32_t reach_render_group_equal(const reach_render_group *first, const reach_render_group *second)
+{
+    size_t index;
+    if (first == second)
+        return 1;
+    if (first == 0 || second == 0 || first->id != second->id ||
+        first->parent_id != second->parent_id ||
+        !reach_render_rect_equal(first->bounds, second->bounds) ||
+        first->has_clip != second->has_clip ||
+        !reach_render_rect_equal(first->clip, second->clip) ||
+        first->has_tint != second->has_tint || first->repeat_offset_x != second->repeat_offset_x ||
+        first->repeat_hold_seconds != second->repeat_hold_seconds ||
+        first->repeat_travel_seconds != second->repeat_travel_seconds ||
+        !reach_motion_equal(&first->x, &second->x) || !reach_motion_equal(&first->y, &second->y) ||
+        !reach_motion_equal(&first->opacity, &second->opacity) ||
+        !reach_motion_equal(&first->scale, &second->scale) ||
+        !reach_motion_equal(&first->scale_y, &second->scale_y))
+        return 0;
+    for (index = 0; index < REACH_RENDER_CLIP_EDGE_COUNT; ++index)
+        if (!reach_motion_equal(&first->clip_insets[index], &second->clip_insets[index]))
+            return 0;
+    for (index = 0; index < REACH_RENDER_COLOR_CHANNEL_COUNT; ++index)
+        if (!reach_motion_equal(&first->tint[index], &second->tint[index]))
+            return 0;
+    return 1;
+}
+
 static int32_t reach_render_group_motion_active(const reach_render_group *group)
 {
     size_t edge;

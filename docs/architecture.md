@@ -458,6 +458,12 @@ Both execution paths validate ownership/order before native mutation. Coverage t
 capability, and root presentation has no parent. Fixed-cap batch preflight uses the same declaration
 checks. Complete popup/section integration remains migration work.
 
+`reach_motion_equal` and `reach_render_group_equal` compare named intent fields, including clocks,
+generations, limits, geometry, hierarchy, clips, tint and repetition. Both retained backends use
+these shared predicates for property submission and root completion ownership. Object padding is
+not animation intent; rebuilding an equivalent descriptor does not restart animations or submit
+properties. New generations and changed physical timelines still invalidate the appropriate state.
+
 `reach_motion_clamp` bounds a derived motion while retaining its canonical event time, easing,
 generation and completion deadline. Affine mappings transform its limits as well as its endpoints.
 CPU sampling applies the limits; `reach_motion_compile_at` provides up to four cubic/constant

@@ -664,8 +664,44 @@ static void test_popup_height_motion_matches_constrained_placement(void)
             }
 }
 
+static void test_group_equality_preserves_intent_without_padding(void)
+{
+    reach_render_group first = {};
+    first.id = 10;
+    first.bounds = {0, 0, 100, 50};
+    reach_motion_set(&first.opacity, 1);
+    reach_render_group second = first;
+    unsigned char *bytes = reinterpret_cast<unsigned char *>(&second);
+    for (size_t at = offsetof(reach_render_group, clip) + sizeof(second.clip);
+         at < offsetof(reach_render_group, clip_insets); ++at)
+        bytes[at] = 0xa5;
+    for (size_t at = offsetof(reach_render_group, has_tint) + sizeof(second.has_tint);
+         at < offsetof(reach_render_group, tint); ++at)
+        bytes[at] = 0xa5;
+    for (size_t at = offsetof(reach_render_group, repeat_travel_seconds) +
+                     sizeof(second.repeat_travel_seconds);
+         at < sizeof(second); ++at)
+        bytes[at] = 0xa5;
+    expect_true(reach_render_group_equal(&first, &second),
+                "group equality ignores representation padding");
+    second.parent_id = 20;
+    expect_true(!reach_render_group_equal(&first, &second),
+                "changed hierarchy keeps distinct ownership");
+    second = first;
+    reach_motion_set(&second.clip_insets[REACH_RENDER_CLIP_BOTTOM], 12);
+    expect_true(!reach_render_group_equal(&first, &second), "clip intent remains distinct");
+    second = first;
+    second.has_tint = 1;
+    reach_motion_set(&second.tint[REACH_RENDER_COLOR_RED], 0.4f);
+    expect_true(!reach_render_group_equal(&first, &second), "tint intent remains distinct");
+    second = first;
+    second.repeat_travel_seconds = 2;
+    expect_true(!reach_render_group_equal(&first, &second), "repeat intent remains distinct");
+}
+
 int main(void)
 {
+    test_group_equality_preserves_intent_without_padding();
     test_stretch_geometry_preserves_caps_and_anchor();
     test_popup_height_motion_matches_constrained_placement();
     test_group_hierarchy_samples_one_geometry_timeline();

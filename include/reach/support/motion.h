@@ -37,6 +37,7 @@ extern "C"
         float cubic;
     } reach_motion_segment;
 
+    int32_t reach_motion_equal(const reach_motion *first, const reach_motion *second);
     double reach_motion_now_seconds(void);
     void reach_motion_set(reach_motion *motion, float value);
     void reach_motion_start(reach_motion *motion, float from, float to, double duration_seconds,

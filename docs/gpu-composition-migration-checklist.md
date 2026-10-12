@@ -36,8 +36,8 @@ support expectation is explicitly resolved.
     Three wire-state aggregate resets use explicit representation clearing with compile-time trivial
     and standard-layout guards. Normal `/O2 /Ob2` flags remain enabled. Isolated Reach/Settings/tool
     Release builds, all 39 Release tests, Debug builds/tests and the owned native protocol probe pass.
-    Full optimized compositor verification exposes two settled-chrome deduplication failures, which
-    remain pending along with workload capture and final acceptance.
+    Optimized compositor deduplication failures were resolved by semantic equality; full optimized
+    and Debug native suites now pass. Workload capture and final acceptance remain pending.
 
 ## 2. Resolve production capabilities
 
@@ -101,6 +101,13 @@ support expectation is explicitly resolved.
     bounded native runs per backend pass, including injected async error/cancel/result failures,
     unchanged terminal queries, stale generations and suspension/recreation. Actual device-loss,
     fence failure and full live acceptance remain pending in the broader resource gate.
+
+  - [x] Make retained intent comparison independent of object padding in optimized builds.
+    Shared named-field motion/group equality covers tint, clips, transforms and root completion
+    ownership. Preserve generation, clock, limits and hierarchy changes. Pure padding regressions,
+    both builds, all 39 tests and five full native runs per backend plus fallback pass in Release
+    and Debug. Padding-only changes and unchanged settled chrome submit no properties or raster
+    work; real generations still update ownership. Total product acceptance remains pending.
 
 ## 4. Feedback and repetition
 
