@@ -948,9 +948,22 @@ its feature runtime rather than in a HUD-specific host cache. Switcher also uses
 path: its capsule owns width animation, presentation, arranged bounds, and geometry publication.
 Generic native-overlay placement resolves screen geometry into the same client content space as
 drawn commands, including shadow and retained envelope offsets. It samples retained translation,
-centered scale, and opacity from the existing motion clock. Switcher requests frames only through
-its active transition or width animation; settled DWM content updates independently. Stage keeps
-its capsule-owned exact placement and synchronized close semantics.
+centered scale, and opacity from the existing motion clock. Runtime native-motion demand delivers
+active projection samples and one terminal sample independently of content-frame demand. Switcher
+and Context Menu no longer request content frames solely for preview-linked popup presentation;
+Switcher width and Context Menu body layout still use their pending CPU paths. Settled DWM content
+updates independently. Stage keeps its capsule-owned exact placement and synchronized close semantics.
+
+Each surface runtime caches its last arrangement inputs, canonical geometry and native projection
+context. Unchanged presented surfaces skip capsule arrangement, command production and renderer
+submission while another surface or native motion keeps the host awake. Native overlay generation
+changes reconcile relationships without requiring a content frame. Environment, anchor, canonical
+intent, window identity or renderer-capability changes invalidate the cache; ordinary dirty flags and
+CPU/fallback frame demand retain their existing behavior. HWND bounds changes may require arrangement
+without forcing content redraw by themselves. Hide clears the cache, relationships and native-motion
+demand. Synchronized presentation continues through the existing full path. This separates native
+sampling from retained content work without feature-specific composition branches; broader layout,
+input and consumer migrations remain pending.
 Retained render groups also publish four animated clip insets. Both Windows backends retain their
 clip objects and submit changed edges without regenerating unchanged content; unsupported targets
 sample the same descriptor. Battery, Quick Settings and tray popup press feedback publish

@@ -391,6 +391,15 @@ typedef struct reach_feature_runtime
     reach_window_id native_overlay_front_source;
     reach_window_thumbnail_id native_overlay_front_id;
     int32_t presentation_visible;
+    int32_t frame_context_valid;
+    int32_t native_overlay_motion_pending;
+    int32_t frame_retained_supported;
+    reach_platform_window *frame_window;
+    reach_window_id frame_native_target;
+    reach_feature_surface_context layout_context;
+    reach_feature_surface_context native_overlay_context;
+    reach_feature_surface_geometry frame_geometry;
+    reach_shadow_pad native_overlay_shadow_pad;
     const reach_feature_definition *definition;
 } reach_feature_runtime;
 
