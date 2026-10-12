@@ -245,8 +245,7 @@ void reach_settings_model_power_focus_custom(reach_settings_model *model, size_t
     reach_text_edit_select_all(&model->power_custom_edits[timer][field]);
     model->power_focused_timer = (int32_t)timer;
     model->power_focused_field = (int32_t)field;
-    model->power_caret_visible = 1;
-    model->power_caret_phase = 0.0;
+    reach_blink_reset_at(&model->power_caret, 0.55, 0.45, reach_motion_now_seconds());
 }
 
 void reach_settings_model_power_blur(reach_settings_model *model)
@@ -265,6 +264,7 @@ void reach_settings_model_power_blur(reach_settings_model *model)
         model->power_custom_edits[timer][field].selection_anchor = -1;
     }
     model->power_focused_timer = -1;
+    reach_blink_stop(&model->power_caret);
 }
 
 static reach_text_edit *reach_settings_power_focused_edit(reach_settings_model *model)
@@ -304,8 +304,7 @@ int32_t reach_settings_model_power_insert_char(reach_settings_model *model, uint
         return 0;
     }
     reach_settings_power_apply_edit_minutes(model);
-    model->power_caret_visible = 1;
-    model->power_caret_phase = 0.0;
+    reach_blink_reset_at(&model->power_caret, 0.55, 0.45, reach_motion_now_seconds());
     return 1;
 }
 
@@ -322,8 +321,7 @@ int32_t reach_settings_model_power_handle_edit_key(reach_settings_model *model,
     {
         reach_settings_power_apply_edit_minutes(model);
     }
-    model->power_caret_visible = 1;
-    model->power_caret_phase = 0.0;
+    reach_blink_reset_at(&model->power_caret, 0.55, 0.45, reach_motion_now_seconds());
     return 1;
 }
 
@@ -397,24 +395,4 @@ void reach_settings_model_power_mark_applied(reach_settings_model *model)
         model->power_applied_minutes[timer] = model->power_minutes[timer];
         model->power_applied_wait_apps[timer] = model->power_wait_apps[timer];
     }
-}
-
-int32_t reach_settings_model_tick_power_caret(reach_settings_model *model, double delta_seconds)
-{
-    if (model == nullptr || model->power_focused_timer < 0)
-    {
-        return 0;
-    }
-    model->power_caret_phase += delta_seconds;
-    while (model->power_caret_phase >= 1.0)
-    {
-        model->power_caret_phase -= 1.0;
-    }
-    int32_t visible = model->power_caret_phase < 0.55 ? 1 : 0;
-    if (visible == model->power_caret_visible)
-    {
-        return 0;
-    }
-    model->power_caret_visible = visible;
-    return 1;
 }

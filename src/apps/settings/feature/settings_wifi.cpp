@@ -5,7 +5,6 @@
 #include <string.h>
 
 #define REACH_SETTINGS_WIFI_ROW_ANIMATION_SECONDS 0.18
-#define REACH_SETTINGS_WIFI_CARET_PERIOD 1.06
 
 const uint16_t *reach_settings_wifi_page_title(void)
 {
@@ -239,8 +238,7 @@ void reach_settings_model_wifi_focus_field(reach_settings_model *model, int32_t 
         return;
     }
     model->wifi_focused_field = field;
-    model->wifi_caret_visible = 1;
-    model->wifi_caret_phase = 0.0;
+    reach_blink_reset_at(&model->wifi_caret, 0.53, 0.53, reach_motion_now_seconds());
     reach_text_edit *edit = reach_settings_wifi_focused_edit(model);
     if (edit != nullptr)
     {
@@ -255,8 +253,7 @@ void reach_settings_model_wifi_blur(reach_settings_model *model)
         return;
     }
     model->wifi_focused_field = REACH_SETTINGS_WIFI_FIELD_NONE;
-    model->wifi_caret_visible = 0;
-    model->wifi_caret_phase = 0.0;
+    reach_blink_stop(&model->wifi_caret);
 }
 
 int32_t reach_settings_model_wifi_toggle_show_key(reach_settings_model *model)
@@ -325,8 +322,7 @@ int32_t reach_settings_model_wifi_insert_char(reach_settings_model *model, uint1
     {
         return 0;
     }
-    model->wifi_caret_visible = 1;
-    model->wifi_caret_phase = 0.0;
+    reach_blink_reset_at(&model->wifi_caret, 0.53, 0.53, reach_motion_now_seconds());
     return 1;
 }
 
@@ -343,8 +339,7 @@ int32_t reach_settings_model_wifi_handle_edit_key(reach_settings_model *model,
     {
         return 0;
     }
-    model->wifi_caret_visible = 1;
-    model->wifi_caret_phase = 0.0;
+    reach_blink_reset_at(&model->wifi_caret, 0.53, 0.53, reach_motion_now_seconds());
     return 1;
 }
 
@@ -464,20 +459,4 @@ int32_t reach_settings_model_tick_wifi_animations(reach_settings_model *model, d
 int32_t reach_settings_model_wifi_animations_active(const reach_settings_model *model)
 {
     return model != nullptr && reach_animation_manager_any_active(&model->wifi_row_animations);
-}
-
-int32_t reach_settings_model_tick_wifi_caret(reach_settings_model *model, double delta_seconds)
-{
-    if (model == nullptr || model->wifi_focused_field == REACH_SETTINGS_WIFI_FIELD_NONE)
-    {
-        return 0;
-    }
-    model->wifi_caret_phase += delta_seconds;
-    if (model->wifi_caret_phase < REACH_SETTINGS_WIFI_CARET_PERIOD * 0.5)
-    {
-        return 0;
-    }
-    model->wifi_caret_phase = 0.0;
-    model->wifi_caret_visible = model->wifi_caret_visible ? 0 : 1;
-    return 1;
 }

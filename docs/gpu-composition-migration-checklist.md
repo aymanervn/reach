@@ -174,6 +174,14 @@ support expectation is explicitly resolved.
     runs include that resolved path. Final product acceptance remains pending.
 - [ ] Migrate eligible loaders/repeating effects; select efficient compositor or deadline behavior for
   carets, preserve focus resets and marquee behavior, and stop hidden repetitions.
+  - [x] Replace frame-rate caret ticking with shared absolute-time deadline scheduling.
+    Settings' Account/Power/Wi-Fi fields and Launcher use one pure blink model, preserving their
+    duty cycles and immediate focus/edit resets. Late wakes skip missed cycles; hidden pages,
+    minimized/offscreen editors and radio-off forms cause no caret wakes. Settings returns to idle
+    after each boundary; Launcher closes retire its clock. Both builds, all 40 tests and owned
+    scheduler/command probes pass, including moved windows and four DPI values. Textbox caret
+    drawing remains compound; isolated retained-caret benefit/cost comparison and broad acceptance
+    remain pending, so this does not close the repetition or final CPU-disposition gates.
 
 ## 5. Reveal, resize and layout motion
 

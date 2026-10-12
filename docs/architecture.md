@@ -523,6 +523,16 @@ scalar tracks, advancement and frame demand are removed; Settings' existing fall
 samples the same published descriptors. Immediate stateless toggles retain the static shared
 control. Settings row expansion and segmented selectors still use scalar tracks.
 
+Caret visibility uses the pure `reach_blink` deadline model on the shared monotonic clock. Focus
+and edit events reset a visible interval; late wakes sample the current phase without accumulating
+frame deltas or replaying missed flips. Power/Account keep their 0.55/0.45-second duty cycle, while
+Wi-Fi and Launcher keep 0.53-second intervals. Page changes and blur retire inactive clocks;
+Launcher closing/hidden reset stops its clock. Settings includes only a visible focused field's
+deadline in its idle wait, with client-coordinate viewport checks and minimized/radio-off filtering.
+It requests a frame at a due boundary, then returns to idle. Other input/content invalidation
+still renders normally. The compound textbox renderer retains its current caret drawing;
+independent retained caret content and its cost comparison remain a migration acceptance question.
+
 Dock and Top Bar press feedback emits a separate flat retained group, copying item placement
 for moving icons. Shared UI feedback owns the group descriptor; the icon helper retains its
 original alpha-mask tint, while trigger and overflow glyphs use RGBA tint. Press feedback no longer

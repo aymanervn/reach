@@ -101,6 +101,49 @@ void reach_settings_model_init(reach_settings_model *model)
     reach_settings_model_power_mark_applied(model);
 }
 
+template <typename Model>
+static auto reach_settings_active_caret(Model *model) -> decltype(&model->power_caret)
+{
+    if (model == nullptr)
+        return nullptr;
+    if (model->selected_page == REACH_SETTINGS_PAGE_POWER_SLEEP &&
+        model->power_focused_timer >= 0 &&
+        model->power_focused_timer < REACH_SETTINGS_POWER_TIMER_COUNT)
+        return &model->power_caret;
+    if (model->selected_page == REACH_SETTINGS_PAGE_ACCOUNT && model->account_focused_field >= 0 &&
+        model->account_focused_field < REACH_SETTINGS_ACCOUNT_FIELD_COUNT)
+        return &model->account_caret;
+    if (model->selected_page == REACH_SETTINGS_PAGE_WIFI &&
+        model->wifi_focused_field != REACH_SETTINGS_WIFI_FIELD_NONE)
+        return &model->wifi_caret;
+    return nullptr;
+}
+
+double reach_settings_model_caret_deadline(const reach_settings_model *model)
+{
+    const reach_blink *caret = reach_settings_active_caret(model);
+    return caret != nullptr ? caret->deadline_seconds : 0.0;
+}
+
+int32_t reach_settings_model_update_caret(reach_settings_model *model, double now_seconds)
+{
+    if (model == nullptr)
+        return 0;
+    reach_blink *caret = reach_settings_active_caret(model);
+    reach_blink *clocks[] = {&model->power_caret, &model->account_caret, &model->wifi_caret};
+    for (reach_blink *clock : clocks)
+        if (clock != caret)
+            reach_blink_stop(clock);
+    if (caret == nullptr)
+        return 0;
+    if (caret->deadline_seconds <= 0.0)
+    {
+        reach_blink_reset_at(caret, caret->visible_seconds, caret->hidden_seconds, now_seconds);
+        return caret->visible;
+    }
+    return reach_blink_update_at(caret, now_seconds);
+}
+
 void reach_settings_model_select_page(reach_settings_model *model, reach_settings_page page)
 {
     if (model == nullptr)
@@ -112,7 +155,11 @@ void reach_settings_model_select_page(reach_settings_model *model, reach_setting
     {
         return;
     }
+    reach_blink_stop(&model->power_caret);
+    reach_blink_stop(&model->account_caret);
+    reach_blink_stop(&model->wifi_caret);
     model->selected_page = page;
+    reach_settings_model_update_caret(model, reach_motion_now_seconds());
     reach_motion_animate_to(&model->nav_selection, target_index,
                             reach_settings_nav_selection_duration_seconds,
                             REACH_EASING_EASE_IN_OUT);

@@ -6,6 +6,7 @@
 #include <new>
 
 #include "reach/features/common/section_reveal.h"
+#include "reach/core/blink.h"
 #include "reach/support/animation.h"
 
 enum
@@ -25,7 +26,7 @@ struct reach_launcher
     reach_motion surface_opacity;
     reach_motion surface_scale;
     double surface_deadline;
-    double caret_deadline;
+    reach_blink caret;
     reach_launcher_state state;
     reach_search_service *search;
     uint32_t search_generation;
@@ -696,6 +697,7 @@ int32_t reach_launcher_set_open(reach_launcher *launcher, int32_t open)
     else
     {
         (void)reach_launcher_close_state(&launcher->state);
+        reach_blink_stop(&launcher->caret);
     }
     reach_launcher_set_surface_animation_open(launcher, open);
     return 1;
@@ -843,33 +845,29 @@ static void reach_launcher_reset_caret(reach_launcher *launcher)
     {
         return;
     }
-    launcher->caret_deadline = reach_motion_now_seconds() + REACH_LAUNCHER_CARET_BLINK_SECONDS;
+    if (launcher->state.model.open)
+        reach_blink_reset_at(&launcher->caret, REACH_LAUNCHER_CARET_BLINK_SECONDS,
+                             REACH_LAUNCHER_CARET_BLINK_SECONDS, reach_motion_now_seconds());
+    else
+        reach_blink_stop(&launcher->caret);
     launcher->state.launcher_caret_visible = 1;
 }
 
-static int32_t reach_launcher_tick_caret(reach_launcher *launcher, double delta_seconds)
+static int32_t reach_launcher_update_caret(reach_launcher *launcher)
 {
     if (launcher == nullptr)
-    {
         return 0;
-    }
     if (!launcher->state.model.open)
     {
-        reach_launcher_reset_caret(launcher);
+        reach_blink_stop(&launcher->caret);
+        launcher->state.launcher_caret_visible = 1;
         return 0;
     }
-    (void)delta_seconds;
-    if (launcher->caret_deadline <= 0.0)
-    {
+    if (launcher->caret.deadline_seconds <= 0.0)
         reach_launcher_reset_caret(launcher);
-    }
-    if (reach_motion_wait_ms(launcher->caret_deadline) == 0)
-    {
-        launcher->caret_deadline = reach_motion_now_seconds() + REACH_LAUNCHER_CARET_BLINK_SECONDS;
-        launcher->state.launcher_caret_visible = !launcher->state.launcher_caret_visible;
-        return 1;
-    }
-    return 0;
+    int32_t changed = reach_blink_update_at(&launcher->caret, reach_motion_now_seconds());
+    launcher->state.launcher_caret_visible = launcher->caret.visible;
+    return changed;
 }
 
 static void reach_launcher_reset_scrollbar_drag(reach_launcher *launcher)
@@ -1036,9 +1034,8 @@ static void reach_launcher_capsule_tick(void *capsule, double delta_seconds,
         reach_animation_manager_active(&launcher->animations,
                                        REACH_LAUNCHER_ANIMATION_RESULTS_EXPANSION);
     int32_t surface_visible = launcher != nullptr && launcher->surface_visible;
-    if (out != nullptr &&
-        (reach_launcher_tick_caret(launcher, delta_seconds) || expansion_was_active ||
-         expansion_active || surface_was_visible != surface_visible))
+    if (out != nullptr && (reach_launcher_update_caret(launcher) || expansion_was_active ||
+                           expansion_active || surface_was_visible != surface_visible))
     {
         out->redraw = 1;
     }
@@ -1362,10 +1359,10 @@ static void reach_launcher_capsule_surface_geometry(const void *capsule,
                                                         reach_launcher_results_expansion(launcher);
     out->deadline_seconds = launcher->surface_deadline;
     out->wait_for_presentation = !launcher->surface_target_open;
-    if (launcher->state.model.open && launcher->caret_deadline > 0.0 &&
-        (out->deadline_seconds <= 0.0 || launcher->caret_deadline < out->deadline_seconds))
+    if (launcher->state.model.open && launcher->caret.deadline_seconds > 0.0 &&
+        (out->deadline_seconds <= 0.0 || launcher->caret.deadline_seconds < out->deadline_seconds))
     {
-        out->deadline_seconds = launcher->caret_deadline;
+        out->deadline_seconds = launcher->caret.deadline_seconds;
     }
     out->presentation.retained = 1;
     out->presentation.max_scale = REACH_LAUNCHER_SURFACE_SCALE;

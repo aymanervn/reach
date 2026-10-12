@@ -98,6 +98,7 @@ target_link_libraries(reach_services PUBLIC
 add_library(reach_core STATIC
     src/core/application.c
     src/core/app_update.c
+    src/core/blink.c
     src/core/bluetooth.c
     src/core/clipboard.c
     src/core/frame_clock.c
