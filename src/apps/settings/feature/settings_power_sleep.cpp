@@ -218,18 +218,12 @@ int32_t reach_settings_model_tick_power_animations(reach_settings_model *model,
         reach_animation_manager_tick(&model->power_animations, delta_seconds);
         active = 1;
     }
-    if (reach_animation_manager_any_active(&model->power_wait_animations))
-    {
-        reach_animation_manager_tick(&model->power_wait_animations, delta_seconds);
-        active = 1;
-    }
     return active;
 }
 
 int32_t reach_settings_model_power_animations_active(const reach_settings_model *model)
 {
-    return model != nullptr && (reach_animation_manager_any_active(&model->power_animations) ||
-                                reach_animation_manager_any_active(&model->power_wait_animations));
+    return model != nullptr && reach_animation_manager_any_active(&model->power_animations);
 }
 
 void reach_settings_model_power_focus_custom(reach_settings_model *model, size_t timer,
@@ -348,7 +342,7 @@ void reach_settings_model_set_power_wait_apps(reach_settings_model *model, size_
         return;
     }
     model->power_wait_apps[timer] = enabled ? 1 : 0;
-    reach_animation_manager_set(&model->power_wait_animations, timer, enabled ? 1.0f : 0.0f);
+    reach_motion_set(&model->power_wait_toggles[timer], enabled ? 1.0f : 0.0f);
 }
 
 int32_t reach_settings_model_power_wait_apps(const reach_settings_model *model, size_t timer)
@@ -369,10 +363,9 @@ int32_t reach_settings_model_toggle_power_wait_apps(reach_settings_model *model,
         return 0;
     }
     model->power_wait_apps[timer] = model->power_wait_apps[timer] ? 0 : 1;
-    float current = reach_animation_manager_value(&model->power_wait_animations, timer);
-    reach_animation_manager_start(&model->power_wait_animations, timer, current,
-                                  model->power_wait_apps[timer] ? 1.0f : 0.0f, 0.18,
-                                  REACH_EASING_EASE_OUT);
+    reach_motion_animate_to(&model->power_wait_toggles[timer],
+                            model->power_wait_apps[timer] ? 1.0f : 0.0f, 0.18,
+                            REACH_EASING_EASE_OUT);
     return 1;
 }
 

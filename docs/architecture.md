@@ -513,6 +513,16 @@ schedules all command-buffer motion only when retained rendering is unavailable,
 final endpoint frame. No button-feedback scalar manager, per-tick advancement or compositor frame
 demand remains. Target introduction, layout, enabled state and theme changes still redraw content.
 
+Settings' animated binary toggles use `reach_ui_toggle_motion_render`: one stationary viewport
+owns separate cached track coverage and knob sources. Shared RGBA tint changes the track color;
+an affine X motion translates the knob without scaling it or moving the viewport clip. Sources
+use the common pixel-aligned retained-command bounds. Display preferences, top-bar auto-hide,
+Wi-Fi/Bluetooth radio state, startup entries and power wait options own canonical `reach_motion`
+intent with event-time reversal. The power wait label's alpha shares its toggle timeline. Their
+scalar tracks, advancement and frame demand are removed; Settings' existing fallback scheduling
+samples the same published descriptors. Immediate stateless toggles retain the static shared
+control. Settings row expansion and segmented selectors still use scalar tracks.
+
 Dock and Top Bar press feedback emits a separate flat retained group, copying item placement
 for moving icons. Shared UI feedback owns the group descriptor; the icon helper retains its
 original alpha-mask tint, while trigger and overflow glyphs use RGBA tint. Press feedback no longer

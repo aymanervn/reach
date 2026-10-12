@@ -380,8 +380,10 @@ void reach_settings_render_wifi_page(const reach_settings_render_input *input,
         toggle_style.track_off = input->theme->settings_toggle_track_off;
         toggle_style.track_on = reach_settings_color_with_alpha(accent, 0.85f);
         toggle_style.knob = input->theme->settings_toggle_knob;
-        reach_ui_toggle_render(commands, layout->wifi_radio_toggle, &toggle_style,
-                               reach_animation_manager_value(&model->wifi_radio_animation, 0));
+        reach_ui_toggle_motion_render(
+            commands, layout->wifi_radio_toggle, &toggle_style,
+            reach_settings_toggle_group_id(REACH_SETTINGS_HIT_WIFI_RADIO_TOGGLE, 0),
+            &model->wifi_radio_toggle);
 
         int32_t enabled = model->wifi_radio == REACH_WIFI_RADIO_ON;
         reach_ui_button_style scan_style =

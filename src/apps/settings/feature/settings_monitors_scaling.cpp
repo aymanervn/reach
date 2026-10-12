@@ -30,7 +30,7 @@ void reach_settings_model_set_high_refresh_rate(reach_settings_model *model, int
         return;
     }
     model->display_high_refresh_rate = enabled ? 1 : 0;
-    reach_animation_manager_set(&model->display_fps_animation, 0, enabled ? 1.0f : 0.0f);
+    reach_motion_set(&model->display_fps_toggle, enabled ? 1.0f : 0.0f);
 }
 
 int32_t reach_settings_model_high_refresh_rate(const reach_settings_model *model)
@@ -45,10 +45,9 @@ int32_t reach_settings_model_toggle_high_refresh_rate(reach_settings_model *mode
         return 0;
     }
     model->display_high_refresh_rate = model->display_high_refresh_rate ? 0 : 1;
-    float current = reach_animation_manager_value(&model->display_fps_animation, 0);
-    reach_animation_manager_start(&model->display_fps_animation, 0, current,
-                                  model->display_high_refresh_rate ? 1.0f : 0.0f, 0.18,
-                                  REACH_EASING_EASE_OUT);
+    reach_motion_animate_to(&model->display_fps_toggle,
+                            model->display_high_refresh_rate ? 1.0f : 0.0f, 0.18,
+                            REACH_EASING_EASE_OUT);
     return 1;
 }
 
@@ -59,7 +58,7 @@ void reach_settings_model_set_bundled_font(reach_settings_model *model, int32_t 
         return;
     }
     model->display_bundled_font = enabled ? 1 : 0;
-    reach_animation_manager_set(&model->display_font_animation, 0, enabled ? 1.0f : 0.0f);
+    reach_motion_set(&model->display_font_toggle, enabled ? 1.0f : 0.0f);
 }
 
 int32_t reach_settings_model_bundled_font(const reach_settings_model *model)
@@ -74,10 +73,8 @@ int32_t reach_settings_model_toggle_bundled_font(reach_settings_model *model)
         return 0;
     }
     model->display_bundled_font = model->display_bundled_font ? 0 : 1;
-    float current = reach_animation_manager_value(&model->display_font_animation, 0);
-    reach_animation_manager_start(&model->display_font_animation, 0, current,
-                                  model->display_bundled_font ? 1.0f : 0.0f, 0.18,
-                                  REACH_EASING_EASE_OUT);
+    reach_motion_animate_to(&model->display_font_toggle, model->display_bundled_font ? 1.0f : 0.0f,
+                            0.18, REACH_EASING_EASE_OUT);
     return 1;
 }
 
@@ -176,16 +173,11 @@ int32_t reach_settings_model_tick_display_animations(reach_settings_model *model
     {
         return 0;
     }
-    reach_animation_manager_tick(&model->display_fps_animation, delta_seconds);
-    reach_animation_manager_tick(&model->display_font_animation, delta_seconds);
     reach_animation_manager_tick(&model->display_theme_animation, delta_seconds);
     return 1;
 }
 
 int32_t reach_settings_model_display_animations_active(const reach_settings_model *model)
 {
-    return model != nullptr &&
-           (reach_animation_manager_any_active(&model->display_fps_animation) ||
-            reach_animation_manager_any_active(&model->display_font_animation) ||
-            reach_animation_manager_any_active(&model->display_theme_animation));
+    return model != nullptr && reach_animation_manager_any_active(&model->display_theme_animation);
 }

@@ -66,7 +66,7 @@ are evaluated independently from the animation's active lifetime.
 | Stage reflow | `REACH_STAGE_ANIMATION_REFLOW`; `stage_layout.cpp` | Scalar/native / source rearrangement | Membership changes | Capability decision: stable sources and shared motion. |
 | Stage departure | `REACH_STAGE_ANIMATION_DEPARTURE`; `stage_layout.cpp` | Scalar/native / departing content | Removed source exit | Capability decision: retiring source lifetime and geometry. |
 | Stage close hover | `reach_stage::close_hover`; shared UI RGBA tint | Retained color / separate background and glyph coverage | Hover enter/leave | Implemented: pointer events submit canonical motion independently of geometry ticks; scalar enum/state sampling removed. Theme RGBA, presence alpha and reversal preserved. Bounded native/fallback checks and subsequent full WUC completion checks pass; final acceptance remains pending. |
-| Stage backdrop | `REACH_STAGE_ANIMATION_BACKDROP`; Stage render | Scalar / backdrop alpha | Presentation/close | Migrate: retained opacity independently of preview decision. |
+| Stage backdrop | `REACH_STAGE_ANIMATION_BACKDROP`; `reach_stage_thumbnail_at`, Stage native-overlay registration, DWM behind-target host | Scalar/native / layered desktop host opacity | Synchronized close reveal | Native-preview migration dependency: the backdrop is the desktop thumbnail host's background and whole-HWND alpha, not a Stage render command. The supported immediate port requires active-only canonical CPU projection with the preview path; no independent retained Stage layer is selected. Preserve desktop source/host ordering and close synchronization. |
 | Stage retarget | `REACH_STAGE_ANIMATION_RETARGET`; `stage_layout.cpp` | Scalar/native / interrupted landing correction | Close retarget | Capability decision: preserve verified landing choreography. |
 
 Declarations: `include/reach/features/dock.h`, `include/reach/features/top_bar.h`, and private
@@ -85,17 +85,17 @@ migrated, rather than only changing the track representation.
 | Effect / declared track storage | Execution and visual consumer | Active lifetime | Initial disposition and reason |
 | --- | --- | --- | --- |
 | `wifi_row_tracks[]`, including add-network row | `settings_wifi.cpp`, `settings_wifi_layout.cpp`, `settings_wifi_render.cpp` | Expand/collapse | Migrate: retained section reveal and following-row movement. |
-| `wifi_radio_track` | `settings_wifi.cpp`, Wi-Fi toggle render | Radio target changes | Migrate: retained knob position and eligible color/opacity feedback. |
+| `wifi_radio_toggle` | `settings_wifi.cpp`, shared retained toggle | Radio target changes | Implemented: canonical track tint/knob translation; scalar radio track, sampled commands and frame demand removed. Native/fallback verification passes; final product acceptance pending. |
 | `bluetooth_row_tracks[]` | `settings_bluetooth.cpp`, Bluetooth layout/render | Expand/collapse | Migrate: same section capability. |
-| `bluetooth_radio_track` | `settings_bluetooth.cpp`, Bluetooth toggle render | Radio target changes | Migrate: shared retained toggle. |
-| `startup_tracks[]` | `settings_startup_apps.cpp`, `settings_render.cpp` | Enable/disable target changes | Migrate: shared toggle across all entries. |
+| `bluetooth_radio_toggle` | `settings_bluetooth.cpp`, shared retained toggle | Radio target changes | Implemented: same retained primitive; scalar radio track, sampled commands and frame demand removed. Final product acceptance pending. |
+| `startup_toggles[]` | `settings_startup_apps.cpp`, shared retained toggle | Enable/disable target changes | Implemented: list refresh resets intent, entry changes retarget the live curve; scalar manager/tick/frame APIs removed. Full-capacity page command ownership verified. Final product acceptance pending. |
 | `power_tracks[]` | `settings_power_sleep.cpp`, `settings_render.cpp` | Custom timer entry/reconfiguration | Migrate: preserve picker/edit reveal with retained content. |
-| `power_wait_tracks[]` | `settings_power_sleep.cpp`, `settings_render.cpp` | Wait option target changes | Migrate: shared retained toggle. |
-| `display_fps_track` | `settings_monitors_scaling.cpp`, `settings_render.cpp` | Refresh preference changes | Migrate: shared retained toggle. |
-| `display_font_track` | `settings_monitors_scaling.cpp`, `settings_render.cpp` | Font preference changes | Migrate: retain feedback and invalidate actual font content. |
+| `power_wait_toggles[]` | `settings_power_sleep.cpp`, shared retained toggle and label tint | Wait option target changes | Implemented: track, knob and label alpha share canonical intent; scalar wait tracks and frame demand removed. Picker/edit reveal remains separate. Final product acceptance pending. |
+| `display_fps_toggle` | `settings_monitors_scaling.cpp`, shared retained toggle | Refresh preference changes | Implemented: retained track/knob; scalar track and frame demand removed, refresh policy unchanged. Final product acceptance pending. |
+| `display_font_toggle` | `settings_monitors_scaling.cpp`, shared retained toggle | Font preference changes | Implemented: retained track/knob; scalar track and frame demand removed, actual font changes still invalidate content. Final product acceptance pending. |
 | `display_theme_track` | `settings_monitors_scaling.cpp`, `settings_render.cpp` | Theme selection | Migrate: retained selection without changing theme policy. |
 | `top_bar_style_track` | `settings_top_bar.cpp`, `settings_render.cpp` | Style selection | Migrate: retained segmented selection. |
-| `top_bar_mode_track` | `settings_top_bar.cpp`, `settings_render.cpp` | Mode selection | Migrate: retained segmented selection. |
+| `top_bar_mode_toggle` | `settings_top_bar.cpp`, shared retained auto-hide toggle | Mode selection | Implemented: this control is a binary toggle, not a segmented selector; retained track/knob replace its scalar track and frame demand. Style selection remains separate. Final product acceptance pending. |
 | `button_press_feedback` | `settings_feature.cpp`, shared UI buttons and app routing | Absolute-time retained RGBA tint / original-target feedback | Implemented: scalar manager, tick and sampled colors removed. Both compositors reuse coverage; fallback schedules the same descriptors to their final frame. Build, tests and bounded diagnostics pass; displayed compositor pixels and total product cost remain pending. |
 
 ## Already retained presentation and movement

@@ -134,6 +134,15 @@ support expectation is explicitly resolved.
     Debug builds, 39 tests and bounded native/fallback diagnostics pass at 100%, 125% and 200%
     geometry scales. GPU color-matrix and fallback coverage readback pass. Displayed compositor
     pixels, live input and total product cost remain part of final acceptance.
+  - [x] Migrate Settings' animated binary toggles and the power wait label fade.
+    Shared cached track tint and knob translation preserve a stationary viewport and pixel-aligned
+    sources. Display/font preferences, top-bar auto-hide, Wi-Fi/Bluetooth radio state, startup
+    entries and power wait options use canonical event-time reversal; their scalar tracks and
+    frame demand are removed. Both builds and all 40 tests pass. Five full native runs per backend
+    plus fallback pass in Debug/Release; full pages, maximum startup membership, themes, four DPI
+    values and nested scope are checked. Fallback source pixels match exactly; cached endpoints
+    differ by at most one channel value. Intermediate filtering stays at the moving knob's
+    antialiased edge and is bounded/inspected. Displayed pixels and total product cost remain open.
   - [x] Dock and Top Bar press/release feedback uses retained opacity or RGBA tint. Feedback
     shares item movement descriptors in separate flat groups; scalar feedback tracks, sampled
     alpha/colors, frame blockers and the final shared pressable scalar bridge are removed.

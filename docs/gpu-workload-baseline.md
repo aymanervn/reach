@@ -1,6 +1,43 @@
 # GPU composition migration: workload baseline
 
 Status: counters verified; full product performance baseline and acceptance pending.
+
+## Settings retained binary toggles
+
+Settings Display/font preferences, top-bar auto-hide, Wi-Fi/Bluetooth radio state, startup entries
+and power wait options publish canonical `reach_motion` intent through one shared toggle control.
+A stationary parent owns viewport clipping, with separate cached track coverage and knob sources.
+RGBA tint and X translation advance natively without scaling the knob or changing source commands.
+Both sources use shared pixel-aligned padded bounds. The power wait label alpha follows the same
+timeline. Their scalar managers/tracks, advancement, sampled render values and frame demand are
+removed; fallback uses Settings' existing published-motion scheduling through the final frame.
+Immediate controls, row expansion and segmented selectors retain their separate current behavior.
+
+Seven simultaneous controls start and reverse through their real model actions. Each native
+backend submits 28 property changes across the two retargets, with zero scalar advances and zero
+retained raster passes. Four repeated settled submissions change no properties. Both Debug and
+Release complete five full native runs per backend plus HWND fallback without exclusions or
+failures. A separate scope check verifies inherited placement and restoring the containing group
+and scissor. Production command construction covers every affected page in both themes and four
+DPI scales, including all 64 startup entries within retained-group capacity.
+
+Readback compares the shared static control with retained execution at five positions, four DPI
+scales, fractional placement, non-unit theme-like RGBA and full/partial viewport clipping. The
+fallback matches exactly. Cached-source GPU composition differs by at most one channel value at
+endpoints. Intermediate bitmap filtering reaches 38 at individual edge channels, with maximum
+mean 0.054943 over the 220x100 image and at most 314 channels differing by more than two. Every
+such difference is within 1.75 pixels of the moving knob's circular antialias boundary; position,
+scale, track RGBA and stationary clip match the direct vector reference. The diagnostic enforces
+strict endpoints, bounded/localized edge filtering and nonempty reference content. The exported
+125% midpoint `toggle-retained.png` and `toggle-reference.png` were inspected. This is offscreen
+source composition, not displayed WUC/DC capture or a full product performance comparison.
+
+Evidence under `build/gpu-composition-migration`: `build-{debug,release}-toggles.log`,
+`test-{debug,release}-toggles.log`, `probe-toggles-{debug,release}-complete.log`,
+`probe-toggles-pixels-inspected.log`, `probe-toggles-parent.log`, and the workload JSONL reports.
+All 40 tests pass in serialized Debug/Release runs; architecture/format/whitespace checks pass.
+Live theme/font changes, input, displayed compositor pixels and total CPU/GPU/power/memory/latency
+acceptance remain pending in the broad checklist gates. The running Reach instance was not changed.
 See the [ledger](gpu-animation-ledger.md) and [checklist](gpu-composition-migration-checklist.md).
 
 ## Collection contract

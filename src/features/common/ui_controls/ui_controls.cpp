@@ -69,12 +69,9 @@ static void reach_ui_push_text(reach_render_command_buffer *commands, reach_rect
     (void)reach_render_command_buffer_push(commands, &command);
 }
 
-int32_t reach_ui_color_feedback_begin(reach_render_command_buffer *commands, uint64_t id,
-                                      reach_rect_f32 bounds, reach_color from, reach_color to,
-                                      const reach_motion *pressed)
+static reach_render_group reach_ui_color_group(uint64_t id, reach_rect_f32 bounds, reach_color from,
+                                               reach_color to, const reach_motion *progress)
 {
-    if (pressed == nullptr)
-        return 0;
     reach_render_group group = {};
     group.id = id;
     group.bounds = bounds;
@@ -83,9 +80,19 @@ int32_t reach_ui_color_feedback_begin(reach_render_command_buffer *commands, uin
     float target[] = {to.r, to.g, to.b, to.a};
     for (size_t index = 0; index < REACH_RENDER_COLOR_CHANNEL_COUNT; ++index)
         group.tint[index] =
-            reach_motion_affine(pressed, target[index] - source[index], source[index]);
+            reach_motion_affine(progress, target[index] - source[index], source[index]);
     reach_motion_set(&group.opacity, 1.0f);
     reach_motion_set(&group.scale, 1.0f);
+    return group;
+}
+
+int32_t reach_ui_color_feedback_begin(reach_render_command_buffer *commands, uint64_t id,
+                                      reach_rect_f32 bounds, reach_color from, reach_color to,
+                                      const reach_motion *pressed)
+{
+    if (pressed == nullptr)
+        return 0;
+    reach_render_group group = reach_ui_color_group(id, bounds, from, to, pressed);
     return reach_render_command_buffer_begin_group(commands, &group) == REACH_OK;
 }
 
@@ -258,6 +265,71 @@ void reach_ui_toggle_render(reach_render_command_buffer *commands, reach_rect_f3
     float knob_on_x = bounds.x + bounds.width - inset - knob;
     float knob_x = knob_off_x + (knob_on_x - knob_off_x) * position;
     reach_ui_push_rect(commands, {knob_x, bounds.y + inset, knob, knob}, knob * 0.5f, style->knob);
+}
+
+reach_result reach_ui_toggle_motion_render(reach_render_command_buffer *commands,
+                                           reach_rect_f32 bounds,
+                                           const reach_ui_toggle_style *style, uint64_t id,
+                                           const reach_motion *position)
+{
+    if (commands == nullptr || style == nullptr || position == nullptr || id == 0 ||
+        id > UINT64_MAX - 2)
+        return REACH_INVALID_ARGUMENT;
+    float inset = bounds.height * 0.15f;
+    float diameter = bounds.height - inset * 2.0f;
+    reach_rect_f32 knob_bounds = {bounds.x + inset, bounds.y + inset, diameter, diameter};
+    reach_render_command shape = {};
+    shape.type = REACH_RENDER_COMMAND_RECT;
+    shape.rect = bounds;
+    reach_rect_f32 track_source = {}, knob_source = {};
+    if (!reach_render_retained_command_bounds(&shape, &track_source))
+        return REACH_INVALID_ARGUMENT;
+    shape.rect = knob_bounds;
+    if (!reach_render_retained_command_bounds(&shape, &knob_source))
+        return REACH_INVALID_ARGUMENT;
+    uint64_t parent = commands->current_group_id;
+    int32_t clipped = commands->has_scissor;
+    reach_rect_f32 clip = commands->scissor_rect;
+    reach_motion progress = reach_motion_clamp(position, 0, 1);
+    reach_render_group viewport = {};
+    viewport.id = id;
+    viewport.parent_id = parent;
+    viewport.bounds = bounds;
+    viewport.has_clip = clipped;
+    viewport.clip = clip;
+    commands->current_group_id = 0;
+    reach_result result = reach_render_command_buffer_begin_group(commands, &viewport);
+    reach_render_command_buffer_end_group(commands);
+    if (result != REACH_OK)
+    {
+        commands->current_group_id = parent;
+        return result;
+    }
+    reach_render_command_buffer_clear_scissor(commands);
+    reach_render_group track =
+        reach_ui_color_group(id + 1, track_source, style->track_off, style->track_on, &progress);
+    track.parent_id = id;
+    result = reach_render_command_buffer_begin_group(commands, &track);
+    if (result == REACH_OK)
+    {
+        reach_ui_push_rect(commands, bounds, bounds.height * 0.5f, {1, 1, 1, 1});
+        reach_render_command_buffer_end_group(commands);
+        reach_render_group knob = {};
+        knob.id = id + 2;
+        knob.parent_id = id;
+        knob.bounds = knob_source;
+        knob.x = reach_motion_affine(&progress, bounds.width - inset * 2.0f - diameter, 0);
+        result = reach_render_command_buffer_begin_group(commands, &knob);
+        if (result == REACH_OK)
+        {
+            reach_ui_push_rect(commands, knob_bounds, diameter * 0.5f, style->knob);
+            reach_render_command_buffer_end_group(commands);
+        }
+    }
+    commands->current_group_id = parent;
+    if (clipped)
+        reach_render_command_buffer_set_scissor(commands, clip);
+    return result;
 }
 
 void reach_ui_textbox_render(reach_render_command_buffer *commands, reach_rect_f32 bounds,
