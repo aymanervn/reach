@@ -243,6 +243,8 @@ extern "C"
                                                     const reach_render_stretch *stretch,
                                                     const reach_render_command *commands,
                                                     size_t command_count);
+    int32_t reach_render_retained_command_bounds(const reach_render_command *command,
+                                                 reach_rect_f32 *out_bounds);
     reach_result reach_render_retain_commands(reach_render_command_buffer *buffer,
                                               size_t first_command, uint64_t first_group_id,
                                               uint64_t parent_id, const reach_motion *opacity,

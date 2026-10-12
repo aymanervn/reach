@@ -329,7 +329,7 @@ void reach_context_menu_open_window_list(reach_context_menu *menu, size_t target
                                        ctx->drop_direction);
     menu->state.open = 1;
     reach_feature_transition_set_open(&menu->popup_transition, 1);
-    reach_animation_manager_set(&menu->animations, REACH_CONTEXT_MENU_ANIM_HOVER, 0.0f);
+    reach_motion_set(&menu->hover, 0.0f);
     reach_motion_set(&menu->close_hover, 0.0f);
 }
 

@@ -128,6 +128,14 @@ support expectation is explicitly resolved.
     Debug build, 39 tests and five close-hover runs per compositor plus fallback pass with no
     retained raster work. Subsequent full native runs include the resolved WUC completion path;
     final product acceptance is still pending.
+  - [x] Context Menu preview header/border hover uses canonical retained opacity and RGBA tint.
+    Remove the scalar hover track/accessor and its frame demand; retain ordinary rows' immediate
+    feedback and existing leave/identity/reset behavior. Window-keyed layers share pixel-aligned
+    source bounds. The final border helper forces opaque alpha, so the existing affine tint preserves
+    its visible color. Debug build, 39 tests and five full native runs per backend plus fallback pass;
+    native hover retargets have zero raster passes/scalar advances. Five hover values at four DPI
+    settings, including fractional placement, match the former fallback pixels exactly and cached
+    composition within one channel value. Displayed pixels and total product cost remain pending.
   - [x] Stage close hover uses the shared retained RGBA tint for background and glyph. Pointer
     events submit changes directly; remove the scalar enum/state sampling and feedback frame demand.
     Preserve theme colors, presence alpha, reversal, source retirement and hide/game-mode reset.

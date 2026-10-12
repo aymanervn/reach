@@ -523,8 +523,14 @@ geometry, backdrop and native close choreography remain separately owned scalar/
 
 Dock preview close buttons retain separate background groups keyed by source window identity.
 The capsule publishes affine hover opacity and keeps the glyph outside that group. Close hover
-owns no scalar track or sampled accessor; hiding/reset clears its motion. Preview header/border
-hover and width/reflow remain scalar consumers.
+owns no scalar track or sampled accessor; hiding/reset clears its motion. Preview header hover now
+uses canonical retained opacity, and the square border uses the shared RGBA tint. Both are keyed by
+window identity and use shared pixel-aligned source bounds. The border drawing helper makes its
+painted alpha opaque, so the visible interpolation is affine. Enter/leave and identity semantics are
+preserved; ordinary menu rows keep immediate feedback. The header hover scalar track/accessor and
+its frame demand are removed; width/reflow remain separate scalar consumers. A contained single
+rectangle in the tint fallback draws directly with its effective color, preserving fractional-position
+edge antialiasing and avoiding an unnecessary intermediate coverage bitmap.
 
 Top Bar tray and Dock icon groups use stable item identities. Pointer events publish direct
 positions, reordered neighbours and released items run compositor motion, and a stationary drag
