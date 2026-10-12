@@ -32,7 +32,9 @@ static const char *const counter_names[] = {"wakeups",
                                             "thumbnail_releases",
                                             "wuc_executions",
                                             "dcomp_executions",
-                                            "fallback_executions"};
+                                            "fallback_executions",
+                                            "visual_tree_mutations",
+                                            "scene_transform_submissions"};
 
 static_assert(sizeof(counter_names) / sizeof(counter_names[0]) == REACH_WORKLOAD_COUNTER_COUNT);
 

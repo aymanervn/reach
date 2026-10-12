@@ -38,6 +38,36 @@ alternative's resource/composition overhead before settling the final CPU/GPU di
 step removes the continuous wake path and provides shared fallback timing; it does not close the
 repetition or final performance acceptance gates.
 
+## Retained scene topology and content matrix
+
+Both adapters previously cleared and reattached the scene on every execution, independently of
+group property/content deduplication. The owned two-layer comparison records 300 retained-tree
+mutations and 100 scene matrix submissions across 100 unchanged executions on each backend.
+Ordered group/parent ownership and named content-matrix fields are now cached. The same comparison
+records zero tree mutations, matrix submissions, raster passes or group-property updates.
+No additional topology vector is allocated for an unchanged submission.
+
+Raster edits and canonical motion retargets preserve native ownership. Matrix changes submit one
+matrix without changing sources or topology; reorder changes native attachment order without
+rasterization. Font replacement invalidates visual identity even when IDs are unchanged. Empty
+scenes remain cached; suspend/recreation clears the cache. Cache validity is withheld until every
+attachment succeeds, and a deliberately rejected oversized source during rebuilding is repaired
+by the next valid submission. Existing hierarchy probes also check reparenting and parent-source
+introduction/retirement without unnecessary tree work. Windows Composition's actual collection is
+enumerated to verify painter order and replacement identity.
+
+`visual_tree_mutations` counts instrumented retained-tree attachment/removal attempts separately
+from group properties; `scene_transform_submissions` counts content matrix writes. These are native
+API observations, not GPU frame counts. The focused comparison passes on both compositors in
+`probe-topology-before.log`, `probe-topology-after.log` and `probe-topology-focused.log` under
+`build/gpu-composition-migration`. Both isolated builds and all 40 tests pass; full native suites
+pass five runs per backend plus fallback in Debug and Release (`probe-topology-{debug,release}-complete.log`).
+Final scoped probes verify the added teardown instrumentation and all topology scenarios on the
+final build (`probe-topology-{debug,release}-counters.log`). Architecture, formatting and whitespace
+checks pass. The existing Reach instance is unchanged.
+Displayed DirectComposition pixels, actual device loss and repeated total product workload
+acceptance remain open; reduced native submissions alone do not prove those gates.
+
 ## Isolated textbox sources
 
 The retained adapter now partitions each ungrouped `TEXTBOX` into its own source and preserves
@@ -62,7 +92,7 @@ Evidence is `probe-textbox-{debug,release}-complete.log`, `probe-textbox-before.
 `test-{debug,release}-textbox-cache.log` under `build/gpu-composition-migration`.
 
 This is source invalidation isolation, not independent GPU caret animation or displayed compositor
-capture. Retained scene topology still requires an unchanged-submission audit, and the final
+capture. Retained scene topology now has a focused unchanged-submission comparison, and the final
 caret disposition and repeated product CPU/GPU/power/memory/latency comparisons remain open.
 
 ## Settings retained binary toggles
