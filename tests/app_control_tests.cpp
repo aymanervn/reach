@@ -100,6 +100,7 @@ static int wait_for_completion(reach_app_control *service,
 }
 
 static std::atomic<unsigned long long> fake_explorer_thread;
+static std::atomic<unsigned long long> fake_path_exists_thread;
 static std::atomic<int> fake_path_exists_calls;
 static std::atomic<int> fake_shell_calls;
 static std::atomic<int> fake_open_path_calls;
@@ -114,6 +115,7 @@ static int32_t fake_path_exists(reach_explorer_service *service, const uint16_t 
 {
     (void)service;
     fake_explorer_thread.store(current_thread_id());
+    fake_path_exists_thread.store(current_thread_id());
     ++fake_path_exists_calls;
     return path != nullptr && path[0] == 'y';
 }
@@ -182,14 +184,14 @@ static void test_open_location_never_touches_the_port_on_the_caller(void)
 
     const unsigned long long caller = current_thread_id();
     fake_explorer_thread.store(caller);
+    fake_path_exists_thread.store(caller);
 
     const uint16_t shell_location[] = {'s', 'h', 'e', 'l', 'l', 0};
     expect_true(reach_app_control_schedule_open_location(service, REACH_APP_CONTROL_LOCATION_SHELL,
                                                          shell_location) == REACH_OK,
                 "a shell location is accepted for scheduling");
-    expect_true(fake_shell_calls.load() == 0,
-                "scheduling a shell location does not open it on the caller");
     expect_true(wait_for_explorer(fake_shell_calls), "the worker opens the shell location");
+    expect_true(fake_shell_calls.load() == 1, "the worker opens the requested shell location once");
     expect_true(fake_explorer_thread.load() != caller,
                 "the shell location is opened off the calling thread");
 
@@ -197,13 +199,13 @@ static void test_open_location_never_touches_the_port_on_the_caller(void)
     expect_true(reach_app_control_schedule_open_location(service, REACH_APP_CONTROL_LOCATION_PATH,
                                                          missing) == REACH_OK,
                 "a path is accepted for scheduling");
-    expect_true(fake_path_exists_calls.load() == 0,
-                "the existence probe does not run on the caller");
     expect_true(wait_for_explorer(fake_open_default_calls),
                 "a path that does not exist falls back to the default location");
+    expect_true(fake_path_exists_calls.load() == 1 && fake_path_exists_thread.load() != caller,
+                "the existence probe runs once off the calling thread");
     expect_true(fake_open_path_calls.load() == 0, "and does not open the missing path");
     expect_true(fake_explorer_thread.load() != caller,
-                "the existence probe runs off the calling thread");
+                "the fallback location opens off the calling thread");
 
     reach_app_control_stop(service);
     reach_app_control_destroy(service);
