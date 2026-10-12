@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "reach/core/geometry.h"
+#include "reach/core/animated_rect.h"
 #include "reach/core/ui_events.h"
 #include "reach/core/window_id.h"
 #include "reach/support/util.h"
@@ -51,6 +52,8 @@ extern "C"
         reach_motion y;
         reach_motion scale;
         reach_motion scale_y;
+        int32_t has_motion_bounds;
+        reach_rect_motion motion_bounds;
     } reach_platform_window_input_presentation;
 
     typedef struct reach_platform_window_ops

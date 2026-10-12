@@ -1,6 +1,7 @@
 #include "reach/features/common/layout.h"
 #include "reach/core/ui_layout.h"
 #include "reach/core/render_commands.h"
+#include "reach/features/common/popup.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -620,9 +621,53 @@ static void test_retained_command_preflight_preserves_batch_atomicity(void)
                 "text source padding is pixel aligned and contains glyph overhang");
 }
 
+static void test_popup_height_motion_matches_constrained_placement(void)
+{
+    for (float dpi : {1.0f, 1.25f, 1.5f, 2.0f})
+        for (int direction : {REACH_POPUP_DROP_DOWN, REACH_POPUP_DROP_UP})
+            for (float edge : {-100.0f, 30.0f, 350.0f, 780.0f, 1200.0f})
+            {
+                reach_popup_anchor anchor = {};
+                anchor.monitor = {100 * dpi, 50 * dpi, 800 * dpi, 700 * dpi};
+                anchor.button = {110 * dpi, edge * dpi, 40 * dpi, 30 * dpi};
+                anchor.bar_edge_y = edge * dpi;
+                anchor.direction = direction;
+                reach_motion height = {};
+                reach_motion_start_at(&height, 180 * dpi, 900 * dpi, 2, REACH_EASING_EASE_OUT, 10);
+                reach_rect_motion bounds = {};
+                expect_true(reach_popup_height_motion(&anchor, 950 * dpi, &height, 8 * dpi,
+                                                      &bounds) == REACH_OK,
+                            "popup dimension motion resolves monitor constraints");
+                reach_transform_f32 transform = {1.25f, 0.75f, 17, -8};
+                reach_rect_motion projected = reach_rect_motion_transform(&bounds, transform);
+                for (double now : {10.0, 10.1, 10.5, 11.0, 12.0})
+                {
+                    reach_rect_f32 expected =
+                        reach_popup_place(&anchor, 950 * dpi, reach_motion_value_at(&height, now),
+                                          8 * dpi)
+                            .bounds;
+                    reach_rect_f32 actual = reach_rect_motion_value_at(&bounds, now);
+                    expect_near(actual.x, expected.x, 0.001f,
+                                "motion preserves horizontal constraints");
+                    expect_near(actual.y, expected.y, 0.001f,
+                                "motion preserves anchored and clamped Y placement");
+                    expect_near(actual.width, expected.width, 0.001f,
+                                "motion preserves constrained popup width");
+                    expect_near(actual.height, expected.height, 0.001f,
+                                "motion preserves constrained popup height");
+                    reach_rect_f32 mapped = reach_rect_motion_value_at(&projected, now);
+                    expect_near(mapped.y, actual.y * transform.scale_y + transform.offset_y, 0.001f,
+                                "native input projection shares the canonical rectangle");
+                    expect_near(mapped.height, actual.height * transform.scale_y, 0.001f,
+                                "native input projection preserves bounded dimension motion");
+                }
+            }
+}
+
 int main(void)
 {
     test_stretch_geometry_preserves_caps_and_anchor();
+    test_popup_height_motion_matches_constrained_placement();
     test_group_hierarchy_samples_one_geometry_timeline();
     test_retained_command_preflight_preserves_batch_atomicity();
     test_group_hierarchy_rejects_ambiguous_ownership_and_order();

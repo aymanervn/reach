@@ -69,10 +69,10 @@ reach_pointer_event reach_host_surface_pointer_event(const reach_feature_runtime
     {
         desc->definition->capsule_ops->surface_geometry(desc->capsule, &geometry);
     }
+    double now_seconds = reach_motion_now_seconds();
     if (geometry.presentation.retained)
     {
         const reach_render_group *group = &geometry.presentation.group;
-        double now_seconds = reach_motion_now_seconds();
         reach_point_f32 scale = reach_render_group_scale_at(group, now_seconds);
         float center_x = geometry.visible_bounds.x + geometry.visible_bounds.width * 0.5f;
         float center_y = geometry.visible_bounds.y + geometry.visible_bounds.height * 0.5f;
@@ -89,6 +89,16 @@ reach_pointer_event reach_host_surface_pointer_event(const reach_feature_runtime
         }
         pointer.surface_relation =
             reach_rect_contains(geometry.visible_bounds, pointer.x, pointer.y)
+                ? REACH_POINTER_SURFACE_INSIDE
+                : REACH_POINTER_SURFACE_OUTSIDE;
+    }
+    if (geometry.has_input_bounds)
+    {
+        reach_rect_f32 input = reach_rect_motion_value_at(&geometry.input_bounds, now_seconds);
+        input.x += geometry.visible_bounds.x;
+        input.y += geometry.visible_bounds.y;
+        pointer.surface_relation =
+            input.width > 0 && input.height > 0 && reach_rect_contains(input, pointer.x, pointer.y)
                 ? REACH_POINTER_SURFACE_INSIDE
                 : REACH_POINTER_SURFACE_OUTSIDE;
     }

@@ -51,7 +51,7 @@ support expectation is explicitly resolved.
     stationary inner clips and ancestor motion compose without a new clock. Preserve painter
     order and validate parent ownership; reparenting and parent-content retirement reuse children.
     Debug builds, all 39 tests and five full native runs per backend plus HWND fallback pass.
-    Complete Quick Settings integration and displayed-pixel/product acceptance remain pending.
+    Quick Settings height/section integration is implemented; displayed-pixel/product acceptance remains pending.
 - [ ] Decide whether supported live-preview composition meets behavior and efficiency requirements;
   document the selected compositor or optimized hybrid design for Dock, Switcher and Stage.
   - [x] Select the existing DWM port with retained Reach visuals and active-only native motion.
@@ -70,8 +70,8 @@ support expectation is explicitly resolved.
     Preserve delayed fade/early saturation, negative affine mapping, event-time retarget and owner
     deadlines. Both native renderers, fallback, root endpoints/envelopes and fixed-cap normalization
     consume the limits; the old adapter-local compiler is removed. Debug builds, all 39 tests and
-    five full native runs per backend plus HWND fallback pass. Complete Quick Settings
-    integration and displayed-pixel/product-performance acceptance remain pending.
+    five full native runs per backend plus HWND fallback pass. Quick Settings height/section
+    integration is implemented; displayed-pixel/product-performance acceptance remains pending.
 - [ ] Separate content/layout invalidation, compositor submission, native placement and input updates
   in both application loops; pure compositor motion must not request periodic application frames.
 - [ ] Verify completion, stale-generation rejection, hide/reset and supported fallback semantics on
@@ -103,7 +103,7 @@ support expectation is explicitly resolved.
     compositor/fallback diagnostics pass.
   - [x] Quick Settings press/release overlay uses the same shared primitive; obsolete feedback track
     and sampled alpha removed (`e4c133e`). Build, 39 tests and native compositor/fallback diagnostics pass.
-    Height and section expansion remain separate pending work.
+    Height and section expansion now use retained layout motion; final product acceptance remains open.
   - [x] Tray popup press/release uses retained icon-tint or rectangle opacity, preserving its
     previous appearance. The scalar track, accessor and composition frame blocker are removed.
     Debug builds, 39 tests and bounded capsule diagnostics pass on both compositors and fallback.
@@ -149,7 +149,18 @@ support expectation is explicitly resolved.
     the slide and visible clips; one deadline retires content. Debug builds, 39 tests and five full
     native runs per backend plus fallback pass, including maximum membership and DPI/source-pixel
     checks. Endpoint limits stay strict; intermediate bitmap filtering is explicitly bounded and
-    inspected. Popup height/scroll/monitor integration and final product acceptance remain open.
+    inspected. Popup height/scroll/monitor integration is implemented; final product acceptance remains open.
+  - [x] Migrate Quick Settings popup height, scroll clamping and input alignment.
+    One canonical layout epoch drives shared fixed-cap chrome, body placement, viewport clipping and
+    scroll translation inside a stable session envelope. Remove the height scalar manager, tick,
+    accessors, sampled render state and composition frame blocker. Panel source-extent changes
+    retarget scroll geometry even when the collapsed target is unchanged; reopening resets intent.
+    Generic capsule/native input rectangles sample the same motion without a window-update timer.
+    Debug build, all 39 tests, architecture/format/whitespace and five full native runs per backend
+    plus fallback pass. Positive scroll/collapse/reversal, source churn, both directions, compact
+    monitors and four DPI values are covered; source chrome readback differs by at most one channel
+    value. Native collapse/reversal reuses sources with zero raster passes. Animated custom compact
+    geometry, displayed compositor pixels and total product acceptance remain in the broader gates.
 - [ ] Migrate Top Bar control widths and Dock insertion, removal, reorder and capacity fitting;
   verify existing compositor consumers as well as newly migrated paths.
 - [ ] Migrate Dock popup width/reflow and Switcher width fitting using the selected preview design;

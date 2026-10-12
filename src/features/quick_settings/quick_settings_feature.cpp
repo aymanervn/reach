@@ -644,12 +644,6 @@ reach_quick_settings_layout reach_quick_settings_layout_for_content_bounds_scale
         content_bounds, theme, model, output_devices_expansion, app_volumes_expansion, dpi_scale);
 }
 
-enum
-{
-    REACH_QUICK_SETTINGS_ANIMATION_HEIGHT = 0,
-    REACH_QUICK_SETTINGS_ANIMATION_COUNT
-};
-
 static const float REACH_QUICK_SETTINGS_POPUP_MARGIN = 8.0f;
 
 #define REACH_QUICK_SETTINGS_MAX_RETIRED_RENDER_ICONS                                              \
@@ -657,8 +651,15 @@ static const float REACH_QUICK_SETTINGS_POPUP_MARGIN = 8.0f;
 
 struct reach_quick_settings
 {
-    reach_animation_manager animations;
-    reach_animation_track animation_tracks[REACH_QUICK_SETTINGS_ANIMATION_COUNT];
+    reach_motion height;
+    reach_motion layout_progress;
+    reach_motion scroll_maximum;
+    reach_quick_settings_layout_context layout_context = {};
+    int32_t layout_initialized = 0;
+    double pending_motion_seconds = 0;
+    float content_target_height = 0;
+    float output_content_span = 0;
+    float app_content_span = 0;
     reach_feature_transition popup_transition;
     reach_pressable pressable;
     reach_motion press_feedback;
@@ -725,12 +726,21 @@ static void reach_quick_settings_animate_expansion(reach_quick_settings *quick_s
     reach_motion_animate_to_at(motion, expanded ? 1.0f : 0.0f, REACH_SECTION_REVEAL_SECONDS,
                                REACH_EASING_EASE_OUT, now_seconds);
     quick_settings->section_cleanup_pending = 1;
+    quick_settings->pending_motion_seconds = now_seconds;
+    quick_settings->relayout_animate_pending = 1;
 }
 
 static void reach_quick_settings_sample_input_layout(reach_quick_settings *quick_settings,
                                                      double now_seconds)
 {
     reach_quick_settings_state &state = quick_settings->state;
+    reach_rect_f32 body = reach_rect_motion_value_at(&state.surface_motion, now_seconds);
+    state.bounds = body;
+    state.bounds.x += state.render_bounds.x;
+    state.bounds.y += state.render_bounds.y;
+    state.content_bounds = reach_quick_settings_content_bounds_for(
+        body, &quick_settings->layout_theme, quick_settings->layout_dpi, state.drop_direction);
+    state.scroll_offset = reach_motion_value_at(&state.scroll_motion, now_seconds);
     float output = reach_motion_value_at(&state.output_devices_expansion, now_seconds);
     float apps = reach_motion_value_at(&state.app_volumes_expansion, now_seconds);
     float height = reach_quick_settings_content_height_for_expansion_scaled(
@@ -821,9 +831,12 @@ int32_t reach_quick_settings_set_open(reach_quick_settings *quick_settings, int3
     if (next_open)
     {
         state->scroll_offset = 0.0f;
+        reach_motion_set(&state->scroll_motion, 0);
+        reach_motion_set(&quick_settings->scroll_maximum, 0);
         reach_quick_settings_refresh_system(quick_settings, 0);
         reach_quick_settings_refresh_audio(quick_settings);
-        reach_quick_settings_reset_height_animation(quick_settings);
+        reach_motion_set(&quick_settings->height, 0);
+        quick_settings->layout_initialized = 0;
     }
     return 1;
 }
@@ -841,6 +854,11 @@ void reach_quick_settings_force_close(reach_quick_settings *quick_settings)
                      state->model.output_devices_expanded ? 1 : 0);
     reach_motion_set(&state->app_volumes_expansion, state->model.expanded ? 1 : 0);
     quick_settings->section_cleanup_pending = 0;
+    reach_motion_set(&quick_settings->layout_progress, 1);
+    reach_motion_set(&quick_settings->height, state->target_bounds.height);
+    quick_settings->relayout_animate_pending = 0;
+    quick_settings->pending_motion_seconds = 0;
+
     state->drag.active = 0;
     state->drag.type = REACH_QUICK_SETTINGS_HIT_NONE;
     reach_quick_settings_reset_pressable(quick_settings);
@@ -854,8 +872,14 @@ void reach_quick_settings_reset(reach_quick_settings *quick_settings)
     }
     reach_quick_settings_state *state = reach_quick_settings_state_mut(quick_settings);
     reach_quick_settings_model_init(&state->model);
-    reach_animation_manager_reset(&quick_settings->animations,
-                                  REACH_QUICK_SETTINGS_ANIMATION_HEIGHT);
+    reach_motion_set(&quick_settings->height, 0);
+    reach_motion_set(&quick_settings->layout_progress, 1);
+    reach_motion_set(&quick_settings->scroll_maximum, 0);
+    state->surface_motion = {};
+    state->render_bounds = {};
+    reach_motion_set(&state->scroll_motion, 0);
+    quick_settings->layout_initialized = 0;
+    quick_settings->pending_motion_seconds = 0;
     reach_motion_set(&state->output_devices_expansion, 0.0f);
     reach_motion_set(&state->app_volumes_expansion, 0.0f);
     quick_settings->section_cleanup_pending = 0;
@@ -920,10 +944,6 @@ static void reach_quick_settings_capsule_tick(void *capsule, double delta_second
                                               reach_feature_tick_result *out)
 {
     reach_quick_settings *quick_settings = static_cast<reach_quick_settings *>(capsule);
-    int32_t animations_were_active =
-        quick_settings != nullptr &&
-        reach_animation_manager_any_active(&quick_settings->animations);
-    reach_quick_settings_tick(quick_settings, delta_seconds);
     int32_t popup_changed =
         quick_settings != nullptr
             ? reach_feature_transition_tick(&quick_settings->popup_transition, delta_seconds)
@@ -937,7 +957,8 @@ static void reach_quick_settings_capsule_tick(void *capsule, double delta_second
     reach_feature_tick_result changes = {};
     reach_quick_settings_process_changes(quick_settings, &changes);
     if (quick_settings != nullptr && quick_settings->section_cleanup_pending &&
-        !reach_quick_settings_sections_active(quick_settings))
+        !reach_quick_settings_sections_active(quick_settings) &&
+        !reach_motion_active(&quick_settings->layout_progress))
     {
         quick_settings->section_cleanup_pending = 0;
         changes.redraw = changes.relayout = 1;
@@ -945,9 +966,7 @@ static void reach_quick_settings_capsule_tick(void *capsule, double delta_second
     }
     if (out != nullptr)
     {
-        out->redraw = changes.redraw || animations_were_active || popup_changed ||
-                      (quick_settings != nullptr &&
-                       reach_animation_manager_any_active(&quick_settings->animations));
+        out->redraw = changes.redraw || popup_changed;
         out->relayout = changes.relayout;
         out->request_update = changes.request_update ||
                               (quick_settings != nullptr && reach_feature_transition_needs_update(
@@ -975,7 +994,6 @@ static int32_t reach_quick_settings_capsule_needs_frame(const void *capsule)
         return 0;
     }
     return reach_feature_transition_needs_update(&quick_settings->popup_transition) ||
-           reach_animation_manager_any_active(&quick_settings->animations) ||
            (quick_settings->status != nullptr &&
             (reach_system_status_audio_pending(quick_settings->status) ||
              reach_system_status_system_pending(quick_settings->status)));
@@ -1002,16 +1020,19 @@ static void reach_quick_settings_capsule_surface_geometry(const void *capsule,
     }
     const reach_quick_settings *quick_settings = static_cast<const reach_quick_settings *>(capsule);
     *out = {};
-    out->visible_bounds = quick_settings->state.bounds;
-    out->envelope_bounds = quick_settings->state.target_bounds;
+    out->visible_bounds = quick_settings->state.render_bounds;
+    out->envelope_bounds = quick_settings->state.render_bounds;
+    out->has_input_bounds = 1;
+    out->input_bounds = quick_settings->state.surface_motion;
     out->notch_anchor_x = quick_settings->state.notch_anchor_x;
     out->notch_side = reach_popup_notch_side(quick_settings->state.drop_direction);
     reach_feature_transition_presentation(&quick_settings->popup_transition, out);
     if (quick_settings->section_cleanup_pending)
         out->deadline_seconds =
             fmax(out->deadline_seconds,
-                 fmax(reach_motion_deadline(&quick_settings->state.output_devices_expansion),
-                      reach_motion_deadline(&quick_settings->state.app_volumes_expansion)));
+                 fmax(reach_motion_deadline(&quick_settings->layout_progress),
+                      fmax(reach_motion_deadline(&quick_settings->state.output_devices_expansion),
+                           reach_motion_deadline(&quick_settings->state.app_volumes_expansion))));
 }
 
 static reach_quick_settings_hit_result
@@ -1349,6 +1370,8 @@ static void reach_quick_settings_capsule_handle_pointer(void *capsule,
             quick_settings->state.scroll_offset = quick_settings->state.scroll_max;
         }
         out->handled = 1;
+        quick_settings->state.scroll_motion = reach_motion_clamp(
+            &quick_settings->scroll_maximum, 0, quick_settings->state.scroll_offset);
         out->redraw = 1;
         out->relayout = 1;
     }
@@ -1386,8 +1409,6 @@ reach_result reach_quick_settings_create(reach_quick_settings **out_quick_settin
     {
         return REACH_ERROR;
     }
-    reach_animation_manager_init(&quick_settings->animations, quick_settings->animation_tracks,
-                                 REACH_QUICK_SETTINGS_ANIMATION_COUNT);
     reach_feature_transition_init(&quick_settings->popup_transition,
                                   REACH_FEATURE_TRANSITION_FROM_ABOVE);
     reach_pressable_init(&quick_settings->pressable);
@@ -1548,58 +1569,9 @@ void reach_quick_settings_process_changes(reach_quick_settings *quick_settings,
     }
 }
 
-void reach_quick_settings_tick(reach_quick_settings *quick_settings, double delta_seconds)
-{
-    if (quick_settings == nullptr)
-    {
-        return;
-    }
-    reach_animation_manager_tick(&quick_settings->animations, delta_seconds);
-}
-
-void reach_quick_settings_start_height_animation(reach_quick_settings *quick_settings,
-                                                 float from_height, float to_height)
-{
-    if (quick_settings == nullptr)
-    {
-        return;
-    }
-    reach_animation_manager_start(&quick_settings->animations,
-                                  REACH_QUICK_SETTINGS_ANIMATION_HEIGHT, from_height, to_height,
-                                  REACH_SECTION_REVEAL_SECONDS, REACH_EASING_EASE_OUT);
-}
-
-void reach_quick_settings_reset_height_animation(reach_quick_settings *quick_settings)
-{
-    if (quick_settings == nullptr)
-    {
-        return;
-    }
-    reach_animation_manager_reset(&quick_settings->animations,
-                                  REACH_QUICK_SETTINGS_ANIMATION_HEIGHT);
-}
-
-int32_t reach_quick_settings_height_animation_active(const reach_quick_settings *quick_settings)
-{
-    return quick_settings != nullptr &&
-           reach_animation_manager_active(&quick_settings->animations,
-                                          REACH_QUICK_SETTINGS_ANIMATION_HEIGHT);
-}
-
-float reach_quick_settings_height_animation_value(const reach_quick_settings *quick_settings)
-{
-    if (quick_settings == nullptr)
-    {
-        return 0.0f;
-    }
-    return reach_animation_manager_value(&quick_settings->animations,
-                                         REACH_QUICK_SETTINGS_ANIMATION_HEIGHT);
-}
-
-static reach_rect_f32 reach_quick_settings_content_bounds_for(reach_rect_f32 surface_bounds,
-                                                              const reach_theme *theme,
-                                                              float dpi_scale,
-                                                              int32_t drop_direction)
+reach_rect_f32 reach_quick_settings_content_bounds_for(reach_rect_f32 surface_bounds,
+                                                       const reach_theme *theme, float dpi_scale,
+                                                       int32_t drop_direction)
 {
     reach_rect_f32 bounds = reach_theme_border_content_rect(theme, dpi_scale, surface_bounds);
 
@@ -1671,58 +1643,141 @@ reach_quick_settings_placement(reach_quick_settings *quick_settings,
                              REACH_QUICK_SETTINGS_POPUP_MARGIN * ctx->dpi_scale);
 }
 
-static int32_t reach_quick_settings_height_changed(float a, float b)
+static reach_motion reach_quick_settings_layout_curve(const reach_motion *progress, float from,
+                                                      float to)
 {
-    float diff = a - b;
-    if (diff < 0.0f)
-    {
-        diff = -diff;
-    }
-    return diff > 0.5f;
+    reach_motion result = *progress;
+    result.from = from;
+    result.to = to;
+    if (from == to || result.duration_seconds <= 0)
+        reach_motion_set(&result, to);
+    return result;
 }
 
 void reach_quick_settings_refresh_layout(reach_quick_settings *quick_settings,
                                          const reach_quick_settings_layout_context *ctx)
 {
-    if (quick_settings == nullptr || ctx == nullptr)
-    {
+    if (quick_settings == nullptr || ctx == nullptr || ctx->theme == nullptr)
         return;
-    }
-
-    reach_quick_settings_state *state = reach_quick_settings_state_mut(quick_settings);
+    reach_quick_settings_state &state = quick_settings->state;
+    double now = reach_motion_now_seconds();
     reach_feature_transition_configure(&quick_settings->popup_transition, ctx->theme,
                                        ctx->dpi_scale, ctx->drop_direction);
-
-    reach_rect_f32 previous_target = state->target_bounds;
-    float current_height = state->bounds.height;
-    reach_popup_placement placement = reach_quick_settings_placement(quick_settings, ctx, 0.0f);
-    state->target_bounds = placement.bounds;
-
-    if (quick_settings->relayout_animate_pending)
+    bool environment_changed =
+        !quick_settings->layout_initialized || quick_settings->layout_dpi != ctx->dpi_scale ||
+        quick_settings->layout_theme.border_thickness != ctx->theme->border_thickness ||
+        !reach_rect_equal(quick_settings->layout_context.monitor, ctx->monitor) ||
+        !reach_rect_equal(quick_settings->layout_context.anchor_button, ctx->anchor_button) ||
+        quick_settings->layout_context.bar_edge_y != ctx->bar_edge_y ||
+        quick_settings->layout_context.drop_direction != ctx->drop_direction;
+    float current_height = quick_settings->height.generation != 0
+                               ? reach_motion_value_at(&quick_settings->height, now)
+                               : state.bounds.height;
+    float current_scroll = reach_motion_value_at(&state.scroll_motion, now);
+    reach_popup_placement target = reach_quick_settings_placement(quick_settings, ctx, 0);
+    float target_content =
+        reach_quick_settings_content_height_for_model_scaled(&state.model, ctx->dpi_scale);
+    float base_content = reach_quick_settings_content_height_for_expansion_scaled(
+        &state.model, 0, 0, ctx->dpi_scale);
+    float output_span = reach_quick_settings_content_height_for_expansion_scaled(&state.model, 1, 0,
+                                                                                 ctx->dpi_scale) -
+                        base_content;
+    float app_span = reach_quick_settings_content_height_for_expansion_scaled(&state.model, 0, 1,
+                                                                              ctx->dpi_scale) -
+                     base_content;
+    bool target_changed = !reach_rect_equal(state.target_bounds, target.bounds) ||
+                          fabsf(quick_settings->content_target_height - target_content) > 0.5f ||
+                          fabsf(quick_settings->output_content_span - output_span) > 0.5f ||
+                          fabsf(quick_settings->app_content_span - app_span) > 0.5f;
+    bool animate = !environment_changed &&
+                   (quick_settings->relayout_animate_pending ||
+                    (target_changed && (reach_motion_active(&quick_settings->layout_progress) ||
+                                        reach_quick_settings_sections_active(quick_settings))));
+    if (animate)
     {
-        quick_settings->relayout_animate_pending = 0;
-        if (reach_quick_settings_height_changed(previous_target.height, placement.bounds.height))
+        double event_time = quick_settings->pending_motion_seconds > 0
+                                ? quick_settings->pending_motion_seconds
+                                : now;
+        current_height = reach_motion_value_at(&quick_settings->height, event_time);
+        current_scroll = reach_motion_value_at(&state.scroll_motion, event_time);
+        float output_from =
+            state.output_devices_expansion.started_seconds == event_time
+                ? state.output_devices_expansion.from
+                : reach_motion_value_at(&state.output_devices_expansion, event_time);
+        float app_from = state.app_volumes_expansion.started_seconds == event_time
+                             ? state.app_volumes_expansion.from
+                             : reach_motion_value_at(&state.app_volumes_expansion, event_time);
+        reach_motion_start_at(&quick_settings->layout_progress, 0, 1, REACH_SECTION_REVEAL_SECONDS,
+                              REACH_EASING_EASE_OUT, event_time);
+        state.output_devices_expansion =
+            reach_quick_settings_layout_curve(&quick_settings->layout_progress, output_from,
+                                              state.model.output_devices_expanded ? 1 : 0);
+        state.app_volumes_expansion = reach_quick_settings_layout_curve(
+            &quick_settings->layout_progress, app_from, state.model.expanded ? 1 : 0);
+        quick_settings->height = reach_quick_settings_layout_curve(
+            &quick_settings->layout_progress, current_height, target.bounds.height);
+        float padding =
+            target.bounds.height - reach_quick_settings_content_bounds_for(
+                                       {0, 0, target.bounds.width, target.bounds.height},
+                                       ctx->theme, ctx->dpi_scale, ctx->drop_direction)
+                                       .height;
+        float content_from = reach_quick_settings_content_height_for_expansion_scaled(
+            &state.model, output_from, app_from, ctx->dpi_scale);
+        quick_settings->scroll_maximum = reach_quick_settings_layout_curve(
+            &quick_settings->layout_progress, content_from - current_height + padding,
+            target_content - target.bounds.height + padding);
+        state.scroll_motion =
+            reach_motion_clamp(&quick_settings->scroll_maximum, 0, fmaxf(0, current_scroll));
+        quick_settings->section_cleanup_pending = 1;
+    }
+    else if (environment_changed ||
+             (!reach_motion_active(&quick_settings->layout_progress) && target_changed))
+    {
+        reach_motion_set(&quick_settings->height, target.bounds.height);
+        reach_motion_set(&quick_settings->layout_progress, 1);
+        if (environment_changed)
         {
-            reach_quick_settings_start_height_animation(quick_settings, current_height,
-                                                        placement.bounds.height);
+            reach_motion_set(&state.output_devices_expansion,
+                             state.model.output_devices_expanded ? 1 : 0);
+            reach_motion_set(&state.app_volumes_expansion, state.model.expanded ? 1 : 0);
+            quick_settings->section_cleanup_pending = 0;
         }
+        float viewport = reach_quick_settings_content_bounds_for(
+                             {0, 0, target.bounds.width, target.bounds.height}, ctx->theme,
+                             ctx->dpi_scale, ctx->drop_direction)
+                             .height;
+        reach_motion_set(&quick_settings->scroll_maximum, fmaxf(0, target_content - viewport));
+        state.scroll_motion =
+            reach_motion_clamp(&quick_settings->scroll_maximum, 0, fmaxf(0, current_scroll));
     }
-
-    if (!reach_quick_settings_height_animation_active(quick_settings))
+    quick_settings->relayout_animate_pending = 0;
+    quick_settings->pending_motion_seconds = 0;
+    quick_settings->content_target_height = target_content;
+    quick_settings->output_content_span = output_span;
+    quick_settings->app_content_span = app_span;
+    state.target_bounds = target.bounds;
+    float extent = environment_changed
+                       ? target.bounds.height
+                       : fmaxf(state.render_bounds.height,
+                               fmaxf(quick_settings->height.from, quick_settings->height.to));
+    state.render_bounds = reach_quick_settings_placement(quick_settings, ctx, extent).bounds;
+    reach_popup_anchor anchor = reach_quick_settings_popup_anchor(ctx);
+    reach_rect_motion screen = {};
+    if (reach_popup_height_motion(&anchor, target.bounds.width, &quick_settings->height,
+                                  REACH_QUICK_SETTINGS_POPUP_MARGIN * ctx->dpi_scale,
+                                  &screen) == REACH_OK)
     {
-        state->bounds = state->target_bounds;
+        screen.x = reach_motion_affine(&screen.x, 1, -state.render_bounds.x);
+        screen.y = reach_motion_affine(&screen.y, 1, -state.render_bounds.y);
+        state.surface_motion = screen;
     }
-    state->notch_anchor_x = placement.notch_anchor_x;
-    state->drop_direction = ctx->drop_direction;
+    state.notch_anchor_x = target.notch_anchor_x;
+    state.drop_direction = ctx->drop_direction;
     quick_settings->layout_theme = *ctx->theme;
     quick_settings->layout_dpi = ctx->dpi_scale;
-
-    reach_rect_f32 surface_bounds = {};
-    surface_bounds.width = state->bounds.width;
-    surface_bounds.height = state->bounds.height;
-    state->content_bounds = reach_quick_settings_content_bounds_for(
-        surface_bounds, ctx->theme, ctx->dpi_scale, ctx->drop_direction);
-    reach_quick_settings_sample_input_layout(quick_settings, reach_motion_now_seconds());
+    quick_settings->layout_context = *ctx;
+    quick_settings->layout_initialized = 1;
+    reach_quick_settings_sample_input_layout(quick_settings, now);
 }
 
 void reach_quick_settings_relayout(reach_quick_settings *quick_settings,
@@ -1736,35 +1791,6 @@ void reach_quick_settings_relayout(reach_quick_settings *quick_settings,
 
     quick_settings->relayout_animate_pending = animate_height ? 1 : 0;
     reach_quick_settings_refresh_layout(quick_settings, ctx);
-}
-
-int32_t reach_quick_settings_update_open_animation(reach_quick_settings *quick_settings,
-                                                   const reach_quick_settings_layout_context *ctx)
-{
-    if (quick_settings == nullptr || ctx == nullptr)
-    {
-        return 0;
-    }
-
-    reach_quick_settings_state *state = reach_quick_settings_state_mut(quick_settings);
-    if (!state->open)
-    {
-        return 0;
-    }
-
-    if (reach_quick_settings_height_animation_active(quick_settings) ||
-        reach_quick_settings_height_changed(state->bounds.height, state->target_bounds.height))
-    {
-        reach_popup_placement animated = reach_quick_settings_placement(
-            quick_settings, ctx, reach_quick_settings_height_animation_value(quick_settings));
-
-        state->bounds = animated.bounds;
-
-        reach_quick_settings_refresh_layout(quick_settings, ctx);
-        return 1;
-    }
-
-    return 0;
 }
 
 int32_t reach_quick_settings_bluetooth_available(reach_quick_settings *quick_settings)

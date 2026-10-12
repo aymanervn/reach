@@ -9,7 +9,6 @@
 #include "reach/ports/text_measure.h"
 #include "reach/services/system_status.h"
 #include "reach/support/util.h"
-#include "reach/support/animation.h"
 
 #include <stdint.h>
 
@@ -126,7 +125,13 @@ extern "C"
         float dpi_scale;
         reach_motion output_devices_expansion;
         reach_motion app_volumes_expansion;
+        reach_rect_motion surface_motion;
+        reach_motion scroll_motion;
+        reach_rect_f32 render_bounds;
         reach_rect_f32 viewport;
+        int32_t has_background;
+        float notch_center_x;
+        int32_t notch_side;
         reach_text_measure_port text_measure;
         uint64_t press_feedback_target;
         reach_motion press_feedback;
@@ -184,10 +189,6 @@ extern "C"
 
     reach_result reach_quick_settings_create(reach_quick_settings **out_quick_settings);
     void reach_quick_settings_destroy(reach_quick_settings *quick_settings);
-    void reach_quick_settings_reset_height_animation(reach_quick_settings *quick_settings);
-    int32_t
-    reach_quick_settings_height_animation_active(const reach_quick_settings *quick_settings);
-
     typedef struct reach_quick_settings_drag_state
     {
         int32_t active;
@@ -208,6 +209,9 @@ extern "C"
         reach_rect_f32 content_bounds;
         reach_motion output_devices_expansion;
         reach_motion app_volumes_expansion;
+        reach_rect_motion surface_motion;
+        reach_motion scroll_motion;
+        reach_rect_f32 render_bounds;
         float scroll_offset;
         float scroll_max;
         float notch_anchor_x;
@@ -251,10 +255,6 @@ extern "C"
     void reach_quick_settings_relayout(reach_quick_settings *quick_settings,
                                        const reach_quick_settings_layout_context *ctx,
                                        int32_t animate_height);
-
-    int32_t
-    reach_quick_settings_update_open_animation(reach_quick_settings *quick_settings,
-                                               const reach_quick_settings_layout_context *ctx);
 
     int32_t reach_quick_settings_bluetooth_available(reach_quick_settings *quick_settings);
     int32_t reach_quick_settings_bluetooth_enabled(reach_quick_settings *quick_settings);

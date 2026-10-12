@@ -874,7 +874,16 @@ Quick Settings's output-device/app-volume reveals, following-row movement and ti
 crossfades now publish retained motion. Each section parent shares its fade and slide while
 individual paint leaves preserve overlapping alpha. Source layout is stable; pointer events sample
 current geometry and slide before hit testing. One deadline retires closing section content, and
-force-close clears motion. The popup-height scalar path remains pending.
+force-close clears motion. Popup height and section progress now share one absolute-time layout
+curve. The capsule owns shared fixed-cap chrome, a moving body, a clipped viewport and a scroll
+parent inside a stable session envelope. Wheel intent updates the scroll clamp; section source
+extent changes reconcile it even when the final collapsed height is unchanged. Environment changes
+cut old geometry and reopen resets scroll intent. The height manager, sampled render values and
+height frame blocker are removed. Optional capsule input bounds use `reach_rect_motion`; generic
+composition projects them into native client space and classifies events, and Win32 samples them
+for hit testing after the root inverse transform. Pure retained height motion requests no periodic
+application frames. Compact static chrome preserves the existing drawing path; animated geometry
+below fixed-cap limits remains part of the migration's pending capability work.
 Broader resize, color feedback and native-layout migrations remain pending in
 the [GPU migration checklist](gpu-composition-migration-checklist.md).
 Layout definitions can also reserve a top or bottom edge. A consumer that opts into reserved

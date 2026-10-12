@@ -183,7 +183,7 @@ static void test_expansion_keeps_popup_anchor_position(void)
     for (size_t frame = 0; frame < 12; ++frame)
     {
         reach_quick_settings_capsule_ops()->tick(quick_settings, 0.03, &tick);
-        (void)reach_quick_settings_update_open_animation(quick_settings, &ctx);
+        reach_quick_settings_refresh_layout(quick_settings, &ctx);
         expect_near(reach_quick_settings_state_ptr(quick_settings)->bounds.y, initial_y, 0.001f,
                     "height animation preserves the popup anchor position on every frame");
     }

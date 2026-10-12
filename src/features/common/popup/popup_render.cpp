@@ -1,5 +1,9 @@
 #include "reach/features/common/popup.h"
 
+#include <math.h>
+#include <memory>
+#include <new>
+
 float reach_popup_radius(const reach_theme *theme)
 {
     return theme != nullptr ? theme->radius_large : reach_theme_default()->radius_large;
@@ -89,6 +93,52 @@ reach_popup_placement reach_popup_place(const reach_popup_anchor *anchor, float 
     return placement;
 }
 
+reach_result reach_popup_height_motion(const reach_popup_anchor *anchor, float width,
+                                       const reach_motion *height, float margin,
+                                       reach_rect_motion *out_bounds)
+{
+    if (anchor == nullptr || height == nullptr || out_bounds == nullptr || !isfinite(width) ||
+        width <= 0 || !isfinite(margin) || margin < 0 || height->generation == 0 ||
+        !isfinite(height->from) || !isfinite(height->to))
+        return REACH_INVALID_ARGUMENT;
+    reach_rect_motion result = {};
+    result.height = *height;
+    bool constrained = anchor->monitor.width > 0 && anchor->monitor.height > 0;
+    float vertical_margin = margin * 2 < anchor->monitor.height ? margin : 0;
+    float top = anchor->monitor.y + vertical_margin;
+    float bottom = anchor->monitor.y + anchor->monitor.height - vertical_margin;
+    if (constrained)
+        result.height = reach_motion_clamp(height, 0, bottom - top);
+    float first = reach_motion_value_at(&result.height, result.height.started_seconds);
+    float last = reach_motion_value_at(&result.height, reach_motion_deadline(&result.height));
+    if (fminf(first, last) <= 0)
+        return REACH_INVALID_ARGUMENT;
+    reach_popup_placement placement = reach_popup_place(anchor, width, fmaxf(first, last), margin);
+    reach_motion_set(&result.x, placement.bounds.x);
+    reach_motion_set(&result.width, placement.bounds.width);
+    if (anchor->direction == REACH_POPUP_DROP_DOWN)
+    {
+        float anchor_y = anchor->bar_edge_y + margin;
+        if (constrained)
+        {
+            result.y = reach_motion_affine(&result.height, -1, bottom);
+            result.y = reach_motion_clamp(&result.y, top, fmaxf(top, anchor_y));
+        }
+        else
+            reach_motion_set(&result.y, anchor_y);
+    }
+    else
+    {
+        float anchor_y = anchor->bar_edge_y - margin;
+        result.y = reach_motion_affine(&result.height, -1,
+                                       constrained ? fminf(anchor_y, bottom) : anchor_y);
+        if (constrained)
+            result.y = reach_motion_clamp(&result.y, top, bottom);
+    }
+    *out_bounds = result;
+    return REACH_OK;
+}
+
 float reach_popup_notch_width(void)
 {
     return 18.0f;
@@ -168,4 +218,63 @@ reach_result reach_popup_push_background(const reach_popup_background_input *inp
         out_commands, &shape, background, input->theme->popup_border,
         reach_theme_border_thickness(input->theme, input->dpi_scale), &input->theme->popup_shadow,
         input->dpi_scale);
+}
+
+reach_result reach_popup_push_height_background(const reach_popup_background_input *input,
+                                                const reach_motion *height, uint64_t parent_id,
+                                                uint64_t first_group_id,
+                                                reach_render_command_buffer *out_commands)
+{
+    if (!reach_popup_render_input_valid(input, out_commands) || height == nullptr ||
+        height->generation == 0)
+        return REACH_INVALID_ARGUMENT;
+    reach_shadow_pad pad = reach_theme_shadow_pad(&input->theme->popup_shadow, input->dpi_scale);
+    pad.left = ceilf(pad.left);
+    pad.right = ceilf(pad.right);
+    pad.top = ceilf(pad.top);
+    pad.bottom = ceilf(pad.bottom);
+    float first = reach_motion_value_at(height, height->started_seconds);
+    float last = reach_motion_value_at(height, reach_motion_deadline(height));
+    auto commands = std::unique_ptr<reach_render_command_buffer>(new (std::nothrow)
+                                                                     reach_render_command_buffer());
+    if (!commands)
+        return REACH_ERROR;
+    reach_render_group source = {};
+    source.id = first_group_id;
+    source.parent_id = parent_id;
+    source.bounds = {-pad.left, -pad.top, ceilf(input->bounds.width + pad.left + pad.right), 0};
+    reach_popup_background_input shape = *input;
+    float radius = reach_popup_radius_scaled(input->theme, input->dpi_scale);
+    float extent = reach_theme_shadow_extent(&input->theme->popup_shadow, input->dpi_scale);
+    float notch = reach_popup_notch_height_scaled(input->dpi_scale);
+    reach_render_stretch stretch = {};
+    stretch.top =
+        ceilf(pad.top + radius + extent + (input->notch_side == REACH_NOTCH_SIDE_TOP ? notch : 0));
+    stretch.bottom = ceilf(pad.bottom + radius + extent +
+                           (input->notch_side == REACH_NOTCH_SIDE_BOTTOM ? notch : 0));
+    source.bounds.height = stretch.top + stretch.bottom + 1;
+    float source_body_height = source.bounds.height - pad.top - pad.bottom;
+    if (first == last && first < source_body_height)
+    {
+        shape.bounds.height = last;
+        source.bounds.height = ceilf(last + pad.top + pad.bottom);
+        reach_result result = reach_popup_push_background(&shape, commands.get());
+        if (result != REACH_OK)
+            return result;
+        result = reach_render_command_buffer_begin_group(out_commands, &source);
+        if (result != REACH_OK)
+            return result;
+        for (size_t index = 0; index < commands->count && result == REACH_OK; ++index)
+            result = reach_render_command_buffer_push(out_commands, &commands->commands[index]);
+        reach_render_command_buffer_end_group(out_commands);
+        return result;
+    }
+    shape.bounds.height = source.bounds.height - pad.top - pad.bottom;
+    reach_result result = reach_popup_push_background(&shape, commands.get());
+    if (result != REACH_OK)
+        return result;
+    reach_motion_set(&stretch.width, source.bounds.width);
+    stretch.height = reach_motion_affine(height, 1, pad.top + pad.bottom);
+    return reach_render_push_stretched_chrome(out_commands, &source, &stretch, commands->commands,
+                                              commands->count);
 }
