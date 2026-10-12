@@ -44,6 +44,7 @@ add_library(reach_support STATIC
     src/support/util.cpp
     src/support/animation.cpp
     src/support/motion.cpp
+    src/support/motion_clock.cpp
     src/support/workload.cpp
     src/support/layout.cpp
     src/support/search_ranking.cpp
@@ -940,6 +941,11 @@ target_link_libraries(reach_stage_feature_tests PRIVATE
 add_executable(reach_launcher_feature_tests
     tests/launcher_feature_tests.cpp
 )
+
+foreach(target IN ITEMS reach_host_layout_tests reach_context_menu_feature_tests
+                        reach_stage_feature_tests reach_launcher_feature_tests)
+    target_sources(${target} PRIVATE tests/motion_clock_test_support.cpp)
+endforeach()
 
 reach_configure_common(reach_launcher_feature_tests)
 target_compile_features(reach_launcher_feature_tests PRIVATE

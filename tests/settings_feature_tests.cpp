@@ -248,8 +248,10 @@ static void test_power_timers(void)
                 "selecting an option applies its minutes");
     expect_true(reach_settings_model_power_animations_active(model.get()),
                 "selecting an option starts the cross-fade animation");
-    expect_true(reach_settings_model_tick_power_animations(model.get(), 1.0),
-                "animation tick reports activity");
+    expect_true(reach_settings_model_sample_power_animations_at(
+                    model.get(), reach_motion_deadline(
+                                     &model->power_tracks[REACH_SETTINGS_POWER_TIMER_LOCK].motion)),
+                "endpoint sampling reports the final animation update");
     expect_true(!reach_settings_model_power_animations_active(model.get()),
                 "animation completes after its duration");
 }

@@ -113,7 +113,8 @@ static void reach_switcher_capsule_tick(void *capsule, double delta_seconds,
     }
     int32_t transition_changed =
         reach_feature_transition_tick(&switcher->surface_transition, delta_seconds);
-    reach_animation_manager_tick(&switcher->animations, delta_seconds);
+    int32_t width_was_active = reach_switcher_width_animation_active(switcher);
+    reach_animation_manager_sample_at(&switcher->animations, reach_motion_now_seconds());
     if (out != nullptr &&
         (transition_changed || reach_feature_transition_active(&switcher->surface_transition)))
     {
@@ -121,7 +122,7 @@ static void reach_switcher_capsule_tick(void *capsule, double delta_seconds,
         out->request_update = reach_feature_transition_active(&switcher->surface_transition) ||
                               reach_feature_transition_needs_update(&switcher->surface_transition);
     }
-    if (out != nullptr && reach_switcher_width_animation_active(switcher))
+    if (out != nullptr && (width_was_active || reach_switcher_width_animation_active(switcher)))
     {
         out->redraw = 1;
     }

@@ -2991,11 +2991,12 @@ reach_result reach_settings_app_update(reach_settings_app *app, double delta_sec
     {
         app->dirty = 1;
     }
-    if (reach_settings_model_tick_wifi_animations(&app->model, delta_seconds))
+    double animation_now = reach_motion_now_seconds();
+    if (reach_settings_model_sample_wifi_animations_at(&app->model, animation_now))
     {
         app->dirty = 1;
     }
-    if (reach_settings_model_tick_bluetooth_animations(&app->model, delta_seconds))
+    if (reach_settings_model_sample_bluetooth_animations_at(&app->model, animation_now))
     {
         app->dirty = 1;
     }
@@ -3011,15 +3012,15 @@ reach_result reach_settings_app_update(reach_settings_app *app, double delta_sec
     {
         app->dirty = 1;
     }
-    if (reach_settings_model_tick_power_animations(&app->model, delta_seconds))
+    if (reach_settings_model_sample_power_animations_at(&app->model, animation_now))
     {
         app->dirty = 1;
     }
-    if (reach_settings_model_tick_display_animations(&app->model, delta_seconds))
+    if (reach_settings_model_sample_display_animations_at(&app->model, animation_now))
     {
         app->dirty = 1;
     }
-    if (reach_settings_model_tick_top_bar_animations(&app->model, delta_seconds))
+    if (reach_settings_model_sample_top_bar_animations_at(&app->model, animation_now))
     {
         app->dirty = 1;
     }

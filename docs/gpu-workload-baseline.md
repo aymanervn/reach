@@ -2,6 +2,50 @@
 
 Status: counters verified; full product performance baseline and acceptance pending.
 
+## Canonical scalar-manager timing
+
+Every finite scalar track now stores `reach_motion`; easing, event origin, generation and endpoints
+share the retained renderer's contract. All production manager callers use explicit monotonic time
+instead of frame-delta accumulation. Settings samples its five remaining finite families at one
+update timestamp. Cached value/activity remain necessary CPU presentation state until each visual
+consumer migrates: activity retires only when a sample delivers the final endpoint. Retargeting uses
+the curve at the input time, even when the last rendered value is older. Equal targets and immediate
+sets do not keep frame demand active; reset retires ownership. The obsolete delta tick and unused
+track-relative crossing API are removed.
+Initialization and reset publish an explicit zero-valued generation; an absent native property must
+not substitute its identity default for a manager's numeric zero.
+
+Three pure temporal checks cover shared time/easing, late wakes, event-time reversal, published
+intent, immediate transitions, cancellation, reset and invalid samples. Four existing capsule test
+drivers advance a test-linked clock rather than synthetic frame deltas; the production clock remains
+an independent monotonic implementation with no mutable override. Multiple capsules in one test
+frame share one time. A close-position test now inspects previews during the close, before retirement.
+Both isolated builds and all 40 tests pass. Owned Settings/Launcher caret scheduler probes also pass.
+The owned callback probe also checks delayed terminal samples in Switcher width and Clipboard hover.
+Both previously tested only post-sample activity when deciding redraw; their pre-sample activity now
+requests the endpoint frame even when the first wake arrives after the duration has elapsed.
+
+Focused native probes publish the manager's descriptor into one retained translation/opacity group,
+reverse it between CPU samples and hold without application frame submissions. Each backend records
+one reversal execution, one property-helper submission, zero raster passes and zero visual-tree
+mutations. A delayed CPU sample then delivers its endpoint and clears pending activity. Evidence is
+`probe-canonical-manager-{debug,release}-focused.log`, `probe-caret-canonical-manager-{debug,release}.log`,
+`build-{debug,release}-canonical-manager*.log` and `test-{debug,release}-canonical-manager.log` under
+`build/gpu-composition-migration`. Both full native suites pass five runs per backend plus fallback
+(`probe-canonical-manager-{debug,release}-complete.log`). Fresh zero intent also passes a native WUC
+opacity query. Full builds/tests, architecture, formatting and whitespace checks pass. The Stage
+feedback fixture now waits for actual opening settlement instead of using a synthetic delta.
+
+One Release test run exposed an existing scheduling-dependent assertion in asynchronous path
+verification. `7b85e26` records the probe thread separately and checks it after completion, preserving
+the worker requirement without assuming start order. Twenty repeated focused runs per configuration
+and both final full test suites pass. This is a separate test-only commit; service behavior is unchanged.
+
+This unifies timing and enables retained publication; it does not make existing scalar-rendered
+visuals GPU animations automatically. Their content/frame predicates, loaders, scrolling and native
+close synchronization remain explicit migration work. Broad displayed-pixel and repeated product
+workload acceptance remain open.
+
 ## Caret deadline scheduling
 
 Settings previously requested frames whenever any edit field retained focus, then advanced three

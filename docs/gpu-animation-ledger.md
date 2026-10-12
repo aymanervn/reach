@@ -13,8 +13,9 @@ symbols so the record survives line-number changes.
 
 Drivers and present work:
 
-- **Scalar:** `reach_animation_manager_tick` advances delta-based values. Consumers bake values
-  into commands/layout and request application frames while active. Retained caching may avoid
+- **Scalar:** `reach_animation_manager_sample_at` samples canonical absolute-time `reach_motion`
+  intent. Consumers still bake cached values into commands/layout and request application frames
+  until their final endpoint sample. Retained caching may avoid
   some actual rasterization; a command/layout frame is not automatically a raster draw.
 - **Retained:** `reach_motion` or compositor repetition drives visual properties. Application work
   submits changes and handles events/deadlines/completion; unsupported rendering uses the existing
@@ -167,6 +168,13 @@ These do not become GPU algorithms, but their scheduling must not hide redundant
   the GPU or introducing polling. Existing system-stats sampling is the separately approved exception.
 
 ## Inventory evidence and acceptance updates
+
+Finite scalar tracks now share `reach_motion` timing, easing and generation with retained effects.
+The delta tick and unused scalar crossing API are removed across every production caller. Retargeting
+uses input time rather than the last rendered value; one sample retires pending endpoint activity.
+Settings samples its five remaining scalar families at one update timestamp. Manager intent can be
+published unchanged to retained groups. Existing scalar consumers still need their visual/frame
+migration, and direct loader/scroll/native choreography timing remains separately pending.
 
 The shared retained adapter caches ordered group/parent ownership and scene content matrices.
 Raster edits and property motion do not rebuild unchanged native trees. Membership/order/reparenting,

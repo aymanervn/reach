@@ -1,7 +1,11 @@
 #ifndef REACH_SUPPORT_MOTION_H
 #define REACH_SUPPORT_MOTION_H
 
-#include "reach/support/animation.h"
+#include <stddef.h>
+#include <stdint.h>
+
+#include "reach/support/easing.h"
+#include "reach/support/util.h"
 
 #ifdef __cplusplus
 extern "C"

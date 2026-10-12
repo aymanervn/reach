@@ -441,7 +441,8 @@ int32_t reach_settings_model_wifi_loader(reach_settings_model *model, double del
     return reach_loader_update(&model->wifi_loader, delta_seconds);
 }
 
-int32_t reach_settings_model_tick_wifi_animations(reach_settings_model *model, double delta_seconds)
+int32_t reach_settings_model_sample_wifi_animations_at(reach_settings_model *model,
+                                                       double now_seconds)
 {
     if (model == nullptr)
     {
@@ -450,7 +451,7 @@ int32_t reach_settings_model_tick_wifi_animations(reach_settings_model *model, d
     int32_t changed = 0;
     if (reach_animation_manager_any_active(&model->wifi_row_animations))
     {
-        reach_animation_manager_tick(&model->wifi_row_animations, delta_seconds);
+        reach_animation_manager_sample_at(&model->wifi_row_animations, now_seconds);
         changed = 1;
     }
     return changed;

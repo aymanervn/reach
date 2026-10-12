@@ -415,6 +415,17 @@ composition draws the title as static clipped text. Hidden groups are detached a
 Transport controls retain their dedicated actions, and a pressable release on the remaining card
 opens the snapshot's source application through the shared `OPEN_TARGET` action.
 
+Finite scalar animation tracks also own canonical `reach_motion` descriptors. The manager samples
+an explicit monotonic event time with `reach_animation_manager_sample_at`; it no longer accumulates
+frame deltas or implements a separate interpolation curve. Retargeting samples the previous curve
+at the event, advances generation and preserves continuity between application frames. Cached value
+and activity are CPU presentation state: pending activity survives until a sample delivers the final
+endpoint, then stops. `reach_animation_manager_motion` exposes the same intent for retained rendering
+without GPU readback. Settings samples all finite scalar families at one update timestamp. Loader,
+scroll and native choreography timing remain separate migration responsibilities.
+Switcher width and Clipboard hover preserve pre-sample activity when deciding redraw, so a late
+wake still publishes the terminal visual state after sampling clears their active flags.
+
 Retained render groups carry stable identities, local content bounds, clips, and independent X/Y,
 opacity, and scale motion. Scale remains uniform by default; an explicit `scale_y` motion overrides
 the inherited vertical scale. Both compositors, fallback, root completion, native preview projection,

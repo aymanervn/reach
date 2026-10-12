@@ -1,6 +1,7 @@
 #include "reach/support/animation.h"
-#include "reach/support/motion.h"
 #include "reach/support/workload.h"
+
+#include <cmath>
 
 static float reach_animation_clamp01(float value)
 {
@@ -70,53 +71,23 @@ void reach_animation_manager_init(reach_animation_manager *manager, reach_animat
     for (size_t index = 0; index < manager->track_count; ++index)
     {
         manager->tracks[index] = {};
+        reach_motion_set(&manager->tracks[index].motion, 0);
     }
 }
 
-void reach_animation_manager_tick(reach_animation_manager *manager, double delta_seconds)
+void reach_animation_manager_sample_at(reach_animation_manager *manager, double now_seconds)
 {
-    if (manager == nullptr || manager->tracks == nullptr)
-    {
+    if (manager == nullptr || manager->tracks == nullptr || !std::isfinite(now_seconds))
         return;
-    }
-    if (delta_seconds < 0.0)
-    {
-        delta_seconds = 0.0;
-    }
-
     for (size_t index = 0; index < manager->track_count; ++index)
     {
         reach_animation_track *track = &manager->tracks[index];
         if (!track->active)
-        {
             continue;
-        }
-
         reach_workload_add(REACH_WORKLOAD_SCALAR_ADVANCES, 1);
-        track->elapsed_seconds += delta_seconds;
-        float progress = track->duration_seconds > 0.0
-                             ? (float)(track->elapsed_seconds / track->duration_seconds)
-                             : 1.0f;
-        if (progress >= 1.0f)
-        {
-            track->value = track->to;
-            track->active = 0;
-            continue;
-        }
-
-        float eased = reach_easing_apply(progress, track->easing);
-        track->value = track->from + (track->to - track->from) * eased;
+        track->value = reach_motion_value_at(&track->motion, now_seconds);
+        track->active = reach_motion_active_at(&track->motion, now_seconds);
     }
-}
-
-double reach_animation_track_time_to_value(const reach_animation_track *track, float target_value)
-{
-    if (track == nullptr || !track->active || track->duration_seconds <= 0.0)
-    {
-        return 0.0;
-    }
-    reach_motion motion = {track->from, track->to, 0.0, track->duration_seconds, track->easing, 1};
-    return reach_motion_time_to_value_at(&motion, target_value, track->elapsed_seconds);
 }
 
 void reach_animation_manager_set(reach_animation_manager *manager, size_t track_id, float value)
@@ -124,46 +95,54 @@ void reach_animation_manager_set(reach_animation_manager *manager, size_t track_
     reach_animation_track *track = reach_animation_manager_track(manager, track_id);
     if (track != nullptr)
     {
-        *track = {value, value, value, 0.0, 0.0, REACH_EASING_EASE_IN_OUT, 0};
+        reach_motion_set(&track->motion, value);
+        track->value = value;
+        track->active = 0;
     }
 }
 
 void reach_animation_manager_start(reach_animation_manager *manager, size_t track_id, float from,
                                    float to, double duration_seconds, reach_easing easing)
 {
+    reach_animation_manager_start_at(manager, track_id, from, to, duration_seconds, easing,
+                                     reach_motion_now_seconds());
+}
+
+void reach_animation_manager_start_at(reach_animation_manager *manager, size_t track_id, float from,
+                                      float to, double duration_seconds, reach_easing easing,
+                                      double now_seconds)
+{
     reach_animation_track *track = reach_animation_manager_track(manager, track_id);
     if (track == nullptr)
-    {
         return;
-    }
-
-    if (duration_seconds <= 0.0 || from == to)
-    {
-        reach_animation_manager_set(manager, track_id, to);
-        return;
-    }
-
-    *track = {from, to, from, 0.0, duration_seconds, easing, 1};
+    reach_motion_start_at(&track->motion, from, to, from == to ? 0.0 : duration_seconds, easing,
+                          now_seconds);
+    track->value = reach_motion_value_at(&track->motion, now_seconds);
+    track->active = reach_motion_active_at(&track->motion, now_seconds);
 }
 
 void reach_animation_manager_animate_to(reach_animation_manager *manager, size_t track_id, float to,
                                         double duration_seconds, reach_easing easing)
 {
+    reach_animation_manager_animate_to_at(manager, track_id, to, duration_seconds, easing,
+                                          reach_motion_now_seconds());
+}
+
+void reach_animation_manager_animate_to_at(reach_animation_manager *manager, size_t track_id,
+                                           float to, double duration_seconds, reach_easing easing,
+                                           double now_seconds)
+{
     reach_animation_track *track = reach_animation_manager_track(manager, track_id);
-    if (track != nullptr)
-    {
-        reach_animation_manager_start(manager, track_id, track->value, to, duration_seconds,
-                                      easing);
-    }
+    if (track == nullptr)
+        return;
+    reach_animation_manager_start_at(manager, track_id,
+                                     reach_motion_value_at(&track->motion, now_seconds), to,
+                                     duration_seconds, easing, now_seconds);
 }
 
 void reach_animation_manager_reset(reach_animation_manager *manager, size_t track_id)
 {
-    reach_animation_track *track = reach_animation_manager_track(manager, track_id);
-    if (track != nullptr)
-    {
-        *track = {};
-    }
+    reach_animation_manager_set(manager, track_id, 0);
 }
 
 float reach_animation_manager_value(const reach_animation_manager *manager, size_t track_id)
@@ -175,7 +154,14 @@ float reach_animation_manager_value(const reach_animation_manager *manager, size
 float reach_animation_manager_target(const reach_animation_manager *manager, size_t track_id)
 {
     const reach_animation_track *track = reach_animation_manager_const_track(manager, track_id);
-    return track != nullptr ? track->to : 0.0f;
+    return track != nullptr ? track->motion.to : 0.0f;
+}
+
+const reach_motion *reach_animation_manager_motion(const reach_animation_manager *manager,
+                                                   size_t track_id)
+{
+    const reach_animation_track *track = reach_animation_manager_const_track(manager, track_id);
+    return track != nullptr ? &track->motion : nullptr;
 }
 
 int32_t reach_animation_manager_active(const reach_animation_manager *manager, size_t track_id)

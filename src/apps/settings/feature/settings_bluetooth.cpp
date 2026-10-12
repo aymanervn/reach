@@ -241,14 +241,14 @@ int32_t reach_settings_model_bluetooth_loader(reach_settings_model *model, doubl
     return reach_loader_update(&model->bluetooth_loader, delta_seconds);
 }
 
-int32_t reach_settings_model_tick_bluetooth_animations(reach_settings_model *model,
-                                                       double delta_seconds)
+int32_t reach_settings_model_sample_bluetooth_animations_at(reach_settings_model *model,
+                                                            double now_seconds)
 {
     if (model == nullptr || !reach_animation_manager_any_active(&model->bluetooth_row_animations))
     {
         return 0;
     }
-    reach_animation_manager_tick(&model->bluetooth_row_animations, delta_seconds);
+    reach_animation_manager_sample_at(&model->bluetooth_row_animations, now_seconds);
     return 1;
 }
 

@@ -205,8 +205,8 @@ void reach_settings_model_select_power_option(reach_settings_model *model, size_
                                   REACH_EASING_EASE_OUT);
 }
 
-int32_t reach_settings_model_tick_power_animations(reach_settings_model *model,
-                                                   double delta_seconds)
+int32_t reach_settings_model_sample_power_animations_at(reach_settings_model *model,
+                                                        double now_seconds)
 {
     if (model == nullptr)
     {
@@ -215,7 +215,7 @@ int32_t reach_settings_model_tick_power_animations(reach_settings_model *model,
     int32_t active = 0;
     if (reach_animation_manager_any_active(&model->power_animations))
     {
-        reach_animation_manager_tick(&model->power_animations, delta_seconds);
+        reach_animation_manager_sample_at(&model->power_animations, now_seconds);
         active = 1;
     }
     return active;

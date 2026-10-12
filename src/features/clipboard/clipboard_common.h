@@ -41,7 +41,7 @@ reach_clipboard_hit_result reach_clipboard_hit_test(const reach_clipboard_model 
                                                     int32_t y);
 
 void reach_clipboard_feature_reset(reach_clipboard_feature *clipboard);
-void reach_clipboard_feature_tick(reach_clipboard_feature *clipboard, double delta_seconds);
+void reach_clipboard_feature_sample_at(reach_clipboard_feature *clipboard, double now_seconds);
 void reach_clipboard_feature_collapse_all_hover(reach_clipboard_feature *clipboard);
 void reach_clipboard_feature_move_hover(reach_clipboard_feature *clipboard, size_t previous,
                                         size_t next);

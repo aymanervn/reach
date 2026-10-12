@@ -1004,8 +1004,7 @@ static int32_t reach_launcher_drain_search_results(reach_launcher *launcher)
     return 1;
 }
 
-static void reach_launcher_capsule_tick(void *capsule, double delta_seconds,
-                                        reach_feature_tick_result *out)
+static void reach_launcher_capsule_tick(void *capsule, double, reach_feature_tick_result *out)
 {
     reach_launcher *launcher = static_cast<reach_launcher *>(capsule);
     if (out != nullptr && reach_launcher_drain_search_results(launcher))
@@ -1021,7 +1020,7 @@ static void reach_launcher_capsule_tick(void *capsule, double delta_seconds,
     int32_t surface_was_visible = launcher != nullptr && launcher->surface_visible;
     if (launcher != nullptr)
     {
-        reach_animation_manager_tick(&launcher->animations, delta_seconds);
+        reach_animation_manager_sample_at(&launcher->animations, reach_motion_now_seconds());
         if (launcher->surface_deadline > 0.0 &&
             reach_motion_wait_ms(launcher->surface_deadline) == 0)
         {

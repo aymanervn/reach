@@ -1,3 +1,5 @@
+#include "motion_clock_test_support.h"
+
 #include "host_internal.h"
 
 #include "reach/features/battery.h"
@@ -1265,6 +1267,7 @@ static void test_registered_surface_frame_syncs_native_overlay(void)
                 "joining a source preserves every existing native relationship");
     thumbnail_unavailable_source = 0;
     reach_feature_tick_result tick = {};
+    reach_test_motion_clock_advance(0.016);
     stage->definition->capsule_ops->tick(stage->capsule, 0.016, &tick);
     expect_true(reach_host_frame_registered_surface(host, stage, &frame) == REACH_OK,
                 "the unavailable relationship is retried on the next frame");
@@ -1283,6 +1286,7 @@ static void test_registered_surface_frame_syncs_native_overlay(void)
         "a closed source starts a Stage reflow");
     expect_true(reach_host_frame_registered_surface(host, stage, &frame) == REACH_OK,
                 "the departing source keeps its relationship through the transition");
+    reach_test_motion_clock_advance(1.0);
     stage->definition->capsule_ops->tick(stage->capsule, 1.0, &tick);
     expect_true(reach_host_frame_registered_surface(host, stage, &frame) == REACH_OK,
                 "Stage presents the settled layout after the source departs");
@@ -1387,14 +1391,17 @@ static void test_forced_bars_hold_through_a_closing_stage(void)
                 "a Stage animating closed is still presented, so the bars stay forced shown");
 
     reach_feature_tick_result tick = {};
+    reach_test_motion_clock_advance(5.0);
     stage->definition->capsule_ops->tick(stage->capsule, 5.0, &tick);
     expect_true(reach_host_surface_presented(stage),
                 "bars remain forced through the aligned frame");
     stage->definition->capsule_ops->presentation_committed(stage->capsule, REACH_OK, &tick);
+    reach_test_motion_clock_advance(5.0);
     stage->definition->capsule_ops->tick(stage->capsule, 5.0, &tick);
     expect_true(reach_host_surface_presented(stage),
                 "bars remain forced through the transparent frame");
     stage->definition->capsule_ops->presentation_committed(stage->capsule, REACH_OK, &tick);
+    reach_test_motion_clock_advance(0.016);
     stage->definition->capsule_ops->tick(stage->capsule, 0.016, &tick);
     expect_true(!reach_host_surface_presented(stage),
                 "a fully closed Stage stops forcing the bars shown");
