@@ -183,3 +183,21 @@ matches the ordinary direct drawing within one channel value for both notch dire
 static sizes. Collapse/reversal submits five intent/deadline frames with zero raster passes on both
 compositors; fallback draws the same descriptors. These checks do not establish displayed compositor
 pixels or full product cost. The broader resize/reveal and product acceptance gates stay open.
+
+## Launcher integration requirements
+
+The current Launcher starts at `layout.search_box.height` with a corner radius of half that height
+(`launcher_render.cpp`). The collapsed body is exactly a pill; its corner/shadow caps do not leave
+an independent stretch band. The existing fixed-cap helper requires a positive center and enough
+space to isolate shadow/corner pixels, so applying it directly would distort or reject the opening
+geometry. Resolve compact rounded chrome with shadow on both supported backends before claiming
+an end-to-end Launcher resize migration. Preserve border thickness and source proportions.
+
+Launcher also publishes a root opening scale while its visible body height follows results
+expansion (`launcher_state.cpp`). Its current root scale center therefore changes with body height.
+A stable retained envelope must preserve this physical pivot during overlapping open/result
+motions, through a supported animated pivot or another verified compositional construction; fixing
+it to the full target height would change appearance and event projection. Geometry, native input
+and root inverse sampling must share that solution. The result fade/slide, row clipping, scrolling,
+error rows, caret deadlines and source changes remain part of the complete consumer migration.
+These are confirmed requirements, not a selected new renderer mechanism or completed consumer.
