@@ -47,31 +47,51 @@ reach_result reach_context_menu_render_previews(reach_context_menu *menu,
     for (size_t visible = 0; visible < menu->previews.count; ++visible)
     {
         const reach_context_menu_preview_card *card = &menu->previews.cards[visible];
-        reach_color highlight = reach_theme_color_alpha(
-            theme->context_menu_hover_background,
-            state->hovered_index == card->index ? reach_context_menu_hover_opacity(menu) : 0.0f);
+        reach_motion hover = {};
+        reach_motion_set(&hover, 0);
+        if (state->hovered_index == card->index)
+            hover = menu->hover;
         reach_render_command command = {};
         command.type = REACH_RENDER_COMMAND_RECT;
         command.rect = card->header;
         command.radius = card->header.height * 0.5f;
-        command.color = highlight;
+        command.color = reach_theme_color_alpha(theme->context_menu_hover_background, 1);
+        size_t header_start = out_commands->count;
         result = reach_render_command_buffer_push(out_commands, &command);
         if (result != REACH_OK)
-        {
             return result;
-        }
+        reach_motion stationary = {};
+        reach_motion_set(&stationary, 0);
+        result = reach_render_retain_commands(out_commands, header_start,
+                                              card->window ^ UINT64_C(0x1000000000000000), 0,
+                                              &hover, &stationary);
+        if (result != REACH_OK)
+            return result;
         command = {};
         command.type = REACH_RENDER_COMMAND_RECT;
         float border = reach_theme_border_thickness(theme, scale);
         command.rect = {card->preview.x - border, card->preview.y - border,
                         card->preview.width + border * 2.0f, card->preview.height + border * 2.0f};
-        reach_color outline =
-            reach_theme_color_mix(theme->popup_background, highlight, highlight.a);
+        reach_color outline = theme->context_menu_hover_background;
+        reach_color base = theme->popup_background;
+        base.a = outline.a = 1;
+        size_t border_start = out_commands->count;
         result = reach_render_push_bordered_background(
-            out_commands, &command, theme->popup_background, outline, border, nullptr, scale);
+            out_commands, &command, theme->popup_background, {1, 1, 1, 1}, border, nullptr, scale);
         if (result != REACH_OK)
-        {
             return result;
+        if (border > 0 && out_commands->count > border_start)
+        {
+            const auto &coverage = out_commands->commands[border_start];
+            reach_rect_f32 coverage_bounds = {};
+            if (!reach_render_retained_command_bounds(&coverage, &coverage_bounds))
+                return REACH_ERROR;
+            if (!reach_ui_color_feedback_begin(out_commands,
+                                               card->window ^ UINT64_C(0x2000000000000000),
+                                               coverage_bounds, base, outline, &hover))
+                return REACH_ERROR;
+            out_commands->commands[border_start].group_id = out_commands->current_group_id;
+            reach_render_command_buffer_end_group(out_commands);
         }
         reach_rect_f32 title = card->header;
         float title_padding = reach_preview_title_padding_dp * scale;

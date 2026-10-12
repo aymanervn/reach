@@ -379,3 +379,36 @@ visual/resource acceptance and comparable total CPU/GPU/power/memory/latency mea
 The final native suite (`probe-qs-height-final.log`) passes five full runs on each compositor plus
 HWND fallback with `diagnostic failures=0`, including the existing completion/failure, hierarchy,
 fixed-cap, bounded-motion and feedback diagnostics. No running Reach instance was terminated.
+
+## Context Menu preview header and border hover
+
+Preview hover publishes one canonical 0.18-second ease-in-out motion to a window-keyed header opacity
+layer and border tint layer. Source bounds reuse `reach_render_retained_command_bounds` and retained
+command ownership, preserving raster phase and transparent edge padding. Remove the hover scalar
+track and sampled accessor; ordinary menu rows retain their immediate behavior. Force-close/reset
+and new menu sessions clear hover motion. Width/reflow and native preview synchronization remain
+separate migration work.
+
+The previous capability classification followed an intermediate quadratic alpha but missed the final
+paint helper: `reach_theme_color_alpha` assigns hover alpha, and `reach_render_push_bordered_background`
+forces painted border alpha to one. The visible border RGB is affine in hover progress and reuses the
+existing RGBA tint contract. No additional nonlinear color capability is needed for this consumer.
+Clipboard's nested border RGB interpolation remains a separate pending capability.
+
+Focused bounded native hover checks verify body/header input, leaving and changed window identity,
+shared color/opacity time, idle ticks, retirement and fallback scheduling. Three native submissions
+use six property updates and zero raster passes or scalar advances on each compositor. The fallback
+uses four ordinary draws. Evidence is in `probe-preview-hover-focused.log`; Debug build, all 39 tests
+and architecture checks pass (`build-preview-hover.log`, `test-preview-hover.log`).
+
+GPU readback compares both fallback drawing and cached-source composition with the committed former
+renderer at five hover values and 100/125/150/200% DPI, including fractional placement and a theme
+hover color with non-unit alpha. Fallback pixels match exactly; cached-source comparisons differ by
+at most one channel value, within the strict two-channel tolerance. A fractional-edge mismatch in
+`FillOpacityMask` was resolved for contained single filled rectangles by applying their tint directly
+in fallback; other coverage groups retain the existing mask path. These are offscreen comparisons,
+not displayed WUC/DC capture, and do not close the total product performance/resource gates.
+
+`probe-preview-hover-final.log` passes five full runs per compositor and HWND fallback with zero
+diagnostic failures, including existing completion/failure, hierarchy, resize, bounded-motion,
+Quick Settings and feedback diagnostics. No running Reach instance was terminated.

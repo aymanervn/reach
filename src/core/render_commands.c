@@ -505,9 +505,11 @@ reach_result reach_render_command_buffer_push(reach_render_command_buffer *buffe
     return REACH_OK;
 }
 
-static int32_t reach_render_retained_command_bounds(const reach_render_command *command,
-                                                    reach_rect_f32 *out_bounds)
+int32_t reach_render_retained_command_bounds(const reach_render_command *command,
+                                             reach_rect_f32 *out_bounds)
 {
+    if (command == 0 || out_bounds == 0)
+        return 0;
     if (!isfinite(command->rect.x) || !isfinite(command->rect.y) ||
         !isfinite(command->rect.width) || !isfinite(command->rect.height) ||
         command->rect.width < 0.0f || command->rect.height < 0.0f ||

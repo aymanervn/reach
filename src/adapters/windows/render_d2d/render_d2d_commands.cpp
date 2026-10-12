@@ -139,6 +139,19 @@ static reach_result reach_d2d_execute_tinted_group(reach_render_backend *backend
     UINT height = (UINT)ceilf(group.bounds.height);
     if ((uint64_t)width * height * 4 > UINT64_C(128) * 1024 * 1024)
         return REACH_ERROR;
+    reach_color tint = reach_render_group_tint_at(&group, now_seconds);
+    tint.a *= opacity;
+    if (count == 1 && commands[0].type == REACH_RENDER_COMMAND_RECT &&
+        commands[0].stroke_width <= 0 && commands[0].rect.x >= group.bounds.x &&
+        commands[0].rect.y >= group.bounds.y &&
+        commands[0].rect.x + commands[0].rect.width <= group.bounds.x + group.bounds.width &&
+        commands[0].rect.y + commands[0].rect.height <= group.bounds.y + group.bounds.height)
+    {
+        reach_render_command command = commands[0];
+        tint.a *= command.color.a;
+        command.color = tint;
+        return reach_d2d_execute_commands(backend, &command, 1);
+    }
     ComPtr<ID2D1BitmapRenderTarget> coverage;
     D2D1_SIZE_F size = D2D1::SizeF((float)width, (float)height);
     D2D1_SIZE_U pixels = D2D1::SizeU(width, height);
@@ -163,8 +176,6 @@ static reach_result reach_d2d_execute_tinted_group(reach_render_backend *backend
     ComPtr<ID2D1Bitmap> bitmap;
     ComPtr<ID2D1SolidColorBrush> brush;
     hr = coverage->GetBitmap(&bitmap);
-    reach_color tint = reach_render_group_tint_at(&group, now_seconds);
-    tint.a *= opacity;
     if (SUCCEEDED(hr))
         hr = target->CreateSolidColorBrush(reach_d2d_color(tint), &brush);
     if (FAILED(hr))

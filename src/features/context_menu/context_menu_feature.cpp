@@ -105,6 +105,7 @@ void reach_context_menu_force_close(reach_context_menu *menu)
         menu->pressable_identity = 0;
         menu->state.open = 0;
         menu->state.close_hovered_index = REACH_CONTEXT_MENU_NO_ITEM;
+        reach_motion_set(&menu->hover, 0.0f);
         reach_motion_set(&menu->close_hover, 0.0f);
         reach_animation_manager_reset(&menu->animations, REACH_CONTEXT_MENU_ANIM_WIDTH);
         reach_context_menu_stop_preview_reflow(menu);
@@ -218,7 +219,7 @@ void reach_context_menu_reset(reach_context_menu *menu)
         menu->state.item_windows[index] = 0;
         menu->state.item_titles[index][0] = 0;
     }
-    reach_animation_manager_set(&menu->animations, REACH_CONTEXT_MENU_ANIM_HOVER, 0.0f);
+    reach_motion_set(&menu->hover, 0.0f);
     reach_motion_set(&menu->close_hover, 0.0f);
     reach_animation_manager_reset(&menu->animations, REACH_CONTEXT_MENU_ANIM_WIDTH);
     reach_context_menu_stop_preview_reflow(menu);
@@ -237,13 +238,6 @@ static void reach_context_menu_present(reach_context_menu *menu,
 int32_t reach_context_menu_window_list_is_open(const reach_context_menu *menu)
 {
     return menu != nullptr && menu->state.open && menu->state.window_list_open;
-}
-
-float reach_context_menu_hover_opacity(const reach_context_menu *menu)
-{
-    return menu != nullptr
-               ? reach_animation_manager_value(&menu->animations, REACH_CONTEXT_MENU_ANIM_HOVER)
-               : 0.0f;
 }
 
 int32_t reach_context_menu_set_close_hovered(reach_context_menu *menu, size_t index)
@@ -269,9 +263,8 @@ int32_t reach_context_menu_set_hovered(reach_context_menu *menu, size_t index)
     menu->state.hovered_index = index;
     if (is_hovered != was_hovered)
     {
-        reach_animation_manager_animate_to(&menu->animations, REACH_CONTEXT_MENU_ANIM_HOVER,
-                                           is_hovered ? 1.0f : 0.0f, 0.18,
-                                           REACH_EASING_EASE_IN_OUT);
+        reach_motion_animate_to(&menu->hover, is_hovered ? 1.0f : 0.0f, 0.18,
+                                REACH_EASING_EASE_IN_OUT);
     }
     return 1;
 }
@@ -375,7 +368,7 @@ void reach_context_menu_open_power(reach_context_menu *menu,
     state->hovered_index = REACH_CONTEXT_MENU_NO_ITEM;
     state->close_hovered_index = REACH_CONTEXT_MENU_NO_ITEM;
     reach_context_menu_present(menu, ctx);
-    reach_animation_manager_set(&menu->animations, REACH_CONTEXT_MENU_ANIM_HOVER, 0.0f);
+    reach_motion_set(&menu->hover, 0.0f);
 }
 
 /* The menu answers with the whole request it was opened for, so composition never asks the
@@ -505,7 +498,7 @@ void reach_context_menu_open_for_item(reach_context_menu *menu, size_t target_in
     state->hovered_index = REACH_CONTEXT_MENU_NO_ITEM;
     state->close_hovered_index = REACH_CONTEXT_MENU_NO_ITEM;
     reach_context_menu_present(menu, ctx);
-    reach_animation_manager_set(&menu->animations, REACH_CONTEXT_MENU_ANIM_HOVER, 0.0f);
+    reach_motion_set(&menu->hover, 0.0f);
 }
 
 int32_t reach_context_menu_hover_region_contains(reach_rect_f32 popup_bounds,
