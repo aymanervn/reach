@@ -56,6 +56,11 @@ acceptance matrix; this design decision does not close that gate.
 - Keep active-only CPU geometry for DWM destinations, cropping, opacity and necessary HWND
   movement. Record this CPU disposition explicitly for preview-linked effects. Retain GPU-driven
   independent feedback, reveal, backdrop and chrome whenever the shared capabilities support it.
+- Stage's existing backdrop fade is coupled to the desktop preview host: its native-overlay item
+  supplies `background.a`, and the behind-target DWM adapter applies whole-window alpha through
+  `SetLayeredWindowAttributes`. It is not a separately drawn Stage background. Migrate its timing
+  and invalidation with the active-only native path, preserving host/source ordering and the
+  synchronized reveal; do not infer independent GPU opacity from the former ledger entry.
 - Preserve Stage close/landing synchronization and cancellation. CPU/native completion is semantic
   work; it must not be replaced by a visual-only deadline that activates the source too early.
 - Account for integer destination and byte-opacity quantization. Native updates and compositor

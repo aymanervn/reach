@@ -2975,10 +2975,6 @@ reach_result reach_settings_app_update(reach_settings_app *app, double delta_sec
     {
         app->dirty = 1;
     }
-    if (reach_settings_model_tick_startup_animations(&app->model, delta_seconds))
-    {
-        app->dirty = 1;
-    }
     if (reach_settings_model_tick_power_animations(&app->model, delta_seconds))
     {
         app->dirty = 1;
@@ -3078,7 +3074,6 @@ int32_t reach_settings_app_needs_frame(const reach_settings_app *app)
                app->model.installed_apps_scrollbar.target ||
            app->model.display_scrollbar.offset != app->model.display_scrollbar.target ||
            app->update_scrollbar_drag.active || app->startup_scrollbar_drag.active ||
-           reach_settings_model_startup_animations_active(&app->model) ||
            reach_settings_model_power_animations_active(&app->model) ||
            reach_settings_model_display_animations_active(&app->model) ||
            reach_settings_model_top_bar_animations_active(&app->model) ||

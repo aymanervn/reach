@@ -41,8 +41,8 @@ void reach_settings_model_set_top_bar_mode(reach_settings_model *model,
         return;
     }
     model->top_bar_mode = mode;
-    reach_animation_manager_set(&model->top_bar_mode_animation, 0,
-                                mode == REACH_CONFIG_TOP_BAR_MODE_DYNAMIC ? 1.0f : 0.0f);
+    reach_motion_set(&model->top_bar_mode_toggle,
+                     mode == REACH_CONFIG_TOP_BAR_MODE_DYNAMIC ? 1.0f : 0.0f);
 }
 
 reach_config_top_bar_mode reach_settings_model_top_bar_mode(const reach_settings_model *model)
@@ -59,11 +59,9 @@ int32_t reach_settings_model_toggle_top_bar_mode(reach_settings_model *model)
     model->top_bar_mode = model->top_bar_mode == REACH_CONFIG_TOP_BAR_MODE_STATIC
                               ? REACH_CONFIG_TOP_BAR_MODE_DYNAMIC
                               : REACH_CONFIG_TOP_BAR_MODE_STATIC;
-    float current = reach_animation_manager_value(&model->top_bar_mode_animation, 0);
-    reach_animation_manager_start(&model->top_bar_mode_animation, 0, current,
-                                  model->top_bar_mode == REACH_CONFIG_TOP_BAR_MODE_DYNAMIC ? 1.0f
-                                                                                           : 0.0f,
-                                  0.18, REACH_EASING_EASE_OUT);
+    reach_motion_animate_to(&model->top_bar_mode_toggle,
+                            model->top_bar_mode == REACH_CONFIG_TOP_BAR_MODE_DYNAMIC ? 1.0f : 0.0f,
+                            0.18, REACH_EASING_EASE_OUT);
     return 1;
 }
 
@@ -75,13 +73,10 @@ int32_t reach_settings_model_tick_top_bar_animations(reach_settings_model *model
         return 0;
     }
     reach_animation_manager_tick(&model->top_bar_style_animation, delta_seconds);
-    reach_animation_manager_tick(&model->top_bar_mode_animation, delta_seconds);
     return 1;
 }
 
 int32_t reach_settings_model_top_bar_animations_active(const reach_settings_model *model)
 {
-    return model != nullptr &&
-           (reach_animation_manager_any_active(&model->top_bar_style_animation) ||
-            reach_animation_manager_any_active(&model->top_bar_mode_animation));
+    return model != nullptr && reach_animation_manager_any_active(&model->top_bar_style_animation);
 }

@@ -239,8 +239,7 @@ extern "C"
         double power_caret_phase;
         reach_animation_track power_tracks[REACH_SETTINGS_POWER_TIMER_COUNT];
         reach_animation_manager power_animations;
-        reach_animation_track power_wait_tracks[REACH_SETTINGS_POWER_TIMER_COUNT];
-        reach_animation_manager power_wait_animations;
+        reach_motion power_wait_toggles[REACH_SETTINGS_POWER_TIMER_COUNT];
         uint16_t account_display_name[REACH_SETTINGS_ACCOUNT_NAME_CAPACITY];
         uint16_t account_user_name[REACH_SETTINGS_ACCOUNT_NAME_CAPACITY];
         int32_t account_is_admin;
@@ -253,8 +252,7 @@ extern "C"
         reach_startup_app_list startup_apps;
         uint64_t startup_icons[REACH_STARTUP_APP_MAX_ENTRIES];
         reach_scrollbar_model startup_scrollbar;
-        reach_animation_track startup_tracks[REACH_STARTUP_APP_MAX_ENTRIES];
-        reach_animation_manager startup_animations;
+        reach_motion startup_toggles[REACH_STARTUP_APP_MAX_ENTRIES];
         int32_t startup_loaded;
         int32_t startup_busy;
         int32_t startup_status;
@@ -267,11 +265,9 @@ extern "C"
         int32_t installed_apps_status;
         int32_t display_high_refresh_rate;
         reach_scrollbar_model display_scrollbar;
-        reach_animation_track display_fps_track;
-        reach_animation_manager display_fps_animation;
+        reach_motion display_fps_toggle;
         int32_t display_bundled_font;
-        reach_animation_track display_font_track;
-        reach_animation_manager display_font_animation;
+        reach_motion display_font_toggle;
         int32_t display_light_theme;
         reach_animation_track display_theme_track;
         reach_animation_manager display_theme_animation;
@@ -281,8 +277,7 @@ extern "C"
         reach_animation_track top_bar_style_track;
         reach_animation_manager top_bar_style_animation;
         reach_config_top_bar_mode top_bar_mode;
-        reach_animation_track top_bar_mode_track;
-        reach_animation_manager top_bar_mode_animation;
+        reach_motion top_bar_mode_toggle;
         int32_t hovered_button;
         reach_motion button_press_feedback;
         reach_pressable button_pressable;
@@ -306,8 +301,7 @@ extern "C"
         reach_loader_model wifi_loader;
         reach_animation_track wifi_row_tracks[REACH_WIFI_MAX_NETWORKS + 1];
         reach_animation_manager wifi_row_animations;
-        reach_animation_track wifi_radio_track;
-        reach_animation_manager wifi_radio_animation;
+        reach_motion wifi_radio_toggle;
         reach_bluetooth_device_list bluetooth_devices;
         uint64_t bluetooth_icons[REACH_BLUETOOTH_MAX_DEVICES];
         reach_bluetooth_pairing_request bluetooth_pairing;
@@ -321,8 +315,7 @@ extern "C"
         reach_loader_model bluetooth_loader;
         reach_animation_track bluetooth_row_tracks[REACH_BLUETOOTH_MAX_DEVICES];
         reach_animation_manager bluetooth_row_animations;
-        reach_animation_track bluetooth_radio_track;
-        reach_animation_manager bluetooth_radio_animation;
+        reach_motion bluetooth_radio_toggle;
     } reach_settings_model;
 
     typedef struct reach_settings_nav_item
@@ -594,9 +587,6 @@ extern "C"
     const uint16_t *reach_settings_startup_status_message(int32_t status);
     void reach_settings_model_scroll_startup(reach_settings_model *model, float delta);
     int32_t reach_settings_model_startup_scroll(reach_settings_model *model, double delta_seconds);
-    int32_t reach_settings_model_tick_startup_animations(reach_settings_model *model,
-                                                         double delta_seconds);
-    int32_t reach_settings_model_startup_animations_active(const reach_settings_model *model);
 
     void reach_settings_model_apply_installed_apps(reach_settings_model *model,
                                                    const reach_installed_app_list *list);

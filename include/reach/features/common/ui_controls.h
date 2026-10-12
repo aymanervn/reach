@@ -100,6 +100,10 @@ extern "C"
 
     void reach_ui_toggle_render(reach_render_command_buffer *commands, reach_rect_f32 bounds,
                                 const reach_ui_toggle_style *style, float position);
+    reach_result reach_ui_toggle_motion_render(reach_render_command_buffer *commands,
+                                               reach_rect_f32 bounds,
+                                               const reach_ui_toggle_style *style, uint64_t id,
+                                               const reach_motion *position);
 
     reach_result reach_ui_feedback_begin(reach_render_command_buffer *commands, uint64_t id,
                                          reach_rect_f32 bounds, const reach_motion *opacity,

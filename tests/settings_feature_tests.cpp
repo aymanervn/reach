@@ -360,11 +360,11 @@ static void test_power_wait_apps_toggle(void)
     expect_true(
         reach_settings_model_power_wait_apps(model.get(), REACH_SETTINGS_POWER_TIMER_SLEEP) == 0,
         "toggling turns the flag off");
-    expect_true(reach_settings_model_power_animations_active(model.get()),
-                "toggling animates the switch");
-    expect_true(reach_settings_model_tick_power_animations(model.get(), 1.0),
-                "toggle animation tick reports activity");
+    const reach_motion *toggle = &model->power_wait_toggles[REACH_SETTINGS_POWER_TIMER_SLEEP];
+    expect_true(reach_motion_active(toggle), "toggling animates the switch");
     expect_true(!reach_settings_model_power_animations_active(model.get()),
+                "toggle motion does not require scalar frames");
+    expect_true(reach_motion_value_at(toggle, reach_motion_deadline(toggle)) == 0.0f,
                 "toggle animation completes after its duration");
     expect_true(reach_settings_model_power_dirty(model.get()), "toggling marks the page dirty");
     reach_settings_model_power_mark_applied(model.get());
@@ -593,7 +593,7 @@ static void test_top_bar_preferences(void)
                 "top bar defaults to split style");
     expect_true(reach_settings_model_top_bar_mode(model.get()) == REACH_CONFIG_TOP_BAR_MODE_DYNAMIC,
                 "top bar defaults to dynamic mode");
-    expect_true(reach_animation_manager_value(&model->top_bar_mode_animation, 0) == 1.0f,
+    expect_true(reach_motion_value(&model->top_bar_mode_toggle) == 1.0f,
                 "dynamic mode presents auto hide as enabled");
 
     expect_true(
@@ -616,7 +616,7 @@ static void test_top_bar_preferences(void)
     expect_true(reach_settings_model_toggle_top_bar_mode(model.get()), "top bar mode can toggle");
     expect_true(reach_settings_model_top_bar_mode(model.get()) == REACH_CONFIG_TOP_BAR_MODE_STATIC,
                 "top bar mode toggles to static");
-    expect_true(reach_animation_manager_target(&model->top_bar_mode_animation, 0) == 0.0f,
+    expect_true(model->top_bar_mode_toggle.to == 0.0f,
                 "static mode presents auto hide as disabled");
     expect_true(reach_settings_model_top_bar_animations_active(model.get()),
                 "top bar preference changes animate their toggles");
@@ -661,8 +661,8 @@ static void test_radio_toggle_animations(void)
 
     reach_settings_model_set_wifi_radio(model.get(), REACH_WIFI_RADIO_ON);
     expect_true(reach_settings_model_toggle_wifi_radio(model.get()), "Wi-Fi radio can toggle");
-    reach_settings_model_tick_wifi_animations(model.get(), 0.09);
-    float wifi_position = reach_animation_manager_value(&model->wifi_radio_animation, 0);
+    float wifi_position = reach_motion_value_at(&model->wifi_radio_toggle,
+                                                model->wifi_radio_toggle.started_seconds + 0.09);
     expect_true(wifi_position > 0.0f && wifi_position < 1.0f,
                 "Wi-Fi radio toggle animates between states");
 
@@ -672,8 +672,8 @@ static void test_radio_toggle_animations(void)
     reach_settings_model_set_bluetooth_radio(model.get(), bluetooth_state);
     expect_true(reach_settings_model_toggle_bluetooth_radio(model.get()),
                 "Bluetooth radio can toggle");
-    reach_settings_model_tick_bluetooth_animations(model.get(), 0.09);
-    float bluetooth_position = reach_animation_manager_value(&model->bluetooth_radio_animation, 0);
+    float bluetooth_position = reach_motion_value_at(
+        &model->bluetooth_radio_toggle, model->bluetooth_radio_toggle.started_seconds + 0.09);
     expect_true(bluetooth_position > 0.0f && bluetooth_position < 1.0f,
                 "Bluetooth radio toggle animates between states");
 }

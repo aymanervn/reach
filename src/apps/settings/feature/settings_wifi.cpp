@@ -68,13 +68,11 @@ void reach_settings_model_set_wifi_radio(reach_settings_model *model, reach_wifi
     float target = radio == REACH_WIFI_RADIO_ON ? 1.0f : 0.0f;
     if (!model->wifi_loaded)
     {
-        reach_animation_manager_set(&model->wifi_radio_animation, 0, target);
+        reach_motion_set(&model->wifi_radio_toggle, target);
     }
-    else if (reach_animation_manager_target(&model->wifi_radio_animation, 0) != target)
+    else if (model->wifi_radio_toggle.to != target)
     {
-        float current = reach_animation_manager_value(&model->wifi_radio_animation, 0);
-        reach_animation_manager_start(&model->wifi_radio_animation, 0, current, target, 0.18,
-                                      REACH_EASING_EASE_OUT);
+        reach_motion_animate_to(&model->wifi_radio_toggle, target, 0.18, REACH_EASING_EASE_OUT);
     }
 }
 
@@ -86,10 +84,9 @@ int32_t reach_settings_model_toggle_wifi_radio(reach_settings_model *model)
     }
     model->wifi_radio =
         model->wifi_radio == REACH_WIFI_RADIO_ON ? REACH_WIFI_RADIO_OFF : REACH_WIFI_RADIO_ON;
-    float current = reach_animation_manager_value(&model->wifi_radio_animation, 0);
-    reach_animation_manager_start(&model->wifi_radio_animation, 0, current,
-                                  model->wifi_radio == REACH_WIFI_RADIO_ON ? 1.0f : 0.0f, 0.18,
-                                  REACH_EASING_EASE_OUT);
+    reach_motion_animate_to(&model->wifi_radio_toggle,
+                            model->wifi_radio == REACH_WIFI_RADIO_ON ? 1.0f : 0.0f, 0.18,
+                            REACH_EASING_EASE_OUT);
     return 1;
 }
 
@@ -461,18 +458,12 @@ int32_t reach_settings_model_tick_wifi_animations(reach_settings_model *model, d
         reach_animation_manager_tick(&model->wifi_row_animations, delta_seconds);
         changed = 1;
     }
-    if (reach_animation_manager_any_active(&model->wifi_radio_animation))
-    {
-        reach_animation_manager_tick(&model->wifi_radio_animation, delta_seconds);
-        changed = 1;
-    }
     return changed;
 }
 
 int32_t reach_settings_model_wifi_animations_active(const reach_settings_model *model)
 {
-    return model != nullptr && (reach_animation_manager_any_active(&model->wifi_row_animations) ||
-                                reach_animation_manager_any_active(&model->wifi_radio_animation));
+    return model != nullptr && reach_animation_manager_any_active(&model->wifi_row_animations);
 }
 
 int32_t reach_settings_model_tick_wifi_caret(reach_settings_model *model, double delta_seconds)

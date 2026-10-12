@@ -36,7 +36,7 @@ void reach_settings_model_apply_startup_apps(reach_settings_model *model,
         float value =
             index < model->startup_apps.count && model->startup_apps.entries[index].enabled ? 1.0f
                                                                                             : 0.0f;
-        reach_animation_manager_set(&model->startup_animations, index, value);
+        reach_motion_set(&model->startup_toggles[index], value);
     }
 
     reach_scrollbar_set_target(&model->startup_scrollbar, 0.0f);
@@ -63,9 +63,8 @@ void reach_settings_model_set_startup_enabled(reach_settings_model *model, size_
         return;
     }
     model->startup_apps.entries[index].enabled = enabled ? 1 : 0;
-    float current = reach_animation_manager_value(&model->startup_animations, index);
-    reach_animation_manager_start(&model->startup_animations, index, current, enabled ? 1.0f : 0.0f,
-                                  0.18, REACH_EASING_EASE_OUT);
+    reach_motion_animate_to(&model->startup_toggles[index], enabled ? 1.0f : 0.0f, 0.18,
+                            REACH_EASING_EASE_OUT);
 }
 
 int32_t reach_settings_model_startup_enabled(const reach_settings_model *model, size_t index)
@@ -121,20 +120,4 @@ int32_t reach_settings_model_startup_scroll(reach_settings_model *model, double 
         return 0;
     }
     return reach_scrollbar_update(&model->startup_scrollbar, delta_seconds);
-}
-
-int32_t reach_settings_model_tick_startup_animations(reach_settings_model *model,
-                                                     double delta_seconds)
-{
-    if (model == nullptr || !reach_animation_manager_any_active(&model->startup_animations))
-    {
-        return 0;
-    }
-    reach_animation_manager_tick(&model->startup_animations, delta_seconds);
-    return 1;
-}
-
-int32_t reach_settings_model_startup_animations_active(const reach_settings_model *model)
-{
-    return model != nullptr && reach_animation_manager_any_active(&model->startup_animations);
 }

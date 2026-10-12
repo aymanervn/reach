@@ -2,6 +2,11 @@
 
 #include "reach/core/typography.h"
 
+uint64_t reach_settings_toggle_group_id(int32_t hit, size_t index)
+{
+    return UINT64_C(0x2000000000000000) | ((uint64_t)hit << 32) | ((uint64_t)index << 2);
+}
+
 float reach_settings_scale(const reach_settings_render_input *input, float value)
 {
     return value * (input->dpi_scale > 0.0f ? input->dpi_scale : 1.0f);

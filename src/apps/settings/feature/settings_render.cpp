@@ -282,21 +282,31 @@ static void render_power_page(const reach_settings_render_input *input,
         }
         if (layout->power_wait_toggles[timer].width > 0.0f)
         {
-            float wait_t = reach_animation_manager_value(&model->power_wait_animations, timer);
-            reach_settings_push_text(
-                commands, layout->power_wait_labels[timer],
-                (const uint16_t *)L"Wait for apps keeping the PC awake",
-                reach_settings_scale(input, REACH_TEXT_SIZE_XSMALL), REACH_TEXT_WEIGHT_NORMAL,
-                REACH_TEXT_ALIGNMENT_TRAILING,
-                reach_settings_color_with_alpha(input->theme->settings_secondary_text,
-                                                0.7f + 0.3f * wait_t),
-                1);
+            uint64_t id =
+                reach_settings_toggle_group_id(REACH_SETTINGS_HIT_POWER_WAIT_TOGGLE, timer);
+            const reach_motion *motion = &model->power_wait_toggles[timer];
+            int32_t retained = reach_ui_color_feedback_begin(
+                commands, id + 3, layout->power_wait_labels[timer],
+                reach_settings_color_with_alpha(input->theme->settings_secondary_text, 0.7f),
+                reach_settings_color_with_alpha(input->theme->settings_secondary_text, 1.0f),
+                motion);
+            reach_settings_push_text(commands, layout->power_wait_labels[timer],
+                                     (const uint16_t *)L"Wait for apps keeping the PC awake",
+                                     reach_settings_scale(input, REACH_TEXT_SIZE_XSMALL),
+                                     REACH_TEXT_WEIGHT_NORMAL, REACH_TEXT_ALIGNMENT_TRAILING,
+                                     retained ? reach_color{1, 1, 1, 1}
+                                              : reach_settings_color_with_alpha(
+                                                    input->theme->settings_secondary_text,
+                                                    0.7f + 0.3f * reach_motion_value(motion)),
+                                     1);
+            if (retained)
+                reach_render_command_buffer_end_group(commands);
             reach_ui_toggle_style toggle_style = {};
             toggle_style.track_off = input->theme->settings_toggle_track_off;
             toggle_style.track_on = reach_settings_color_with_alpha(accent, 0.85f);
             toggle_style.knob = input->theme->settings_toggle_knob;
-            reach_ui_toggle_render(commands, layout->power_wait_toggles[timer], &toggle_style,
-                                   wait_t);
+            reach_ui_toggle_motion_render(commands, layout->power_wait_toggles[timer],
+                                          &toggle_style, id, motion);
         }
 
         float t = reach_animation_manager_value(&model->power_animations, timer);
@@ -393,7 +403,8 @@ typedef struct display_toggle_card
     const wchar_t *icon_text;
     const wchar_t *title_text;
     const wchar_t *subtitle_text;
-    float position;
+    const reach_motion *position;
+    int32_t hit;
 } display_toggle_card;
 
 static void render_display_toggle_card(const reach_settings_render_input *input,
@@ -428,7 +439,8 @@ static void render_display_toggle_card(const reach_settings_render_input *input,
                              reach_settings_scale(input, REACH_TEXT_SIZE_XSMALL),
                              REACH_TEXT_WEIGHT_NORMAL, input->text_alignment_leading,
                              input->theme->settings_secondary_text, 1);
-    reach_ui_toggle_render(commands, card->toggle, toggle_style, card->position);
+    reach_ui_toggle_motion_render(commands, card->toggle, toggle_style,
+                                  reach_settings_toggle_group_id(card->hit, 0), card->position);
 }
 
 static void render_display_selector_card(const reach_settings_render_input *input,
@@ -487,11 +499,11 @@ static void render_display_page(const reach_settings_render_input *input,
          layout->display_fps_subtitle, layout->display_fps_toggle, REACH_VECTOR_ICON_ARROW_UP,
          nullptr, L"Adaptive animations",
          L"Match your main display's refresh rate\nBattery saver sets animations to 60 Hz",
-         reach_animation_manager_value(&model->display_fps_animation, 0)},
+         &model->display_fps_toggle, REACH_SETTINGS_HIT_DISPLAY_FPS_TOGGLE},
         {layout->display_font_card, layout->display_font_icon, layout->display_font_title,
          layout->display_font_subtitle, layout->display_font_toggle, REACH_VECTOR_ICON_NONE, L"F",
-         L"Use JetBrains Mono", L"Off uses the Windows system font",
-         reach_animation_manager_value(&model->display_font_animation, 0)},
+         L"Use JetBrains Mono", L"Off uses the Windows system font", &model->display_font_toggle,
+         REACH_SETTINGS_HIT_DISPLAY_FONT_TOGGLE},
     };
     for (size_t index = 0; index < sizeof(cards) / sizeof(cards[0]); ++index)
     {
@@ -540,17 +552,17 @@ static void render_display_page(const reach_settings_render_input *input,
         (const uint16_t *)u"Choose how top bar items are grouped and framed", top_bar_style_labels,
         REACH_SETTINGS_SELECTOR_ITEM_COUNT,
         reach_animation_manager_value(&model->top_bar_style_animation, 0), accent);
-    display_toggle_card auto_hide = {
-        layout->top_bar_auto_hide_card,
-        {},
-        layout->top_bar_auto_hide_title,
-        layout->top_bar_auto_hide_subtitle,
-        layout->top_bar_auto_hide_toggle,
-        REACH_VECTOR_ICON_NONE,
-        nullptr,
-        L"Auto hide top bar",
-        L"Hide it when a window enters its screen region",
-        reach_animation_manager_value(&model->top_bar_mode_animation, 0)};
+    display_toggle_card auto_hide = {layout->top_bar_auto_hide_card,
+                                     {},
+                                     layout->top_bar_auto_hide_title,
+                                     layout->top_bar_auto_hide_subtitle,
+                                     layout->top_bar_auto_hide_toggle,
+                                     REACH_VECTOR_ICON_NONE,
+                                     nullptr,
+                                     L"Auto hide top bar",
+                                     L"Hide it when a window enters its screen region",
+                                     &model->top_bar_mode_toggle,
+                                     REACH_SETTINGS_HIT_TOP_BAR_AUTO_HIDE_TOGGLE};
     render_display_toggle_card(input, commands, &toggle_style, &auto_hide);
     reach_render_command_buffer_clear_scissor(commands);
     if (layout->display_scrollbar_thumb.height > 0.0f)
@@ -626,7 +638,6 @@ static void render_startup_apps_page(const reach_settings_render_input *input,
         const reach_startup_app_entry *entry = &model->startup_apps.entries[index];
         const reach_rect_f32 row = layout->startup_rows[index];
 
-        float on = reach_animation_manager_value(&model->startup_animations, index);
         reach_settings_push_rect(commands, row,
                                  reach_settings_scale(input, input->theme->radius_small),
                                  input->theme->settings_card_background);
@@ -688,7 +699,10 @@ static void render_startup_apps_page(const reach_settings_render_input *input,
         toggle_style.track_off = input->theme->settings_toggle_track_off;
         toggle_style.track_on = reach_settings_color_with_alpha(accent, 0.85f);
         toggle_style.knob = input->theme->settings_toggle_knob;
-        reach_ui_toggle_render(commands, toggle, &toggle_style, on);
+        reach_ui_toggle_motion_render(
+            commands, toggle, &toggle_style,
+            reach_settings_toggle_group_id(REACH_SETTINGS_HIT_STARTUP_TOGGLE, index),
+            &model->startup_toggles[index]);
     }
     reach_render_command_buffer_clear_scissor(commands);
 
