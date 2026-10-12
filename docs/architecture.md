@@ -424,7 +424,9 @@ finite cubic motion against a monotonic clock for interruption and event-time hi
 tick is needed to advance compositor motion. The adapter owns native visuals, drawing surfaces,
 native animation objects, and completion resources. It compares localized commands independently
 of presentation properties, preserves painter order by splitting static runs around explicit
-groups, and releases the superseded swap chain after constructing the retained scene. Surfaces
+groups and individual ungrouped textboxes, and releases the superseded swap chain after constructing
+the retained scene. Textbox edits and caret boundaries repaint only their editor source; explicit
+groups retain feature-declared ownership. Surfaces
 are bounded to 128 MiB per renderer and 16,384 pixels per dimension. Retired groups are removed
 before replacements are allocated. Processed cover artwork uses a 24-entry, 16 MiB cache, while
 ordinary text and measurement share 32 text formats and 128 layouts with bounded string lengths.

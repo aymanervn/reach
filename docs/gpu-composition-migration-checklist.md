@@ -182,6 +182,14 @@ support expectation is explicitly resolved.
     scheduler/command probes pass, including moved windows and four DPI values. Textbox caret
     drawing remains compound; isolated retained-caret benefit/cost comparison and broad acceptance
     remain pending, so this does not close the repetition or final CPU-disposition gates.
+  - [x] Isolate ordinary textbox raster sources from surrounding static content.
+    Both retained backends partition ungrouped editors without changing explicit group ownership,
+    painter order or fallback drawing. The sample caret repaint area falls from 70,400 to 5,249
+    pixels, with about 8% more estimated source memory. Adjacent fields, placeholder edits, selection,
+    clipping, fractional geometry at four DPI values and complete retirement pass; cached source
+    pixels differ from direct drawing by at most one channel value. Both builds, all 40 tests and
+    five full native runs per backend plus fallback pass in Debug/Release. Independent caret
+    composition, displayed pixels and total product cost remain pending.
 
 ## 5. Reveal, resize and layout motion
 

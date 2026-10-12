@@ -38,6 +38,33 @@ alternative's resource/composition overhead before settling the final CPU/GPU di
 step removes the continuous wake path and provides shared fallback timing; it does not close the
 repetition or final performance acceptance gates.
 
+## Isolated textbox sources
+
+The retained adapter now partitions each ungrouped `TEXTBOX` into its own source and preserves
+static runs before and after it. Explicit render groups keep their declared ownership. This applies
+to ordinary Settings and Launcher editor commands without feature-specific rendering or a new clock.
+Fallback command execution is unchanged. Carets still draw inside the compound editor source.
+
+The bounded native scene has a full background, fractional editor with selection/caret and an
+overlapping foreground. Previously each blink repainted its 70,400-pixel combined source; now it
+repaints 5,249 pixels while the surrounding sources remain unchanged. Estimated source bytes rise
+from 281,600 to 304,296, about 8%, because overlapping content occupies separate surfaces. Twelve
+flips produce twelve raster passes and no group-property updates on each compositor. Batch timings
+vary, especially on DirectComposition, and do not establish a total performance improvement.
+
+Offscreen readback reconstructs actual localized retained commands and compares with direct
+drawing, requiring a nonempty reference. Maximum channel error is one. Adjacent editors, placeholder
+changes, selection, scissoring and fractional placements at 100/125/150/200% DPI also pass. Explicit
+two-command editor groups stay intact; hiding retires all sources. Full native suites pass five runs
+per backend plus HWND fallback in Debug and Release, alongside both builds and all 40 tests.
+Evidence is `probe-textbox-{debug,release}-complete.log`, `probe-textbox-before.log`,
+`probe-textbox-after.log`, `build-{debug,release}-textbox-cache.log` and
+`test-{debug,release}-textbox-cache.log` under `build/gpu-composition-migration`.
+
+This is source invalidation isolation, not independent GPU caret animation or displayed compositor
+capture. Retained scene topology still requires an unchanged-submission audit, and the final
+caret disposition and repeated product CPU/GPU/power/memory/latency comparisons remain open.
+
 ## Settings retained binary toggles
 
 Settings Display/font preferences, top-bar auto-hide, Wi-Fi/Bluetooth radio state, startup entries

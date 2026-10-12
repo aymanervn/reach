@@ -1256,8 +1256,13 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
     {
         const reach_render_command &first = commands->commands[index];
         size_t end = index + 1;
-        while (end < commands->count && commands->commands[end].group_id == first.group_id)
-            ++end;
+        if (first.group_id != 0 || first.type != REACH_RENDER_COMMAND_TEXTBOX)
+        {
+            while (end < commands->count && commands->commands[end].group_id == first.group_id &&
+                   (first.group_id != 0 ||
+                    commands->commands[end].type != REACH_RENDER_COMMAND_TEXTBOX))
+                ++end;
+        }
         reach_render_group group = {};
         if (first.group_id != 0)
             group = *reach_render_command_buffer_group(commands, first.group_id);
