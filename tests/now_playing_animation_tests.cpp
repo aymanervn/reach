@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <cstdio>
+#include <initializer_list>
 
 static int failures = 0;
 
@@ -65,31 +66,44 @@ struct now_playing_fixture
 
 static void test_overflow_uses_one_gpu_animation()
 {
-    now_playing_fixture fixture;
-    reach_top_bar_now_playing_render_input input = fixture.input(1);
-    reach_render_command_buffer commands = {};
-
-    expect_true(reach_top_bar_now_playing_build_render_commands(&input, &commands) == REACH_OK,
-                "GPU render commands build");
-    const reach_render_group *animated = nullptr;
-    for (size_t index = 0; index < commands.group_count; ++index)
-        if (commands.groups[index].repeat_travel_seconds > 0.0f)
-            animated = &commands.groups[index];
-    expect_true(animated != nullptr, "overflow uses one animated text layer");
-    if (animated != nullptr)
+    for (float dpi : {1.0f, 1.25f, 1.5f, 2.0f})
     {
-        expect_near(animated->repeat_offset_x, -52.0, 0.0001,
-                    "animation travels the exact overflow");
-        expect_near(animated->repeat_hold_seconds, 1.6, 0.0001,
-                    "animation retains its endpoint hold");
-        expect_near(animated->repeat_travel_seconds, 2.0, 0.0001,
-                    "animation retains its movement speed");
+        now_playing_fixture fixture;
+        fixture.layout.text.width *= dpi;
+        fixture.layout.text_advance *= dpi;
+        reach_top_bar_now_playing_render_input input = fixture.input(1);
+        input.dpi_scale = dpi;
+        reach_render_command_buffer commands = {};
+
+        expect_true(reach_top_bar_now_playing_build_render_commands(&input, &commands) == REACH_OK,
+                    "GPU render commands build");
+        const reach_render_group *animated = nullptr;
+        for (size_t index = 0; index < commands.group_count; ++index)
+            if (commands.groups[index].repeat_travel_seconds > 0.0f)
+                animated = &commands.groups[index];
+        expect_true(animated != nullptr, "overflow uses one animated text layer");
+        if (animated != nullptr)
+        {
+            expect_near(animated->repeat_offset_x, -52.0 * dpi, 0.0001,
+                        "animation travels the exact overflow");
+            expect_near(animated->repeat_hold_seconds, 1.6, 0.0001,
+                        "animation retains its endpoint hold");
+            expect_near(animated->repeat_travel_seconds, 2.0, 0.0001,
+                        "animation retains its logical movement speed at every DPI");
+        }
+        size_t text_count = 0;
+        for (size_t index = 0; index < commands.count; ++index)
+            if (commands.commands[index].type == REACH_RENDER_COMMAND_TEXT)
+                ++text_count;
+        expect_true(text_count == 1, "GPU path does not draw duplicate text");
+        fixture.layout.text_advance = fixture.layout.text.width + 0.75f * dpi;
+        reach_render_command_buffer_clear(&commands);
+        expect_true(reach_top_bar_now_playing_build_render_commands(&input, &commands) == REACH_OK,
+                    "sub-threshold overflow remains static at every DPI");
+        for (size_t index = 0; index < commands.group_count; ++index)
+            expect_true(commands.groups[index].repeat_travel_seconds == 0,
+                        "overflow threshold stays in logical pixels");
     }
-    size_t text_count = 0;
-    for (size_t index = 0; index < commands.count; ++index)
-        if (commands.commands[index].type == REACH_RENDER_COMMAND_TEXT)
-            ++text_count;
-    expect_true(text_count == 1, "GPU path does not draw duplicate text");
 }
 
 static void test_unavailable_gpu_animation_stays_static()

@@ -69,7 +69,8 @@ static void reach_top_bar_now_playing_push_text(reach_render_command_buffer *com
 static void reach_top_bar_now_playing_push_marquee(reach_render_command_buffer *commands,
                                                    reach_rect_f32 rect, const uint16_t *value,
                                                    float size, int32_t weight, reach_color color,
-                                                   reach_rect_f32 clip, float overflow)
+                                                   reach_rect_f32 clip, float overflow,
+                                                   float dpi_scale)
 {
     reach_render_command command = {};
     reach_render_group group = {};
@@ -79,7 +80,7 @@ static void reach_top_bar_now_playing_push_marquee(reach_render_command_buffer *
     group.clip = clip;
     group.repeat_offset_x = -overflow;
     group.repeat_hold_seconds = REACH_TOP_BAR_NOW_PLAYING_MARQUEE_HOLD_SECONDS;
-    group.repeat_travel_seconds = overflow / REACH_TOP_BAR_NOW_PLAYING_MARQUEE_SPEED;
+    group.repeat_travel_seconds = overflow / (REACH_TOP_BAR_NOW_PLAYING_MARQUEE_SPEED * dpi_scale);
     reach_render_command_buffer_begin_group(commands, &group);
     command.type = REACH_RENDER_COMMAND_TEXT;
     command.rect = rect;
@@ -295,11 +296,12 @@ reach_top_bar_now_playing_build_render_commands(const reach_top_bar_now_playing_
     text.width =
         input->layout->text_advance > text.width ? input->layout->text_advance : text.width;
     float overflow = input->layout->text_advance - input->layout->text.width;
-    if (input->animate_text && overflow > REACH_TOP_BAR_NOW_PLAYING_MIN_OVERFLOW)
+    if (input->animate_text && overflow > REACH_TOP_BAR_NOW_PLAYING_MIN_OVERFLOW * dpi_scale)
     {
-        reach_top_bar_now_playing_push_marquee(
-            out_commands, text, input->model->line, REACH_TEXT_SIZE_MEDIUM * dpi_scale,
-            REACH_TEXT_WEIGHT_BOLD, theme->now_playing_title, input->layout->text, overflow);
+        reach_top_bar_now_playing_push_marquee(out_commands, text, input->model->line,
+                                               REACH_TEXT_SIZE_MEDIUM * dpi_scale,
+                                               REACH_TEXT_WEIGHT_BOLD, theme->now_playing_title,
+                                               input->layout->text, overflow, dpi_scale);
     }
     else
     {

@@ -432,8 +432,13 @@ compilation preserve phase; the compiler rotates one complete cycle to the submi
 Both compositors repeat the resulting keyframes/cubics without application ticks. Root presentation
 remains finite so completion ownership is well-defined. Retiring or replacing retained sources stops
 periodic transform, opacity, clip and tint bindings before releasing the layer; font replacement
-uses the same cleanup. Existing marquee descriptors retain their previous backend behavior pending
-their separate audit. Final workload acceptance remains migration work.
+uses the same cleanup. Now Playing's marquee retains its existing clipped native cycle descriptor:
+Windows Composition uses its established custom Bezier easing and DirectComposition its established
+smoothstep cubics. Logical overflow, speed and the overflow threshold scale together with DPI;
+endpoint holds remain in seconds. Unchanged submissions preserve the cycle and raster, content edits
+restart it, and disable/hide/font replacement retire its native binding. Its driver requires no
+application frames; the renderer fallback keeps the title static. Canonical curve/phase unification
+and final workload acceptance remain migration work.
 
 Settings Wi-Fi, Bluetooth, Windows Update and installed-app loaders publish normalized periodic
 width and translation through the shared loader renderer. Fixed caps preserve the bar radius while

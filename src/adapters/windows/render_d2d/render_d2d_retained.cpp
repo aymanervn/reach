@@ -912,6 +912,7 @@ static HRESULT repeat_motion(reach_render_backend *backend, reach_d2d_retained_l
     float cycle = 2.0f * (hold + travel);
     if (travel <= 0.0f || hold < 0.0f || group.repeat_offset_x == 0.0f)
         return S_OK;
+    reach_workload_add(REACH_WORKLOAD_PROPERTY_SUBMISSIONS, 1);
     if (backend->compositor != nullptr)
     {
         ComPtr<IScalarKeyFrameAnimation> scalar;
