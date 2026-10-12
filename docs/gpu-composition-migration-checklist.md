@@ -116,6 +116,16 @@ support expectation is explicitly resolved.
     and Debug. Padding-only changes and unchanged settled chrome submit no properties or raster
     work; real generations still update ownership. Total product acceptance remains pending.
 
+  - [x] Preserve retained scene topology and content matrices on unchanged submissions.
+    Ordered identity/parent ownership is cached separately from raster and motion intent. Native
+    trees rebuild on membership/order/reparenting or font replacement; partial rebuilds remain
+    invalid until repaired, and suspension resets ownership. The focused two-layer comparison
+    removes 300 tree mutations and 100 matrix submissions per 100 unchanged executions on each
+    backend. Reorder, source edits, matrix/motion changes, parent-content retirement and recovery
+    checks pass. Both builds, all 40 tests, five full native runs per backend plus fallback in
+    Debug/Release and final lifecycle-counter probes pass. Displayed pixels, actual device loss
+    and repeated total product workload acceptance remain open.
+
 ## 4. Feedback and repetition
 
 - [ ] Migrate eligible hover, press, selection and close feedback across Context Menu, Battery, tray,

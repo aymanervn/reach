@@ -549,10 +549,16 @@ static HRESULT create_scene(reach_render_backend *backend)
         {
             hr = backend->swap_chain_visual.As(&old);
             if (SUCCEEDED(hr))
+            {
+                reach_workload_add(REACH_WORKLOAD_VISUAL_TREE_MUTATIONS, 1);
                 (void)children->Remove(old.Get());
+            }
         }
         if (SUCCEEDED(hr))
+        {
+            reach_workload_add(REACH_WORKLOAD_VISUAL_TREE_MUTATIONS, 1);
             hr = children->InsertAtTop(scene.Get());
+        }
         if (SUCCEEDED(hr))
             retire_swap_chain(backend);
         return hr;
@@ -561,7 +567,10 @@ static HRESULT create_scene(reach_render_backend *backend)
     if (SUCCEEDED(hr))
         hr = backend->dcomp_visual->SetContent(nullptr);
     if (SUCCEEDED(hr))
+    {
+        reach_workload_add(REACH_WORKLOAD_VISUAL_TREE_MUTATIONS, 1);
         hr = backend->dcomp_visual->AddVisual(backend->dcomp_scene_visual.Get(), TRUE, nullptr);
+    }
     if (SUCCEEDED(hr))
         hr = backend->dcomp_device->CreateScaleTransform(&backend->scene_scale);
     if (SUCCEEDED(hr))
@@ -585,14 +594,20 @@ static HRESULT create_layer(reach_render_backend *backend, reach_d2d_retained_la
         if (SUCCEEDED(hr))
             hr = layer.visual.As(&visual);
         if (SUCCEEDED(hr))
+        {
+            reach_workload_add(REACH_WORKLOAD_VISUAL_TREE_MUTATIONS, 1);
             hr = children->InsertAtTop(visual.Get());
+        }
         return hr;
     }
     HRESULT hr = backend->dcomp_device->CreateVisual(&layer.dcomp_container);
     if (SUCCEEDED(hr))
         hr = backend->dcomp_device->CreateVisual(&layer.dcomp_visual);
     if (SUCCEEDED(hr))
+    {
+        reach_workload_add(REACH_WORKLOAD_VISUAL_TREE_MUTATIONS, 1);
         hr = layer.dcomp_container->AddVisual(layer.dcomp_visual.Get(), TRUE, nullptr);
+    }
     if (SUCCEEDED(hr))
         hr = backend->dcomp_device->CreateScaleTransform(&layer.dcomp_scale);
     if (SUCCEEDED(hr))
@@ -1037,10 +1052,14 @@ void reach_d2d_release_retained(reach_render_backend *backend)
         ComPtr<ABI::Windows::UI::Composition::IVisual> scene;
         if (SUCCEEDED(backend->root_visual->get_Children(&children)) &&
             SUCCEEDED(backend->scene_visual.As(&scene)))
+        {
+            reach_workload_add(REACH_WORKLOAD_VISUAL_TREE_MUTATIONS, 1);
             (void)children->Remove(scene.Get());
+        }
     }
     if (backend->dcomp_visual != nullptr && backend->dcomp_scene_visual != nullptr)
     {
+        reach_workload_add(REACH_WORKLOAD_VISUAL_TREE_MUTATIONS, 1);
         (void)backend->dcomp_visual->RemoveVisual(backend->dcomp_scene_visual.Get());
         (void)backend->dcomp_visual->SetTransform((IDCompositionTransform *)nullptr);
         (void)backend->dcomp_visual->SetEffect(nullptr);
@@ -1051,6 +1070,9 @@ void reach_d2d_release_retained(reach_render_backend *backend)
             (void)opacity->SetOpacity(1.0f);
     }
     backend->retained_layers.clear();
+    backend->retained_topology.clear();
+    backend->retained_topology_valid = false;
+    backend->has_scene_content_transform = false;
     record_retained_bytes(backend);
     backend->scene_visual.Reset();
     backend->dcomp_scene_visual.Reset();
@@ -1207,15 +1229,17 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
     }
     if (reach_wuc_apply_content_clip(backend, commands->content_rect) != REACH_OK)
         return REACH_ERROR;
-    ComPtr<IVisualCollection> children;
-    if (backend->scene_visual != nullptr)
+    const reach_transform_f32 &transform = commands->content_transform;
+    const reach_transform_f32 &previous_transform = backend->scene_content_transform;
+    bool transform_changed = !backend->has_scene_content_transform ||
+                             transform.scale_x != previous_transform.scale_x ||
+                             transform.scale_y != previous_transform.scale_y ||
+                             transform.offset_x != previous_transform.offset_x ||
+                             transform.offset_y != previous_transform.offset_y;
+    if (transform_changed && backend->scene_visual != nullptr)
     {
-        hr = backend->scene_visual->get_Children(&children);
-        if (SUCCEEDED(hr))
-            hr = children->RemoveAll();
         ComPtr<IVisual> scene;
-        if (SUCCEEDED(hr))
-            hr = backend->scene_visual.As(&scene);
+        hr = backend->scene_visual.As(&scene);
         if (SUCCEEDED(hr))
         {
             ABI::Windows::Foundation::Numerics::Matrix4x4 matrix = {};
@@ -1225,12 +1249,12 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
             matrix.M44 = 1.0f;
             matrix.M41 = commands->content_transform.offset_x;
             matrix.M42 = commands->content_transform.offset_y;
+            reach_workload_add(REACH_WORKLOAD_SCENE_TRANSFORM_SUBMISSIONS, 1);
             hr = scene->put_TransformMatrix(matrix);
         }
     }
-    else
+    else if (transform_changed)
     {
-        hr = backend->dcomp_scene_visual->RemoveAllVisuals();
         D2D_MATRIX_3X2_F matrix = {commands->content_transform.scale_x,
                                    0.0f,
                                    0.0f,
@@ -1238,7 +1262,17 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
                                    commands->content_transform.offset_x,
                                    commands->content_transform.offset_y};
         if (SUCCEEDED(hr))
+        {
+            reach_workload_add(REACH_WORKLOAD_SCENE_TRANSFORM_SUBMISSIONS, 1);
             hr = backend->dcomp_scene_visual->SetTransform(matrix);
+        }
+    }
+    if (FAILED(hr))
+        return REACH_ERROR;
+    if (transform_changed)
+    {
+        backend->scene_content_transform = transform;
+        backend->has_scene_content_transform = true;
     }
     struct retained_plan
     {
@@ -1295,26 +1329,59 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
         }
         index = end;
     }
-    for (auto &layer : backend->retained_layers)
+    bool topology_changed =
+        !backend->retained_topology_valid || plans.size() != backend->retained_topology.size() ||
+        !std::equal(
+            plans.begin(), plans.end(), backend->retained_topology.begin(),
+            [](const retained_plan &left, const reach_d2d_retained_attachment &right)
+            { return left.group.id == right.id && left.group.parent_id == right.parent_id; });
+    ComPtr<IVisualCollection> children;
+    if (topology_changed)
     {
-        if (layer.has_children)
+        backend->retained_topology_valid = false;
+        if (backend->compositor != nullptr)
         {
-            if (backend->compositor != nullptr)
+            hr = backend->scene_visual->get_Children(&children);
+            if (SUCCEEDED(hr))
             {
-                ComPtr<IContainerVisual> content;
-                ComPtr<IVisualCollection> descendants;
-                hr = layer.visual.As(&content);
-                if (SUCCEEDED(hr))
-                    hr = content->get_Children(&descendants);
-                if (SUCCEEDED(hr))
-                    hr = descendants->RemoveAll();
+                reach_workload_add(REACH_WORKLOAD_VISUAL_TREE_MUTATIONS, 1);
+                hr = children->RemoveAll();
             }
-            else
-                hr = layer.dcomp_visual->RemoveAllVisuals();
-            if (FAILED(hr))
-                return REACH_ERROR;
         }
-        layer.has_children = false;
+        else
+        {
+            reach_workload_add(REACH_WORKLOAD_VISUAL_TREE_MUTATIONS, 1);
+            hr = backend->dcomp_scene_visual->RemoveAllVisuals();
+        }
+        if (FAILED(hr))
+            return REACH_ERROR;
+        for (auto &layer : backend->retained_layers)
+        {
+            if (layer.has_children)
+            {
+                if (backend->compositor != nullptr)
+                {
+                    ComPtr<IContainerVisual> content;
+                    ComPtr<IVisualCollection> descendants;
+                    hr = layer.visual.As(&content);
+                    if (SUCCEEDED(hr))
+                        hr = content->get_Children(&descendants);
+                    if (SUCCEEDED(hr))
+                    {
+                        reach_workload_add(REACH_WORKLOAD_VISUAL_TREE_MUTATIONS, 1);
+                        hr = descendants->RemoveAll();
+                    }
+                }
+                else
+                {
+                    reach_workload_add(REACH_WORKLOAD_VISUAL_TREE_MUTATIONS, 1);
+                    hr = layer.dcomp_visual->RemoveAllVisuals();
+                }
+                if (FAILED(hr))
+                    return REACH_ERROR;
+            }
+            layer.has_children = false;
+        }
     }
     backend->retained_layers.erase(std::remove_if(backend->retained_layers.begin(),
                                                   backend->retained_layers.end(),
@@ -1361,45 +1428,57 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
         if (FAILED(hr))
             return REACH_ERROR;
     }
-    for (const retained_plan &plan : plans)
+    if (topology_changed)
     {
-        auto found = std::find_if(backend->retained_layers.begin(), backend->retained_layers.end(),
-                                  [&](const reach_d2d_retained_layer &layer)
-                                  { return layer.id == plan.group.id; });
-        reach_d2d_retained_layer *parent = nullptr;
-        if (plan.group.parent_id != 0)
+        for (const retained_plan &plan : plans)
         {
-            auto owner =
-                std::find_if(backend->retained_layers.begin(), backend->retained_layers.end(),
-                             [&](const reach_d2d_retained_layer &layer)
-                             { return layer.id == plan.group.parent_id; });
-            parent = &*owner;
-            parent->has_children = true;
-        }
-        if (backend->compositor != nullptr)
-        {
-            ComPtr<IVisualCollection> siblings = children;
-            ComPtr<IContainerVisual> owner;
-            ComPtr<IVisual> visual;
-            if (parent != nullptr)
+            auto found = std::find_if(
+                backend->retained_layers.begin(), backend->retained_layers.end(),
+                [&](const reach_d2d_retained_layer &layer) { return layer.id == plan.group.id; });
+            reach_d2d_retained_layer *parent = nullptr;
+            if (plan.group.parent_id != 0)
             {
-                hr = parent->visual.As(&owner);
-                if (SUCCEEDED(hr))
-                    hr = owner->get_Children(&siblings);
+                auto owner =
+                    std::find_if(backend->retained_layers.begin(), backend->retained_layers.end(),
+                                 [&](const reach_d2d_retained_layer &layer)
+                                 { return layer.id == plan.group.parent_id; });
+                parent = &*owner;
+                parent->has_children = true;
             }
-            if (SUCCEEDED(hr))
-                hr = found->container.As(&visual);
-            if (SUCCEEDED(hr))
-                hr = siblings->InsertAtTop(visual.Get());
+            if (backend->compositor != nullptr)
+            {
+                ComPtr<IVisualCollection> siblings = children;
+                ComPtr<IContainerVisual> owner;
+                ComPtr<IVisual> visual;
+                if (parent != nullptr)
+                {
+                    hr = parent->visual.As(&owner);
+                    if (SUCCEEDED(hr))
+                        hr = owner->get_Children(&siblings);
+                }
+                if (SUCCEEDED(hr))
+                    hr = found->container.As(&visual);
+                if (SUCCEEDED(hr))
+                {
+                    reach_workload_add(REACH_WORKLOAD_VISUAL_TREE_MUTATIONS, 1);
+                    hr = siblings->InsertAtTop(visual.Get());
+                }
+            }
+            else
+            {
+                IDCompositionVisual2 *owner = parent != nullptr ? parent->dcomp_visual.Get()
+                                                                : backend->dcomp_scene_visual.Get();
+                reach_workload_add(REACH_WORKLOAD_VISUAL_TREE_MUTATIONS, 1);
+                hr = owner->AddVisual(found->dcomp_container.Get(), FALSE, nullptr);
+            }
+            if (FAILED(hr))
+                return REACH_ERROR;
         }
-        else
-        {
-            IDCompositionVisual2 *owner =
-                parent != nullptr ? parent->dcomp_visual.Get() : backend->dcomp_scene_visual.Get();
-            hr = owner->AddVisual(found->dcomp_container.Get(), FALSE, nullptr);
-        }
-        if (FAILED(hr))
-            return REACH_ERROR;
+        backend->retained_topology.clear();
+        backend->retained_topology.reserve(plans.size());
+        for (const auto &plan : plans)
+            backend->retained_topology.push_back({plan.group.id, plan.group.parent_id});
+        backend->retained_topology_valid = true;
     }
     reach_render_group presentation =
         commands->has_presentation ? commands->presentation : reach_render_group{};

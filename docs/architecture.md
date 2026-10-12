@@ -432,6 +432,12 @@ before replacements are allocated. Processed cover artwork uses a 24-entry, 16 M
 ordinary text and measurement share 32 text formats and 128 layouts with bounded string lengths.
 Font changes, icon retirement, and backend destruction invalidate dependent entries.
 
+The adapter caches ordered retained group identities and parent ownership separately from content
+and motion. Unchanged submissions, raster edits and property retargets keep the native tree intact;
+membership, painter order, parent ownership or font-source replacement rebuild it. A rebuild is
+valid only after every attachment succeeds, and suspension clears that ownership. Scene content
+matrices use named-field comparison and submit only when changed or recreated.
+
 Group clips retain a stationary viewport and four independent absolute-time inset descriptors.
 Windows Composition animates the cached `InsetClip` properties; DirectComposition animates a cached
 rectangle clip, mapping right/bottom insets to native edge coordinates. Removing clipping retires
@@ -495,7 +501,8 @@ capability belongs to explicit groups; root presentation tint is not implemented
 
 Optional process-wide workload diagnostics count application wakes/updates, scalar/loader/scroll
 work, layout and command production, renderer executions and actual raster passes, compositor
-submissions, and native-thumbnail calls separately. `REACH_WORKLOAD_REPORT` enables collection at
+submissions, retained visual-tree mutations, scene content matrices, and native-thumbnail calls
+separately. `REACH_WORKLOAD_REPORT` enables collection at
 startup; Reach and Settings write separate aggregate JSON summaries on ordinary exit. No diagnostic
 timer or reporting worker is added. Retained-surface bytes are an estimate, not total GPU allocation;
 system CPU/GPU, power and presentation latency require independent measurement. See

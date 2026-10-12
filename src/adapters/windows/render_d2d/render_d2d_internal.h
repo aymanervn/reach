@@ -121,6 +121,12 @@ struct reach_d2d_retained_layer
     reach_point_f32 parent_origin = {};
 };
 
+struct reach_d2d_retained_attachment
+{
+    uint64_t id;
+    uint64_t parent_id;
+};
+
 struct reach_render_backend
 {
     HWND hwnd;
@@ -149,6 +155,10 @@ struct reach_render_backend
     ComPtr<ABI::Windows::UI::Composition::ICompositionSurface> composition_surface;
     ComPtr<ABI::Windows::UI::Composition::ICompositionGraphicsDevice> composition_graphics_device;
     std::vector<reach_d2d_retained_layer> retained_layers;
+    std::vector<reach_d2d_retained_attachment> retained_topology;
+    bool retained_topology_valid = false;
+    reach_transform_f32 scene_content_transform = {};
+    bool has_scene_content_transform = false;
     uint64_t reported_retained_bytes = 0;
     ComPtr<ABI::Windows::UI::Composition::IContainerVisual> scene_visual;
     ComPtr<IDCompositionVisual2> dcomp_scene_visual;

@@ -168,6 +168,14 @@ These do not become GPU algorithms, but their scheduling must not hide redundant
 
 ## Inventory evidence and acceptance updates
 
+The shared retained adapter caches ordered group/parent ownership and scene content matrices.
+Raster edits and property motion do not rebuild unchanged native trees. Membership/order/reparenting,
+font-source replacement and recreation invalidate the appropriate ownership; partial rebuilds are
+not cached as successful. The two-layer native comparison removes 300 tree mutations and 100 matrix
+writes per 100 unchanged submissions on both backends. Full Debug/Release native suites and focused
+recovery/lifecycle checks pass. This improves execution of all retained consumers; it does not close
+their remaining feature migrations, displayed-pixel verification or total workload acceptance.
+
 The audit searched all `include` and `src` C/C++ sources for animation/motion/loader declarations,
 manager start/tick/value consumers, retained groups/repetition, delta/phase accumulation, scrollbar
 updates, timers, frame predicates and lifecycle deadlines. Every feature and Settings declared
