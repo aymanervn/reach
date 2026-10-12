@@ -445,7 +445,8 @@ int32_t reach_host_needs_frame(const reach_host *host)
         }
         reach_feature_surface_geometry geometry = {};
         runtime->definition->capsule_ops->surface_geometry(runtime->capsule, &geometry);
-        if ((runtime->surface != nullptr && runtime->surface->fallback_animation_active) ||
+        if ((runtime->native_overlay_motion_pending && reach_host_surface_presented(runtime)) ||
+            (runtime->surface != nullptr && runtime->surface->fallback_animation_active) ||
             (reach_motion_wait_ms(geometry.deadline_seconds) == 0 &&
              reach_host_presentation_ready(const_cast<reach_feature_runtime *>(runtime))))
         {

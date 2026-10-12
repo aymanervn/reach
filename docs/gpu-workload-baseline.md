@@ -2,6 +2,39 @@
 
 Status: counters verified; full product performance baseline and acceptance pending.
 
+## Native root-presentation frame separation
+
+Switcher and Context Menu no longer request content frames solely to advance preview-linked popup
+translation or opacity. Generic runtime native-motion demand samples the existing canonical root
+properties while a visible relationship needs synchronization, including one final endpoint sample.
+This remains necessary CPU work for DWM's immediate placement API; source pixels stay DWM-owned.
+Native motion does not independently dirty content. Unchanged arrangement inputs and canonical
+geometry reuse the prior projection context, so other surfaces also skip unnecessary arrangement
+and rendering on these wakes. Native overlay generation changes can reconcile without a content
+frame. Renderer capability, HWND/window identity, environment, anchors and changed intent invalidate
+the cache. Existing dirty flags, CPU/fallback animation demand and synchronized-close behavior retain
+their full path. A bounds-only HWND change does not by itself force a content redraw.
+
+The owned native check calls the actual registered-surface frame function with real WUC/DC renderers
+and a real DWM adapter over its own hidden source/target windows. Twenty motion samples and the
+terminal sample request native placement without additional capsule arrangements, commands,
+window placement, raster passes or property submissions. Ten settled calls issue no native placement
+requests. Canonical retarget, DPI/theme/anchor changes, a simulated capability loss/restore,
+hide/show and native membership changes exercise invalidation and retirement. Actual Switcher tick
+verification confirms root motion itself requests no content frame. These operations do not contact
+a product instance or Reach IPC, and do not verify displayed alignment or total system cost.
+
+Both isolated builds, all 40 test groups and focused checks pass. Evidence is
+`build-{debug,release}-native-frames.log`, `test-{debug,release}-native-frames.log`,
+`probe-native-frames-{debug,release}.log` and
+`probe-native-frames-capsule-{debug,release}.log` under `build/gpu-composition-migration`.
+The private runtime currently occupies 3,928 bytes per surface, including existing overlay arrays
+and the new context snapshots. Five full native runs per backend plus existing fallback checks pass
+in both builds (`probe-native-frames-{debug,release}-complete.log`). Architecture, formatting and
+whitespace checks pass.
+Switcher width, Dock reflow, Stage body movement, broader loop separation, live pixels and repeated
+CPU/GPU/power/memory acceptance remain pending.
+
 ## Canonical periodic properties
 
 `reach_motion` now expresses periodic forward/backward travel with independent endpoint holds and

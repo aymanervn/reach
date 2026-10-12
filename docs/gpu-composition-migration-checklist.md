@@ -99,6 +99,16 @@ support expectation is explicitly resolved.
     integration is implemented; displayed-pixel/product-performance acceptance remains pending.
 - [ ] Separate content/layout invalidation, compositor submission, native placement and input updates
   in both application loops; pure compositor motion must not request periodic application frames.
+  - [x] Separate native preview root-presentation sampling from retained content frames.
+    Shared runtime demand schedules active DWM projection and one endpoint sample, then returns to
+    idle. Unchanged surface contexts skip capsule arrangement, command production, window placement
+    and renderer submission; native generation changes reconcile separately. Switcher and Context
+    Menu remove root-transition content frame requests. Dirty/environment/anchor/intent/window/
+    capability changes invalidate cached contexts; CPU fallback and synchronized-close paths remain
+    supported. Both builds, all 40 tests and owned native-frame/capsule checks pass. Five full native
+    runs per backend plus existing fallback checks pass in Debug/Release. Width/reflow/body movement,
+    wider application-loop separation, live
+    alignment and total product workload acceptance remain open.
 - [ ] Verify completion, stale-generation rejection, hide/reset and supported fallback semantics on
   both backends; land one complete consumer and remove its obsolete tick/redraw path.
   - [x] Migrate Battery press feedback end to end using shared pressable intent and a retained

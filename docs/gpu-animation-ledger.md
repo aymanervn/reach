@@ -114,8 +114,8 @@ migrated, rather than only changing the track representation.
 | Launcher `surface_scale` | Same; Retained | Open/close with proportion-preserving scale | Verify existing. |
 | HUD `opacity` | `system_hud_feature.cpp`; Retained | Action submits/restarts open/close; absolute total lifetime | Verify existing; hold must not demand animation frames. |
 | Battery popup Y and opacity | `reach_feature_transition` in Battery; Retained | Open/close, absolute deadline and completion | Verify existing. |
-| Context Menu popup Y and opacity | Same shared transition in Context Menu; Retained/native | Open/close; previews require CPU native alignment | Capability decision for native pixels; verify retained chrome. |
-| Switcher popup Y and opacity | Shared transition in Switcher; Retained/native | Open/close; native geometry samples during presentation | Capability decision for native pixels; verify retained chrome. |
+| Context Menu popup Y and opacity | Shared transition and generic native-motion scheduling; Retained/native | GPU presentation; active-only CPU DWM projection and one terminal sample | Root presentation no longer requests content frames. Shared context caching skips unchanged layout/commands/raster; body width/reflow and live/product acceptance remain pending. |
+| Switcher popup Y and opacity | Shared transition and generic native-motion scheduling; Retained/native | GPU presentation; active-only CPU DWM projection and one terminal sample | Root presentation no longer requests content frames. Shared context caching skips unchanged layout/commands/raster; width fitting, native body-motion descriptors and live/product acceptance remain pending. |
 | Clipboard surface Y and opacity | Shared transition in Clipboard; Retained | Open/close and final reconciliation | Verify existing. |
 | Quick Settings popup Y and opacity | Shared transition in Quick Settings; Retained | Open/close and final reconciliation | Verify existing. |
 | Tray popup Y and opacity | Shared transition in tray popup; Retained | Open/close and final reconciliation | Verify existing. |
