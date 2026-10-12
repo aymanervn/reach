@@ -6,6 +6,7 @@
 
 #include "reach/core/app_update.h"
 #include "reach/core/bluetooth.h"
+#include "reach/core/blink.h"
 #include "reach/core/config.h"
 #include "reach/core/loader.h"
 #include "reach/core/installed_apps.h"
@@ -235,8 +236,7 @@ extern "C"
                                           [REACH_SETTINGS_POWER_FIELD_COUNT];
         int32_t power_focused_timer;
         int32_t power_focused_field;
-        int32_t power_caret_visible;
-        double power_caret_phase;
+        reach_blink power_caret;
         reach_animation_track power_tracks[REACH_SETTINGS_POWER_TIMER_COUNT];
         reach_animation_manager power_animations;
         reach_motion power_wait_toggles[REACH_SETTINGS_POWER_TIMER_COUNT];
@@ -246,8 +246,7 @@ extern "C"
         uint64_t account_picture;
         reach_text_edit account_password_edits[REACH_SETTINGS_ACCOUNT_FIELD_COUNT];
         int32_t account_focused_field;
-        int32_t account_caret_visible;
-        double account_caret_phase;
+        reach_blink account_caret;
         int32_t account_status;
         reach_startup_app_list startup_apps;
         uint64_t startup_icons[REACH_STARTUP_APP_MAX_ENTRIES];
@@ -294,8 +293,7 @@ extern "C"
         reach_text_edit wifi_key_edit;
         reach_text_edit wifi_add_name_edit;
         reach_text_edit wifi_add_key_edit;
-        int32_t wifi_caret_visible;
-        double wifi_caret_phase;
+        reach_blink wifi_caret;
         int32_t wifi_loaded;
         reach_scrollbar_model wifi_scrollbar;
         reach_loader_model wifi_loader;
@@ -524,6 +522,8 @@ extern "C"
 
     void reach_settings_model_init(reach_settings_model *model);
     void reach_settings_model_select_page(reach_settings_model *model, reach_settings_page page);
+    double reach_settings_model_caret_deadline(const reach_settings_model *model);
+    int32_t reach_settings_model_update_caret(reach_settings_model *model, double now_seconds);
     void reach_settings_model_begin_update_scan(reach_settings_model *model);
     void reach_settings_model_apply_update_scan(reach_settings_model *model,
                                                 const reach_windows_update_list *updates,
@@ -642,8 +642,6 @@ extern "C"
     int32_t reach_settings_model_top_bar_animations_active(const reach_settings_model *model);
     int32_t reach_settings_model_power_dirty(const reach_settings_model *model);
     void reach_settings_model_power_mark_applied(reach_settings_model *model);
-    int32_t reach_settings_model_tick_power_caret(reach_settings_model *model,
-                                                  double delta_seconds);
 
     void reach_settings_model_set_account(reach_settings_model *model, const uint16_t *display_name,
                                           const uint16_t *user_name, int32_t is_admin,
@@ -658,8 +656,6 @@ extern "C"
                                                          reach_text_edit_modifiers modifiers);
     int32_t reach_settings_model_account_submit_ready(reach_settings_model *model);
     void reach_settings_model_account_apply_status(reach_settings_model *model, int32_t status);
-    int32_t reach_settings_model_tick_account_caret(reach_settings_model *model,
-                                                    double delta_seconds);
     const uint16_t *reach_settings_account_status_message(int32_t status);
 
     const reach_motion *reach_settings_model_button_press_motion(const reach_settings_model *model,
@@ -710,7 +706,6 @@ extern "C"
     int32_t reach_settings_model_tick_wifi_animations(reach_settings_model *model,
                                                       double delta_seconds);
     int32_t reach_settings_model_wifi_animations_active(const reach_settings_model *model);
-    int32_t reach_settings_model_tick_wifi_caret(reach_settings_model *model, double delta_seconds);
 
     void reach_settings_model_apply_bluetooth(reach_settings_model *model,
                                               const reach_bluetooth_device_list *devices,

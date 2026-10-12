@@ -2,6 +2,42 @@
 
 Status: counters verified; full product performance baseline and acceptance pending.
 
+## Caret deadline scheduling
+
+Settings previously requested frames whenever any edit field retained focus, then advanced three
+independent caret phases from frame deltas. Shared `reach_blink` now owns nominal visible/hidden
+intervals and an absolute next boundary on the same monotonic clock as presentation motion.
+Power/Account retain 0.55/0.45 seconds; Wi-Fi and Launcher retain 0.53-second intervals. Typing,
+edit keys and focus reset visibility immediately. Late wakes sample the current phase in constant
+time and schedule the next boundary without catch-up bursts. Blur/page changes stop inactive
+clocks; closing or resetting a hidden Launcher stops its clock.
+
+Settings' idle wait takes the earliest existing monitor deadline or visible caret boundary.
+The frame predicate tests a due boundary instead of field focus. Its client-coordinate field
+checks exclude offscreen fields, minimized windows and Wi-Fi forms hidden by radio state. The
+visible clock is sampled after layout refresh before rendering an event-driven update, so font,
+DPI, bounds and scrolling changes do not need a caret-only layout loop.
+
+The owned `caret_scheduler_probe.cpp` includes the actual Settings scheduling implementation with
+inert worker/service state and an owned window-state stub. It never starts Settings, touches Reach
+IPC or changes the running instance. Real Windows frame waits produce two caret wakes per cycle
+for each field family, followed by idle between boundaries. The Debug capture measured about
+1.012, 1.001 and 1.067 seconds for the Account, Power and Wi-Fi cycles; delivery includes ordinary
+Windows timeout quantization. Focus/input reset, correct textbox command visibility, page return,
+blur, offscreen fields, minimization, radio-off forms, moved-window client coordinates and four DPI
+scales pass. An owned Launcher capsule verifies render snapshots, edit resets and close retirement.
+Three pure temporal checks cover duty boundaries, delayed wakes, reset/stop and invalid or
+unrepresentable deadlines. Debug/Release builds and all 40 tests pass.
+
+Evidence under `build/gpu-composition-migration`: `build-{debug,release}-carets.log`,
+`test-{debug,release}-carets.log`, `probe-caret-scheduler-{debug,release}.log` and the owned probe
+launchers. This verifies scheduling and command visibility, not live focus/input or total product
+power/latency. The existing textbox remains a compound raster source; independent retained caret
+opacity needs a reusable caret-source contract. Measure per-blink command/raster cost and the
+alternative's resource/composition overhead before settling the final CPU/GPU disposition. This
+step removes the continuous wake path and provides shared fallback timing; it does not close the
+repetition or final performance acceptance gates.
+
 ## Settings retained binary toggles
 
 Settings Display/font preferences, top-bar auto-hide, Wi-Fi/Bluetooth radio state, startup entries

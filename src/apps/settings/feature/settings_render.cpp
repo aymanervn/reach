@@ -225,7 +225,7 @@ static void render_account_page(const reach_settings_render_input *input,
         state.placeholder = placeholders[field];
         state.text_alignment = input->text_alignment_leading;
         state.caret_index = edit->caret;
-        state.caret_visible = focused && model->account_caret_visible;
+        state.caret_visible = focused && model->account_caret.visible;
         reach_text_edit_selection_range(edit, &state.selection_start, &state.selection_end);
         if (!focused)
         {
@@ -357,7 +357,7 @@ static void render_power_page(const reach_settings_render_input *input,
                         input, field == REACH_SETTINGS_POWER_FIELD_HOURS ? 16.0f : 24.0f);
                     state.text_alignment = REACH_TEXT_ALIGNMENT_TRAILING;
                     state.caret_index = edit->caret;
-                    state.caret_visible = focused && model->power_caret_visible;
+                    state.caret_visible = focused && model->power_caret.visible;
                     reach_text_edit_selection_range(edit, &state.selection_start,
                                                     &state.selection_end);
                     if (!focused)

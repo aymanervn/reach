@@ -61,7 +61,7 @@ static void reach_settings_wifi_render_key_field(const reach_settings_render_inp
     state.placeholder = placeholder;
     state.text_alignment = input->text_alignment_leading;
     state.caret_index = edit->caret;
-    state.caret_visible = focused && model->wifi_caret_visible;
+    state.caret_visible = focused && model->wifi_caret.visible;
     reach_text_edit_selection_range(edit, &state.selection_start, &state.selection_end);
     if (!focused)
     {
@@ -118,7 +118,7 @@ static void reach_settings_wifi_render_add_row(const reach_settings_render_input
     name_state.placeholder = (const uint16_t *)u"Network name";
     name_state.text_alignment = input->text_alignment_leading;
     name_state.caret_index = model->wifi_add_name_edit.caret;
-    name_state.caret_visible = name_focused && model->wifi_caret_visible;
+    name_state.caret_visible = name_focused && model->wifi_caret.visible;
     reach_text_edit_selection_range(&model->wifi_add_name_edit, &name_state.selection_start,
                                     &name_state.selection_end);
     if (!name_focused)

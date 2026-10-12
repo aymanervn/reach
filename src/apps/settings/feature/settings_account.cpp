@@ -64,8 +64,7 @@ void reach_settings_model_account_focus_password(reach_settings_model *model, si
     }
     reach_text_edit_select_all(&model->account_password_edits[field]);
     model->account_focused_field = (int32_t)field;
-    model->account_caret_visible = 1;
-    model->account_caret_phase = 0.0;
+    reach_blink_reset_at(&model->account_caret, 0.55, 0.45, reach_motion_now_seconds());
     if (model->account_status != REACH_SETTINGS_ACCOUNT_STATUS_SUCCESS)
     {
         model->account_status = REACH_SETTINGS_ACCOUNT_STATUS_NONE;
@@ -83,6 +82,7 @@ void reach_settings_model_account_blur(reach_settings_model *model)
         model->account_password_edits[field].selection_anchor = -1;
     }
     model->account_focused_field = -1;
+    reach_blink_stop(&model->account_caret);
 }
 
 int32_t reach_settings_model_account_insert_char(reach_settings_model *model, uint16_t ch)
@@ -97,8 +97,7 @@ int32_t reach_settings_model_account_insert_char(reach_settings_model *model, ui
         return 0;
     }
     model->account_status = REACH_SETTINGS_ACCOUNT_STATUS_NONE;
-    model->account_caret_visible = 1;
-    model->account_caret_phase = 0.0;
+    reach_blink_reset_at(&model->account_caret, 0.55, 0.45, reach_motion_now_seconds());
     return 1;
 }
 
@@ -115,8 +114,7 @@ int32_t reach_settings_model_account_handle_edit_key(reach_settings_model *model
     {
         model->account_status = REACH_SETTINGS_ACCOUNT_STATUS_NONE;
     }
-    model->account_caret_visible = 1;
-    model->account_caret_phase = 0.0;
+    reach_blink_reset_at(&model->account_caret, 0.55, 0.45, reach_motion_now_seconds());
     return 1;
 }
 
@@ -175,26 +173,6 @@ void reach_settings_model_account_apply_status(reach_settings_model *model, int3
         }
         reach_settings_model_account_blur(model);
     }
-}
-
-int32_t reach_settings_model_tick_account_caret(reach_settings_model *model, double delta_seconds)
-{
-    if (model == nullptr || model->account_focused_field < 0)
-    {
-        return 0;
-    }
-    model->account_caret_phase += delta_seconds;
-    while (model->account_caret_phase >= 1.0)
-    {
-        model->account_caret_phase -= 1.0;
-    }
-    int32_t visible = model->account_caret_phase < 0.55 ? 1 : 0;
-    if (visible == model->account_caret_visible)
-    {
-        return 0;
-    }
-    model->account_caret_visible = visible;
-    return 1;
 }
 
 const uint16_t *reach_settings_account_status_message(int32_t status)

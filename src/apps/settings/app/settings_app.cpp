@@ -2864,6 +2864,46 @@ reach_result reach_settings_app_start(reach_settings_app *app)
     return REACH_OK;
 }
 
+static double reach_settings_app_caret_deadline(const reach_settings_app *app)
+{
+    if (app == nullptr || (app->window.ops.is_minimized != nullptr &&
+                           app->window.ops.is_minimized(app->window.window)))
+        return 0.0;
+    double deadline = reach_settings_model_caret_deadline(&app->model);
+    if (deadline <= 0.0)
+        return 0.0;
+    reach_rect_f32 field = {}, viewport = {0.0f, 0.0f, app->bounds.width, app->bounds.height};
+    const reach_settings_model *model = &app->model;
+    if (model->selected_page == REACH_SETTINGS_PAGE_ACCOUNT)
+        field = app->layout.account_password_fields[model->account_focused_field];
+    else if (model->selected_page == REACH_SETTINGS_PAGE_POWER_SLEEP)
+    {
+        if (model->power_focused_field < 0 ||
+            model->power_focused_field >= REACH_SETTINGS_POWER_FIELD_COUNT)
+            return 0.0;
+        field =
+            app->layout.power_custom_fields[model->power_focused_timer][model->power_focused_field];
+    }
+    else if (model->selected_page == REACH_SETTINGS_PAGE_WIFI)
+    {
+        if (model->wifi_radio != REACH_WIFI_RADIO_ON)
+            return 0.0;
+        viewport = app->layout.wifi_viewport;
+        if (model->wifi_focused_field == REACH_SETTINGS_WIFI_FIELD_KEY)
+            field = app->layout.wifi_key_field;
+        else if (model->wifi_focused_field == REACH_SETTINGS_WIFI_FIELD_ADD_NAME)
+            field = app->layout.wifi_add_name_field;
+        else if (model->wifi_focused_field == REACH_SETTINGS_WIFI_FIELD_ADD_KEY)
+            field = app->layout.wifi_add_key_field;
+    }
+    if (field.width <= 0.0f || field.height <= 0.0f || viewport.width <= 0.0f ||
+        viewport.height <= 0.0f || field.x >= viewport.x + viewport.width ||
+        field.x + field.width <= viewport.x || field.y >= viewport.y + viewport.height ||
+        field.y + field.height <= viewport.y)
+        return 0.0;
+    return deadline;
+}
+
 reach_result reach_settings_app_update(reach_settings_app *app, double delta_seconds)
 {
     if (app == nullptr)
@@ -2959,10 +2999,6 @@ reach_result reach_settings_app_update(reach_settings_app *app, double delta_sec
     {
         app->dirty = 1;
     }
-    if (reach_settings_model_tick_wifi_caret(&app->model, delta_seconds))
-    {
-        app->dirty = 1;
-    }
     if (reach_settings_model_update_scroll(&app->model, delta_seconds))
     {
         app->dirty = 1;
@@ -2979,14 +3015,6 @@ reach_result reach_settings_app_update(reach_settings_app *app, double delta_sec
     {
         app->dirty = 1;
     }
-    if (reach_settings_model_tick_power_caret(&app->model, delta_seconds))
-    {
-        app->dirty = 1;
-    }
-    if (reach_settings_model_tick_account_caret(&app->model, delta_seconds))
-    {
-        app->dirty = 1;
-    }
     if (reach_settings_model_tick_display_animations(&app->model, delta_seconds))
     {
         app->dirty = 1;
@@ -2995,6 +3023,9 @@ reach_result reach_settings_app_update(reach_settings_app *app, double delta_sec
     {
         app->dirty = 1;
     }
+    if (reach_settings_app_caret_deadline(app) > 0.0 &&
+        reach_settings_model_update_caret(&app->model, reach_motion_now_seconds()))
+        app->dirty = 1;
     int32_t motion_fallback = reach_render_command_buffer_motion_active(&app->render_commands) &&
                               (app->renderer.ops.retained_supported == nullptr ||
                                !app->renderer.ops.retained_supported(app->renderer.backend));
@@ -3005,6 +3036,8 @@ reach_result reach_settings_app_update(reach_settings_app *app, double delta_sec
     {
         reach_settings_refresh_bounds(app);
         reach_settings_refresh_layout(app);
+        if (reach_settings_app_caret_deadline(app) > 0.0)
+            reach_settings_model_update_caret(&app->model, reach_motion_now_seconds());
         reach_result result = reach_settings_render(app);
         if (result != REACH_OK)
         {
@@ -3062,7 +3095,9 @@ int32_t reach_settings_app_needs_frame(const reach_settings_app *app)
     reach_settings_update_worker *worker =
         const_cast<reach_settings_update_worker *>(&app->update_worker);
     std::lock_guard<std::mutex> lock(worker->mutex);
-    return app->motion_fallback_active ||
+    double caret_deadline = reach_settings_app_caret_deadline(app);
+    return (caret_deadline > 0.0 && reach_motion_wait_ms(caret_deadline) == 0) ||
+           app->motion_fallback_active ||
            (reach_render_command_buffer_motion_active(&app->render_commands) &&
             (app->renderer.ops.retained_supported == nullptr ||
              !app->renderer.ops.retained_supported(app->renderer.backend))) ||
@@ -3077,8 +3112,6 @@ int32_t reach_settings_app_needs_frame(const reach_settings_app *app)
            reach_settings_model_power_animations_active(&app->model) ||
            reach_settings_model_display_animations_active(&app->model) ||
            reach_settings_model_top_bar_animations_active(&app->model) ||
-           app->model.power_focused_timer >= 0 || app->model.account_focused_field >= 0 ||
-           app->model.wifi_focused_field != REACH_SETTINGS_WIFI_FIELD_NONE ||
            app->async_notify.load() != 0 || app->system_controls_change_flags.load() != 0 ||
            reach_icon_service_work_pending(app->icon_service) ||
            reach_system_status_system_pending(app->system_status) ||
@@ -3128,6 +3161,13 @@ uint32_t reach_settings_app_idle_wait_ms(const reach_settings_app *app)
         {
             wait_ms = confirmation_wait;
         }
+    }
+    double caret_deadline = reach_settings_app_caret_deadline(app);
+    if (caret_deadline > 0.0)
+    {
+        uint32_t caret_wait = reach_motion_wait_ms(caret_deadline);
+        if (caret_wait < wait_ms)
+            wait_ms = caret_wait;
     }
     return wait_ms;
 }
