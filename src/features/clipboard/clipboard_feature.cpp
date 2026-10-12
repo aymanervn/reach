@@ -398,7 +398,8 @@ static void reach_clipboard_capsule_tick(void *capsule, double delta_seconds,
     }
     int32_t transition_changed =
         reach_feature_transition_tick(&clipboard->surface_transition, delta_seconds);
-    reach_clipboard_feature_tick(clipboard, delta_seconds);
+    int32_t hover_was_active = reach_clipboard_feature_any_hover_active(clipboard);
+    reach_clipboard_feature_sample_at(clipboard, reach_motion_now_seconds());
     reach_clipboard_feature_capture(clipboard, out);
     if (out != nullptr && transition_changed)
     {
@@ -411,7 +412,7 @@ static void reach_clipboard_capsule_tick(void *capsule, double delta_seconds,
         out->relayout = 1;
         out->request_update = 1;
     }
-    if (out != nullptr && reach_clipboard_feature_any_hover_active(clipboard))
+    if (out != nullptr && (hover_was_active || reach_clipboard_feature_any_hover_active(clipboard)))
     {
         out->redraw = 1;
     }
@@ -790,13 +791,13 @@ void reach_clipboard_feature_release_resource(reach_clipboard_feature *clipboard
     }
 }
 
-void reach_clipboard_feature_tick(reach_clipboard_feature *clipboard, double delta_seconds)
+void reach_clipboard_feature_sample_at(reach_clipboard_feature *clipboard, double now_seconds)
 {
     if (clipboard == nullptr)
     {
         return;
     }
-    reach_animation_manager_tick(&clipboard->animations, delta_seconds);
+    reach_animation_manager_sample_at(&clipboard->animations, now_seconds);
 }
 
 void reach_clipboard_feature_collapse_all_hover(reach_clipboard_feature *clipboard)

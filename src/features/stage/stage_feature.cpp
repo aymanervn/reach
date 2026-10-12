@@ -759,7 +759,7 @@ static void reach_stage_capsule_tick(void *capsule, double delta_seconds,
     int32_t retarget_was_active =
         reach_animation_manager_active(&stage->animations, REACH_STAGE_ANIMATION_RETARGET);
 
-    reach_animation_manager_tick(&stage->animations, delta_seconds);
+    reach_animation_manager_sample_at(&stage->animations, reach_motion_now_seconds());
     state->progress =
         reach_animation_manager_value(&stage->animations, REACH_STAGE_ANIMATION_PROGRESS);
     state->desktop_progress =

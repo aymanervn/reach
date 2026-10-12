@@ -904,7 +904,7 @@ static void reach_context_menu_capsule_tick(void *capsule, double delta_seconds,
     }
     if (reach_animation_manager_any_active(&menu->animations))
     {
-        reach_animation_manager_tick(&menu->animations, delta_seconds);
+        reach_animation_manager_sample_at(&menu->animations, reach_motion_now_seconds());
         if (menu->state.open)
         {
             out->redraw = 1;

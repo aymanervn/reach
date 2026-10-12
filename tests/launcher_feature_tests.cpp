@@ -1,3 +1,5 @@
+#include "motion_clock_test_support.h"
+
 #include "reach/features/launcher.h"
 #include "reach/core/ui_layout.h"
 #include "test_utf16.h"
@@ -194,6 +196,7 @@ int main()
     failed += expect_close(geometry.presentation.max_scale, 1.08f);
 
     reach_feature_tick_result tick = {};
+    reach_test_motion_clock_advance(0.08);
     capsule_ops->tick(capsule, 0.08, &tick);
     capsule_ops->surface_geometry(capsule, &geometry);
     failed += expect(geometry.visible_bounds.height > expansion_layout.search_box.height &&
@@ -207,6 +210,7 @@ int main()
     failed += expect(scale > 1.0f && scale < 1.08f);
     failed += expect(tick.redraw == 1);
     tick = {};
+    reach_test_motion_clock_advance(0.16);
     capsule_ops->tick(capsule, 0.16, &tick);
     capsule_ops->surface_geometry(capsule, &geometry);
     failed += expect_close(geometry.visible_bounds.height, expansion_layout.bounds.height);
@@ -258,12 +262,14 @@ int main()
     (void)route(capsule, REACH_UI_EVENT_ESCAPE, 0);
     failed += expect(state->model.open == 0);
     tick = {};
+    reach_test_motion_clock_advance(0.06);
     capsule_ops->tick(capsule, 0.06, &tick);
     capsule_ops->surface_geometry(capsule, &geometry);
     failed += expect_close(geometry.presentation.group.opacity.to, 0.0f);
     failed += expect_close(geometry.presentation.group.y.to, 8.0f);
     failed += expect_close(geometry.presentation.group.scale.to, 1.08f);
     tick = {};
+    reach_test_motion_clock_advance(0.12);
     capsule_ops->tick(capsule, 0.12, &tick);
     failed += expect(capsule_ops->needs_frame(capsule) == 0);
     reach_launcher_surface_hidden(capsule);

@@ -1308,7 +1308,7 @@ static void reach_top_bar_capsule_tick(void *capsule, double delta_seconds,
     reach_animation_manager *manager = &top_bar->manager;
 
     int32_t width_was_active = reach_top_bar_width_animation_active(top_bar);
-    reach_animation_manager_tick(manager, delta_seconds);
+    reach_animation_manager_sample_at(manager, reach_motion_now_seconds());
 
     int32_t redraw = 0;
 

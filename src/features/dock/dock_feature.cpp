@@ -178,8 +178,8 @@ void reach_dock_destroy(reach_dock *animations)
     delete animations;
 }
 
-static void reach_dock_tick(reach_dock *animations, double delta_seconds,
-                            reach_feature_tick_result *out)
+static void reach_dock_sample_at(reach_dock *animations, double now_seconds,
+                                 reach_feature_tick_result *out)
 {
     if (out != nullptr)
     {
@@ -194,7 +194,7 @@ static void reach_dock_tick(reach_dock *animations, double delta_seconds,
 
     int32_t slots_were_animating = reach_dock_slots_animating(animations);
 
-    reach_animation_manager_tick(manager, delta_seconds);
+    reach_animation_manager_sample_at(manager, now_seconds);
 
     int32_t redraw = 0;
 
@@ -347,10 +347,9 @@ static void reach_dock_capsule_reset(void *capsule)
     }
 }
 
-static void reach_dock_capsule_tick(void *capsule, double delta_seconds,
-                                    reach_feature_tick_result *out)
+static void reach_dock_capsule_tick(void *capsule, double, reach_feature_tick_result *out)
 {
-    reach_dock_tick(static_cast<reach_dock *>(capsule), delta_seconds, out);
+    reach_dock_sample_at(static_cast<reach_dock *>(capsule), reach_motion_now_seconds(), out);
 }
 
 static int32_t reach_dock_capsule_is_open(const void *capsule)

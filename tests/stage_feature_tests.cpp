@@ -1,3 +1,5 @@
+#include "motion_clock_test_support.h"
+
 #include "reach/core/theme.h"
 #include "reach/features/stage.h"
 
@@ -61,6 +63,7 @@ static size_t find_desktop_tile(const reach_stage_state *state)
 static void tick_stage(reach_stage *stage, double delta, reach_feature_tick_result *tick)
 {
     const reach_feature_capsule_ops *ops = reach_stage_capsule_ops();
+    reach_test_motion_clock_advance(delta);
     ops->tick(stage, delta, tick);
     reach_feature_surface_geometry geometry = {};
     ops->surface_geometry(stage, &geometry);
@@ -416,19 +419,23 @@ static void test_close_requires_completion_before_teardown(void)
     const reach_feature_capsule_ops *ops = reach_stage_capsule_ops();
     reach_feature_tick_result tick = {};
     reach_stage_begin_close(stage);
+    reach_test_motion_clock_advance(1.0);
     ops->tick(stage, 1.0, &tick);
     const reach_stage_state *state = reach_stage_state_ptr(stage);
     expect_true(state->open && state->close_phase == REACH_STAGE_CLOSE_ALIGNED,
                 "a completed movement retains its final thumbnail for presentation");
+    reach_test_motion_clock_advance(1.0);
     ops->tick(stage, 1.0, &tick);
     expect_true(state->close_phase == REACH_STAGE_CLOSE_ALIGNED,
                 "elapsed time cannot bypass the first completion gate");
     ops->presentation_committed(stage, REACH_OK, &tick);
+    reach_test_motion_clock_advance(1.0);
     ops->tick(stage, 1.0, &tick);
     expect_true(state->open && state->close_phase == REACH_STAGE_CLOSE_TRANSPARENT,
                 "the transparent backdrop must be presented before disposal");
     ops->presentation_committed(stage, REACH_OK, &tick);
     expect_true(ops->needs_frame(stage), "disposal still schedules the final cleanup frame");
+    reach_test_motion_clock_advance(0.016);
     ops->tick(stage, 0.016, &tick);
     expect_true(!reach_stage_is_open(stage), "acknowledged reveal can release Stage");
     reach_stage_destroy(stage);
@@ -445,6 +452,7 @@ static void test_close_handoff_holds_only_the_reveal(void)
     reach_feature_tick_result tick = {};
     ops->set_close_handoff_pending(stage, 1, &tick);
     reach_stage_begin_close(stage);
+    reach_test_motion_clock_advance(1.0);
     ops->tick(stage, 1.0, &tick);
     expect_true(reach_stage_state_ptr(stage)->close_phase == REACH_STAGE_CLOSE_ALIGNED,
                 "a pending handoff does not delay Stage movement");
@@ -484,6 +492,7 @@ static void test_app_click_uses_shared_close_animation(void)
 
     reach_feature_tick_result button_tick = {};
     reach_feature_tick_result app_tick = {};
+    reach_test_motion_clock_advance(0.050);
     reach_stage_capsule_ops()->tick(button_close, 0.050, &button_tick);
     reach_stage_capsule_ops()->tick(app_close, 0.050, &app_tick);
     const reach_stage_state *button_state = reach_stage_state_ptr(button_close);
@@ -528,6 +537,7 @@ static void test_desktop_uses_a_shorter_relative_animation(void)
     reach_stage_open(stage, make_rect(0, 0, 1920, 1080), 1, windows, 2);
 
     reach_feature_tick_result tick = {};
+    reach_test_motion_clock_advance(0.35);
     reach_stage_capsule_ops()->tick(stage, 0.35, &tick);
     const reach_stage_state *state = reach_stage_state_ptr(stage);
     expect_near(state->desktop_progress, 1.0f,
@@ -548,6 +558,7 @@ static void test_desktop_only_close_has_no_hidden_app_wait(void)
 
     reach_stage_begin_close(stage);
     reach_feature_tick_result tick = {};
+    reach_test_motion_clock_advance(0.35);
     reach_stage_capsule_ops()->tick(stage, 0.35, &tick);
     expect_true(reach_stage_state_ptr(stage)->close_phase == REACH_STAGE_CLOSE_ALIGNED,
                 "Desktop-only close does not wait for an invisible app track");
@@ -621,6 +632,7 @@ static void test_closing_stage_retargets_restored_windows(void)
     advance_stage(stage, 30, 0.016);
     reach_stage_begin_close(stage);
     reach_feature_tick_result tick = {};
+    reach_test_motion_clock_advance(0.016);
     reach_stage_capsule_ops()->tick(stage, 0.016, &tick);
     reach_rect_f32 before = reach_stage_state_ptr(stage)->tiles[0].current_rect;
 
@@ -628,6 +640,7 @@ static void test_closing_stage_retargets_restored_windows(void)
     app.frame = make_rect(300, 220, 900, 700);
     expect_true(reach_stage_update_windows(stage, &app, 1),
                 "a restored window retargets the shared close path");
+    reach_test_motion_clock_advance(0.0);
     reach_stage_capsule_ops()->tick(stage, 0.0, &tick);
     const reach_stage_state *state = reach_stage_state_ptr(stage);
     expect_near(state->tiles[0].current_rect.x, before.x,
@@ -637,6 +650,7 @@ static void test_closing_stage_retargets_restored_windows(void)
     reach_stage_thumbnail_placement placement = {};
     reach_stage_thumbnail_at(stage, 0, &placement);
     expect_true(placement.visible, "the restored live thumbnail joins the shared close");
+    reach_test_motion_clock_advance(1.0);
     reach_stage_capsule_ops()->tick(stage, 1.0, &tick);
     state = reach_stage_state_ptr(stage);
     expect_near(state->tiles[0].current_rect.x, app.frame.x,
@@ -658,6 +672,7 @@ static void test_restored_thumbnail_is_committed_before_reveal(void)
     reach_feature_tick_result tick = {};
     ops->set_close_handoff_pending(stage, 1, &tick);
     reach_stage_begin_close(stage);
+    reach_test_motion_clock_advance(1.0);
     ops->tick(stage, 1.0, &tick);
     ops->presentation_committed(stage, REACH_OK, &tick);
 
@@ -672,6 +687,7 @@ static void test_restored_thumbnail_is_committed_before_reveal(void)
     expect_true(reach_stage_state_ptr(stage)->close_phase == REACH_STAGE_CLOSE_MOVING,
                 "handoff completion waits for restored thumbnail movement");
     expect_true(ops->needs_frame(stage), "the restored thumbnail schedules a synchronized frame");
+    reach_test_motion_clock_advance(1.0);
     ops->tick(stage, 1.0, &tick);
     expect_true(reach_stage_state_ptr(stage)->close_phase == REACH_STAGE_CLOSE_ALIGNED,
                 "the restored thumbnail reaches its live frame before reveal");
@@ -698,6 +714,7 @@ static void test_minimized_close_exits_top_left_without_expanding(void)
     reach_rect_f32 settled = reach_stage_state_ptr(stage)->tiles[0].current_rect;
     reach_stage_begin_close(stage);
     reach_feature_tick_result tick = {};
+    reach_test_motion_clock_advance(0.1);
     reach_stage_capsule_ops()->tick(stage, 0.1, &tick);
     const reach_stage_state *state = reach_stage_state_ptr(stage);
     expect_near(state->tiles[0].current_rect.width, settled.width,
@@ -705,6 +722,7 @@ static void test_minimized_close_exits_top_left_without_expanding(void)
     expect_near(state->tiles[0].current_rect.height, settled.height,
                 "a minimized placeholder keeps its settled height while closing");
 
+    reach_test_motion_clock_advance(1.0);
     reach_stage_capsule_ops()->tick(stage, 1.0, &tick);
     state = reach_stage_state_ptr(stage);
     expect_true(state->tiles[0].current_rect.x + state->tiles[0].current_rect.width <= bounds.x,
@@ -725,11 +743,13 @@ static void test_closing_stage_retargets_newly_minimized_windows(void)
     reach_stage_begin_close(stage);
 
     reach_feature_tick_result tick = {};
+    reach_test_motion_clock_advance(0.016);
     reach_stage_capsule_ops()->tick(stage, 0.016, &tick);
     reach_rect_f32 before = reach_stage_state_ptr(stage)->tiles[0].current_rect;
     app.minimized = 1;
     expect_true(reach_stage_update_windows(stage, &app, 1),
                 "a newly minimized window retargets the shared close path");
+    reach_test_motion_clock_advance(0.0);
     reach_stage_capsule_ops()->tick(stage, 0.0, &tick);
     const reach_stage_state *state = reach_stage_state_ptr(stage);
     expect_near(state->tiles[0].current_rect.x, before.x,
@@ -737,6 +757,7 @@ static void test_closing_stage_retargets_newly_minimized_windows(void)
     expect_near(state->tiles[0].current_rect.y, before.y,
                 "minimize retargeting preserves the current visual y");
 
+    reach_test_motion_clock_advance(1.0);
     reach_stage_capsule_ops()->tick(stage, 1.0, &tick);
     state = reach_stage_state_ptr(stage);
     expect_true(state->tiles[0].current_rect.x + state->tiles[0].current_rect.width <= bounds.x,
@@ -768,6 +789,7 @@ static void test_departing_tile_fades_three_times_faster_than_reflow(void)
     expect_true(result.action.kind == REACH_FEATURE_ACTION_CLOSE_WINDOW,
                 "the Stage close button starts a window departure");
     reach_feature_tick_result tick = {};
+    reach_test_motion_clock_advance((double)reach_theme_default()->stage_reflow_seconds / 3.0);
     reach_stage_capsule_ops()->tick(
         stage, (double)reach_theme_default()->stage_reflow_seconds / 3.0, &tick);
     const reach_stage_state *state = reach_stage_state_ptr(stage);
@@ -778,6 +800,7 @@ static void test_departing_tile_fades_three_times_faster_than_reflow(void)
     expect_true(state->tile_count == 2,
                 "the faded window remains retained until layout reflow settles");
 
+    reach_test_motion_clock_advance(1.0);
     reach_stage_capsule_ops()->tick(stage, 1.0, &tick);
     expect_true(reach_stage_state_ptr(stage)->tile_count == 1,
                 "the closed Stage window is removed when reflow settles");

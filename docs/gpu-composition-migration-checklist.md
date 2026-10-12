@@ -79,7 +79,18 @@ support expectation is explicitly resolved.
   preserve interruption, reversal, cancellation and deterministic CPU sampling where required.
   - [x] Add explicit event-time start/retarget/active/crossing APIs and affine motion derivation;
     popup and Launcher presentation properties now share one timestamp. Focused non-UI tests cover
-    retarget continuity, affine sampling and endpoint deadlines. The scalar manager remains pending.
+    retarget continuity, affine sampling and endpoint deadlines. The scalar manager now uses the
+    same intent; remaining custom timing and consumer invalidation are tracked separately.
+  - [x] Replace scalar-manager delta accumulation with canonical absolute-time intent.
+    Every remaining manager consumer samples monotonic time; Settings shares one timestamp across
+    its finite families. Retargets preserve event-time continuity, and cached activity delivers a
+    final endpoint update after a delayed wake. The old tick and unused crossing APIs are removed.
+    Switcher width and Clipboard hover now preserve pre-sample activity for terminal redraw.
+    Three pure clock tests, existing deterministic capsule checks and owned caret scheduler probes
+    pass in both builds; focused native publication/reversal checks pass with unchanged rasters and
+    visual trees, including explicit initialized/reset zero intent. Both builds, all 40 tests and
+    five full native runs per backend plus fallback pass in Debug/Release. This does not migrate
+    the remaining visual consumers or settle loader/scroll/native choreography timing and product acceptance.
   - [x] Add shared bounded affine motion and native piecewise compilation for section reveals.
     Preserve delayed fade/early saturation, negative affine mapping, event-time retarget and owner
     deadlines. Both native renderers, fallback, root endpoints/envelopes and fixed-cap normalization
@@ -249,6 +260,12 @@ support expectation is explicitly resolved.
   churn and supported backend recreation on both backends and required fallbacks.
 - [ ] Pass isolated Reach/Settings builds, focused non-UI tests, full ctest, architecture, formatting
   and whitespace checks, plus bounded native/live visual verification.
+
+  - [x] Make existing asynchronous worker verification independent of scheduling order.
+    `7b85e26` records the path-probe thread separately and verifies identity after completion,
+    rather than assuming that the worker has not started immediately after scheduling. Shell and
+    path probes still require one execution on the worker. Twenty repeated focused runs in each
+    configuration and both full 40-test suites pass; service behavior is unchanged.
 
 ## 8. Final acceptance
 
