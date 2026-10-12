@@ -20,6 +20,11 @@ static const wchar_t *REACH_SETTINGS_HOST_ERROR = L"Unable to connect to Reach H
 static const wchar_t *REACH_SETTINGS_LAUNCH_ERROR =
     L"Launching Reach Settings failed. Please restart Reach.";
 
+static void reach_settings_signal_wake(void *user)
+{
+    SetEvent(static_cast<HANDLE>(user));
+}
+
 static void reach_settings_show_error(const wchar_t *message)
 {
     MessageBoxW(nullptr, message, L"Reach Settings", MB_OK | MB_ICONERROR);
@@ -201,7 +206,11 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
     }
 
     reach_settings_app *app = nullptr;
-    reach_result result = reach_settings_app_create(&app);
+    HANDLE wake_event = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+    reach_result result =
+        wake_event != nullptr
+            ? reach_settings_app_create(&app, reach_settings_signal_wake, wake_event)
+            : REACH_ERROR;
     if (result == REACH_OK)
     {
         result = reach_settings_app_start(app);
@@ -209,6 +218,8 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
     if (result != REACH_OK)
     {
         reach_settings_app_destroy(app);
+        if (wake_event != nullptr)
+            CloseHandle(wake_event);
         CoUninitialize();
         CloseHandle(activate_event);
         CloseHandle(instance_mutex);
@@ -222,7 +233,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
     QueryPerformanceFrequency(&frequency);
     QueryPerformanceCounter(&previous_counter);
 
-    HANDLE waits[] = {shell_process, activate_event};
+    HANDLE waits[] = {shell_process, activate_event, wake_event};
     MSG message = {};
     reach_frame_clock frame_clock = {};
     void *frame_timer = reach_windows_frame_timer_create();
@@ -238,7 +249,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
         DWORD wait_ms =
             needed_frame_before_wait ? frame_wait_ms : (DWORD)reach_settings_app_idle_wait_ms(app);
         DWORD wait_result = reach_windows_frame_wait(
-            frame_timer, waits, 2, wait_ms,
+            frame_timer, waits, 3, wait_ms,
             needed_frame_before_wait ? frame_clock.next_frame_seconds : -1.0);
         reach_workload_add(REACH_WORKLOAD_WAKEUPS, 1);
         if (wait_result == WAIT_OBJECT_0)
@@ -261,7 +272,8 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
             DispatchMessageW(&message);
         }
 
-        if (reach_settings_app_has_pending_events(app))
+        int32_t dispatched_event = reach_settings_app_has_pending_events(app);
+        if (dispatched_event)
         {
             (void)reach_settings_app_dispatch_events(app);
         }
@@ -269,6 +281,11 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
         {
             LARGE_INTEGER current_counter = {};
             QueryPerformanceCounter(&current_counter);
+            if (wait_result == WAIT_OBJECT_0 + 2 && !dispatched_event && needed_frame_before_wait &&
+                reach_frame_clock_wait_ms(
+                    &frame_clock, (double)current_counter.QuadPart / (double)frequency.QuadPart,
+                    reach_settings_app_frame_rate_hz(app), 1) > 0)
+                continue;
             double delta_seconds =
                 needed_frame_before_wait && frequency.QuadPart > 0
                     ? (double)(current_counter.QuadPart - previous_counter.QuadPart) /
@@ -288,6 +305,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
 exit_loop:
     reach_windows_frame_timer_destroy(frame_timer);
     reach_settings_app_destroy(app);
+    CloseHandle(wake_event);
     CoUninitialize();
     CloseHandle(activate_event);
     CloseHandle(instance_mutex);

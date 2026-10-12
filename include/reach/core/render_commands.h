@@ -43,6 +43,7 @@ extern "C"
         reach_motion scale_y;
         int32_t has_clip;
         reach_rect_f32 clip;
+        float clip_radius;
         reach_motion clip_insets[REACH_RENDER_CLIP_EDGE_COUNT];
         int32_t has_tint;
         reach_motion tint[REACH_RENDER_COLOR_CHANNEL_COUNT];
@@ -214,6 +215,7 @@ extern "C"
         uint64_t current_group_id;
         int32_t has_presentation;
         reach_render_group presentation;
+        int32_t requires_content_sampling;
     } reach_render_command_buffer;
 
     void reach_render_command_buffer_clear(reach_render_command_buffer *buffer);
@@ -230,6 +232,10 @@ extern "C"
     int32_t reach_render_command_buffer_group_clip_at(const reach_render_command_buffer *buffer,
                                                       uint64_t id, double now_seconds,
                                                       reach_rect_f32 *out_clip);
+    int32_t
+    reach_render_command_buffer_group_rectangular_clip_at(const reach_render_command_buffer *buffer,
+                                                          uint64_t id, double now_seconds,
+                                                          reach_rect_f32 *out_clip);
     reach_rect_f32 reach_render_group_clip_at(const reach_render_group *group, double now_seconds);
     int32_t reach_render_group_equal(const reach_render_group *first,
                                      const reach_render_group *second);

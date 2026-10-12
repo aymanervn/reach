@@ -408,10 +408,9 @@ void reach_settings_render_wifi_page(const reach_settings_render_input *input,
 
     if (layout->wifi_loader_bar.width > 0.0f)
     {
-        reach_rect_f32 bar = reach_loader_bar_rect(&model->wifi_loader, layout->wifi_loader_bar);
-        reach_rect_f32 origin = {0.0f, 0.0f, 0.0f, 0.0f};
-        (void)reach_loader_build_render_commands(layout->wifi_loader_bar, bar, origin, accent,
-                                                 commands);
+        (void)reach_loader_build_render_commands(&model->wifi_loader, layout->wifi_loader_bar, {},
+                                                 accent, input->retained_supported,
+                                                 UINT64_C(0x2800000000000100), commands);
     }
 
     if (model->wifi_radio != REACH_WIFI_RADIO_ON)

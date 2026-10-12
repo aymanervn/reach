@@ -30,8 +30,48 @@ The lifetime query follows the [AnimationController contract](https://learn.micr
 DirectComposition repetition uses the existing native repeat primitive; its timing model is described
 in [Microsoft's animation documentation](https://learn.microsoft.com/en-us/windows/win32/api/dcompanimation/nf-dcompanimation-idcompositionanimation-setabsolutebegintime).
 These checks establish property/lifetime behavior, not displayed pixels or total CPU/GPU/power/memory
-benefit. Existing marquee behavior is preserved, and loader consumers plus their application-frame
-invalidation remain the next migration step.
+benefit. Existing marquee behavior is preserved pending its separate audit. Loader consumers now use
+this capability as described below.
+
+## Settings loader migration
+
+All four Settings loader families now publish canonical periodic width and translation instead of
+advancing phase state each application frame. The shared renderer keeps rounded caps at their
+original size, stretches only the middle and uses a static rounded viewport. Both native backends
+retain two empty parents and three raster sources. Unsupported tiny bounds keep sampled clipped
+geometry explicitly: shrinking fixed caps would distort the original appearance, and adding a second
+shape renderer for an exceptional tiny range would add complexity without a demonstrated benefit.
+Without retained backend support, the helper also uses direct geometry from the same motion; this
+avoids vector stretch seams at fractional patch boundaries. These fallback pixels match the original
+clipped geometry exactly in all 136 cases. The final CPU-disposition and total-workload gates remain open.
+
+Owned native checks verify active repeat bindings, no rendering during a hold, no raster/property/tree
+work on unchanged submission, a fresh restart generation without repainting, complete retirement,
+offscreen omission and the tiny-bound fallback. Source reconstruction compares 17 phases at four DPI
+values on both devices (136 cases). Integral-size cycle endpoints match exactly; fractional filtering
+differences are confined to rounded-cap neighborhoods, with straight sections within two channel
+values. The largest cap difference is 50/255 and whole-image mean error is at most 0.007828/255.
+The enlarged retained/reference cap images were inspected. The initial retained implementation had
+truncated the rounded mask's antialiased edge with an aliased rectangular bound; ancestor rounded
+masks and hard rectangular clips now have separate execution paths.
+
+Settings pending work no longer drives frame polling. A bootstrap-owned auto-reset event receives
+coalesced service/worker notifications after data publication. Draining notification intent before
+consuming data avoids a lost-wake race; progress wakes respect an existing frame deadline. Owned
+checks cover notification-before-wait, notification-during-wait, coalescing, progress payload,
+completion consumption, minimized fallback demand and all four busy pages in both themes at
+100/125/150/200% DPI. They use the actual Settings implementation and Windows frame wait, without
+starting a product instance or contacting Reach IPC.
+
+Both isolated builds, all 40 test groups and scheduler probes pass. Evidence is
+`build-{debug,release}-loader-gpu.log`, `test-{debug,release}-loader-gpu.log`,
+`probe-loader-wake-{debug,release}.log` and `probe-loader-focused-debug.log` under
+`build/gpu-composition-migration`. Five full native runs per backend plus existing fallback checks
+pass in Debug/Release (`probe-loader-{debug,release}-complete.log`). Each suite includes ten native
+loader lifecycle checks and all 136 retained/fallback pixel cases. Architecture, formatting and
+whitespace checks pass.
+These results establish implementation, source appearance and scheduling; displayed compositor
+pixels, complete live interaction and repeated total CPU/GPU/power/memory comparisons remain pending.
 
 ## Canonical scalar-manager timing
 

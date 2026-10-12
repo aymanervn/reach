@@ -11,8 +11,10 @@ extern "C"
 #endif
 
     typedef struct reach_settings_app reach_settings_app;
+    typedef void (*reach_settings_app_notify_fn)(void *user);
 
-    reach_result reach_settings_app_create(reach_settings_app **out_app);
+    reach_result reach_settings_app_create(reach_settings_app **out_app,
+                                           reach_settings_app_notify_fn notify, void *notify_user);
     reach_result reach_settings_app_start(reach_settings_app *app);
     reach_result reach_settings_app_update(reach_settings_app *app, double delta_seconds);
     reach_result reach_settings_app_dispatch_events(reach_settings_app *app);

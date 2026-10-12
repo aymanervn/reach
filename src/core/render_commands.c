@@ -18,7 +18,8 @@ int32_t reach_render_group_equal(const reach_render_group *first, const reach_re
         !reach_render_rect_equal(first->bounds, second->bounds) ||
         first->has_clip != second->has_clip ||
         !reach_render_rect_equal(first->clip, second->clip) ||
-        first->has_tint != second->has_tint || first->repeat_offset_x != second->repeat_offset_x ||
+        first->clip_radius != second->clip_radius || first->has_tint != second->has_tint ||
+        first->repeat_offset_x != second->repeat_offset_x ||
         first->repeat_hold_seconds != second->repeat_hold_seconds ||
         first->repeat_travel_seconds != second->repeat_travel_seconds ||
         !reach_motion_equal(&first->x, &second->x) || !reach_motion_equal(&first->y, &second->y) ||
@@ -130,6 +131,13 @@ reach_render_command_buffer_group(const reach_render_command_buffer *buffer, uin
 static int32_t reach_render_repetition_valid(const reach_render_group *group, int32_t root)
 {
     size_t index;
+    if (!isfinite(group->clip_radius) || group->clip_radius < 0 || (root && group->clip_radius > 0))
+        return 0;
+    if (group->clip_radius > 0)
+        for (index = 0; index < REACH_RENDER_CLIP_EDGE_COUNT; ++index)
+            if (group->clip_insets[index].duration_seconds > 0 ||
+                group->clip_insets[index].from != 0 || group->clip_insets[index].to != 0)
+                return 0;
     if (group->x.repeating && group->repeat_travel_seconds > 0)
         return 0;
     const reach_motion *motions[] = {&group->x,
@@ -268,9 +276,9 @@ float reach_render_command_buffer_group_opacity_at(const reach_render_command_bu
     return opacity;
 }
 
-int32_t reach_render_command_buffer_group_clip_at(const reach_render_command_buffer *buffer,
-                                                  uint64_t id, double now_seconds,
-                                                  reach_rect_f32 *out_clip)
+static int32_t reach_render_group_clips_at(const reach_render_command_buffer *buffer, uint64_t id,
+                                           double now_seconds, reach_rect_f32 *out_clip,
+                                           int32_t rectangular_only)
 {
     int32_t has_clip = 0;
     size_t depth = 0;
@@ -279,7 +287,7 @@ int32_t reach_render_command_buffer_group_clip_at(const reach_render_command_buf
         return 0;
     while (group != 0 && depth++ < buffer->group_count)
     {
-        if (group->has_clip)
+        if (group->has_clip && (!rectangular_only || group->clip_radius == 0))
         {
             reach_rect_f32 clip = reach_render_group_clip_at(group, now_seconds);
             reach_transform_f32 transform = reach_render_command_buffer_group_transform_at(
@@ -307,6 +315,21 @@ int32_t reach_render_command_buffer_group_clip_at(const reach_render_command_buf
         group = reach_render_command_buffer_group(buffer, group->parent_id);
     }
     return has_clip;
+}
+
+int32_t reach_render_command_buffer_group_clip_at(const reach_render_command_buffer *buffer,
+                                                  uint64_t id, double now_seconds,
+                                                  reach_rect_f32 *out_clip)
+{
+    return reach_render_group_clips_at(buffer, id, now_seconds, out_clip, 0);
+}
+
+int32_t
+reach_render_command_buffer_group_rectangular_clip_at(const reach_render_command_buffer *buffer,
+                                                      uint64_t id, double now_seconds,
+                                                      reach_rect_f32 *out_clip)
+{
+    return reach_render_group_clips_at(buffer, id, now_seconds, out_clip, 1);
 }
 
 static void reach_copy_text(uint16_t *dst, size_t dst_count, const uint16_t *src)
@@ -345,6 +368,7 @@ void reach_render_command_buffer_clear(reach_render_command_buffer *buffer)
         buffer->group_count = 0;
         buffer->current_group_id = 0;
         buffer->has_presentation = 0;
+        buffer->requires_content_sampling = 0;
         buffer->has_scissor = 0;
         buffer->content_rect = empty;
         buffer->content_transform = (reach_transform_f32){1.0f, 1.0f, 0.0f, 0.0f};

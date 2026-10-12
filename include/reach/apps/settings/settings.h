@@ -518,6 +518,7 @@ extern "C"
         const reach_settings_layout *layout;
         float dpi_scale;
         int32_t text_alignment_leading;
+        int32_t retained_supported;
     } reach_settings_render_input;
 
     void reach_settings_model_init(reach_settings_model *model);
@@ -539,7 +540,6 @@ extern "C"
     int32_t reach_settings_model_update_busy(const reach_settings_model *model);
     void reach_settings_model_scroll_updates(reach_settings_model *model, float delta);
     int32_t reach_settings_model_update_scroll(reach_settings_model *model, double delta_seconds);
-    int32_t reach_settings_model_update_loader(reach_settings_model *model, double delta_seconds);
 
     void reach_settings_model_set_current_version(reach_settings_model *model,
                                                   const uint16_t *version);
@@ -596,8 +596,6 @@ extern "C"
     const uint16_t *reach_settings_installed_apps_status_message(int32_t status);
     void reach_settings_model_scroll_installed_apps(reach_settings_model *model, float delta);
     int32_t reach_settings_model_installed_apps_scroll(reach_settings_model *model,
-                                                       double delta_seconds);
-    int32_t reach_settings_model_installed_apps_loader(reach_settings_model *model,
                                                        double delta_seconds);
 
     void reach_settings_model_set_high_refresh_rate(reach_settings_model *model, int32_t enabled);
@@ -702,7 +700,6 @@ extern "C"
     void reach_settings_model_wifi_clear_secrets(reach_settings_model *model);
     void reach_settings_model_scroll_wifi(reach_settings_model *model, float delta);
     int32_t reach_settings_model_wifi_scroll(reach_settings_model *model, double delta_seconds);
-    int32_t reach_settings_model_wifi_loader(reach_settings_model *model, double delta_seconds);
     int32_t reach_settings_model_sample_wifi_animations_at(reach_settings_model *model,
                                                            double now_seconds);
     int32_t reach_settings_model_wifi_animations_active(const reach_settings_model *model);
@@ -722,8 +719,6 @@ extern "C"
     void reach_settings_model_bluetooth_expand_row(reach_settings_model *model, int32_t row);
     void reach_settings_model_scroll_bluetooth(reach_settings_model *model, float delta);
     int32_t reach_settings_model_bluetooth_scroll(reach_settings_model *model,
-                                                  double delta_seconds);
-    int32_t reach_settings_model_bluetooth_loader(reach_settings_model *model,
                                                   double delta_seconds);
     int32_t reach_settings_model_sample_bluetooth_animations_at(reach_settings_model *model,
                                                                 double now_seconds);
