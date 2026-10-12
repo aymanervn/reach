@@ -1084,8 +1084,9 @@ static reach_result reach_context_menu_native_overlay_item(const void *capsule, 
     out->plane = REACH_WINDOW_THUMBNAIL_PLANE_TARGET;
     out->placement.opacity = 1.0f;
     reach_result result =
-        reach_context_menu_thumbnail_at(static_cast<const reach_context_menu *>(capsule), index,
-                                        &out->source, &out->placement.destination);
+        reach_context_menu_thumbnail_motion_at(static_cast<const reach_context_menu *>(capsule),
+                                               index, &out->source, &out->destination_motion);
+    out->has_destination_motion = 1;
     out->placement.visible = out->source != 0;
     return result;
 }

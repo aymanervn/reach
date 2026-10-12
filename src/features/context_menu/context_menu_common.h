@@ -50,7 +50,6 @@ int32_t reach_context_menu_set_close_hovered(reach_context_menu *menu, size_t in
 enum
 {
     REACH_CONTEXT_MENU_ANIM_WIDTH = 0,
-    REACH_CONTEXT_MENU_ANIM_REFLOW,
     REACH_CONTEXT_MENU_ANIM_COUNT
 };
 
@@ -61,6 +60,7 @@ typedef struct reach_context_menu_preview_card
     reach_rect_f32 preview;
     reach_rect_f32 header;
     reach_rect_f32 close;
+    reach_motion x;
     int32_t live;
 } reach_context_menu_preview_card;
 
@@ -90,6 +90,7 @@ struct reach_context_menu
     reach_animation_track animation_tracks[REACH_CONTEXT_MENU_ANIM_COUNT];
     reach_motion hover;
     reach_motion close_hover;
+    reach_motion reflow;
     reach_feature_transition popup_transition;
     reach_pressable pressable;
     uint64_t pressable_identity;
@@ -104,6 +105,12 @@ struct reach_context_menu
     reach_context_menu_preview_origin preview_origins[REACH_MENU_MAX_WINDOWS];
     size_t preview_origin_count;
 };
+
+reach_context_menu_preview_card reach_context_menu_preview_card_at(const reach_context_menu *menu,
+                                                                   size_t index,
+                                                                   double now_seconds);
+reach_context_menu_hit_result reach_context_menu_hit_test_menu_items(const reach_context_menu *menu,
+                                                                     int32_t x, int32_t y);
 
 void reach_context_menu_stop_preview_reflow(reach_context_menu *menu);
 void reach_context_menu_reflow_previews(reach_context_menu *menu,

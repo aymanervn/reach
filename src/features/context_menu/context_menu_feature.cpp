@@ -623,8 +623,7 @@ static uint64_t reach_context_menu_pressable_target(const reach_context_menu *me
     reach_context_menu_hit_result hit = {};
     if (reach_context_menu_point_in_item_viewport(&menu->state, x, y))
     {
-        hit =
-            reach_context_menu_hit_test_items(menu->state.item_slots, menu->state.item_count, x, y);
+        hit = reach_context_menu_hit_test_menu_items(menu, x, y);
     }
     if (hit.hit)
     {
@@ -818,8 +817,7 @@ static void reach_context_menu_capsule_handle_pointer(void *capsule,
         reach_context_menu_hit_result hit = {};
         if (reach_context_menu_point_in_item_viewport(&menu->state, event->x, event->y))
         {
-            hit = reach_context_menu_hit_test_items(menu->state.item_slots, menu->state.item_count,
-                                                    event->x, event->y);
+            hit = reach_context_menu_hit_test_menu_items(menu, event->x, event->y);
         }
         size_t hovered = hit.hit ? hit.index : REACH_CONTEXT_MENU_NO_ITEM;
         reach_context_menu_hit_result close_hit = {};
@@ -911,6 +909,11 @@ static void reach_context_menu_capsule_tick(void *capsule, double delta_seconds,
             out->request_update = 1;
         }
     }
+    if (menu->preview_origin_count > 0 && !reach_motion_active(&menu->reflow))
+    {
+        reach_context_menu_stop_preview_reflow(menu);
+        out->redraw = 1;
+    }
     int32_t popup_was_visible = reach_feature_transition_visible(&menu->popup_transition);
     if (reach_feature_transition_tick(&menu->popup_transition, delta_seconds))
     {
@@ -960,6 +963,9 @@ static void reach_context_menu_capsule_surface_geometry(const void *capsule,
         out->notch_anchor_x = menu->state.notch_anchor_x;
         out->notch_side = reach_popup_notch_side(menu->state.drop_direction);
         reach_feature_transition_presentation(&menu->popup_transition, out);
+        if (menu->preview_origin_count > 0)
+            out->deadline_seconds =
+                fmax(out->deadline_seconds, reach_motion_deadline(&menu->reflow));
     }
 }
 

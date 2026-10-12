@@ -454,19 +454,32 @@ size_t reach_context_menu_thumbnail_count(const reach_context_menu *menu)
     return menu != nullptr && menu->state.window_list_open ? menu->previews.count : 0;
 }
 
+reach_result reach_context_menu_thumbnail_motion_at(const reach_context_menu *menu, size_t index,
+                                                    reach_window_id *out_window,
+                                                    reach_rect_motion *out_destination)
+{
+    if (menu == nullptr || out_window == nullptr || out_destination == nullptr ||
+        index >= reach_context_menu_thumbnail_count(menu))
+        return REACH_INVALID_ARGUMENT;
+    const reach_context_menu_preview_card *card = &menu->previews.cards[index];
+    *out_window = card->live ? card->window : 0;
+    *out_destination = {};
+    out_destination->x = reach_motion_affine(&card->x, 1, card->preview.x + menu->state.bounds.x);
+    reach_motion_set(&out_destination->y, card->preview.y + menu->state.bounds.y);
+    reach_motion_set(&out_destination->width, card->preview.width);
+    reach_motion_set(&out_destination->height, card->preview.height);
+    return REACH_OK;
+}
+
 reach_result reach_context_menu_thumbnail_at(const reach_context_menu *menu, size_t index,
                                              reach_window_id *out_window,
                                              reach_rect_f32 *out_destination)
 {
-    if (menu == nullptr || out_window == nullptr || out_destination == nullptr ||
-        index >= reach_context_menu_thumbnail_count(menu))
-    {
+    if (out_destination == nullptr)
         return REACH_INVALID_ARGUMENT;
-    }
-    const reach_context_menu_preview_card *card = &menu->previews.cards[index];
-    *out_window = card->live ? card->window : 0;
-    *out_destination = card->preview;
-    out_destination->x += menu->state.bounds.x;
-    out_destination->y += menu->state.bounds.y;
-    return REACH_OK;
+    reach_rect_motion motion = {};
+    reach_result result = reach_context_menu_thumbnail_motion_at(menu, index, out_window, &motion);
+    if (result == REACH_OK)
+        *out_destination = reach_rect_motion_value_at(&motion, reach_motion_now_seconds());
+    return result;
 }

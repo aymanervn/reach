@@ -18,9 +18,12 @@ reach_context_menu_hit_test_close_buttons(const reach_context_menu *menu, int32_
     {
         return hit;
     }
+    double now = reach_motion_now_seconds();
     for (size_t visible = 0; visible < menu->previews.count; ++visible)
     {
-        const reach_context_menu_preview_card *card = &menu->previews.cards[visible];
+        reach_context_menu_preview_card sampled =
+            reach_context_menu_preview_card_at(menu, visible, now);
+        const reach_context_menu_preview_card *card = &sampled;
         if (reach_context_menu_rect_contains(card->close, x, y))
         {
             hit.hit = 1;
@@ -49,6 +52,30 @@ reach_context_menu_hit_result reach_context_menu_hit_test_items(const reach_rect
             hit.hit = 1;
             hit.index = index;
             return hit;
+        }
+    }
+    return hit;
+}
+
+reach_context_menu_hit_result reach_context_menu_hit_test_menu_items(const reach_context_menu *menu,
+                                                                     int32_t x, int32_t y)
+{
+    if (!menu->state.window_list_open)
+        return reach_context_menu_hit_test_items(menu->state.item_slots, menu->state.item_count, x,
+                                                 y);
+    reach_context_menu_hit_result hit = {};
+    hit.index = REACH_CONTEXT_MENU_NO_ITEM;
+    double now = reach_motion_now_seconds();
+    for (size_t index = 0; index < menu->previews.count; ++index)
+    {
+        const reach_context_menu_preview_card *card = &menu->previews.cards[index];
+        reach_rect_f32 slot = menu->state.item_slots[card->index];
+        slot.x += reach_motion_value_at(&card->x, now);
+        if (reach_context_menu_rect_contains(slot, x, y))
+        {
+            hit.hit = 1;
+            hit.index = card->index;
+            break;
         }
     }
     return hit;

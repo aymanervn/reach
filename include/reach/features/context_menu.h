@@ -73,6 +73,10 @@ extern "C"
                                                  reach_window_id *out_window,
                                                  reach_rect_f32 *out_destination);
 
+    reach_result reach_context_menu_thumbnail_motion_at(const reach_context_menu *menu,
+                                                        size_t index, reach_window_id *out_window,
+                                                        reach_rect_motion *out_destination);
+
     int32_t reach_context_menu_is_open(const reach_context_menu *menu);
     void reach_context_menu_force_close(reach_context_menu *menu);
     void reach_context_menu_reset(reach_context_menu *menu);
