@@ -9,7 +9,6 @@
 #include "reach/core/scrollbar.h"
 #include "reach/features/common/pressable.h"
 #include "reach/ports/clipboard.h"
-#include "reach/support/animation.h"
 #include "reach/support/util.h"
 
 #ifdef __cplusplus
@@ -54,7 +53,8 @@ extern "C"
         const reach_theme *theme;
         const reach_clipboard_model *model;
         const reach_clipboard_layout *layout;
-        const float *hover_values;
+        const reach_motion *hover_motions;
+        const uint64_t *hover_group_ids;
         float dpi_scale;
         int32_t text_alignment_leading;
     } reach_clipboard_render_input;

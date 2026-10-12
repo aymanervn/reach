@@ -96,6 +96,52 @@ int32_t reach_ui_color_feedback_begin(reach_render_command_buffer *commands, uin
     return reach_render_command_buffer_begin_group(commands, &group) == REACH_OK;
 }
 
+reach_result reach_ui_bordered_color_feedback_render(reach_render_command_buffer *commands,
+                                                     uint64_t first_id, reach_rect_f32 bounds,
+                                                     float radius, float border, reach_color from,
+                                                     reach_color to, reach_color outline,
+                                                     const reach_motion *progress)
+{
+    if (commands == nullptr || progress == nullptr || first_id == 0 ||
+        first_id > UINT64_C(0x7ffffffffffffffb))
+        return REACH_INVALID_ARGUMENT;
+    if (bounds.width <= 0 || bounds.height <= 0)
+        return REACH_OK;
+    uint64_t parent_id = commands->current_group_id;
+    reach_motion hover = reach_motion_clamp(progress, 0, 1);
+    from.a = to.a = 1;
+    reach_render_command shape = {};
+    shape.type = REACH_RENDER_COMMAND_RECT;
+    shape.rect = bounds;
+    shape.radius = radius;
+    reach_render_command shapes[2];
+    size_t count =
+        reach_render_bordered_background_shapes(&shape, {1, 1, 1, 1}, {1, 1, 1, 1}, border, shapes);
+    for (size_t index = 0; index < count; ++index)
+    {
+        reach_rect_f32 source = {};
+        if (!reach_render_retained_command_bounds(&shapes[index], &source))
+            return REACH_INVALID_ARGUMENT;
+        reach_render_group group = reach_ui_color_group(first_id + index, source, from, to, &hover);
+        group.parent_id = parent_id;
+        if (index == 0 && border > 0)
+        {
+            group.tint_rgb_target = outline;
+            reach_motion weight = reach_motion_affine(&hover, outline.a, 0);
+            group.tint_rgb_mix = reach_motion_clamp(&weight, 0, 1);
+        }
+        reach_result result = reach_render_command_buffer_begin_group(commands, &group);
+        if (result != REACH_OK)
+            return result;
+        result = reach_render_command_buffer_push(commands, &shapes[index]);
+        reach_render_command_buffer_end_group(commands);
+        commands->current_group_id = parent_id;
+        if (result != REACH_OK)
+            return result;
+    }
+    return REACH_OK;
+}
+
 void reach_ui_button_render(reach_render_command_buffer *commands, reach_rect_f32 bounds,
                             const uint16_t *label, const reach_ui_button_style *style,
                             int32_t enabled, uint64_t feedback_id, const reach_motion *pressed)

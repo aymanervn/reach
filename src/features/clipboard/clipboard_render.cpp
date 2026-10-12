@@ -3,6 +3,8 @@
 #include "clipboard_common.h"
 #include "reach/features/common/scrollbar_render.h"
 #include "clipboard_metrics.h"
+#include "reach/features/common/ui_controls.h"
+
 static float reach_clipboard_max_float(float a, float b)
 {
     return a > b ? a : b;
@@ -11,19 +13,6 @@ static float reach_clipboard_max_float(float a, float b)
 static float reach_clipboard_min_float(float a, float b)
 {
     return a < b ? a : b;
-}
-
-static float reach_clipboard_clamp01(float value)
-{
-    if (value < 0.0f)
-    {
-        return 0.0f;
-    }
-    if (value > 1.0f)
-    {
-        return 1.0f;
-    }
-    return value;
 }
 
 static constexpr size_t REACH_CLIPBOARD_RENDER_ITEM_LIMIT = 5;
@@ -577,27 +566,20 @@ reach_result reach_clipboard_build_render_commands(const reach_clipboard_render_
         const reach_rect_f32 local_visible_item =
             reach_clipboard_local(visible_item, layout->bounds);
         const reach_clipboard_item *item_data = &model->items[index];
-        const float hover = reach_clipboard_clamp01(
-            input->hover_values != nullptr ? input->hover_values[index] : 0.0f);
-
-        reach_color item_background = reach_theme_color_mix(
-            theme->clipboard_item_background, theme->clipboard_item_hover_background, hover);
-        reach_color border_source = theme->clipboard_item_hover_border;
-        float border_alpha = border_source.a * hover;
-        border_source.a = 1.0f;
-        reach_color item_border =
-            reach_theme_color_mix(item_background, border_source, border_alpha);
-        reach_render_command item_shape = {};
-        item_shape.type = REACH_RENDER_COMMAND_RECT;
-        item_shape.rect = local_visible_item;
-        item_shape.radius = reach_clipboard_scale_value(theme->radius_small, input->dpi_scale);
-        result = reach_render_push_bordered_background(commands, &item_shape, item_background,
-                                                       item_border, border_thickness, nullptr,
-                                                       input->dpi_scale);
+        reach_motion hover = {};
+        reach_motion_set(&hover, 0);
+        if (input->hover_motions != nullptr)
+            hover = reach_motion_clamp(&input->hover_motions[index], 0, 1);
+        uint64_t feedback_id = input->hover_group_ids != nullptr
+                                   ? input->hover_group_ids[index]
+                                   : UINT64_C(0x7000000000000000) + index * 16;
+        result = reach_ui_bordered_color_feedback_render(
+            commands, feedback_id, local_visible_item,
+            reach_clipboard_scale_value(theme->radius_small, input->dpi_scale), border_thickness,
+            theme->clipboard_item_background, theme->clipboard_item_hover_background,
+            theme->clipboard_item_hover_border, &hover);
         if (result != REACH_OK)
-        {
             return result;
-        }
 
         const float close_size = metrics.close_button_size;
         const float close_margin = metrics.close_button_margin;
@@ -608,11 +590,23 @@ reach_result reach_clipboard_build_render_commands(const reach_clipboard_render_
         command.type = REACH_RENDER_COMMAND_RECT;
         command.rect = close_rect;
         command.color = theme->clipboard_secondary_text;
-        command.color.a = metrics.close_button_hover_alpha * hover;
+        command.color.a = 1;
+        reach_motion close_opacity =
+            reach_motion_affine(&hover, metrics.close_button_hover_alpha, 0);
         command.radius = reach_clipboard_scale_value(theme->radius_small, input->dpi_scale);
         if (reach_clipboard_clip_rect(&command.rect, local_visible_item))
         {
-            reach_render_command_buffer_push(commands, &command);
+            reach_rect_f32 source = {};
+            if (!reach_render_retained_command_bounds(&command, &source))
+                return REACH_ERROR;
+            result =
+                reach_ui_feedback_begin(commands, feedback_id + 4, source, &close_opacity, nullptr);
+            if (result != REACH_OK)
+                return result;
+            result = reach_render_command_buffer_push(commands, &command);
+            reach_render_command_buffer_end_group(commands);
+            if (result != REACH_OK)
+                return result;
         }
 
         const float inset = close_size * metrics.close_button_inset_ratio;
@@ -623,10 +617,23 @@ reach_result reach_clipboard_build_render_commands(const reach_clipboard_render_
                         reach_clipboard_max_float(0.0f, close_rect.height - inset * 2.0f)};
         command.icon_id = REACH_VECTOR_ICON_CLOSE;
         command.color = theme->clipboard_secondary_text;
-        command.color.a = theme->clipboard_secondary_text.a * (0.5f + 0.5f * hover);
+        command.color.a = 1;
+        reach_motion glyph_opacity =
+            reach_motion_affine(&hover, theme->clipboard_secondary_text.a * 0.5f,
+                                theme->clipboard_secondary_text.a * 0.5f);
         if (reach_clipboard_clip_rect(&command.rect, local_visible_item))
         {
-            reach_render_command_buffer_push(commands, &command);
+            reach_rect_f32 source = {};
+            if (!reach_render_retained_command_bounds(&command, &source))
+                return REACH_ERROR;
+            result =
+                reach_ui_feedback_begin(commands, feedback_id + 5, source, &glyph_opacity, nullptr);
+            if (result != REACH_OK)
+                return result;
+            result = reach_render_command_buffer_push(commands, &command);
+            reach_render_command_buffer_end_group(commands);
+            if (result != REACH_OK)
+                return result;
         }
 
         const float padding = metrics.thumbnail_padding;
@@ -701,14 +708,12 @@ reach_result reach_clipboard_append_render_commands(reach_clipboard_feature *cli
 
     reach_clipboard_state *state = reach_clipboard_feature_state_mut(clipboard);
 
-    float hover_values[REACH_CLIPBOARD_MAX_ITEMS] = {};
-    reach_clipboard_feature_fill_hover_values(clipboard, hover_values, REACH_CLIPBOARD_MAX_ITEMS);
-
     reach_clipboard_render_input input = {};
     input.theme = theme;
     input.model = &state->model;
     input.layout = &state->layout;
-    input.hover_values = hover_values;
+    input.hover_motions = reach_clipboard_feature_hover_motions(clipboard);
+    input.hover_group_ids = reach_clipboard_feature_hover_group_ids(clipboard);
     input.dpi_scale = dpi_scale;
     input.text_alignment_leading = REACH_TEXT_ALIGNMENT_LEADING;
 

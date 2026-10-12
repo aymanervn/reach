@@ -47,6 +47,8 @@ extern "C"
         reach_motion clip_insets[REACH_RENDER_CLIP_EDGE_COUNT];
         int32_t has_tint;
         reach_motion tint[REACH_RENDER_COLOR_CHANNEL_COUNT];
+        reach_motion tint_rgb_mix;
+        reach_color tint_rgb_target;
         float repeat_offset_x;
         float repeat_hold_seconds;
         float repeat_travel_seconds;
@@ -274,6 +276,10 @@ extern "C"
     reach_result reach_render_push_shadow(reach_render_command_buffer *buffer,
                                           const reach_render_command *shape,
                                           const reach_shadow *shadow, float dpi_scale);
+    size_t reach_render_bordered_background_shapes(const reach_render_command *shape,
+                                                   reach_color background_color,
+                                                   reach_color border_color, float border_thickness,
+                                                   reach_render_command out_shapes[2]);
     reach_result reach_render_push_bordered_background(reach_render_command_buffer *buffer,
                                                        const reach_render_command *shape,
                                                        reach_color background_color,

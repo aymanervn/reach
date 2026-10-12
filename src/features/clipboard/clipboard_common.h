@@ -46,10 +46,9 @@ void reach_clipboard_feature_collapse_all_hover(reach_clipboard_feature *clipboa
 void reach_clipboard_feature_move_hover(reach_clipboard_feature *clipboard, size_t previous,
                                         size_t next);
 void reach_clipboard_feature_clear_hover(reach_clipboard_feature *clipboard, size_t previous);
-int32_t reach_clipboard_feature_any_hover_active(const reach_clipboard_feature *clipboard);
 int32_t reach_clipboard_feature_any_animation_active(const reach_clipboard_feature *clipboard);
-void reach_clipboard_feature_fill_hover_values(const reach_clipboard_feature *clipboard,
-                                               float *out_values, size_t count);
+const reach_motion *reach_clipboard_feature_hover_motions(reach_clipboard_feature *clipboard);
+const uint64_t *reach_clipboard_feature_hover_group_ids(const reach_clipboard_feature *clipboard);
 float reach_clipboard_feature_animate_layout_value(reach_clipboard_feature *clipboard,
                                                    reach_clipboard_layout_track track, float target,
                                                    int32_t *out_active);

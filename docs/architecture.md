@@ -423,8 +423,8 @@ and activity are CPU presentation state: pending activity survives until a sampl
 endpoint, then stops. `reach_animation_manager_motion` exposes the same intent for retained rendering
 without GPU readback. Settings samples all finite scalar families at one update timestamp. Loader,
 scroll and native choreography timing remain separate migration responsibilities.
-Switcher width and Clipboard hover preserve pre-sample activity when deciding redraw, so a late
-wake still publishes the terminal visual state after sampling clears their active flags.
+Switcher width preserves pre-sample activity when deciding redraw, so a late
+wake still publishes the terminal visual state after sampling clears its active flag.
 
 Finite and periodic properties share `reach_motion`. Periodic intent adds forward/backward travel
 with independent endpoint holds and an absolute epoch. CPU sampling, affine mapping and bounded
@@ -543,6 +543,21 @@ retiring a group releases its tint objects. The HWND fallback renders aggregate 
 bounded temporary bitmap and applies sampled color once, preserving overlapping shapes.
 `reach_render_group_tint_at` and all fallback geometry sample one timestamp per frame. This
 capability belongs to explicit groups; root presentation tint is not implemented.
+
+Coverage tint can additionally blend its animated RGB with a fixed RGB target through canonical
+`tint_rgb_mix`, preserving the independent alpha coverage. Windows Composition evaluates the blend
+in the existing color-brush expression; DirectComposition chains a second color matrix after the
+coverage tint. Fallback samples both intents at the same frame timestamp. Normalized blend limits,
+semantic equality, native cancellation and repeating-property retirement share the retained contract.
+The mix is a leaf capability and is rejected on root presentation.
+
+Clipboard item feedback uses canonical hover motion and item-keyed retained source identities.
+Shared bordered feedback consumes `reach_render_bordered_background_shapes`, the same pixel-aligned
+opaque outer/inner geometry used by ordinary bordered backgrounds. The RGB blend preserves the
+previous nested hover border colors without overlapping translucent rounded layers. Close background
+and glyph coverage use separate retained opacity. Hover tracks, sampled render values, tick redraw
+and hover-only frame demand are removed; sizing and scrolling remain separate CPU consumers.
+
 
 Optional process-wide workload diagnostics count application wakes/updates, scalar/loader/scroll
 work, layout and command production, renderer executions and actual raster passes, compositor

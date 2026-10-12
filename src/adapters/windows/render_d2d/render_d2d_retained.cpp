@@ -55,7 +55,7 @@ static void stop_layer_repetition(reach_render_backend *backend, reach_d2d_retai
     bool x = group.x.repeating || group.repeat_travel_seconds > 0;
     const reach_motion motions[] = {group.x, group.y, group.opacity, group.scale,
                                     reach_render_group_y_scale(&group)};
-    bool active = x;
+    bool active = x || group.tint_rgb_mix.repeating;
     for (const auto &motion : motions)
         active = active || motion.repeating;
     for (const auto &motion : group.clip_insets)
@@ -72,6 +72,8 @@ static void stop_layer_repetition(reach_render_backend *backend, reach_d2d_retai
         for (size_t index = 0; index < 5; ++index)
             if (motions[index].repeating || (index == 0 && x))
                 stop_wuc_repetition(layer.visual.Get(), properties[index]);
+        if (group.tint_rgb_mix.repeating)
+            stop_wuc_repetition(layer.tint_properties.Get(), L"Mix");
         const wchar_t *clips[] = {L"LeftInset", L"TopInset", L"RightInset", L"BottomInset"};
         const wchar_t *tints[] = {L"Red", L"Green", L"Blue", L"Alpha"};
         for (size_t index = 0; index < 4; ++index)
@@ -121,6 +123,12 @@ static void stop_layer_repetition(reach_render_backend *backend, reach_d2d_retai
                 if (group.tint[index].repeating)
                     (void)layer.dcomp_tint->SetMatrixElement(index == 3 ? 3 : 4, (UINT)index, 0.0f);
         }
+        if (layer.dcomp_tint_mix != nullptr && group.tint_rgb_mix.repeating)
+            for (UINT index = 0; index < 3; ++index)
+            {
+                (void)layer.dcomp_tint_mix->SetMatrixElement(index, index, 1.0f);
+                (void)layer.dcomp_tint_mix->SetMatrixElement(4, index, 0.0f);
+            }
     }
 }
 
@@ -253,7 +261,12 @@ static HRESULT sync_tint(reach_render_backend *backend, reach_d2d_retained_layer
 {
     if (!group.has_tint && !layer.group.has_tint)
         return S_OK;
-    bool tint_changed = group.has_tint != layer.group.has_tint;
+    bool mixing = group.tint_rgb_mix.generation != 0;
+    bool mix_changed = !reach_motion_equal(&group.tint_rgb_mix, &layer.group.tint_rgb_mix) ||
+                       group.tint_rgb_target.r != layer.group.tint_rgb_target.r ||
+                       group.tint_rgb_target.g != layer.group.tint_rgb_target.g ||
+                       group.tint_rgb_target.b != layer.group.tint_rgb_target.b;
+    bool tint_changed = group.has_tint != layer.group.has_tint || mix_changed;
     for (size_t index = 0; index < REACH_RENDER_COLOR_CHANNEL_COUNT; ++index)
         tint_changed =
             tint_changed || !reach_motion_equal(&group.tint[index], &layer.group.tint[index]);
@@ -277,6 +290,7 @@ static HRESULT sync_tint(reach_render_backend *backend, reach_d2d_retained_layer
             layer.tint_mask.Reset();
             layer.tint_brush.Reset();
             layer.tint_properties.Reset();
+            layer.dcomp_tint_mix.Reset();
             layer.dcomp_tint.Reset();
         }
         return hr;
@@ -311,7 +325,25 @@ static HRESULT sync_tint(reach_render_backend *backend, reach_d2d_retained_layer
             if (SUCCEEDED(hr))
                 hr = wuc_motion(backend, layer.tint_properties.Get(), names[index], channel);
         }
-        if (SUCCEEDED(hr) && !initialized)
+        if (SUCCEEDED(hr) && mixing && (!initialized || mix_changed))
+        {
+            hr = layer.tint_properties->InsertScalar(HStringReference(L"Mix").Get(),
+                                                     reach_motion_value(&group.tint_rgb_mix));
+            if (SUCCEEDED(hr))
+                hr = wuc_motion(backend, layer.tint_properties.Get(), L"Mix", group.tint_rgb_mix);
+            const wchar_t *targets[] = {L"TargetRed", L"TargetGreen", L"TargetBlue"};
+            float channels[] = {group.tint_rgb_target.r, group.tint_rgb_target.g,
+                                group.tint_rgb_target.b};
+            for (size_t index = 0; index < 3 && SUCCEEDED(hr); ++index)
+                hr = layer.tint_properties->InsertScalar(HStringReference(targets[index]).Get(),
+                                                         channels[index] * 255);
+        }
+        if (SUCCEEDED(hr) && !mixing && layer.group.tint_rgb_mix.generation != 0)
+        {
+            stop_wuc_repetition(layer.tint_properties.Get(), L"Mix");
+            hr = layer.tint_properties->InsertScalar(HStringReference(L"Mix").Get(), 0);
+        }
+        if (SUCCEEDED(hr) && (!initialized || mixing != (layer.group.tint_rgb_mix.generation != 0)))
         {
             ComPtr<IExpressionAnimation> expression;
             ComPtr<ICompositionAnimation> animation;
@@ -319,7 +351,12 @@ static HRESULT sync_tint(reach_render_backend *backend, reach_d2d_retained_layer
             ComPtr<ICompositionObject> brush;
             hr = backend->compositor->CreateExpressionAnimationWithExpression(
                 HStringReference(
-                    L"ColorRGB(channels.Alpha, channels.Red, channels.Green, channels.Blue)")
+                    mixing
+                        ? L"ColorRGB(channels.Alpha, "
+                          L"channels.Red*(1-channels.Mix)+channels.TargetRed*channels.Mix, "
+                          L"channels.Green*(1-channels.Mix)+channels.TargetGreen*channels.Mix, "
+                          L"channels.Blue*(1-channels.Mix)+channels.TargetBlue*channels.Mix)"
+                        : L"ColorRGB(channels.Alpha, channels.Red, channels.Green, channels.Blue)")
                     .Get(),
                 &expression);
             if (SUCCEEDED(hr))
@@ -387,10 +424,61 @@ static HRESULT sync_tint(reach_render_backend *backend, reach_d2d_retained_layer
         else if (motion_hr == S_OK)
             hr = layer.dcomp_tint->SetMatrixElement(row, (int)index, animation.Get());
     }
+    if (SUCCEEDED(hr) && mixing)
+    {
+        bool mix_initialized = layer.dcomp_tint_mix != nullptr;
+        if (!mix_initialized)
+        {
+            ComPtr<IDCompositionDevice3> device;
+            hr = backend->dcomp_device->QueryInterface(IID_PPV_ARGS(&device));
+            if (SUCCEEDED(hr))
+                hr = device->CreateColorMatrixEffect(&layer.dcomp_tint_mix);
+            D2D1_MATRIX_5X4_F matrix = {};
+            matrix._11 = matrix._22 = matrix._33 = matrix._44 = 1;
+            if (SUCCEEDED(hr))
+                hr = layer.dcomp_tint_mix->SetMatrix(matrix);
+            if (SUCCEEDED(hr))
+                hr = layer.dcomp_tint_mix->SetAlphaMode(D2D1_COLORMATRIX_ALPHA_MODE_PREMULTIPLIED);
+            if (SUCCEEDED(hr))
+                hr = layer.dcomp_tint_mix->SetClampOutput(TRUE);
+        }
+        if (SUCCEEDED(hr))
+            hr = layer.dcomp_tint_mix->SetInput(0, layer.dcomp_tint.Get(), 0);
+        if (mix_changed || !mix_initialized)
+        {
+            float target[] = {group.tint_rgb_target.r, group.tint_rgb_target.g,
+                              group.tint_rgb_target.b};
+            for (UINT channel = 0; channel < 3 && SUCCEEDED(hr); ++channel)
+                for (UINT element = 0; element < 2 && SUCCEEDED(hr); ++element)
+                {
+                    UINT row = element == 0 ? channel : 4;
+                    reach_motion motion =
+                        element == 0 ? reach_motion_affine(&group.tint_rgb_mix, -1, 1)
+                                     : reach_motion_affine(&group.tint_rgb_mix, target[channel], 0);
+                    hr = layer.dcomp_tint_mix->SetMatrixElement(row, channel,
+                                                                reach_motion_value(&motion));
+                    ComPtr<IDCompositionAnimation> animation;
+                    HRESULT motion_hr =
+                        SUCCEEDED(hr) ? dcomp_motion(backend, motion, &animation) : hr;
+                    if (FAILED(motion_hr))
+                        hr = motion_hr;
+                    else if (motion_hr == S_OK)
+                        hr = layer.dcomp_tint_mix->SetMatrixElement(row, channel, animation.Get());
+                }
+        }
+    }
     if (SUCCEEDED(hr))
-        hr = layer.dcomp_visual->SetEffect(layer.dcomp_tint.Get());
+    {
+        hr = layer.dcomp_visual->SetEffect(mixing ? layer.dcomp_tint_mix.Get()
+                                                  : layer.dcomp_tint.Get());
+        if (!mixing)
+            layer.dcomp_tint_mix.Reset();
+    }
     if (FAILED(hr))
+    {
+        layer.dcomp_tint_mix.Reset();
         layer.dcomp_tint.Reset();
+    }
     return hr;
 }
 

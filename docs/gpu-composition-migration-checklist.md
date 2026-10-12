@@ -203,6 +203,16 @@ support expectation is explicitly resolved.
     Debug build, 39 tests and five scoped native runs per compositor plus fallback pass. The known
     WUC root-completion check was excluded from the initial scoped run; subsequent full native
     runs include that resolved path. Final product acceptance remains pending.
+  - [x] Migrate Clipboard item, border and close hover using shared retained RGB blending and opacity.
+    Item-keyed cached sources preserve the original nested RGB, opaque outer/inner border geometry
+    and close alpha. Remove twenty hover scalar tracks, sampled values, tick redraw and hover-only
+    frame demand. Surviving source identities follow membership changes; native reversal reuses
+    rasters and unchanged settled submissions change no properties or trees. Both builds, all 40
+    tests, owned capsule/native lifetime checks and five full native runs per backend plus fallback
+    pass. Two themes/four DPI values/five hover values match fallback exactly and cached two-matrix
+    coverage within two channel values. Displayed pixels, source memory comparison and total product
+    workload acceptance remain in the broader gates.
+
 - [ ] Migrate eligible loaders/repeating effects; select efficient compositor or deadline behavior for
   carets, preserve focus resets and marquee behavior, and stop hidden repetitions.
   - [x] Add canonical periodic properties for retained transforms, opacity, clips and tint.
