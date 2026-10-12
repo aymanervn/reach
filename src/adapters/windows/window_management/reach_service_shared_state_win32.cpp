@@ -4,8 +4,13 @@
 #include <sddl.h>
 
 #include <new>
+#include <cstring>
+#include <type_traits>
 
 static const size_t REACH_SHARED_MAX_SUBSCRIBERS = 4;
+
+static_assert(std::is_trivial<reach_service_shared_state>::value);
+static_assert(std::is_standard_layout<reach_service_shared_state>::value);
 
 struct reach_shared_reader_subscriber
 {
@@ -215,7 +220,7 @@ static void reach_shared_reader_set_disconnected(void)
     reach_shared_reader_lock();
     was_connected = g_reader.connected;
     g_reader.connected = 0;
-    g_reader.cache = {};
+    std::memset(&g_reader.cache, 0, sizeof(g_reader.cache));
     g_reader.last_publish_sequence = 0;
     g_reader.last_window_sequence = 0;
     g_reader.last_hotkey_sequence = 0;
@@ -393,7 +398,7 @@ static void reach_shared_reader_stop_if_unused(void)
 
     reach_shared_reader_lock();
     g_reader.connected = 0;
-    g_reader.cache = {};
+    std::memset(&g_reader.cache, 0, sizeof(g_reader.cache));
     g_reader.last_publish_sequence = 0;
     g_reader.last_window_sequence = 0;
     g_reader.last_hotkey_sequence = 0;
@@ -618,7 +623,7 @@ reach_result reach_service_shared_writer_start(void)
 
     g_writer.generation = GetTickCount();
     g_writer.next_hotkey_event = 1;
-    *g_writer.view = {};
+    std::memset(g_writer.view, 0, sizeof(*g_writer.view));
     g_writer.view->version = reach_service_protocol_version();
     g_writer.view->layout_size = sizeof(reach_service_shared_state);
     g_writer.view->writer_pid = GetCurrentProcessId();

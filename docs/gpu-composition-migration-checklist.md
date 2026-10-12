@@ -32,6 +32,13 @@ support expectation is explicitly resolved.
   rasterization, presents, native updates, total Reach/Settings plus DWM CPU/GPU cost, latency, power
   and memory; establish variation and regression thresholds before comparison.
 
+  - [x] Resolve the optimized-build blocker and verify protocol storage reset behavior.
+    Three wire-state aggregate resets use explicit representation clearing with compile-time trivial
+    and standard-layout guards. Normal `/O2 /Ob2` flags remain enabled. Isolated Reach/Settings/tool
+    Release builds, all 39 Release tests, Debug builds/tests and the owned native protocol probe pass.
+    Full optimized compositor verification exposes two settled-chrome deduplication failures, which
+    remain pending along with workload capture and final acceptance.
+
 ## 2. Resolve production capabilities
 
 - [ ] Select and verify reusable animated clipping, reveal and resize mechanisms on Windows

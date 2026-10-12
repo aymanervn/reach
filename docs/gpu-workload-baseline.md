@@ -233,15 +233,19 @@ power, memory and instrumentation overhead still require product scenarios and s
 
 ## Baseline prerequisites still open
 
-- The isolated optimized MSVC build reaches an internal compiler error `C1001` in the existing
-  `src/adapters/windows/window_management/reach_service_shared_state_win32.cpp` (aggregate
-  initialization sites around 396/621). Explicit `/EHsc` removed initial exception warnings but
-  did not resolve the optimizer failure. An explicit byte-clear rewrite with compile-time layout
-  guards also failed at the same optimizer location; that unsuccessful source change was removed.
-  A subsequent isolated `/O2 /Ob1` build still failed at line 396. Standard `/Ob2` flags were
-  restored in the isolated cache; no compiler workaround was added to product source.
-  Debug Reach and Settings compile and all 39 tests pass.
-  Resolve optimized-build verification separately before claiming production performance results.
+- The optimized MSVC build blocker is resolved. Three aggregate resets of the shared wire state
+  now clear its object representation explicitly, guarded by trivial/standard-layout assertions.
+  Normal `/O2 /Ob2 /DNDEBUG` flags are retained. Isolated Release Reach/Settings/tool builds and all
+  39 Release tests pass; Debug builds and all 39 tests also pass. A bounded optimized native protocol
+  probe seeds owned storage with nonzero bytes, verifies writer headers/empty payload, publication,
+  reader snapshots, disconnect/reset clearing and owned-resource retirement. It uses private named
+  mapping/event objects and never touches the running Reach instance.
+  Evidence: `build-release-storage.log`, `build-release-tests.log`, `test-release-storage.log`,
+  `build-debug-storage.log`, `test-debug-storage.log`, `probe-protocol-storage.log`.
+- The first full optimized compositor suite completes with two failures in the unchanged settled
+  chrome property-submission check (`probe-native-release.log`). Other assertions pass. This exposes
+  an optimized-path verification issue requiring its own renderer investigation; it is not accepted
+  as harmless and does not close production native or total performance acceptance.
 - Windows Performance Recorder exposes CPU, GPU and DesktopComposition profiles, but starting
   the combined recording failed with `0xc5585011`, "Failed to enable the policy to profile system
   performance." A subsequent status check confirmed no recording is active. No trace was captured;
