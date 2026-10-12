@@ -682,9 +682,40 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
             input.y = geometry.presentation.group.y;
             input.scale = geometry.presentation.group.scale;
             input.scale_y = geometry.presentation.group.scale_y;
+            input.has_motion_bounds = geometry.has_input_bounds;
+            if (geometry.has_input_bounds)
+            {
+                reach_transform_f32 transform =
+                    surface_ctx.content_transform_active
+                        ? surface_ctx.render_transform
+                        : reach_transform_f32{1, 1, shadow_pad.left, shadow_pad.top};
+                input.motion_bounds =
+                    reach_rect_motion_transform(&geometry.input_bounds, transform);
+            }
             (void)desc->surface->window.ops.set_input_presentation(desc->surface->window.window,
                                                                    &input);
         }
+    }
+    if (!geometry.presentation.retained &&
+        desc->surface->window.ops.set_input_presentation != nullptr)
+    {
+        reach_platform_window_input_presentation input = {};
+        input.has_motion_bounds = geometry.has_input_bounds;
+        if (geometry.has_input_bounds)
+        {
+            reach_transform_f32 transform =
+                surface_ctx.content_transform_active
+                    ? surface_ctx.render_transform
+                    : reach_transform_f32{1, 1, shadow_pad.left, shadow_pad.top};
+            input.motion_bounds = reach_rect_motion_transform(&geometry.input_bounds, transform);
+            reach_rect_f32 region = {shadow_pad.left, shadow_pad.top, geometry.visible_bounds.width,
+                                     geometry.visible_bounds.height};
+            if (desc->surface->window.ops.set_input_regions != nullptr)
+                (void)desc->surface->window.ops.set_input_regions(desc->surface->window.window,
+                                                                  &region, 1);
+        }
+        (void)desc->surface->window.ops.set_input_presentation(
+            desc->surface->window.window, geometry.has_input_bounds ? &input : nullptr);
     }
     surface_ctx.render_bounds = bounds;
 

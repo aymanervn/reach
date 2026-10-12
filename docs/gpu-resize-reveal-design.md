@@ -154,5 +154,32 @@ half-pixel text softness at 125% DPI. The bounded intermediate comparison and ma
 inspection retain the ordinary linear filter for shape edges. This does not establish displayed
 WUC/DC pixels, all fonts/themes, high-refresh behavior or final total-product efficiency.
 
-Popup height still uses its scalar track and requests frames. Complete height/scroll/monitor and
-native-input integration remains the next consumer step; the broader resize/reveal gate stays open.
+## Quick Settings height and input consumer
+
+Height and both section progress descriptors derive from one event-time layout curve. A stable
+session envelope grows on intent when required and stays allocated through collapse/reversal;
+ordinary motion does not resize the native window every frame. Shared popup placement derives
+monitor-clamped body Y and height, while retained fixed-cap chrome preserves the border, corners,
+shadow and unchanged-width notch. A body parent moves the chrome and viewport together; the viewport
+shrinks its bottom clip and an independent scroll parent moves the cached content. Constant ordinary
+heights keep the same chrome source patches. A compact constant body uses the existing static shape;
+animated custom geometry below the cap limits remains a pending generic capability.
+
+Scroll maximum derives from the same section/height epoch. Wheel steps remain input policy and
+change its upper clamp directly. Changes in either panel's source extent retarget the layout even
+when the collapsed target height is unchanged, preventing cached hit geometry from diverging from
+the published scroll descriptor. Reopening resets both the offset and its descriptor. DPI, monitor,
+anchor, direction and border changes reconcile the placement and cut obsolete geometry.
+
+Capsules publish an optional neutral `reach_rect_motion` for their input bounds. Generic composition
+uses one timestamp for root inverse presentation and rectangle sampling. It also projects the same
+motion into native client space; Win32 hit testing samples it without a window-update timer.
+Nonretained publication uses a valid static input region and clears obsolete motion when absent.
+
+Focused native diagnostics cover positive scroll, collapse/reversal, both exclusive panels, source
+changes during collapse, reopening, compact monitors, environment changes, host event conversion,
+client input publication/reset and Win32 hit testing across four DPI values. Chrome source readback
+matches the ordinary direct drawing within one channel value for both notch directions and compact
+static sizes. Collapse/reversal submits five intent/deadline frames with zero raster passes on both
+compositors; fallback draws the same descriptors. These checks do not establish displayed compositor
+pixels or full product cost. The broader resize/reveal and product acceptance gates stay open.

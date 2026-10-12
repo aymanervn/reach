@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "reach/core/animated_rect.h"
+
 #include "reach/core/geometry.h"
 #include "reach/core/render_commands.h"
 #include "reach/support/util.h"
@@ -114,6 +116,8 @@ extern "C"
     {
         reach_rect_f32 visible_bounds;
         reach_rect_f32 envelope_bounds;
+        int32_t has_input_bounds;
+        reach_rect_motion input_bounds;
         int32_t synchronize_presentation;
         int32_t manage_monitor_work_area;
         int32_t reserve_monitor_work_area;

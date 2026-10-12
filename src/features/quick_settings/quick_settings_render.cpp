@@ -1,4 +1,5 @@
 #include "reach/features/quick_settings.h"
+#include "reach/features/common/popup.h"
 #include "reach/features/common/progress_bar_render.h"
 #include "reach/features/common/section_reveal.h"
 
@@ -57,19 +58,18 @@ reach_quick_settings_push_chevron_crossfade(reach_render_command_buffer *command
                : reach_quick_settings_retain_part(commands, first, id + 1, parent, progress);
 }
 
-static reach_result reach_quick_settings_declare_group(reach_render_command_buffer *commands,
-                                                       uint64_t id, uint64_t parent,
-                                                       reach_rect_f32 bounds, reach_rect_f32 clip,
-                                                       const reach_motion *y,
-                                                       const reach_motion *bottom,
-                                                       const reach_motion *opacity)
+static reach_result
+reach_quick_settings_declare_group(reach_render_command_buffer *commands, uint64_t id,
+                                   uint64_t parent, reach_rect_f32 bounds, reach_rect_f32 clip,
+                                   const reach_motion *y, const reach_motion *bottom,
+                                   const reach_motion *opacity, bool clipped = true)
 {
     reach_render_group group = {};
     group.id = id;
     group.parent_id = parent;
     group.bounds = bounds;
     group.bounds.height = fmaxf(1.0f, bounds.height);
-    group.has_clip = 1;
+    group.has_clip = clipped ? 1 : 0;
     group.clip = clip;
     if (y != nullptr)
         group.y = *y;
@@ -670,6 +670,30 @@ reach_quick_settings_build_render_commands(const reach_quick_settings_render_inp
     reach_quick_settings_metrics metrics = reach_quick_settings_metrics_for_scale(input->dpi_scale);
     reach_rect_f32 viewport =
         input->viewport.width > 0 ? input->viewport : input->layout.content_bounds;
+    reach_rect_f32 body_bounds = input->render_bounds.width > 0 ? input->render_bounds : viewport;
+    const reach_motion *body_y =
+        input->surface_motion.height.generation != 0 ? &input->surface_motion.y : nullptr;
+    if (reach_quick_settings_declare_group(commands, 7, 0, body_bounds, body_bounds, body_y,
+                                           nullptr, nullptr, false) != REACH_OK)
+        return REACH_ERROR;
+    if (input->has_background)
+    {
+        reach_popup_background_input background = {};
+        background.theme = &input->theme;
+        background.bounds = body_bounds;
+        background.notch_center_x = input->notch_center_x;
+        background.notch_side = input->notch_side;
+        background.dpi_scale = input->dpi_scale;
+        reach_result result = reach_popup_push_height_background(
+            &background, &input->surface_motion.height, 7, 1700, commands);
+        if (result != REACH_OK)
+            return result;
+    }
+    reach_motion viewport_bottom = {};
+    if (input->surface_motion.height.generation != 0)
+        viewport_bottom =
+            reach_motion_affine(&input->surface_motion.height, -1, body_bounds.height);
+    reach_motion scrolling = reach_motion_affine(&input->scroll_motion, -1, 0);
     reach_motion output_opacity = reach_section_reveal_opacity(&input->output_devices_expansion);
     reach_motion app_opacity = reach_section_reveal_opacity(&input->app_volumes_expansion);
     float reveal_offset = 4 * (input->dpi_scale > 0 ? input->dpi_scale : 1);
@@ -689,24 +713,26 @@ reach_quick_settings_build_render_commands(const reach_quick_settings_render_inp
     reach_motion app_bottom =
         reach_motion_affine(&input->app_volumes_expansion, -input->layout.app_volumes_panel.height,
                             input->layout.app_volumes_panel.height);
-    if (reach_quick_settings_declare_group(commands, 1, 0, viewport, viewport, nullptr, nullptr,
-                                           nullptr) != REACH_OK ||
-        reach_quick_settings_declare_group(commands, 2, 1, viewport, viewport, &following, nullptr,
-                                           nullptr) != REACH_OK ||
-        reach_quick_settings_declare_group(commands, 3, 1, input->layout.output_devices_panel,
+    if (reach_quick_settings_declare_group(commands, 1, 7, viewport, viewport, nullptr,
+                                           &viewport_bottom, nullptr) != REACH_OK ||
+        reach_quick_settings_declare_group(commands, 8, 1, viewport, viewport, &scrolling, nullptr,
+                                           nullptr, false) != REACH_OK ||
+        reach_quick_settings_declare_group(commands, 2, 8, viewport, viewport, &following, nullptr,
+                                           nullptr, false) != REACH_OK ||
+        reach_quick_settings_declare_group(commands, 3, 8, input->layout.output_devices_panel,
                                            input->layout.output_devices_panel, &output_y,
                                            &output_bottom, &output_opacity) != REACH_OK ||
         reach_quick_settings_declare_group(commands, 4, 2, input->layout.app_volumes_panel,
                                            input->layout.app_volumes_panel, &app_y, &app_bottom,
                                            &app_opacity) != REACH_OK)
         return REACH_ERROR;
-    if (reach_quick_settings_declare_group(commands, 6, 1, input->layout.output_devices_panel,
+    if (reach_quick_settings_declare_group(commands, 6, 8, input->layout.output_devices_panel,
                                            input->layout.output_devices_panel, nullptr,
                                            &output_bottom, nullptr) != REACH_OK)
         return REACH_ERROR;
     reach_render_group base = {};
     base.id = 5;
-    base.parent_id = 1;
+    base.parent_id = 8;
     if (reach_render_command_buffer_begin_group(commands, &base) != REACH_OK)
         return REACH_ERROR;
 
@@ -807,7 +833,7 @@ reach_quick_settings_build_render_commands(const reach_quick_settings_render_inp
     reach_render_command_buffer_end_group(commands);
     result = reach_quick_settings_push_chevron_crossfade(
         commands, input->layout.output_device_button_chevron, &input->output_devices_expansion,
-        input->theme.system_glyph, 1, 10);
+        input->theme.system_glyph, 8, 10);
     if (result != REACH_OK)
         return result;
 
@@ -935,11 +961,18 @@ reach_result reach_quick_settings_append_render_commands(
     reach_quick_settings_render_input input = {};
     input.theme = *theme;
     input.model = state->model;
-    reach_rect_f32 source_bounds = state->content_bounds;
-    source_bounds.y -= state->scroll_offset;
+    reach_rect_f32 source_bounds = reach_quick_settings_content_bounds_for(
+        {0, 0, state->render_bounds.width, state->render_bounds.height}, theme, dpi_scale,
+        state->drop_direction);
     input.layout = reach_quick_settings_layout_for_expansion_scaled(
         source_bounds, theme, &state->model, 0.0f, 1.0f, dpi_scale);
-    input.viewport = state->content_bounds;
+    input.viewport = source_bounds;
+    input.surface_motion = state->surface_motion;
+    input.scroll_motion = state->scroll_motion;
+    input.render_bounds = {0, 0, state->render_bounds.width, state->render_bounds.height};
+    input.has_background = 1;
+    input.notch_center_x = state->notch_anchor_x - state->render_bounds.x;
+    input.notch_side = reach_popup_notch_side(state->drop_direction);
     input.dpi_scale = dpi_scale;
     input.text_measure = text_measure != nullptr ? *text_measure : reach_text_measure_port{};
     input.output_devices_expansion = state->output_devices_expansion;

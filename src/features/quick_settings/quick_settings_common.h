@@ -41,10 +41,9 @@ extern "C"
     reach_quick_settings_state *
     reach_quick_settings_state_mut(reach_quick_settings *quick_settings);
     void reach_quick_settings_reset(reach_quick_settings *quick_settings);
-    void reach_quick_settings_tick(reach_quick_settings *quick_settings, double delta_seconds);
-    void reach_quick_settings_start_height_animation(reach_quick_settings *quick_settings,
-                                                     float from_height, float to_height);
-    float reach_quick_settings_height_animation_value(const reach_quick_settings *quick_settings);
+    reach_rect_f32 reach_quick_settings_content_bounds_for(reach_rect_f32 surface_bounds,
+                                                           const reach_theme *theme,
+                                                           float dpi_scale, int32_t direction);
     uint64_t reach_quick_settings_press_feedback_target(const reach_quick_settings *quick_settings);
     reach_motion
     reach_quick_settings_press_feedback_motion(const reach_quick_settings *quick_settings);

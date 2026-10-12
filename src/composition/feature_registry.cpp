@@ -497,12 +497,6 @@ static void reach_feature_notify_system_hud(void *capsule,
     out->request_update = 1;
 }
 
-static int32_t reach_feature_quick_settings_blocks_position_frame(const void *capsule)
-{
-    return reach_quick_settings_height_animation_active(
-        static_cast<const reach_quick_settings *>(capsule));
-}
-
 static size_t reach_feature_quick_settings_take_retired(void *capsule,
                                                         reach_feature_render_resource *out,
                                                         size_t cap)
@@ -684,7 +678,7 @@ static const reach_feature_control_ops reach_tray_control_ops = {
     reach_feature_control_tray_open, nullptr, nullptr, nullptr, &reach_tray_resource_ops};
 static const reach_feature_control_ops reach_quick_settings_control_ops = {
     reach_feature_control_quick_settings_open, nullptr, reach_feature_notify_quick_settings,
-    reach_feature_quick_settings_blocks_position_frame, &reach_quick_settings_resource_ops};
+    nullptr, &reach_quick_settings_resource_ops};
 static const reach_feature_control_ops reach_battery_control_ops = {
     reach_feature_control_battery_open, nullptr, nullptr, nullptr, nullptr};
 static const reach_feature_control_ops reach_system_hud_control_ops = {
@@ -872,7 +866,7 @@ static void reach_host_init_feature_definitions(reach_host *host)
     definitions[REACH_SURFACE_ID_QUICK_SETTINGS].surface.opening_origin = REACH_SURFACE_ID_TOP_BAR;
     definitions[REACH_SURFACE_ID_QUICK_SETTINGS].layout.anchor_slot =
         REACH_TOP_BAR_CONTROL_QUICK_SETTINGS;
-    definitions[REACH_SURFACE_ID_QUICK_SETTINGS].surface.popup_chrome = 1;
+    definitions[REACH_SURFACE_ID_QUICK_SETTINGS].surface.popup_chrome = 0;
     definitions[REACH_SURFACE_ID_BATTERY].layout.anchor = REACH_SURFACE_ID_TOP_BAR;
     definitions[REACH_SURFACE_ID_BATTERY].surface.opening_origin = REACH_SURFACE_ID_TOP_BAR;
     definitions[REACH_SURFACE_ID_BATTERY].layout.anchor_slot = REACH_TOP_BAR_CONTROL_BATTERY;
@@ -1363,9 +1357,7 @@ static int32_t reach_quick_settings_surface_arrange(void *capsule,
     layout.bar_edge_y = ctx->anchor_bar_edge_y;
     layout.drop_direction = ctx->anchor_direction;
     reach_quick_settings_refresh_layout(quick_settings, &layout);
-    int32_t animation_changed = reach_quick_settings_update_open_animation(quick_settings, &layout);
-    return animation_changed ||
-           !reach_rect_equal(before, reach_quick_settings_state_ptr(quick_settings)->bounds);
+    return !reach_rect_equal(before, reach_quick_settings_state_ptr(quick_settings)->bounds);
 }
 
 static reach_result reach_quick_settings_surface_render(void *capsule,

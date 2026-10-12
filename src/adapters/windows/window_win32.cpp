@@ -203,9 +203,9 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
             float point_y = (float)point.y;
             const reach_platform_window_input_presentation *presentation =
                 &window->input_presentation;
+            double now_seconds = reach_motion_now_seconds();
             if (presentation->bounds.width > 0.0f)
             {
-                double now_seconds = reach_motion_now_seconds();
                 float scale_x = presentation->scale.generation
                                     ? reach_motion_value_at(&presentation->scale, now_seconds)
                                     : 1.0f;
@@ -222,6 +222,15 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
                 point_y = center_y + (point_y - center_y -
                                       reach_motion_value_at(&presentation->y, now_seconds)) /
                                          scale_y;
+            }
+            if (presentation->has_motion_bounds)
+            {
+                reach_rect_f32 bounds =
+                    reach_rect_motion_value_at(&presentation->motion_bounds, now_seconds);
+                return bounds.width > 0 && bounds.height > 0 &&
+                               reach_platform_window_rect_contains(bounds, point_x, point_y)
+                           ? HTCLIENT
+                           : HTTRANSPARENT;
             }
             for (size_t index = 0; index < window->input_region_count; ++index)
             {

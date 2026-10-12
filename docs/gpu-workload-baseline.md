@@ -351,4 +351,31 @@ and strict. These checks validate this migration mechanism, not all product conf
 
 `qs-retained.png` and `qs-reference.png` are offscreen sampled images, not displayed WUC/DC captures.
 Live pixels, other themes/fonts, source/input churn, high refresh and total product cost remain in
-final acceptance. Complete popup height/scroll/monitor/native-input integration is still pending.
+final acceptance. Popup height/scroll/monitor/native-input integration now uses the same retained layout epoch.
+
+## Quick Settings popup height, scrolling and input
+
+The height scalar manager, track, tick/accessors, sampled render state and composition frame blocker
+are removed. Shared fixed-cap popup chrome, body placement, viewport clipping and scroll translation
+use the section layout epoch inside a stable session envelope. Input sampling and native hit regions
+consume the same neutral motion rectangle. Source-extent changes retarget scroll bounds during
+collapse even when the final popup height is unchanged; reopening clears stale scroll intent.
+
+`probe-qs-height-focused.log` verifies both compositors and HWND fallback at 100/125/150/200% DPI and
+both drop directions. Each positive-scroll collapse/reversal sequence has five render submissions:
+zero raster passes on WUC and DirectComposition, five ordinary draws on fallback. The same bounded
+run checks output-device source changes during collapse, reopening, compact monitors and DPI changes.
+Host event conversion and generic native input publication/reset are checked separately from the
+owned Win32 window's moving hit regions. New pure geometry checks compare popup motion with existing
+constrained placement, including out-of-monitor anchors and independent-axis projection. Debug build,
+all 39 tests and architecture checks pass (`build-height-review.log`, `test-height-review.log`).
+
+The shared popup chrome wrapper's GPU source readback compares ordinary retained patches against
+existing direct chrome at four DPI values, top/bottom notches and compact constant bodies. Maximum
+channel error is one for ordinary sizes and zero for compact static bodies. This is offscreen source
+composition, not displayed WUC/DC capture. Animated custom bodies below fixed-cap limits, broad live
+visual/resource acceptance and comparable total CPU/GPU/power/memory/latency measurements remain open.
+
+The final native suite (`probe-qs-height-final.log`) passes five full runs on each compositor plus
+HWND fallback with `diagnostic failures=0`, including the existing completion/failure, hierarchy,
+fixed-cap, bounded-motion and feedback diagnostics. No running Reach instance was terminated.

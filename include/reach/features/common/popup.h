@@ -2,6 +2,7 @@
 #define REACH_FEATURES_COMMON_POPUP_H
 
 #include "reach/core/render_commands.h"
+#include "reach/core/animated_rect.h"
 #include "reach/core/theme.h"
 #include "reach/features/common/presentation.h"
 
@@ -38,6 +39,9 @@ extern "C"
                                             float height, float margin);
     reach_rect_f32 reach_popup_constrain_bounds(reach_rect_f32 bounds, reach_rect_f32 monitor,
                                                 float margin);
+    reach_result reach_popup_height_motion(const reach_popup_anchor *anchor, float width,
+                                           const reach_motion *height, float margin,
+                                           reach_rect_motion *out_bounds);
 
     typedef struct reach_popup_background_input
     {
@@ -57,6 +61,10 @@ extern "C"
     float reach_popup_notch_height(void);
     float reach_popup_notch_height_scaled(float dpi_scale);
     float reach_popup_clamp_notch_center_scaled(float notch_center_x, float width, float dpi_scale);
+    reach_result reach_popup_push_height_background(const reach_popup_background_input *input,
+                                                    const reach_motion *height, uint64_t parent_id,
+                                                    uint64_t first_group_id,
+                                                    reach_render_command_buffer *out_commands);
     reach_result reach_popup_push_background(const reach_popup_background_input *input,
                                              reach_render_command_buffer *out_commands);
 
