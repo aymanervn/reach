@@ -265,6 +265,71 @@ runs and regression thresholds before comparing the migration. CPU/GPU totals in
 both relevant application processes. Pending prerequisites do not close the measurement checklist
 item; independent capability and implementation work can continue while they are resolved.
 
+## Read-only system workload capture
+
+`tools/measure_gpu_workload.py` uses the Python standard library and owned query handles on Windows.
+It samples explicitly selected existing PIDs for a bounded duration, writes a new JSONL file and
+closes its handles. It never launches, changes or terminates a measured process, changes performance
+policy or starts a trace session. Duplicate labels/PIDs and the collector's own PID are rejected.
+
+Select the current Reach and session DWM PIDs, then run:
+
+```powershell
+$reachProcessId = (Get-Process reach).Id
+$currentSessionId = (Get-Process -Id $PID).SessionId
+$dwmProcessId = (Get-Process dwm | Where-Object SessionId -eq $currentSessionId).Id
+python tools/measure_gpu_workload.py --process "reach:$reachProcessId" --process "dwm:$dwmProcessId" --scenario idle-capability --seconds 30 --interval 1 --output build/gpu-composition-migration/idle-capability.jsonl
+```
+
+Include Settings with another `--process settings:PID` when that workload is being measured.
+Use a new output path for each run. Supply `--revision` only when the running binaries' provenance
+is known; the default is `unknown`. Metadata records available binary paths/hashes, OS, CPU count,
+observer PID, collection settings, provider errors and unsupported latency measurement.
+
+Process CPU uses creation-identity-checked native CPU-time differences, normalized to all logical
+processors. Process V2 counters provide CPU and memory when direct process access is denied,
+including DWM on the verified machine. That fallback requires continuous counter identity/lifetime
+and preserves the original access error and data source. Missing or reset measurements stay
+unavailable; incomplete combined CPU totals are not reported as zero. Private bytes and working
+set remain separate. Selected raw PDH values and statuses are retained, using the
+[documented wildcard counter array API](https://learn.microsoft.com/en-us/windows/win32/api/pdh/nf-pdh-pdhgetformattedcounterarrayw).
+
+GPU utilization retains adapter/physical-engine identity and sums selected processes only within
+the same engine. The per-adapter summary selects the busiest engine; separate engines must not be
+added into one GPU percentage because they may operate concurrently or share underlying cores.
+See [Microsoft's GPU engine explanation](https://devblogs.microsoft.com/directx/gpus-in-the-task-manager/).
+System CPU and system GPU engines provide background-load context. GPU dedicated/shared memory
+counters are supplemental and require independent cross-checking: Microsoft documents
+[incorrect per-process GPU memory values on affected systems](https://learn.microsoft.com/en-us/troubleshoot/windows-client/performance/gpu-process-memory-counters-report-wrong-value).
+
+The collector verifies EMI version and picowatt-hour units before reading accumulated energy.
+Delta energy converts to joules with `3.6e-9`; delta time converts to seconds with `1e-7`.
+Package summaries retain separate package channels and never add overlapping core/package energy.
+See the [EMI contract](https://learn.microsoft.com/en-us/windows-hardware/drivers/powermeter/energy-meter-interface)
+and [measurement timestamp units](https://learn.microsoft.com/en-us/windows/win32/api/emi/ns-emi-emi_channel_measurement_data).
+Optional NVML board power converts milliwatts to watts; recent NVIDIA devices return a one-second
+average. See [NVML power usage](https://docs.nvidia.com/deploy/archive/R550/nvml-api/group__nvmlDeviceQueries.html).
+Package and board readings include the whole device's workload, not just Reach or DWM.
+
+Samples include actual intervals, collection-call duration and separate observer CPU cost. Missed
+sampling slots are skipped rather than collected in bursts. Summary statistics describe available
+samples, with counts exposing missing coverage; use raw intervals for time-weighted comparisons.
+Keep interval, providers and observer overhead comparable across repeated runs. Do not subtract
+observer CPU from package/board power or claim unmeasured wakeup, frame-latency or total allocation
+results from these counters.
+
+Verification on 2026-10-12: the ten-second `collector-verified-final.jsonl` capture attributes Reach
+through native process times and DWM through Process V2, includes both PIDs in GPU attribution,
+and reads system CPU, EMI package power and NVML board power without provider errors. Collection
+median was 8.04 ms, p95 48.77 ms, and observer CPU averaged 0.107% of machine capacity. Concurrent
+build/test activity makes this a capability capture, not an idle baseline or efficiency result.
+`collector-unavailable.jsonl` verifies explicit missing-process attribution; bounded CLI checks
+verify rejected duplicate/out-of-range PIDs and durations shorter than the requested interval.
+Five pure accounting tests and all 40 tests pass in isolated Debug and Release builds; architecture
+checks pass. Build/test logs end in `-collector.log` under `build/gpu-composition-migration`.
+Repeated controlled product scenarios, variation thresholds, latency and independent GPU-memory
+validation remain pending; the full baseline and acceptance checklist items stay open.
+
 ## Bounded reveal curve capability
 
 The shared `reach_motion_clamp` and `reach_motion_compile_at` preserve delayed fade/early saturation,
