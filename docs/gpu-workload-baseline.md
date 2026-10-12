@@ -73,6 +73,31 @@ whitespace checks pass.
 These results establish implementation, source appearance and scheduling; displayed compositor
 pixels, complete live interaction and repeated total CPU/GPU/power/memory comparisons remain pending.
 
+## Existing marquee audit
+
+The Now Playing title already uses one cached clipped source and native repetition, without a
+feature frame predicate or CPU phase advancement. Windows Composition uses its existing custom
+Bezier `(0.645, 0.045), (0.355, 1)`; DirectComposition uses its existing smoothstep cubics. Replacing
+both with the shared motion curve would change the Windows Composition path, so this audit preserves
+both established curves and leaves canonical curve/phase unification open.
+
+The producer previously scaled overflow with DPI but kept speed and the overflow threshold in
+physical pixels. It now scales all three together: a 52-logical-pixel overflow travels for two seconds
+at 100/125/150/200% DPI, with the original 1.6-second holds at each endpoint. A sub-one-logical-pixel
+overflow stays static at each scale. Diagnostic property submissions now also include native marquee
+starts/restarts, which the old helper omitted; old start counts are not directly comparable.
+
+Owned probes execute 80 cases per build: both backends, both themes, four DPI values and five runs.
+During holds there are no application renders. Ten unchanged submissions per case cause zero
+raster, property or tree updates; a title edit repaints once and records one native restart. Disabling
+retains the static source without repainting or motion demand. Font replacement and hide retire
+source ownership and native bindings; WUC controller queries verify binding lifetime. Evidence is
+`probe-marquee-{debug,release}.log`, `build-{debug,release}-marquee-audit.log` and
+`test-{debug,release}-marquee-audit.log` under `build/gpu-composition-migration`.
+Both builds, all 40 test groups, architecture, formatting and whitespace checks pass. These scoped
+checks establish the current lifecycle and DPI policy; live appearance, canonical unification and
+repeated total CPU/GPU/power/memory acceptance remain pending.
+
 ## Canonical scalar-manager timing
 
 Every finite scalar track now stores `reach_motion`; easing, event origin, generation and endpoints

@@ -215,6 +215,15 @@ support expectation is explicitly resolved.
     retained filtering differences stay at rounded caps and are bounded/inspected. Five full native
     runs per backend plus existing fallback checks pass in both builds. Displayed pixels, the tiny-bound
     CPU cost disposition and total product workload acceptance remain in the broader gates.
+  - [x] Audit existing Now Playing marquee setup, source reuse and repetition retirement.
+    Both native drivers already avoid animation-driven application frames. Fix logical speed and
+    overflow threshold scaling so travel duration stays consistent at 100/125/150/200% DPI; account
+    native starts/restarts in workload diagnostics. Eighty scoped native cases per build cover both
+    backends, two themes, five repetitions, unchanged submissions, title changes, static disable,
+    threshold crossing, font replacement and hiding. Existing deterministic checks and both builds
+    pass; all 40 tests pass in Debug/Release. Preserve the established WUC Bezier and DC smoothstep
+    curves. Canonical curve/phase unification, displayed appearance and total workload/power
+    acceptance remain open; this audit does not close the shared-motion or repetition gates.
   - [x] Replace frame-rate caret ticking with shared absolute-time deadline scheduling.
     Settings' Account/Power/Wi-Fi fields and Launcher use one pure blink model, preserving their
     duty cycles and immediate focus/edit resets. Late wakes skip missed cycles; hidden pages,

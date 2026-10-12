@@ -107,7 +107,7 @@ migrated, rather than only changing the track representation.
 | Dock released item `drag.snap` | Dock drag and render; Retained | Release submits finite snap; stable identity | Verify existing; stopped drag must cause no periodic frames. |
 | Tray neighbour movement `tray_x[]` | `top_bar_interaction.cpp`, `top_bar_render.cpp`; Retained | Drag/reorder submits finite movement | Verify existing, including width changes. |
 | Tray released icon `tray_drag.snap` | Same tray interaction/render; Retained | Release submits finite snap | Verify existing. |
-| Now Playing title marquee | `top_bar_now_playing.cpp`, `reach_render_group.repeat_offset_x`; Retained repetition | Content change submits bounded clipped title; hidden group retires | Verify existing repetition, setup, power and resource cost. |
+| Now Playing title marquee | `top_bar_now_playing.cpp`, `reach_render_group.repeat_offset_x`; Retained repetition | Content change submits one clipped title; unchanged source preserves the native loop; hide/disable/font changes retire it | Native audit complete in both builds/backends, themes and four DPI values. Logical speed/threshold now scale consistently; native starts are counted. Existing backend easing differs; canonical curve/phase unification, live appearance and power/product cost remain pending. |
 | Settings nav selector `nav_selection` | `settings_feature.cpp`, `settings_render.cpp`; Retained | Selection submits finite Y motion | Verify existing and finite fallback. |
 | Launcher `surface_y` | `launcher_state.cpp`; Retained | Open/close submission, events and completion | Verify existing. |
 | Launcher `surface_opacity` | Same; Retained | Open/close, final visibility reconciliation | Verify existing. |
