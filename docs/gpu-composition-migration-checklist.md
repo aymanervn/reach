@@ -195,6 +195,14 @@ support expectation is explicitly resolved.
     runs include that resolved path. Final product acceptance remains pending.
 - [ ] Migrate eligible loaders/repeating effects; select efficient compositor or deadline behavior for
   carets, preserve focus resets and marquee behavior, and stop hidden repetitions.
+  - [x] Add canonical periodic properties for retained transforms, opacity, clips and tint.
+    Shared motion adds independent endpoint holds, absolute phase, affine/clamped sampling and a
+    bounded rotated-cycle compiler. Both adapters use native repetition; unchanged intent does not
+    repaint or resubmit properties. Layer retirement, font replacement and suspension stop bindings;
+    root presentation rejects infinite motion. Pure sampling/compiler/crossing checks, both builds,
+    all 40 tests and focused native lifetime probes pass. Five full native runs per backend plus
+    existing fallback checks also pass in Debug/Release. Loader
+    consumer migration, existing marquee audit, displayed pixels and product acceptance remain open.
   - [x] Replace frame-rate caret ticking with shared absolute-time deadline scheduling.
     Settings' Account/Power/Wi-Fi fields and Launcher use one pure blink model, preserving their
     duty cycles and immediate focus/edit resets. Late wakes skip missed cycles; hidden pages,

@@ -127,6 +127,35 @@ reach_render_command_buffer_group(const reach_render_command_buffer *buffer, uin
     return 0;
 }
 
+static int32_t reach_render_repetition_valid(const reach_render_group *group, int32_t root)
+{
+    size_t index;
+    if (group->x.repeating && group->repeat_travel_seconds > 0)
+        return 0;
+    const reach_motion *motions[] = {&group->x,
+                                     &group->y,
+                                     &group->opacity,
+                                     &group->scale,
+                                     &group->scale_y,
+                                     &group->clip_insets[0],
+                                     &group->clip_insets[1],
+                                     &group->clip_insets[2],
+                                     &group->clip_insets[3],
+                                     &group->tint[0],
+                                     &group->tint[1],
+                                     &group->tint[2],
+                                     &group->tint[3]};
+    for (index = 0; index < sizeof(motions) / sizeof(motions[0]); ++index)
+    {
+        const reach_motion *motion = motions[index];
+        if (motion->repeating && (root || motion->repeating != 1 || motion->generation == 0 ||
+                                  !isfinite(motion->started_seconds) || !isfinite(motion->from) ||
+                                  !isfinite(motion->to) || reach_motion_cycle_seconds(motion) <= 0))
+            return 0;
+    }
+    return 1;
+}
+
 reach_result reach_render_command_buffer_validate_groups(const reach_render_command_buffer *buffer)
 {
     size_t index, other, active_count = 0;
@@ -136,12 +165,14 @@ reach_result reach_render_command_buffer_validate_groups(const reach_render_comm
     int32_t descendants_drawn[REACH_MAX_RENDER_GROUPS] = {0};
     if (buffer == 0 || buffer->group_count > REACH_MAX_RENDER_GROUPS ||
         buffer->count > REACH_MAX_RENDER_COMMANDS ||
-        (buffer->has_presentation && buffer->presentation.parent_id != 0))
+        (buffer->has_presentation && (buffer->presentation.parent_id != 0 ||
+                                      !reach_render_repetition_valid(&buffer->presentation, 1))))
         return REACH_INVALID_ARGUMENT;
     for (index = 0; index < buffer->group_count; ++index)
     {
         const reach_render_group *group = &buffer->groups[index];
-        if (group->id == 0 || (group->id & UINT64_C(0x8000000000000000)) != 0)
+        if (group->id == 0 || (group->id & UINT64_C(0x8000000000000000)) != 0 ||
+            !reach_render_repetition_valid(group, 0))
             return REACH_INVALID_ARGUMENT;
         for (other = 0; other < index; ++other)
             if (buffer->groups[other].id == group->id)
@@ -324,7 +355,7 @@ reach_result reach_render_command_buffer_check_group(const reach_render_command_
                                                      const reach_render_group *group)
 {
     size_t index;
-    if (buffer == 0 || group == 0 || group->id == 0 ||
+    if (buffer == 0 || group == 0 || group->id == 0 || !reach_render_repetition_valid(group, 0) ||
         (group->id & UINT64_C(0x8000000000000000)) != 0 ||
         buffer->group_count >= REACH_MAX_RENDER_GROUPS || buffer->current_group_id != 0)
     {

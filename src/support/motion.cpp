@@ -15,7 +15,10 @@ int32_t reach_motion_equal(const reach_motion *first, const reach_motion *second
            first->to == second->to && first->started_seconds == second->started_seconds &&
            first->duration_seconds == second->duration_seconds && first->easing == second->easing &&
            first->generation == second->generation && first->has_limits == second->has_limits &&
-           first->minimum == second->minimum && first->maximum == second->maximum;
+           first->minimum == second->minimum && first->maximum == second->maximum &&
+           first->repeating == second->repeating &&
+           first->hold_start_seconds == second->hold_start_seconds &&
+           first->hold_end_seconds == second->hold_end_seconds;
 }
 
 void reach_motion_set(reach_motion *motion, float value)
@@ -201,11 +204,132 @@ size_t reach_motion_compile_at(const reach_motion *motion, double now_seconds,
     return count;
 }
 
+void reach_motion_repeat_at(reach_motion *motion, float from, float to, double travel_seconds,
+                            double hold_start_seconds, double hold_end_seconds, reach_easing easing,
+                            double now_seconds)
+{
+    if (motion == nullptr)
+        return;
+    double cycle = travel_seconds * 2 + hold_start_seconds + hold_end_seconds;
+    if (!isfinite(travel_seconds) || travel_seconds <= 0 || !isfinite(hold_start_seconds) ||
+        hold_start_seconds < 0 || !isfinite(hold_end_seconds) || hold_end_seconds < 0 ||
+        !isfinite(cycle))
+    {
+        reach_motion_set(motion, to);
+        return;
+    }
+    reach_motion_start_at(motion, from, to, travel_seconds, easing, now_seconds);
+    motion->repeating = 1;
+    motion->hold_start_seconds = hold_start_seconds;
+    motion->hold_end_seconds = hold_end_seconds;
+}
+
+double reach_motion_cycle_seconds(const reach_motion *motion)
+{
+    if (motion == nullptr || !motion->repeating || !isfinite(motion->duration_seconds) ||
+        motion->duration_seconds <= 0 || !isfinite(motion->hold_start_seconds) ||
+        motion->hold_start_seconds < 0 || !isfinite(motion->hold_end_seconds) ||
+        motion->hold_end_seconds < 0)
+        return 0;
+    double cycle =
+        motion->duration_seconds * 2 + motion->hold_start_seconds + motion->hold_end_seconds;
+    return isfinite(cycle) ? cycle : 0;
+}
+
+size_t
+reach_motion_compile_repeat_at(const reach_motion *motion, double now_seconds,
+                               reach_motion_segment segments[REACH_MOTION_MAX_REPEAT_SEGMENTS])
+{
+    double cycle = reach_motion_cycle_seconds(motion);
+    if (cycle <= 0 || segments == nullptr || !isfinite(now_seconds) ||
+        !isfinite(motion->started_seconds) || !isfinite(motion->from) || !isfinite(motion->to) ||
+        reach_motion_limit(motion, motion->from) == reach_motion_limit(motion, motion->to))
+        return 0;
+    double phase = fmod(fmax(0.0, now_seconds - motion->started_seconds), cycle);
+    double end = phase + cycle;
+    if (!isfinite(end))
+        return 0;
+    size_t count = 0;
+    for (int iteration = 0; iteration < 2; ++iteration)
+    {
+        double base = iteration * cycle;
+        double points[] = {base, base + motion->hold_start_seconds,
+                           base + motion->hold_start_seconds + motion->duration_seconds,
+                           base + motion->hold_start_seconds + motion->duration_seconds +
+                               motion->hold_end_seconds,
+                           base + cycle};
+        for (size_t interval = 0; interval < 4; ++interval)
+        {
+            double left = fmax(phase, points[interval]);
+            double right = fmin(end, points[interval + 1]);
+            if (left >= right)
+                continue;
+            if (interval == 0 || interval == 2)
+            {
+                if (count == REACH_MOTION_MAX_REPEAT_SEGMENTS)
+                    return 0;
+                float value = reach_motion_limit(motion, interval == 0 ? motion->from : motion->to);
+                segments[count++] = {left - phase, right - phase, value, value, 0, 0, 0};
+                continue;
+            }
+            reach_motion leg = *motion;
+            leg.repeating = 0;
+            leg.started_seconds = points[interval];
+            if (interval == 3)
+            {
+                leg.from = motion->to;
+                leg.to = motion->from;
+            }
+            reach_motion_segment pieces[REACH_MOTION_MAX_SEGMENTS] = {};
+            size_t piece_count = reach_motion_compile_at(&leg, left, pieces);
+            for (size_t index = 0; index < piece_count; ++index)
+            {
+                reach_motion_segment piece = pieces[index];
+                double piece_left = left + piece.start;
+                double piece_right = fmin(right, left + piece.end);
+                if (piece_left >= piece_right)
+                    continue;
+                if (count == REACH_MOTION_MAX_REPEAT_SEGMENTS)
+                    return 0;
+                piece.start = piece_left - phase;
+                piece.end = piece_right - phase;
+                piece.end_value = reach_motion_value_at(&leg, piece_right);
+                segments[count++] = piece;
+            }
+        }
+    }
+    return count;
+}
+
 float reach_motion_value_at(const reach_motion *motion, double now_seconds)
 {
     if (motion == nullptr)
     {
         return 0.0f;
+    }
+    if (motion->repeating)
+    {
+        double cycle = reach_motion_cycle_seconds(motion);
+        if (cycle <= 0 || now_seconds <= motion->started_seconds)
+            return reach_motion_limit(motion, motion->from);
+        double phase = fmod(now_seconds - motion->started_seconds, cycle);
+        if (phase <= motion->hold_start_seconds)
+            return reach_motion_limit(motion, motion->from);
+        phase -= motion->hold_start_seconds;
+        if (phase <= motion->duration_seconds)
+            return reach_motion_limit(
+                motion,
+                motion->from + (motion->to - motion->from) *
+                                   reach_easing_apply((float)(phase / motion->duration_seconds),
+                                                      motion->easing));
+        phase -= motion->duration_seconds;
+        if (phase <= motion->hold_end_seconds)
+            return reach_motion_limit(motion, motion->to);
+        phase -= motion->hold_end_seconds;
+        return reach_motion_limit(
+            motion, motion->to + (motion->from - motion->to) *
+                                     reach_easing_apply((float)(phase / motion->duration_seconds),
+                                                        motion->easing));
     }
     if (motion->duration_seconds <= 0.0 || now_seconds >= reach_motion_deadline(motion))
     {
@@ -231,6 +355,9 @@ int32_t reach_motion_active(const reach_motion *motion)
 
 int32_t reach_motion_active_at(const reach_motion *motion, double now_seconds)
 {
+    if (motion != nullptr && motion->repeating)
+        return reach_motion_cycle_seconds(motion) > 0 &&
+               reach_motion_limit(motion, motion->from) != reach_motion_limit(motion, motion->to);
     return motion != nullptr && motion->duration_seconds > 0.0 &&
            now_seconds < reach_motion_deadline(motion);
 }
@@ -240,6 +367,32 @@ double reach_motion_time_to_value_at(const reach_motion *motion, float target_va
 {
     if (!reach_motion_active_at(motion, now_seconds) || motion->from == motion->to)
         return 0.0;
+    if (motion->repeating)
+    {
+        float current = reach_motion_value_at(motion, now_seconds);
+        if (current == target_value)
+            return 0;
+        float low =
+            fminf(reach_motion_limit(motion, motion->from), reach_motion_limit(motion, motion->to));
+        float high =
+            fmaxf(reach_motion_limit(motion, motion->from), reach_motion_limit(motion, motion->to));
+        if (target_value < low || target_value > high)
+            return INFINITY;
+        double cycle = reach_motion_cycle_seconds(motion);
+        double phase = fmod(fmax(0.0, now_seconds - motion->started_seconds), cycle);
+        double progress = ((double)target_value - motion->from) / (motion->to - motion->from);
+        double forward =
+            motion->hold_start_seconds +
+            reach_motion_crossing_progress(progress, motion->easing) * motion->duration_seconds;
+        double backward =
+            motion->hold_start_seconds + motion->duration_seconds + motion->hold_end_seconds +
+            reach_motion_crossing_progress(1 - progress, motion->easing) * motion->duration_seconds;
+        if (forward < phase)
+            forward += cycle;
+        if (backward < phase)
+            backward += cycle;
+        return fmax(0.0, motion->started_seconds - now_seconds) + fmin(forward, backward) - phase;
+    }
     float current = reach_motion_value_at(motion, now_seconds);
     float endpoint = reach_motion_limit(motion, motion->to);
     if (motion->to > motion->from ? target_value <= current : target_value >= current)
@@ -269,7 +422,7 @@ double reach_motion_time_to_value_at(const reach_motion *motion, float target_va
 
 double reach_motion_deadline(const reach_motion *motion)
 {
-    return motion != nullptr && motion->duration_seconds > 0.0
+    return motion != nullptr && !motion->repeating && motion->duration_seconds > 0.0
                ? motion->started_seconds + motion->duration_seconds
                : 0.0;
 }

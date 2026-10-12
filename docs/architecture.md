@@ -426,6 +426,15 @@ scroll and native choreography timing remain separate migration responsibilities
 Switcher width and Clipboard hover preserve pre-sample activity when deciding redraw, so a late
 wake still publishes the terminal visual state after sampling clears their active flags.
 
+Finite and periodic properties share `reach_motion`. Periodic intent adds forward/backward travel
+with independent endpoint holds and an absolute epoch. CPU sampling, affine mapping and bounded
+compilation preserve phase; the compiler rotates one complete cycle to the submission time.
+Both compositors repeat the resulting keyframes/cubics without application ticks. Root presentation
+remains finite so completion ownership is well-defined. Retiring or replacing retained sources stops
+periodic transform, opacity, clip and tint bindings before releasing the layer; font replacement
+uses the same cleanup. Existing marquee descriptors retain their previous backend behavior pending
+their separate audit. Loader consumers and final workload acceptance remain migration work.
+
 Retained render groups carry stable identities, local content bounds, clips, and independent X/Y,
 opacity, and scale motion. Scale remains uniform by default; an explicit `scale_y` motion overrides
 the inherited vertical scale. Both compositors, fallback, root completion, native preview projection,

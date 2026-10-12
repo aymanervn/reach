@@ -23,11 +23,15 @@ extern "C"
         int32_t has_limits;
         float minimum;
         float maximum;
+        int32_t repeating;
+        double hold_start_seconds;
+        double hold_end_seconds;
     } reach_motion;
 
     enum
     {
-        REACH_MOTION_MAX_SEGMENTS = 4
+        REACH_MOTION_MAX_SEGMENTS = 4,
+        REACH_MOTION_MAX_REPEAT_SEGMENTS = 16
     };
 
     typedef struct reach_motion_segment
@@ -48,6 +52,10 @@ extern "C"
                             reach_easing easing);
     void reach_motion_start_at(reach_motion *motion, float from, float to, double duration_seconds,
                                reach_easing easing, double now_seconds);
+    void reach_motion_repeat_at(reach_motion *motion, float from, float to, double travel_seconds,
+                                double hold_start_seconds, double hold_end_seconds,
+                                reach_easing easing, double now_seconds);
+    double reach_motion_cycle_seconds(const reach_motion *motion);
     void reach_motion_animate_to(reach_motion *motion, float to, double duration_seconds,
                                  reach_easing easing);
     void reach_motion_animate_to_at(reach_motion *motion, float to, double duration_seconds,
@@ -56,6 +64,9 @@ extern "C"
     reach_motion reach_motion_clamp(const reach_motion *motion, float minimum, float maximum);
     size_t reach_motion_compile_at(const reach_motion *motion, double now_seconds,
                                    reach_motion_segment segments[REACH_MOTION_MAX_SEGMENTS]);
+    size_t
+    reach_motion_compile_repeat_at(const reach_motion *motion, double now_seconds,
+                                   reach_motion_segment segments[REACH_MOTION_MAX_REPEAT_SEGMENTS]);
     float reach_motion_value_at(const reach_motion *motion, double now_seconds);
     float reach_motion_value(const reach_motion *motion);
     int32_t reach_motion_active(const reach_motion *motion);

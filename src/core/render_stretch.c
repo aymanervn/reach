@@ -45,9 +45,10 @@ static int32_t reach_render_stretch_axis_valid(float size, float near_inset, flo
            isfinite(motion->to) &&
            (!motion->has_limits || (isfinite(motion->minimum) && isfinite(motion->maximum) &&
                                     motion->minimum <= motion->maximum)) &&
-           fminf(reach_motion_value_at(motion, motion->started_seconds),
-                 reach_motion_value_at(motion, reach_motion_deadline(motion))) >
-               near_inset + far_inset &&
+           fminf(motion->has_limits ? fminf(motion->maximum, fmaxf(motion->minimum, motion->from))
+                                    : motion->from,
+                 motion->has_limits ? fminf(motion->maximum, fmaxf(motion->minimum, motion->to))
+                                    : motion->to) > near_inset + far_inset &&
            isfinite(anchor) && anchor >= 0.0f && anchor <= 1.0f;
 }
 
