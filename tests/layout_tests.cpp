@@ -364,6 +364,30 @@ static void test_retained_tint_samples_one_timeline(void)
     expect_near(sample.g, 0.9f - 0.4f * value, 0.001f, "tint green supports descending values");
     expect_near(sample.b, 0.3f, 0.001f, "constant tint channel remains stable");
     expect_near(sample.a, 1.0f - 0.5f * value, 0.001f, "tint preserves its alpha timeline");
+    group.tint_rgb_target = {0.95f, 0.15f, 0.6f, 0};
+    reach_motion weight = reach_motion_affine(&progress, 0.4f, 0);
+    group.tint_rgb_mix = reach_motion_clamp(&weight, 0, 1);
+    reach_color mixed = reach_render_group_tint_at(&group, 11.0);
+    expect_near(mixed.r, sample.r + (0.95f - sample.r) * value * 0.4f, 0.001f,
+                "nested tint preserves the product of canonical motions");
+    expect_near(mixed.g, sample.g + (0.15f - sample.g) * value * 0.4f, 0.001f,
+                "nested tint blends descending channels without altering coverage");
+    expect_near(mixed.a, sample.a, 0.001f, "RGB mixing preserves the independent alpha timeline");
+    expect_near(reach_render_group_tint_at(&group, 20.0).r, 0.86f, 0.001f,
+                "late RGB mix sampling uses both final endpoints");
+    group.id = 1;
+    group.bounds = {0, 0, 100, 50};
+    auto buffer = std::make_unique<reach_render_command_buffer>();
+    reach_render_command_buffer_clear(buffer.get());
+    expect_true(reach_render_command_buffer_begin_group(buffer.get(), &group) == REACH_OK,
+                "normalized RGB mix intent is accepted before native mutation");
+    reach_render_command_buffer_end_group(buffer.get());
+    reach_render_command_buffer_clear(buffer.get());
+    group.tint_rgb_mix.maximum = 2;
+    expect_true(reach_render_command_buffer_begin_group(buffer.get(), &group) ==
+                    REACH_INVALID_ARGUMENT,
+                "out-of-range RGB mixing is rejected before native mutation");
+    group.tint_rgb_mix.maximum = 1;
     group.has_tint = 0;
     expect_near(reach_render_group_tint_at(&group, 11.0).a, 1.0f, 0.001f,
                 "disabled tint does not change content");
@@ -707,6 +731,12 @@ static void test_group_equality_preserves_intent_without_padding(void)
     second.has_tint = 1;
     reach_motion_set(&second.tint[REACH_RENDER_COLOR_RED], 0.4f);
     expect_true(!reach_render_group_equal(&first, &second), "tint intent remains distinct");
+    second = first;
+    second.tint_rgb_target.r = 0.5f;
+    expect_true(!reach_render_group_equal(&first, &second), "RGB mix target remains distinct");
+    second = first;
+    reach_motion_set(&second.tint_rgb_mix, 0.5f);
+    expect_true(!reach_render_group_equal(&first, &second), "RGB mix intent remains distinct");
     second = first;
     second.repeat_travel_seconds = 2;
     expect_true(!reach_render_group_equal(&first, &second), "repeat intent remains distinct");

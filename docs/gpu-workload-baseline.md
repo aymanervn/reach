@@ -2,6 +2,43 @@
 
 Status: counters verified; full product performance baseline and acceptance pending.
 
+## Clipboard retained hover and nested RGB tint
+
+Clipboard publishes canonical item hover with stable item-keyed source ids. Shared bordered feedback
+uses the existing pixel-aligned opaque outer/inner fills. An optional canonical RGB mixing weight
+blends the base animated tint with a fixed target while preserving coverage alpha: WUC evaluates
+this in its existing color-brush expression, and DC chains a second color matrix. Close background
+and glyph sources use retained opacity. The twenty hover scalar tracks, value getter, sampled colors,
+hover tick redraw and hover-only frame demand are removed. Size and scrolling are still pending.
+
+Both isolated builds and all 40 tests pass (`build-debug-clipboard-feedback.log`,
+`build-release-clipboard-feedback.log`, `test-debug-clipboard-feedback.log`,
+`test-release-clipboard-feedback.log`). Existing pure retained-intent tests cover the nested RGB
+product, unchanged alpha, final endpoints, normalized blend preflight and semantic equality.
+Owned capsule probes verify terminal hover needs no content redraw in both builds
+(`probe-clipboard-feedback-capsule-debug.log`, `probe-clipboard-feedback-capsule-release.log`).
+
+Scoped native probes exercise the actual Clipboard command producer, hover enter/leave/reversal,
+unchanged active/settled submissions, item removal and source retirement on WUC and DC. Hover and
+reversal have zero raster passes; unchanged settled submissions have zero raster, property and tree
+updates. A native hold advances without renderer executions and hover alone requests no capsule
+frames. Periodic mixed-tint probes also verify unchanged submission reuse and font/hide binding
+retirement. Item removal preserves surviving source ids; membership changes retire outgoing sources and
+fade surviving hover from its current canonical value. These are bounded owned surfaces, not a full
+Reach workload measurement.
+
+Offscreen comparisons cover two themes, 100/125/150/200% DPI, fractional input placement and five
+hover values. Direct fallback matches the former color/geometry formula exactly. Reconstructed
+cached coverage with the actual two-matrix blend differs by at most two channel values, preserving
+the existing tolerance. The rounded layered experiment was removed because it altered coverage;
+no rendering tolerance was increased. Logs are `probe-clipboard-feedback-native-debug.log` and
+`probe-clipboard-feedback-native-release.log`.
+
+Five full native runs per backend plus existing HWND fallback checks pass in both builds
+(`probe-clipboard-feedback-full-debug.log`, `probe-clipboard-feedback-full-release.log`). Architecture,
+formatting and whitespace checks pass. The existing Reach process remains running. Displayed native
+pixels, source memory comparison and repeated total CPU/GPU/power/latency acceptance remain open.
+
 ## Dock preview reflow and native body intent
 
 Horizontal card reflow now publishes canonical progress and a clamped translation for each stable

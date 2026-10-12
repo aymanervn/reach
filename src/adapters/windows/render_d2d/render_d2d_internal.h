@@ -112,6 +112,7 @@ struct reach_d2d_retained_layer
     ComPtr<IDCompositionScaleTransform> dcomp_scale;
     ComPtr<IDCompositionRectangleClip> dcomp_clip;
     ComPtr<IDCompositionColorMatrixEffect> dcomp_tint;
+    ComPtr<IDCompositionColorMatrixEffect> dcomp_tint_mix;
     UINT width = 0;
     UINT height = 0;
     bool initialized = false;

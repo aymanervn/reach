@@ -1,5 +1,6 @@
 #include "reach/features/clipboard.h"
 #include "reach/features/common/presentation.h"
+#include "reach/support/animation.h"
 
 #include "clipboard_common.h"
 #include "clipboard_metrics.h"
@@ -259,9 +260,7 @@ reach_clipboard_hit_result reach_clipboard_hit_test(const reach_clipboard_model 
 
 enum
 {
-    REACH_CLIPBOARD_ANIMATION_HOVER_BASE = 0,
-    REACH_CLIPBOARD_ANIMATION_HEIGHT = REACH_CLIPBOARD_ANIMATION_HOVER_BASE +
-        REACH_CLIPBOARD_MAX_ITEMS,
+    REACH_CLIPBOARD_ANIMATION_HEIGHT = 0,
     REACH_CLIPBOARD_ANIMATION_ITEM_WIDTH,
     REACH_CLIPBOARD_ANIMATION_COUNT
 };
@@ -270,6 +269,10 @@ struct reach_clipboard_feature
 {
     reach_animation_manager animations;
     reach_animation_track animation_tracks[REACH_CLIPBOARD_ANIMATION_COUNT];
+    reach_motion hover[REACH_CLIPBOARD_MAX_ITEMS];
+    uint64_t hover_item_ids[REACH_CLIPBOARD_MAX_ITEMS];
+    uint64_t hover_group_ids[REACH_CLIPBOARD_MAX_ITEMS];
+    uint64_t next_hover_group_id;
     reach_feature_transition surface_transition;
     reach_clipboard_state state;
     std::atomic<int32_t> refresh_requested;
@@ -337,6 +340,8 @@ void reach_clipboard_feature_reset(reach_clipboard_feature *clipboard)
         clipboard->state.press_identity = 0;
         reach_clipboard_model_init(&clipboard->state.model);
         reach_feature_transition_reset(&clipboard->surface_transition);
+        for (auto &hover : clipboard->hover)
+            reach_motion_set(&hover, 0);
     }
 }
 
@@ -398,7 +403,6 @@ static void reach_clipboard_capsule_tick(void *capsule, double delta_seconds,
     }
     int32_t transition_changed =
         reach_feature_transition_tick(&clipboard->surface_transition, delta_seconds);
-    int32_t hover_was_active = reach_clipboard_feature_any_hover_active(clipboard);
     reach_clipboard_feature_sample_at(clipboard, reach_motion_now_seconds());
     reach_clipboard_feature_capture(clipboard, out);
     if (out != nullptr && transition_changed)
@@ -411,10 +415,6 @@ static void reach_clipboard_capsule_tick(void *capsule, double delta_seconds,
         out->redraw = 1;
         out->relayout = 1;
         out->request_update = 1;
-    }
-    if (out != nullptr && (hover_was_active || reach_clipboard_feature_any_hover_active(clipboard)))
-    {
-        out->redraw = 1;
     }
 }
 
@@ -666,11 +666,6 @@ int32_t reach_clipboard_feature_take_refresh(reach_clipboard_feature *clipboard)
     return clipboard != nullptr ? clipboard->refresh_requested.exchange(0) : 0;
 }
 
-static size_t reach_clipboard_feature_hover_track(size_t index)
-{
-    return REACH_CLIPBOARD_ANIMATION_HOVER_BASE + index;
-}
-
 static size_t reach_clipboard_feature_layout_track(reach_clipboard_layout_track track)
 {
     return track == REACH_CLIPBOARD_LAYOUT_ITEM_WIDTH ? (size_t)REACH_CLIPBOARD_ANIMATION_ITEM_WIDTH
@@ -697,6 +692,14 @@ reach_result reach_clipboard_feature_create(reach_clipboard_feature **out_clipbo
     clipboard->port = {};
     clipboard->retired_count = 0;
     reach_clipboard_model_init(&clipboard->state.model);
+    for (auto &hover : clipboard->hover)
+        reach_motion_set(&hover, 0);
+    clipboard->next_hover_group_id = UINT64_C(0x7000000000000000);
+    for (size_t index = 0; index < REACH_CLIPBOARD_MAX_ITEMS; ++index)
+    {
+        clipboard->hover_item_ids[index] = 0;
+        clipboard->hover_group_ids[index] = 0;
+    }
     *out_clipboard = clipboard;
     return REACH_OK;
 }
@@ -800,67 +803,84 @@ void reach_clipboard_feature_sample_at(reach_clipboard_feature *clipboard, doubl
     reach_animation_manager_sample_at(&clipboard->animations, now_seconds);
 }
 
+static void reach_clipboard_feature_sync_hover(reach_clipboard_feature *clipboard)
+{
+    const auto &model = clipboard->state.model;
+    bool changed = false;
+    for (size_t index = 0; index < REACH_CLIPBOARD_MAX_ITEMS; ++index)
+        changed = changed || clipboard->hover_item_ids[index] !=
+                                 (index < model.count ? model.items[index].id : 0);
+    if (!changed)
+        return;
+    reach_motion previous[REACH_CLIPBOARD_MAX_ITEMS];
+    uint64_t previous_ids[REACH_CLIPBOARD_MAX_ITEMS];
+    uint64_t previous_groups[REACH_CLIPBOARD_MAX_ITEMS];
+    for (size_t index = 0; index < REACH_CLIPBOARD_MAX_ITEMS; ++index)
+    {
+        previous[index] = clipboard->hover[index];
+        previous_ids[index] = clipboard->hover_item_ids[index];
+        previous_groups[index] = clipboard->hover_group_ids[index];
+    }
+    double now = reach_motion_now_seconds();
+    for (size_t index = 0; index < REACH_CLIPBOARD_MAX_ITEMS; ++index)
+    {
+        uint64_t id = index < model.count ? model.items[index].id : 0;
+        size_t previous_index = 0;
+        while (previous_index < REACH_CLIPBOARD_MAX_ITEMS &&
+               (id == 0 || previous_ids[previous_index] != id))
+            ++previous_index;
+        clipboard->hover_item_ids[index] = id;
+        if (previous_index < REACH_CLIPBOARD_MAX_ITEMS)
+        {
+            clipboard->hover[index] = previous[previous_index];
+            clipboard->hover_group_ids[index] = previous_groups[previous_index];
+            reach_motion_animate_to_at(&clipboard->hover[index], 0, 0.10, REACH_EASING_EASE_OUT,
+                                       now);
+        }
+        else
+        {
+            reach_motion_set(&clipboard->hover[index], 0);
+            clipboard->hover_group_ids[index] = 0;
+            if (id != 0)
+            {
+                clipboard->hover_group_ids[index] = clipboard->next_hover_group_id;
+                clipboard->next_hover_group_id += 16;
+            }
+        }
+    }
+}
+
 void reach_clipboard_feature_collapse_all_hover(reach_clipboard_feature *clipboard)
 {
     if (clipboard == nullptr)
-    {
         return;
-    }
-    for (size_t index = 0; index < REACH_CLIPBOARD_MAX_ITEMS; ++index)
-    {
-        reach_animation_manager_animate_to(&clipboard->animations,
-                                           reach_clipboard_feature_hover_track(index), 0.0f, 0.10,
-                                           REACH_EASING_EASE_OUT);
-    }
+    reach_clipboard_feature_sync_hover(clipboard);
+    double now = reach_motion_now_seconds();
+    for (auto &hover : clipboard->hover)
+        reach_motion_animate_to_at(&hover, 0, 0.10, REACH_EASING_EASE_OUT, now);
 }
 
 void reach_clipboard_feature_move_hover(reach_clipboard_feature *clipboard, size_t previous,
                                         size_t next)
 {
     if (clipboard == nullptr)
-    {
         return;
-    }
+    reach_clipboard_feature_sync_hover(clipboard);
+    double now = reach_motion_now_seconds();
     if (previous < REACH_CLIPBOARD_MAX_ITEMS)
-    {
-        reach_animation_manager_animate_to(&clipboard->animations,
-                                           reach_clipboard_feature_hover_track(previous), 0.0f,
-                                           0.12, REACH_EASING_EASE_OUT);
-    }
+        reach_motion_animate_to_at(&clipboard->hover[previous], 0, 0.12, REACH_EASING_EASE_OUT,
+                                   now);
     if (next < REACH_CLIPBOARD_MAX_ITEMS)
-    {
-        reach_animation_manager_animate_to(&clipboard->animations,
-                                           reach_clipboard_feature_hover_track(next), 1.0f, 0.14,
-                                           REACH_EASING_EASE_OUT);
-    }
+        reach_motion_animate_to_at(&clipboard->hover[next], 1, 0.14, REACH_EASING_EASE_OUT, now);
 }
 
 void reach_clipboard_feature_clear_hover(reach_clipboard_feature *clipboard, size_t previous)
 {
-    if (clipboard == nullptr || previous >= REACH_CLIPBOARD_MAX_ITEMS)
+    if (clipboard != nullptr && previous < REACH_CLIPBOARD_MAX_ITEMS)
     {
-        return;
+        reach_clipboard_feature_sync_hover(clipboard);
+        reach_motion_animate_to(&clipboard->hover[previous], 0, 0.12, REACH_EASING_EASE_OUT);
     }
-    reach_animation_manager_animate_to(&clipboard->animations,
-                                       reach_clipboard_feature_hover_track(previous), 0.0f, 0.12,
-                                       REACH_EASING_EASE_OUT);
-}
-
-int32_t reach_clipboard_feature_any_hover_active(const reach_clipboard_feature *clipboard)
-{
-    if (clipboard == nullptr)
-    {
-        return 0;
-    }
-    for (size_t index = 0; index < REACH_CLIPBOARD_MAX_ITEMS; ++index)
-    {
-        if (reach_animation_manager_active(&clipboard->animations,
-                                           reach_clipboard_feature_hover_track(index)))
-        {
-            return 1;
-        }
-    }
-    return 0;
 }
 
 int32_t reach_clipboard_feature_any_animation_active(const reach_clipboard_feature *clipboard)
@@ -868,21 +888,16 @@ int32_t reach_clipboard_feature_any_animation_active(const reach_clipboard_featu
     return clipboard != nullptr && reach_animation_manager_any_active(&clipboard->animations);
 }
 
-void reach_clipboard_feature_fill_hover_values(const reach_clipboard_feature *clipboard,
-                                               float *out_values, size_t count)
+const reach_motion *reach_clipboard_feature_hover_motions(reach_clipboard_feature *clipboard)
 {
-    if (out_values == nullptr)
-    {
-        return;
-    }
-    for (size_t index = 0; index < count; ++index)
-    {
-        out_values[index] =
-            clipboard != nullptr
-                ? reach_animation_manager_value(&clipboard->animations,
-                                                reach_clipboard_feature_hover_track(index))
-                : 0.0f;
-    }
+    if (clipboard != nullptr)
+        reach_clipboard_feature_sync_hover(clipboard);
+    return clipboard != nullptr ? clipboard->hover : nullptr;
+}
+
+const uint64_t *reach_clipboard_feature_hover_group_ids(const reach_clipboard_feature *clipboard)
+{
+    return clipboard != nullptr ? clipboard->hover_group_ids : nullptr;
 }
 
 float reach_clipboard_feature_animate_layout_value(reach_clipboard_feature *clipboard,

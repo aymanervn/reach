@@ -19,6 +19,10 @@ int32_t reach_render_group_equal(const reach_render_group *first, const reach_re
         first->has_clip != second->has_clip ||
         !reach_render_rect_equal(first->clip, second->clip) ||
         first->clip_radius != second->clip_radius || first->has_tint != second->has_tint ||
+        !reach_motion_equal(&first->tint_rgb_mix, &second->tint_rgb_mix) ||
+        first->tint_rgb_target.r != second->tint_rgb_target.r ||
+        first->tint_rgb_target.g != second->tint_rgb_target.g ||
+        first->tint_rgb_target.b != second->tint_rgb_target.b ||
         first->repeat_offset_x != second->repeat_offset_x ||
         first->repeat_hold_seconds != second->repeat_hold_seconds ||
         first->repeat_travel_seconds != second->repeat_travel_seconds ||
@@ -43,6 +47,8 @@ static int32_t reach_render_group_motion_active(const reach_render_group *group)
         for (edge = 0; edge < REACH_RENDER_COLOR_CHANNEL_COUNT; ++edge)
             if (reach_motion_active(&group->tint[edge]))
                 return 1;
+    if (group->has_tint && reach_motion_active(&group->tint_rgb_mix))
+        return 1;
     if (group->has_clip)
         for (edge = 0; edge < REACH_RENDER_CLIP_EDGE_COUNT; ++edge)
             if (reach_motion_active(&group->clip_insets[edge]))
@@ -81,6 +87,13 @@ reach_color reach_render_group_tint_at(const reach_render_group *group, double n
         color.g = reach_motion_value_at(&group->tint[REACH_RENDER_COLOR_GREEN], now_seconds);
         color.b = reach_motion_value_at(&group->tint[REACH_RENDER_COLOR_BLUE], now_seconds);
         color.a = reach_motion_value_at(&group->tint[REACH_RENDER_COLOR_ALPHA], now_seconds);
+        if (group->tint_rgb_mix.generation != 0)
+        {
+            float weight = reach_motion_value_at(&group->tint_rgb_mix, now_seconds);
+            color.r += (group->tint_rgb_target.r - color.r) * weight;
+            color.g += (group->tint_rgb_target.g - color.g) * weight;
+            color.b += (group->tint_rgb_target.b - color.b) * weight;
+        }
     }
     return color;
 }
@@ -131,6 +144,18 @@ reach_render_command_buffer_group(const reach_render_command_buffer *buffer, uin
 static int32_t reach_render_repetition_valid(const reach_render_group *group, int32_t root)
 {
     size_t index;
+    if (group->tint_rgb_mix.generation != 0 &&
+        (root || !group->has_tint || !isfinite(group->tint_rgb_target.r) ||
+         !isfinite(group->tint_rgb_target.g) || !isfinite(group->tint_rgb_target.b) ||
+         group->tint_rgb_target.r < 0 || group->tint_rgb_target.r > 1 ||
+         group->tint_rgb_target.g < 0 || group->tint_rgb_target.g > 1 ||
+         group->tint_rgb_target.b < 0 || group->tint_rgb_target.b > 1 ||
+         !isfinite(group->tint_rgb_mix.from) || !isfinite(group->tint_rgb_mix.to) ||
+         !group->tint_rgb_mix.has_limits || !isfinite(group->tint_rgb_mix.minimum) ||
+         !isfinite(group->tint_rgb_mix.maximum) ||
+         group->tint_rgb_mix.minimum > group->tint_rgb_mix.maximum ||
+         group->tint_rgb_mix.minimum < 0 || group->tint_rgb_mix.maximum > 1))
+        return 0;
     if (!isfinite(group->clip_radius) || group->clip_radius < 0 || (root && group->clip_radius > 0))
         return 0;
     if (group->clip_radius > 0)
@@ -152,7 +177,8 @@ static int32_t reach_render_repetition_valid(const reach_render_group *group, in
                                      &group->tint[0],
                                      &group->tint[1],
                                      &group->tint[2],
-                                     &group->tint[3]};
+                                     &group->tint[3],
+                                     &group->tint_rgb_mix};
     for (index = 0; index < sizeof(motions) / sizeof(motions[0]); ++index)
     {
         const reach_motion *motion = motions[index];
@@ -509,62 +535,71 @@ static reach_render_command reach_render_inset_shape(const reach_render_command 
     return inner;
 }
 
+size_t reach_render_bordered_background_shapes(const reach_render_command *shape,
+                                               reach_color background_color,
+                                               reach_color border_color, float border_thickness,
+                                               reach_render_command out_shapes[2])
+{
+    reach_render_command outer;
+    reach_render_command inner;
+    if (shape == 0 || out_shapes == 0 ||
+        (shape->type != REACH_RENDER_COMMAND_RECT &&
+         shape->type != REACH_RENDER_COMMAND_NOTCHED_ROUNDED_RECT))
+        return 0;
+    outer = *shape;
+    outer.rect = reach_render_pixel_aligned_rect(outer.rect);
+    outer.stroke_width = 0;
+    if (outer.rect.width <= 0 || outer.rect.height <= 0)
+        return 0;
+    background_color.a = 1;
+    if (border_thickness <= 0 || border_color.a <= 0)
+    {
+        outer.color = background_color;
+        out_shapes[0] = outer;
+        return 1;
+    }
+    border_color.a = 1;
+    outer.color = border_color;
+    out_shapes[0] = outer;
+    inner = reach_render_inset_shape(&outer, border_thickness);
+    if (inner.rect.width <= 0 || inner.rect.height <= 0)
+        return 1;
+    inner.color = background_color;
+    out_shapes[1] = inner;
+    return 2;
+}
+
 reach_result reach_render_push_bordered_background(reach_render_command_buffer *buffer,
                                                    const reach_render_command *shape,
                                                    reach_color background_color,
                                                    reach_color border_color, float border_thickness,
                                                    const reach_shadow *shadow, float dpi_scale)
 {
-    reach_render_command outer;
-    reach_render_command inner;
+    reach_render_command shapes[2];
+    size_t count;
+    size_t index;
     reach_result result;
-
     if (buffer == 0 || shape == 0 ||
         (shape->type != REACH_RENDER_COMMAND_RECT &&
          shape->type != REACH_RENDER_COMMAND_NOTCHED_ROUNDED_RECT))
-    {
         return REACH_INVALID_ARGUMENT;
-    }
-
-    outer = *shape;
-    outer.rect = reach_render_pixel_aligned_rect(outer.rect);
-    outer.stroke_width = 0.0f;
-    if (outer.rect.width <= 0.0f || outer.rect.height <= 0.0f)
-    {
+    count = reach_render_bordered_background_shapes(shape, background_color, border_color,
+                                                    border_thickness, shapes);
+    if (count == 0)
         return REACH_OK;
-    }
-
     if (shadow != 0)
     {
-        result = reach_render_push_shadow(buffer, &outer, shadow, dpi_scale);
+        result = reach_render_push_shadow(buffer, &shapes[0], shadow, dpi_scale);
         if (result != REACH_OK)
-        {
             return result;
-        }
     }
-
-    background_color.a = 1.0f;
-    if (border_thickness <= 0.0f || border_color.a <= 0.0f)
+    for (index = 0; index < count; ++index)
     {
-        outer.color = background_color;
-        return reach_render_command_buffer_push(buffer, &outer);
+        result = reach_render_command_buffer_push(buffer, &shapes[index]);
+        if (result != REACH_OK)
+            return result;
     }
-
-    border_color.a = 1.0f;
-    outer.color = border_color;
-    result = reach_render_command_buffer_push(buffer, &outer);
-    if (result != REACH_OK)
-    {
-        return result;
-    }
-
-    inner = reach_render_inset_shape(&outer, border_thickness);
-    if (inner.rect.width <= 0.0f || inner.rect.height <= 0.0f)
-    {
-        return REACH_OK;
-    }
-    inner.color = background_color;
-    return reach_render_command_buffer_push(buffer, &inner);
+    return REACH_OK;
 }
 
 reach_result reach_render_command_buffer_push(reach_render_command_buffer *buffer,
