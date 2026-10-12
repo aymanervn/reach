@@ -159,6 +159,7 @@ struct reach_render_backend
     bool retained_topology_valid = false;
     reach_transform_f32 scene_content_transform = {};
     bool has_scene_content_transform = false;
+    double motion_sample_seconds = 0;
     uint64_t reported_retained_bytes = 0;
     ComPtr<ABI::Windows::UI::Composition::IContainerVisual> scene_visual;
     ComPtr<IDCompositionVisual2> dcomp_scene_visual;
@@ -200,6 +201,7 @@ int32_t reach_d2d_retained_supported(const reach_render_backend *backend);
 reach_result reach_d2d_sync_retained(reach_render_backend *backend,
                                      const reach_render_command_buffer *commands);
 void reach_d2d_release_retained(reach_render_backend *backend);
+void reach_d2d_clear_retained_layers(reach_render_backend *backend);
 reach_result reach_d2d_presentation_complete(reach_render_backend *backend, uint64_t generation,
                                              int32_t *out_complete);
 void reach_d2d_suspend(reach_render_backend *backend);

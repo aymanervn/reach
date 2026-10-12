@@ -181,10 +181,16 @@ static void test_motion_equality_preserves_identity_without_padding(void)
     for (size_t at = offsetof(reach_motion, easing) + sizeof(second.easing);
          at < offsetof(reach_motion, generation); ++at)
         bytes[at] = 0xa5;
-    for (size_t at = offsetof(reach_motion, maximum) + sizeof(second.maximum); at < sizeof(second);
-         ++at)
+    for (size_t at = offsetof(reach_motion, maximum) + sizeof(second.maximum);
+         at < offsetof(reach_motion, repeating); ++at)
         bytes[at] = 0xa5;
     expect(reach_motion_equal(&first, &second), "motion equality ignores representation padding");
+    second.repeating = 1;
+    expect(!reach_motion_equal(&first, &second), "repetition is motion intent");
+    second = first;
+    second.hold_start_seconds = 1;
+    expect(!reach_motion_equal(&first, &second), "repetition holds preserve motion identity");
+    second = first;
     second.generation++;
     expect(!reach_motion_equal(&first, &second), "a new generation retains distinct ownership");
     second = first;

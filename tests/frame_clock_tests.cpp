@@ -3,6 +3,7 @@
 #include "reach/support/animation.h"
 
 #include <cmath>
+#include <initializer_list>
 #include <stdio.h>
 
 static int failures;
@@ -201,6 +202,77 @@ static void test_animation_immediate_reset_and_invalid_sample(void)
                 "reset retires old ownership and publishes an explicit zero endpoint");
 }
 
+static void test_repeating_motion_compilation_and_limits(void)
+{
+    for (reach_easing easing :
+         {REACH_EASING_EASE_IN, REACH_EASING_EASE_OUT, REACH_EASING_EASE_IN_OUT})
+    {
+        for (double hold : {0.0, 0.3, 1.4})
+        {
+            reach_motion motion = {};
+            reach_motion_repeat_at(&motion, -0.4f, 1.6f, 0.7, hold, hold * 0.5, easing, 100);
+            motion = reach_motion_clamp(&motion, 0, 1);
+            double cycle = reach_motion_cycle_seconds(&motion);
+            expect_true(cycle > 0 && reach_motion_deadline(&motion) == 0 &&
+                            reach_motion_active_at(&motion, 1000000),
+                        "repetition stays active without a finite completion deadline");
+            for (double offset : {0.0, 0.15, 0.6, 1.1, 3.0, 20.07})
+            {
+                double now = 100 + offset;
+                reach_motion_segment pieces[REACH_MOTION_MAX_REPEAT_SEGMENTS] = {};
+                size_t count = reach_motion_compile_repeat_at(&motion, now, pieces);
+                expect_true(count > 0 && pieces[0].start == 0 &&
+                                std::fabs(pieces[count - 1].end - cycle) < 1e-9,
+                            "rotated compilation covers exactly one complete cycle");
+                if (count == 0)
+                    continue;
+                for (int sample = 0; sample <= 64; ++sample)
+                {
+                    double time = cycle * sample / 64;
+                    for (size_t index = 0; index < count; ++index)
+                    {
+                        const auto &piece = pieces[index];
+                        if (time > piece.end && index + 1 < count)
+                            continue;
+                        double dt = time - piece.start;
+                        double compiled = piece.value + piece.linear * dt +
+                                          piece.quadratic * dt * dt + piece.cubic * dt * dt * dt;
+                        expect_true(std::fabs(compiled -
+                                              reach_motion_value_at(&motion, now + time)) < 0.0002,
+                                    "periodic native pieces match canonical CPU sampling");
+                        break;
+                    }
+                }
+            }
+        }
+    }
+}
+
+static void test_repeating_motion_affine_crossing_and_retirement(void)
+{
+    reach_motion motion = {};
+    reach_motion_repeat_at(&motion, 0, 1, 1, 1, 2, REACH_EASING_EASE_IN_OUT, 10);
+    expect_true(reach_motion_value_at(&motion, 10.5) == 0 &&
+                    reach_motion_value_at(&motion, 13) == 1 &&
+                    reach_motion_value_at(&motion, 15) == 0,
+                "asymmetric holds preserve the complete forward and backward schedule");
+    expect_true(std::fabs(reach_motion_time_to_value_at(&motion, 0.5f, 12.5) - 2) < 1e-6,
+                "periodic crossing finds the next return leg instead of a past crossing");
+    reach_motion mapped = reach_motion_affine(&motion, -3, 5);
+    expect_true(mapped.repeating && mapped.started_seconds == motion.started_seconds &&
+                    mapped.generation == motion.generation &&
+                    std::fabs(reach_motion_value_at(&mapped, 14.5) - 3.5f) < 1e-6,
+                "affine repetition preserves epoch, phase and ownership");
+    uint64_t generation = motion.generation;
+    float value = reach_motion_value_at(&motion, 14.5);
+    reach_motion_animate_to_at(&motion, 0, 0.2, REACH_EASING_EASE_OUT, 14.5);
+    expect_true(!motion.repeating && motion.from == value && motion.generation != generation,
+                "retarget cancels repetition continuously using the same intent contract");
+    reach_motion_repeat_at(&motion, 0, 1, 1, -1, 0, REACH_EASING_EASE_OUT, 20);
+    expect_true(!motion.repeating && !reach_motion_active_at(&motion, 20),
+                "invalid repetition retires to an immediate endpoint");
+}
+
 int main(void)
 {
     test_frame_rate_policy();
@@ -212,5 +284,7 @@ int main(void)
     test_animation_absolute_sampling_and_final_update();
     test_animation_event_time_retarget_and_descriptor();
     test_animation_immediate_reset_and_invalid_sample();
+    test_repeating_motion_compilation_and_limits();
+    test_repeating_motion_affine_crossing_and_retirement();
     return failures != 0;
 }

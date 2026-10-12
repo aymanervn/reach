@@ -12,9 +12,124 @@ using namespace ABI::Windows::UI::Composition;
 using ABI::Windows::Foundation::Numerics::Vector2;
 using ABI::Windows::Foundation::Numerics::Vector3;
 
-static float scalar_value(const reach_motion &motion, float fallback)
+static double motion_sample_time(reach_render_backend *backend)
 {
-    return motion.generation == 0 ? fallback : reach_motion_value(&motion);
+    if (backend->motion_sample_seconds == 0)
+        backend->motion_sample_seconds = reach_motion_now_seconds();
+    return backend->motion_sample_seconds;
+}
+
+struct motion_sample_scope
+{
+    reach_render_backend *backend;
+    double previous;
+
+    explicit motion_sample_scope(reach_render_backend *value)
+        : backend(value), previous(value->motion_sample_seconds)
+    {
+        backend->motion_sample_seconds = 0;
+    }
+
+    ~motion_sample_scope()
+    {
+        backend->motion_sample_seconds = previous;
+    }
+};
+
+static void stop_wuc_repetition(IInspectable *value, const wchar_t *name)
+{
+    if (value == nullptr)
+        return;
+    ComPtr<ICompositionObject> object;
+    HSTRING property = nullptr;
+    if (SUCCEEDED(value->QueryInterface(IID_PPV_ARGS(&object))) &&
+        SUCCEEDED(WindowsCreateString(name, (UINT32)wcslen(name), &property)))
+        (void)object->StopAnimation(property);
+    if (property != nullptr)
+        WindowsDeleteString(property);
+}
+
+static void stop_layer_repetition(reach_render_backend *backend, reach_d2d_retained_layer &layer)
+{
+    const reach_render_group &group = layer.group;
+    bool x = group.x.repeating || group.repeat_travel_seconds > 0;
+    const reach_motion motions[] = {group.x, group.y, group.opacity, group.scale,
+                                    reach_render_group_y_scale(&group)};
+    bool active = x;
+    for (const auto &motion : motions)
+        active = active || motion.repeating;
+    for (const auto &motion : group.clip_insets)
+        active = active || motion.repeating;
+    for (const auto &motion : group.tint)
+        active = active || motion.repeating;
+    if (!active)
+        return;
+    reach_workload_add(REACH_WORKLOAD_PROPERTY_SUBMISSIONS, 1);
+    if (backend->compositor != nullptr)
+    {
+        const wchar_t *properties[] = {L"Offset.X", L"Offset.Y", L"Opacity", L"Scale.X",
+                                       L"Scale.Y"};
+        for (size_t index = 0; index < 5; ++index)
+            if (motions[index].repeating || (index == 0 && x))
+                stop_wuc_repetition(layer.visual.Get(), properties[index]);
+        const wchar_t *clips[] = {L"LeftInset", L"TopInset", L"RightInset", L"BottomInset"};
+        const wchar_t *tints[] = {L"Red", L"Green", L"Blue", L"Alpha"};
+        for (size_t index = 0; index < 4; ++index)
+        {
+            if (group.clip_insets[index].repeating)
+                stop_wuc_repetition(layer.inset_clip.Get(), clips[index]);
+            if (group.tint[index].repeating)
+                stop_wuc_repetition(layer.tint_properties.Get(), tints[index]);
+        }
+    }
+    else
+    {
+        if (layer.dcomp_visual != nullptr)
+        {
+            if (x)
+                (void)layer.dcomp_visual->SetOffsetX(0.0f);
+            if (group.y.repeating)
+                (void)layer.dcomp_visual->SetOffsetY(0.0f);
+            if (group.opacity.repeating)
+            {
+                ComPtr<IDCompositionVisual3> visual;
+                if (SUCCEEDED(layer.dcomp_visual.As(&visual)))
+                    (void)visual->SetOpacity(0.0f);
+            }
+        }
+        if (layer.dcomp_scale != nullptr)
+        {
+            if (group.scale.repeating)
+                (void)layer.dcomp_scale->SetScaleX(1.0f);
+            if (reach_render_group_y_scale(&group).repeating)
+                (void)layer.dcomp_scale->SetScaleY(1.0f);
+        }
+        if (layer.dcomp_clip != nullptr)
+        {
+            if (group.clip_insets[0].repeating)
+                (void)layer.dcomp_clip->SetLeft(0.0f);
+            if (group.clip_insets[1].repeating)
+                (void)layer.dcomp_clip->SetTop(0.0f);
+            if (group.clip_insets[2].repeating)
+                (void)layer.dcomp_clip->SetRight(0.0f);
+            if (group.clip_insets[3].repeating)
+                (void)layer.dcomp_clip->SetBottom(0.0f);
+        }
+        if (layer.dcomp_tint != nullptr)
+        {
+            for (size_t index = 0; index < 4; ++index)
+                if (group.tint[index].repeating)
+                    (void)layer.dcomp_tint->SetMatrixElement(index == 3 ? 3 : 4, (UINT)index, 0.0f);
+        }
+    }
+}
+
+static float scalar_value(reach_render_backend *backend, const reach_motion &motion, float fallback)
+{
+    if (motion.generation == 0)
+        return fallback;
+    double now = motion.repeating ? motion_sample_time(backend) : reach_motion_now_seconds();
+    return reach_motion_value_at(&motion, now);
 }
 
 static HRESULT wuc_motion(reach_render_backend *backend, IInspectable *visual,
@@ -27,8 +142,10 @@ static HRESULT wuc_motion(reach_render_backend *backend, IInspectable *visual,
     {
         hr = WindowsCreateString(property_name, (UINT32)wcslen(property_name), &property);
     }
-    reach_motion_segment segments[REACH_MOTION_MAX_SEGMENTS] = {};
-    size_t count = reach_motion_compile_at(&motion, reach_motion_now_seconds(), segments);
+    reach_motion_segment segments[REACH_MOTION_MAX_REPEAT_SEGMENTS] = {};
+    double now = motion.repeating ? motion_sample_time(backend) : reach_motion_now_seconds();
+    size_t count = motion.repeating ? reach_motion_compile_repeat_at(&motion, now, segments)
+                                    : reach_motion_compile_at(&motion, now, segments);
     if (SUCCEEDED(hr))
     {
         hr = object->StopAnimation(property);
@@ -50,6 +167,10 @@ static HRESULT wuc_motion(reach_render_backend *backend, IInspectable *visual,
         ABI::Windows::Foundation::TimeSpan timespan = {
             (INT64)(std::max(0.001, duration) * 10000000.0)};
         hr = keyframes->put_Duration(timespan);
+        if (SUCCEEDED(hr) && motion.repeating)
+            hr = keyframes->put_IterationBehavior(AnimationIterationBehavior_Forever);
+        if (SUCCEEDED(hr) && motion.repeating && motion.started_seconds > now)
+            hr = keyframes->put_DelayTime({(INT64)((motion.started_seconds - now) * 10000000.0)});
     }
     if (SUCCEEDED(hr) && count > 0)
     {
@@ -99,23 +220,30 @@ static HRESULT wuc_motion(reach_render_backend *backend, IInspectable *visual,
 static HRESULT dcomp_motion(reach_render_backend *backend, const reach_motion &motion,
                             ComPtr<IDCompositionAnimation> *animation)
 {
-    reach_motion_segment segments[REACH_MOTION_MAX_SEGMENTS] = {};
-    size_t count = reach_motion_compile_at(&motion, reach_motion_now_seconds(), segments);
+    reach_motion_segment segments[REACH_MOTION_MAX_REPEAT_SEGMENTS] = {};
+    double now = motion.repeating ? motion_sample_time(backend) : reach_motion_now_seconds();
+    size_t count = motion.repeating ? reach_motion_compile_repeat_at(&motion, now, segments)
+                                    : reach_motion_compile_at(&motion, now, segments);
     if (count == 0)
     {
         return S_FALSE;
     }
     HRESULT hr = backend->dcomp_device->CreateAnimation(animation->ReleaseAndGetAddressOf());
+    double delay = motion.repeating ? fmax(0.0, motion.started_seconds - now) : 0;
+    if (SUCCEEDED(hr) && delay > 0)
+        hr = (*animation)->AddCubic(0, reach_motion_value_at(&motion, now), 0, 0, 0);
     for (size_t index = 0; index < count && SUCCEEDED(hr); ++index)
     {
         const reach_motion_segment &segment = segments[index];
         hr = (*animation)
-                 ->AddCubic(segment.start, segment.value, segment.linear, segment.quadratic,
+                 ->AddCubic(delay + segment.start, segment.value, segment.linear, segment.quadratic,
                             segment.cubic);
     }
     if (SUCCEEDED(hr))
     {
-        hr = (*animation)->End(segments[count - 1].end, segments[count - 1].end_value);
+        hr = motion.repeating
+                 ? (*animation)->AddRepeat(delay + segments[count - 1].end, segments[count - 1].end)
+                 : (*animation)->End(segments[count - 1].end, segments[count - 1].end_value);
     }
     return hr;
 }
@@ -405,17 +533,20 @@ static HRESULT wuc_properties(reach_render_backend *backend, IInspectable *inspe
     HRESULT hr = inspectable->QueryInterface(IID_PPV_ARGS(&visual));
     if (SUCCEEDED(hr))
     {
-        hr = visual->put_Offset(
-            {base_x + scalar_value(group.x, 0.0f), base_y + scalar_value(group.y, 0.0f), 0.0f});
+        hr = visual->put_Offset({base_x + scalar_value(backend, group.x, 0.0f),
+                                 base_y + scalar_value(backend, group.y, 0.0f), 0.0f});
     }
     if (SUCCEEDED(hr))
     {
         if (mask & 4)
-            hr = visual->put_Opacity(scalar_value(group.opacity, 1.0f));
+            hr = visual->put_Opacity(scalar_value(backend, group.opacity, 1.0f));
     }
     if (SUCCEEDED(hr))
     {
-        reach_point_f32 scale = reach_render_group_scale_at(&group, reach_motion_now_seconds());
+        double now = group.scale.repeating || reach_render_group_y_scale(&group).repeating
+                         ? motion_sample_time(backend)
+                         : reach_motion_now_seconds();
+        reach_point_f32 scale = reach_render_group_scale_at(&group, now);
         if (mask & 24)
             hr = visual->put_Scale({scale.x, scale.y, 1.0f});
     }
@@ -442,18 +573,18 @@ static HRESULT dcomp_properties(reach_render_backend *backend, IDCompositionVisu
     reach_workload_add(REACH_WORKLOAD_PROPERTY_SUBMISSIONS, 1);
     HRESULT hr = preserve_repeat || !(mask & 1)
                      ? S_OK
-                     : visual->SetOffsetX(base_x + scalar_value(group.x, 0.0f));
+                     : visual->SetOffsetX(base_x + scalar_value(backend, group.x, 0.0f));
     if (SUCCEEDED(hr) && (mask & 2))
-        hr = visual->SetOffsetY(base_y + scalar_value(group.y, 0.0f));
+        hr = visual->SetOffsetY(base_y + scalar_value(backend, group.y, 0.0f));
     ComPtr<IDCompositionVisual3> opacity;
     if (SUCCEEDED(hr) && (mask & 4))
         hr = visual->QueryInterface(IID_PPV_ARGS(&opacity));
     if (SUCCEEDED(hr) && (mask & 4))
-        hr = opacity->SetOpacity(scalar_value(group.opacity, 1.0f));
+        hr = opacity->SetOpacity(scalar_value(backend, group.opacity, 1.0f));
     if (SUCCEEDED(hr) && (mask & 8))
-        hr = scale->SetScaleX(scalar_value(group.scale, 1.0f));
+        hr = scale->SetScaleX(scalar_value(backend, group.scale, 1.0f));
     if (SUCCEEDED(hr) && (mask & 16))
-        hr = scale->SetScaleY(scalar_value(reach_render_group_y_scale(&group), 1.0f));
+        hr = scale->SetScaleY(scalar_value(backend, reach_render_group_y_scale(&group), 1.0f));
     reach_motion motions[5] = {group.x, group.y, group.opacity, group.scale,
                                reach_render_group_y_scale(&group)};
     motions[0] = reach_motion_affine(&group.x, 1.0f, base_x);
@@ -1015,6 +1146,15 @@ int32_t reach_d2d_retained_supported(const reach_render_backend *backend)
             backend->dcomp_device != nullptr);
 }
 
+void reach_d2d_clear_retained_layers(reach_render_backend *backend)
+{
+    for (auto &layer : backend->retained_layers)
+        stop_layer_repetition(backend, layer);
+    backend->retained_layers.clear();
+    backend->retained_topology_valid = false;
+    record_retained_bytes(backend);
+}
+
 void reach_d2d_release_retained(reach_render_backend *backend)
 {
     if (backend == nullptr)
@@ -1069,11 +1209,10 @@ void reach_d2d_release_retained(reach_render_backend *backend)
         if (SUCCEEDED(backend->dcomp_visual->QueryInterface(IID_PPV_ARGS(&opacity))))
             (void)opacity->SetOpacity(1.0f);
     }
-    backend->retained_layers.clear();
+    reach_d2d_clear_retained_layers(backend);
     backend->retained_topology.clear();
     backend->retained_topology_valid = false;
     backend->has_scene_content_transform = false;
-    record_retained_bytes(backend);
     backend->scene_visual.Reset();
     backend->dcomp_scene_visual.Reset();
     backend->scene_scale.Reset();
@@ -1219,6 +1358,7 @@ reach_result reach_d2d_presentation_complete(reach_render_backend *backend, uint
 reach_result reach_d2d_sync_retained(reach_render_backend *backend,
                                      const reach_render_command_buffer *commands)
 {
+    motion_sample_scope sample(backend);
     if (reach_render_command_buffer_validate_groups(commands) != REACH_OK)
         return REACH_INVALID_ARGUMENT;
     HRESULT hr = create_scene(backend);
@@ -1383,6 +1523,9 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
             layer.has_children = false;
         }
     }
+    for (auto &layer : backend->retained_layers)
+        if (plan_for(layer.id) == plans.end())
+            stop_layer_repetition(backend, layer);
     backend->retained_layers.erase(std::remove_if(backend->retained_layers.begin(),
                                                   backend->retained_layers.end(),
                                                   [&](const reach_d2d_retained_layer &layer)

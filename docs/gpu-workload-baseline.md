@@ -2,6 +2,37 @@
 
 Status: counters verified; full product performance baseline and acceptance pending.
 
+## Canonical periodic properties
+
+`reach_motion` now expresses periodic forward/backward travel with independent endpoint holds and
+an absolute epoch. Affine and clamped mappings keep that epoch. A bounded compiler rotates one full
+cycle to the sampled phase, preserving initial values and a continuous wrap. Windows Composition
+repeats the keyframes; DirectComposition repeats the cubics. Related periodic properties in one
+submission share a sampled time. Finite properties retain their existing timing path, and root
+presentation rejects repetition because its completion protocol remains finite.
+
+Pure checks compare compiled polynomials with CPU sampling across all easing values, asymmetric
+holds, clipping, interrupted cycles and delayed wakes. They also cover affine mapping, next crossings,
+cancellation and invalid timing. Named-field equality includes repetition and holds; padding probes
+are updated for the extended value object. Both builds and all 40 tests pass.
+
+The owned native probe publishes repeating X/scale/opacity, clip and tint properties. Holding them
+requests no application submissions. Ten identical submissions produce no raster, property or tree
+updates; changing one repeating component submits one helper without repainting. Font replacement
+and hiding stop every binding; WUC queries verify either no animation or a closed retired visual.
+The same layer cleanup is used on suspension. Source byte accounting retires with the layer table.
+Evidence is `probe-periodic-focused-{debug,release}.log`, `build-{debug,release}-repetition.log` and
+`test-{debug,release}-repetition.log` under `build/gpu-composition-migration`. Full native suites pass
+five runs per backend plus existing fallback checks in Debug/Release
+(`probe-periodic-{debug,release}-complete.log`). Architecture, formatting and whitespace checks pass.
+
+The lifetime query follows the [AnimationController contract](https://learn.microsoft.com/en-us/uwp/api/windows.ui.composition.compositionobject.trygetanimationcontroller).
+DirectComposition repetition uses the existing native repeat primitive; its timing model is described
+in [Microsoft's animation documentation](https://learn.microsoft.com/en-us/windows/win32/api/dcompanimation/nf-dcompanimation-idcompositionanimation-setabsolutebegintime).
+These checks establish property/lifetime behavior, not displayed pixels or total CPU/GPU/power/memory
+benefit. Existing marquee behavior is preserved, and loader consumers plus their application-frame
+invalidation remain the next migration step.
+
 ## Canonical scalar-manager timing
 
 Every finite scalar track now stores `reach_motion`; easing, event origin, generation and endpoints

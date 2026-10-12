@@ -144,8 +144,7 @@ void reach_d2d_set_ui_font(reach_render_backend *backend, int32_t use_bundled_fo
         return;
     backend->text_layouts.clear();
     backend->text_formats.clear();
-    backend->retained_layers.clear();
-    backend->retained_topology_valid = false;
+    reach_d2d_clear_retained_layers(backend);
     backend->use_bundled_font = use_bundled_font ? 1 : 0;
     backend->ui_font_family[0] = 0;
 }
