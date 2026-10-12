@@ -242,10 +242,14 @@ power, memory and instrumentation overhead still require product scenarios and s
   mapping/event objects and never touches the running Reach instance.
   Evidence: `build-release-storage.log`, `build-release-tests.log`, `test-release-storage.log`,
   `build-debug-storage.log`, `test-debug-storage.log`, `probe-protocol-storage.log`.
-- The first full optimized compositor suite completes with two failures in the unchanged settled
-  chrome property-submission check (`probe-native-release.log`). Other assertions pass. This exposes
-  an optimized-path verification issue requiring its own renderer investigation; it is not accepted
-  as harmless and does not close production native or total performance acceptance.
+- The optimized compositor deduplication finding is resolved. Shared field-wise motion/group
+  equality replaces descriptor byte comparisons throughout retained property and root ownership
+  handling. Changing only object padding previously submitted four properties on each backend;
+  it now submits none and does no retained raster work. Real generation changes still submit and
+  preserve completion ownership. Full optimized and Debug suites each pass five runs per compositor
+  plus HWND fallback, including source-pixel, completion/failure, hierarchy and feature checks.
+  Evidence: `probe-padding-before.log`, `probe-equality-release.log`, `probe-equality-debug.log`.
+  Comparable total workload measurements and live product acceptance remain pending.
 - Windows Performance Recorder exposes CPU, GPU and DesktopComposition profiles, but starting
   the combined recording failed with `0xc5585011`, "Failed to enable the policy to profile system
   performance." A subsequent status check confirmed no recording is active. No trace was captured;
@@ -416,3 +420,25 @@ not displayed WUC/DC capture, and do not close the total product performance/res
 `probe-preview-hover-final.log` passes five full runs per compositor and HWND fallback with zero
 diagnostic failures, including existing completion/failure, hierarchy, resize, bounded-motion,
 Quick Settings and feedback diagnostics. No running Reach instance was terminated.
+
+## Semantic retained descriptor equality
+
+`reach_motion_equal` and `reach_render_group_equal` compare all named intent fields, not padding.
+The renderer uses them for tint channels, clip edges, transforms, group geometry and root completion
+ownership. Pure regression checks poison known padding without changing values and verify that
+clocks, generations, limits, hierarchy and repetition still distinguish new intent. Both isolated
+builds and all 39 tests pass (`build-release-equality.log`, `test-release-equality.log`,
+`build-debug-equality.log`, `test-debug-equality.log`).
+
+Before the fix, an optimized padding-only submission produced four native property updates per
+backend with zero raster changes. Afterwards it produces zero updates and zero raster changes;
+fallback performs one ordinary draw. A new generation still updates native state and completion
+ownership without rerasterizing unchanged content. Reconstructed settled chrome also submits no
+properties. Dock cancellation without pointer movement now updates only feedback: the diagnostic
+checks all named group fields and requires exactly one changed feedback group and one property
+submission, rather than counting an unchanged placement upload. Source bytes and actual movement
+remain separately checked.
+
+Full native suites pass five runs per backend plus fallback in both optimized and Debug configurations
+with no exclusions (`probe-equality-release.log`, `probe-equality-debug.log`). This fixes an optimized
+cache correctness/efficiency defect; it does not establish total CPU/GPU/power/latency benefit.

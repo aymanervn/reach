@@ -231,6 +231,8 @@ extern "C"
                                                       uint64_t id, double now_seconds,
                                                       reach_rect_f32 *out_clip);
     reach_rect_f32 reach_render_group_clip_at(const reach_render_group *group, double now_seconds);
+    int32_t reach_render_group_equal(const reach_render_group *first,
+                                     const reach_render_group *second);
     reach_color reach_render_group_tint_at(const reach_render_group *group, double now_seconds);
     reach_motion reach_render_group_y_scale(const reach_render_group *group);
     reach_point_f32 reach_render_group_scale_at(const reach_render_group *group,

@@ -3,6 +3,7 @@
 
 #include <math.h>
 #include <stdio.h>
+#include <stddef.h>
 
 static int failed = 0;
 
@@ -171,8 +172,31 @@ static void test_motion_compilation_matches_cpu_sampling(void)
            "static and absent motion submit no native curve");
 }
 
+static void test_motion_equality_preserves_identity_without_padding(void)
+{
+    reach_motion first = {};
+    reach_motion_start_at(&first, 0, 1, 0.3, REACH_EASING_EASE_OUT, 10);
+    reach_motion second = first;
+    unsigned char *bytes = reinterpret_cast<unsigned char *>(&second);
+    for (size_t at = offsetof(reach_motion, easing) + sizeof(second.easing);
+         at < offsetof(reach_motion, generation); ++at)
+        bytes[at] = 0xa5;
+    for (size_t at = offsetof(reach_motion, maximum) + sizeof(second.maximum); at < sizeof(second);
+         ++at)
+        bytes[at] = 0xa5;
+    expect(reach_motion_equal(&first, &second), "motion equality ignores representation padding");
+    second.generation++;
+    expect(!reach_motion_equal(&first, &second), "a new generation retains distinct ownership");
+    second = first;
+    second.started_seconds += 0.01;
+    expect(!reach_motion_equal(&first, &second), "a changed physical timeline remains distinct");
+    second = reach_motion_clamp(&first, 0.2f, 0.8f);
+    expect(!reach_motion_equal(&first, &second), "visible motion limits remain part of identity");
+}
+
 int main(void)
 {
+    test_motion_equality_preserves_identity_without_padding();
     test_motion_retarget_uses_one_event_time();
     test_motion_affine_preserves_the_physical_timeline();
     test_motion_crossing_preserves_endpoint_deadlines();

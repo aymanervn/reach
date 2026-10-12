@@ -8,6 +8,17 @@ static float reach_motion_limit(const reach_motion *motion, float value)
     return motion->has_limits ? fminf(motion->maximum, fmaxf(motion->minimum, value)) : value;
 }
 
+int32_t reach_motion_equal(const reach_motion *first, const reach_motion *second)
+{
+    if (first == second)
+        return 1;
+    return first != nullptr && second != nullptr && first->from == second->from &&
+           first->to == second->to && first->started_seconds == second->started_seconds &&
+           first->duration_seconds == second->duration_seconds && first->easing == second->easing &&
+           first->generation == second->generation && first->has_limits == second->has_limits &&
+           first->minimum == second->minimum && first->maximum == second->maximum;
+}
+
 double reach_motion_now_seconds(void)
 {
     return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch())

@@ -125,8 +125,11 @@ static HRESULT sync_tint(reach_render_backend *backend, reach_d2d_retained_layer
 {
     if (!group.has_tint && !layer.group.has_tint)
         return S_OK;
-    if (!content_changed && group.has_tint == layer.group.has_tint &&
-        memcmp(group.tint, layer.group.tint, sizeof(group.tint)) == 0)
+    bool tint_changed = group.has_tint != layer.group.has_tint;
+    for (size_t index = 0; index < REACH_RENDER_COLOR_CHANNEL_COUNT; ++index)
+        tint_changed =
+            tint_changed || !reach_motion_equal(&group.tint[index], &layer.group.tint[index]);
+    if (!content_changed && !tint_changed)
         return S_OK;
     reach_workload_add(REACH_WORKLOAD_PROPERTY_SUBMISSIONS, 1);
     if (!group.has_tint)
@@ -172,8 +175,7 @@ static HRESULT sync_tint(reach_render_backend *backend, reach_d2d_retained_layer
         const wchar_t *names[] = {L"Red", L"Green", L"Blue", L"Alpha"};
         for (size_t index = 0; index < REACH_RENDER_COLOR_CHANNEL_COUNT && SUCCEEDED(hr); ++index)
         {
-            if (initialized &&
-                memcmp(&group.tint[index], &layer.group.tint[index], sizeof(reach_motion)) == 0)
+            if (initialized && reach_motion_equal(&group.tint[index], &layer.group.tint[index]))
                 continue;
             reach_motion channel = reach_motion_affine(&group.tint[index], 255.0f, 0.0f);
             hr = layer.tint_properties->InsertScalar(HStringReference(names[index]).Get(),
@@ -244,8 +246,7 @@ static HRESULT sync_tint(reach_render_backend *backend, reach_d2d_retained_layer
     }
     for (size_t index = 0; index < REACH_RENDER_COLOR_CHANNEL_COUNT && SUCCEEDED(hr); ++index)
     {
-        if (initialized &&
-            memcmp(&group.tint[index], &layer.group.tint[index], sizeof(reach_motion)) == 0)
+        if (initialized && reach_motion_equal(&group.tint[index], &layer.group.tint[index]))
             continue;
         int row = index == REACH_RENDER_COLOR_ALPHA ? 3 : 4;
         hr = layer.dcomp_tint->SetMatrixElement(row, (int)index,
@@ -293,8 +294,7 @@ static HRESULT sync_clip(reach_render_backend *backend, reach_d2d_retained_layer
                         ? 15
                         : 0;
     for (size_t edge = 0; edge < REACH_RENDER_CLIP_EDGE_COUNT; ++edge)
-        if (memcmp(&group.clip_insets[edge], &layer.group.clip_insets[edge],
-                   sizeof(reach_motion)) != 0)
+        if (!reach_motion_equal(&group.clip_insets[edge], &layer.group.clip_insets[edge]))
             mask |= 1u << edge;
     if (mask == 0)
         return S_OK;
@@ -498,17 +498,17 @@ static unsigned property_mask(const reach_render_group &group, const reach_rende
     float previous_x = previous.has_clip ? previous.bounds.x - previous.clip.x : 0.0f;
     float previous_y = previous.has_clip ? previous.bounds.y - previous.clip.y : 0.0f;
     unsigned mask = 0;
-    if (memcmp(&group.x, &previous.x, sizeof(reach_motion)) != 0 || base_x != previous_x)
+    if (!reach_motion_equal(&group.x, &previous.x) || base_x != previous_x)
         mask |= 1;
-    if (memcmp(&group.y, &previous.y, sizeof(reach_motion)) != 0 || base_y != previous_y)
+    if (!reach_motion_equal(&group.y, &previous.y) || base_y != previous_y)
         mask |= 2;
-    if (memcmp(&group.opacity, &previous.opacity, sizeof(reach_motion)) != 0)
+    if (!reach_motion_equal(&group.opacity, &previous.opacity))
         mask |= 4;
-    if (memcmp(&group.scale, &previous.scale, sizeof(reach_motion)) != 0)
+    if (!reach_motion_equal(&group.scale, &previous.scale))
         mask |= 8;
     reach_motion y = reach_render_group_y_scale(&group);
     reach_motion previous_y_scale = reach_render_group_y_scale(&previous);
-    if (memcmp(&y, &previous_y_scale, sizeof(reach_motion)) != 0)
+    if (!reach_motion_equal(&y, &previous_y_scale))
         mask |= 16;
     return mask;
 }
@@ -920,7 +920,7 @@ static HRESULT sync_layer(reach_render_backend *backend, reach_d2d_retained_laye
                                           : DCOMPOSITION_BITMAP_INTERPOLATION_MODE_LINEAR);
     }
     bool geometry_changed = !initialized || text_phase_changed || text_sampling_changed ||
-                            memcmp(&group, &layer.group, sizeof(group)) != 0 ||
+                            !reach_render_group_equal(&group, &layer.group) ||
                             parent_origin.x != layer.parent_origin.x ||
                             parent_origin.y != layer.parent_origin.y;
     float anchor_x = group.has_clip ? group.clip.x : group.bounds.x;
@@ -1398,20 +1398,16 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
     }
     reach_render_group presentation =
         commands->has_presentation ? commands->presentation : reach_render_group{};
-    if (SUCCEEDED(hr) &&
-        (!backend->has_scene_presentation ||
-         memcmp(&presentation, &backend->scene_presentation, sizeof(presentation)) != 0))
+    if (SUCCEEDED(hr) && (!backend->has_scene_presentation ||
+                          !reach_render_group_equal(&presentation, &backend->scene_presentation)))
     {
         bool animation_changed =
             !backend->has_scene_presentation ||
-            memcmp(&presentation.opacity, &backend->scene_presentation.opacity,
-                   sizeof(reach_motion)) != 0 ||
-            memcmp(&presentation.x, &backend->scene_presentation.x, sizeof(reach_motion)) != 0 ||
-            memcmp(&presentation.y, &backend->scene_presentation.y, sizeof(reach_motion)) != 0 ||
-            memcmp(&presentation.scale, &backend->scene_presentation.scale, sizeof(reach_motion)) !=
-                0 ||
-            memcmp(&presentation.scale_y, &backend->scene_presentation.scale_y,
-                   sizeof(reach_motion)) != 0;
+            !reach_motion_equal(&presentation.opacity, &backend->scene_presentation.opacity) ||
+            !reach_motion_equal(&presentation.x, &backend->scene_presentation.x) ||
+            !reach_motion_equal(&presentation.y, &backend->scene_presentation.y) ||
+            !reach_motion_equal(&presentation.scale, &backend->scene_presentation.scale) ||
+            !reach_motion_equal(&presentation.scale_y, &backend->scene_presentation.scale_y);
         if (animation_changed)
         {
             if (backend->presentation_batch != nullptr)
