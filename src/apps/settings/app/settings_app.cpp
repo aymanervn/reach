@@ -111,6 +111,8 @@ struct reach_settings_update_worker
 
 struct reach_settings_app
 {
+    reach_settings_app_notify_fn notify;
+    void *notify_user;
     reach_platform_window_port window;
     reach_render_backend_port renderer;
     int32_t motion_fallback_active;
@@ -411,12 +413,23 @@ static reach_result reach_settings_render(reach_settings_app *app)
         return REACH_INVALID_ARGUMENT;
     }
 
+    if (app->window.ops.is_minimized != nullptr && app->window.ops.is_minimized(app->window.window))
+    {
+        if (app->renderer.ops.suspend != nullptr)
+            app->renderer.ops.suspend(app->renderer.backend);
+        reach_render_command_buffer_clear(&app->render_commands);
+        app->motion_fallback_active = 0;
+        return REACH_OK;
+    }
+
     reach_settings_render_input input = {};
     input.theme = app->theme;
     input.model = &app->model;
     input.layout = &app->layout;
     input.dpi_scale = reach_settings_app_scale(app);
     input.text_alignment_leading = REACH_TEXT_ALIGNMENT_LEADING;
+    input.retained_supported = app->renderer.ops.retained_supported != nullptr &&
+                               app->renderer.ops.retained_supported(app->renderer.backend);
 
     reach_render_command_buffer_clear(&app->render_commands);
     reach_workload_add(REACH_WORKLOAD_COMMAND_BUILDS, 1);
@@ -591,12 +604,15 @@ static void reach_settings_on_config_service_event(void *, reach_config_service_
     }
 }
 
+static void reach_settings_async_notify(void *user);
+
 static void reach_settings_update_progress(void *user, reach_windows_update_progress progress)
 {
     reach_settings_app *app = static_cast<reach_settings_app *>(user);
     if (app != nullptr)
     {
         app->update_worker.progress_state = (int32_t)progress;
+        reach_settings_async_notify(app);
     }
 }
 
@@ -722,6 +738,7 @@ static void reach_settings_update_worker_main(reach_settings_app *app)
             worker->completed = 1;
             worker->in_flight = 0;
         }
+        reach_settings_async_notify(app);
     }
 }
 
@@ -999,6 +1016,7 @@ static void reach_settings_reach_progress(void *user, uint64_t received, uint64_
     {
         app->reach_worker.received = received;
         app->reach_worker.total = total;
+        reach_settings_async_notify(app);
     }
 }
 
@@ -1045,6 +1063,7 @@ static void reach_settings_reach_worker_main(reach_settings_app *app)
             worker->completed = 1;
             worker->in_flight = 0;
         }
+        reach_settings_async_notify(app);
     }
 }
 
@@ -1256,6 +1275,7 @@ static void reach_settings_startup_worker_main(reach_settings_app *app)
             worker->work_result = result;
             worker->list = list;
         }
+        reach_settings_async_notify(app);
     }
 }
 
@@ -1432,7 +1452,9 @@ static void reach_settings_async_notify(void *user)
     reach_settings_app *app = static_cast<reach_settings_app *>(user);
     if (app != nullptr)
     {
-        app->async_notify.store(1);
+        int32_t pending = app->async_notify.exchange(1);
+        if (!pending && app->notify != nullptr)
+            app->notify(app->notify_user);
     }
 }
 
@@ -1463,6 +1485,7 @@ static void reach_settings_on_system_controls_changed(void *user, uint32_t chang
     if (app != nullptr && change_flags != 0)
     {
         app->system_controls_change_flags.fetch_or(change_flags);
+        reach_settings_async_notify(app);
     }
 }
 
@@ -2699,7 +2722,8 @@ static void reach_settings_handle_event(void *user, const reach_ui_event *event)
     }
 }
 
-reach_result reach_settings_app_create(reach_settings_app **out_app)
+reach_result reach_settings_app_create(reach_settings_app **out_app,
+                                       reach_settings_app_notify_fn notify, void *notify_user)
 {
     if (out_app == nullptr)
     {
@@ -2712,6 +2736,8 @@ reach_result reach_settings_app_create(reach_settings_app **out_app)
     {
         return REACH_ERROR;
     }
+    app->notify = notify;
+    app->notify_user = notify_user;
     app->theme = reach_theme_default();
     reach_settings_model_init(&app->model);
 
@@ -2910,6 +2936,10 @@ reach_result reach_settings_app_update(reach_settings_app *app, double delta_sec
     {
         return REACH_INVALID_ARGUMENT;
     }
+    if (app->async_notify.exchange(0) != 0)
+    {
+        app->dirty = 1;
+    }
     reach_workload_add(REACH_WORKLOAD_APP_UPDATES, 1);
     if (reach_monitor_refresh_retry_due(&app->monitor_refresh_retry) ||
         reach_monitor_topology_confirmation_due(&app->monitor_topology))
@@ -2957,10 +2987,6 @@ reach_result reach_settings_app_update(reach_settings_app *app, double delta_sec
         reach_settings_apply_bluetooth_radio(app, &system_snapshot.bluetooth);
         app->dirty = 1;
     }
-    if (app->async_notify.exchange(0) != 0)
-    {
-        app->dirty = 1;
-    }
     reach_settings_apply_wifi_snapshot(app);
     reach_settings_apply_bluetooth_snapshot(app);
     if (reach_settings_model_wifi_scroll(&app->model, delta_seconds))
@@ -2975,19 +3001,7 @@ reach_result reach_settings_app_update(reach_settings_app *app, double delta_sec
     {
         app->dirty = 1;
     }
-    if (reach_settings_model_installed_apps_loader(&app->model, delta_seconds))
-    {
-        app->dirty = 1;
-    }
     if (reach_settings_model_display_scroll(&app->model, delta_seconds))
-    {
-        app->dirty = 1;
-    }
-    if (reach_settings_model_wifi_loader(&app->model, delta_seconds))
-    {
-        app->dirty = 1;
-    }
-    if (reach_settings_model_bluetooth_loader(&app->model, delta_seconds))
     {
         app->dirty = 1;
     }
@@ -3001,10 +3015,6 @@ reach_result reach_settings_app_update(reach_settings_app *app, double delta_sec
         app->dirty = 1;
     }
     if (reach_settings_model_update_scroll(&app->model, delta_seconds))
-    {
-        app->dirty = 1;
-    }
-    if (reach_settings_model_update_loader(&app->model, delta_seconds))
     {
         app->dirty = 1;
     }
@@ -3027,9 +3037,10 @@ reach_result reach_settings_app_update(reach_settings_app *app, double delta_sec
     if (reach_settings_app_caret_deadline(app) > 0.0 &&
         reach_settings_model_update_caret(&app->model, reach_motion_now_seconds()))
         app->dirty = 1;
-    int32_t motion_fallback = reach_render_command_buffer_motion_active(&app->render_commands) &&
-                              (app->renderer.ops.retained_supported == nullptr ||
-                               !app->renderer.ops.retained_supported(app->renderer.backend));
+    int32_t motion_fallback = app->render_commands.requires_content_sampling ||
+                              (reach_render_command_buffer_motion_active(&app->render_commands) &&
+                               (app->renderer.ops.retained_supported == nullptr ||
+                                !app->renderer.ops.retained_supported(app->renderer.backend)));
     if (motion_fallback || app->motion_fallback_active)
         app->dirty = 1;
     app->motion_fallback_active = motion_fallback;
@@ -3083,27 +3094,29 @@ int32_t reach_settings_app_needs_frame(const reach_settings_app *app)
     int32_t reach_busy = 0;
     {
         std::lock_guard<std::mutex> reach_lock(reach_worker->mutex);
-        reach_busy = reach_worker->pending || reach_worker->in_flight || reach_worker->completed;
+        reach_busy = reach_worker->completed;
     }
     reach_settings_startup_worker *startup_worker =
         const_cast<reach_settings_startup_worker *>(&app->startup_worker);
     int32_t startup_busy = 0;
     {
         std::lock_guard<std::mutex> startup_lock(startup_worker->mutex);
-        startup_busy =
-            startup_worker->pending || startup_worker->in_flight || startup_worker->completed;
+        startup_busy = startup_worker->completed;
     }
     reach_settings_update_worker *worker =
         const_cast<reach_settings_update_worker *>(&app->update_worker);
     std::lock_guard<std::mutex> lock(worker->mutex);
     double caret_deadline = reach_settings_app_caret_deadline(app);
-    return (caret_deadline > 0.0 && reach_motion_wait_ms(caret_deadline) == 0) ||
-           app->motion_fallback_active ||
-           (reach_render_command_buffer_motion_active(&app->render_commands) &&
-            (app->renderer.ops.retained_supported == nullptr ||
-             !app->renderer.ops.retained_supported(app->renderer.backend))) ||
-           app->dirty || reach_busy || startup_busy || worker->pending || worker->in_flight ||
-           worker->completed || app->update_worker.progress_state.load() != 0 ||
+    int32_t visible = app->window.ops.is_minimized == nullptr ||
+                      !app->window.ops.is_minimized(app->window.window);
+    int32_t sampled_visual =
+        visible && (app->motion_fallback_active || app->render_commands.requires_content_sampling ||
+                    (reach_render_command_buffer_motion_active(&app->render_commands) &&
+                     (app->renderer.ops.retained_supported == nullptr ||
+                      !app->renderer.ops.retained_supported(app->renderer.backend))));
+    return (caret_deadline > 0.0 && reach_motion_wait_ms(caret_deadline) == 0) || sampled_visual ||
+           app->dirty || reach_busy || startup_busy || worker->completed ||
+           app->update_worker.progress_state.load() != 0 ||
            app->model.update_scrollbar.offset != app->model.update_scrollbar.target ||
            app->model.startup_scrollbar.offset != app->model.startup_scrollbar.target ||
            app->model.installed_apps_scrollbar.offset !=
@@ -3114,18 +3127,11 @@ int32_t reach_settings_app_needs_frame(const reach_settings_app *app)
            reach_settings_model_display_animations_active(&app->model) ||
            reach_settings_model_top_bar_animations_active(&app->model) ||
            app->async_notify.load() != 0 || app->system_controls_change_flags.load() != 0 ||
-           reach_icon_service_work_pending(app->icon_service) ||
-           reach_system_status_system_pending(app->system_status) ||
-           reach_wifi_service_pending(app->wifi_service) ||
-           reach_bluetooth_service_pending(app->bluetooth_service) ||
-           reach_installed_apps_service_pending(app->installed_apps_service) ||
            app->model.wifi_scrollbar.offset != app->model.wifi_scrollbar.target ||
            app->model.bluetooth_scrollbar.offset != app->model.bluetooth_scrollbar.target ||
            app->wifi_scrollbar_drag.active || app->bluetooth_scrollbar_drag.active ||
            reach_settings_model_wifi_animations_active(&app->model) ||
-           reach_settings_model_bluetooth_animations_active(&app->model) ||
-           app->model.wifi_status == REACH_SETTINGS_WIFI_STATUS_SCANNING ||
-           app->model.bluetooth_status == REACH_SETTINGS_BLUETOOTH_STATUS_SCANNING;
+           reach_settings_model_bluetooth_animations_active(&app->model);
 }
 
 int32_t reach_settings_app_frame_rate_hz(const reach_settings_app *app)

@@ -546,6 +546,19 @@ static void test_group_hierarchy_samples_one_geometry_timeline(void)
         expect_near(clip.height, bottom - top, 0.001f,
                     "outer viewport remains fixed during reveal");
     }
+    buffer.groups[2].clip_radius = 5;
+    reach_rect_f32 rounded_bounds = {}, rectangular_bounds = {};
+    expect_true(reach_render_command_buffer_group_clip_at(&buffer, leaf.id, 10, &rounded_bounds) &&
+                    reach_render_command_buffer_group_rectangular_clip_at(&buffer, leaf.id, 10,
+                                                                          &rectangular_bounds),
+                "rounded viewports keep separate rectangular ancestor clips");
+    expect_true(rectangular_bounds.width > rounded_bounds.width,
+                "hard ancestor clipping does not truncate the rounded mask's antialiased edge");
+    expect_true(reach_render_command_buffer_validate_groups(&buffer) == REACH_OK,
+                "static rounded body clips are supported");
+    reach_motion_start_at(&buffer.groups[2].clip_insets[0], 0, 2, 1, REACH_EASING_EASE_IN_OUT, 10);
+    expect_true(reach_render_command_buffer_validate_groups(&buffer) == REACH_INVALID_ARGUMENT,
+                "rounded clips reject unsupported animated insets");
 }
 
 static void test_group_hierarchy_rejects_ambiguous_ownership_and_order(void)
@@ -672,7 +685,7 @@ static void test_group_equality_preserves_intent_without_padding(void)
     reach_motion_set(&first.opacity, 1);
     reach_render_group second = first;
     unsigned char *bytes = reinterpret_cast<unsigned char *>(&second);
-    for (size_t at = offsetof(reach_render_group, clip) + sizeof(second.clip);
+    for (size_t at = offsetof(reach_render_group, clip_radius) + sizeof(second.clip_radius);
          at < offsetof(reach_render_group, clip_insets); ++at)
         bytes[at] = 0xa5;
     for (size_t at = offsetof(reach_render_group, has_tint) + sizeof(second.has_tint);

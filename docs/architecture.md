@@ -433,7 +433,27 @@ Both compositors repeat the resulting keyframes/cubics without application ticks
 remains finite so completion ownership is well-defined. Retiring or replacing retained sources stops
 periodic transform, opacity, clip and tint bindings before releasing the layer; font replacement
 uses the same cleanup. Existing marquee descriptors retain their previous backend behavior pending
-their separate audit. Loader consumers and final workload acceptance remain migration work.
+their separate audit. Final workload acceptance remains migration work.
+
+Settings Wi-Fi, Bluetooth, Windows Update and installed-app loaders publish normalized periodic
+width and translation through the shared loader renderer. Fixed caps preserve the bar radius while
+the middle stretches; a static rounded viewport preserves container coverage. Retained groups expose
+`clip_radius` for static rounded body clipping; animated rounded insets and rounded root clips are
+rejected. Windows Composition uses a geometric clip and DirectComposition a rounded rectangle clip.
+Fallback drawing applies rounded ancestor masks separately from hard rectangular ancestor clips,
+so a rectangular bounding approximation cannot cut away rounded antialiasing. Small bounds whose
+minimum bar width cannot contain fixed caps publish sampled clipped geometry and set
+`requires_content_sampling`; generic frame scheduling respects that flag. Settings passes retained
+renderer capability into its render input. Without retained support, the shared loader emits direct
+rounded geometry sampled from the same motion, preserving fractional-position fallback pixels
+without building stretch patches.
+
+Settings bootstrap owns an auto-reset wake event. Services and local workers publish data before
+calling a coalesced notification; the UI drains notification intent before consuming results so
+concurrent publications retain a wake. Pending work alone does not request application frames.
+Progress wakes respect an already pending frame deadline, and input remains immediate. Minimized
+rendering suspends retained sources and clears sampled motion demand; restoring republishes the
+current absolute phase. Worker/service teardown precedes closing the bootstrap event.
 
 Retained render groups carry stable identities, local content bounds, clips, and independent X/Y,
 opacity, and scale motion. Scale remains uniform by default; an explicit `scale_y` motion overrides

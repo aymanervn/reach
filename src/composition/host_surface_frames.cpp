@@ -187,9 +187,10 @@ reach_host_execute_registered_surface(reach_host *host, reach_feature_runtime *d
         commands->presentation.bounds = commands->content_rect;
     }
     desc->surface->fallback_animation_active =
-        (desc->surface->renderer.ops.retained_supported == nullptr ||
-         !desc->surface->renderer.ops.retained_supported(desc->surface->renderer.backend)) &&
-        reach_render_command_buffer_motion_active(commands);
+        commands->requires_content_sampling ||
+        ((desc->surface->renderer.ops.retained_supported == nullptr ||
+          !desc->surface->renderer.ops.retained_supported(desc->surface->renderer.backend)) &&
+         reach_render_command_buffer_motion_active(commands));
     if (definition != nullptr && definition->surface.popup_chrome)
     {
         return reach_host_render_popup_surface(host, desc->definition->id, desc->surface,

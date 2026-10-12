@@ -33,34 +33,32 @@ static reach_rect_f32 make_container(void)
     return container;
 }
 
-static reach_rect_f32 rect_at(reach_loader_phase phase, float progress)
+static reach_rect_f32 rect_at(int phase, float progress)
 {
     reach_loader_model model = {};
-    reach_loader_model_init(&model, 1.0f);
-    model.phase = phase;
-    model.phase_progress = progress;
-    return reach_loader_bar_rect(&model, make_container());
+    reach_loader_model_init_at(&model, 1.0f, 100);
+    return reach_loader_bar_rect_at(&model, make_container(), 100 + phase + progress);
 }
 
 static void test_phase_endpoints_are_continuous(void)
 {
-    reach_rect_f32 grow_end = rect_at(REACH_LOADER_PHASE_GROW, 1.0f);
-    reach_rect_f32 out_start = rect_at(REACH_LOADER_PHASE_SLIDE_OUT, 0.0f);
+    reach_rect_f32 grow_end = rect_at(0, 1.0f);
+    reach_rect_f32 out_start = rect_at(1, 0.0f);
     expect_near(grow_end.x, out_start.x, "grow end origin matches slide out start");
     expect_near(grow_end.width, out_start.width, "grow end width matches slide out start");
 
-    reach_rect_f32 out_end = rect_at(REACH_LOADER_PHASE_SLIDE_OUT, 1.0f);
-    reach_rect_f32 back_start = rect_at(REACH_LOADER_PHASE_SLIDE_BACK, 0.0f);
+    reach_rect_f32 out_end = rect_at(1, 1.0f);
+    reach_rect_f32 back_start = rect_at(2, 0.0f);
     expect_near(out_end.x, back_start.x, "slide out end origin matches slide back start");
     expect_near(out_end.width, back_start.width, "slide out end width matches slide back start");
 
-    reach_rect_f32 back_end = rect_at(REACH_LOADER_PHASE_SLIDE_BACK, 1.0f);
-    reach_rect_f32 shrink_start = rect_at(REACH_LOADER_PHASE_SHRINK, 0.0f);
+    reach_rect_f32 back_end = rect_at(2, 1.0f);
+    reach_rect_f32 shrink_start = rect_at(3, 0.0f);
     expect_near(back_end.x, shrink_start.x, "slide back end origin matches shrink start");
     expect_near(back_end.width, shrink_start.width, "slide back end width matches shrink start");
 
-    reach_rect_f32 shrink_end = rect_at(REACH_LOADER_PHASE_SHRINK, 1.0f);
-    reach_rect_f32 grow_start = rect_at(REACH_LOADER_PHASE_GROW, 0.0f);
+    reach_rect_f32 shrink_end = rect_at(3, 1.0f);
+    reach_rect_f32 grow_start = rect_at(0, 0.0f);
     expect_near(shrink_end.x, grow_start.x, "shrink end origin matches grow start");
     expect_near(shrink_end.width, grow_start.width, "shrink end width matches grow start");
 }
@@ -68,8 +66,7 @@ static void test_phase_endpoints_are_continuous(void)
 static void test_bar_never_overflows_container(void)
 {
     reach_rect_f32 container = make_container();
-    reach_loader_phase phases[4] = {REACH_LOADER_PHASE_GROW, REACH_LOADER_PHASE_SLIDE_OUT,
-                                    REACH_LOADER_PHASE_SLIDE_BACK, REACH_LOADER_PHASE_SHRINK};
+    int phases[4] = {0, 1, 2, 3};
 
     for (int phase_index = 0; phase_index < 4; ++phase_index)
     {
@@ -86,39 +83,26 @@ static void test_bar_never_overflows_container(void)
     }
 }
 
-static void test_phase_cycle_order(void)
+static void test_absolute_cycle_and_reset(void)
 {
     reach_loader_model model = {};
-    reach_loader_model_init(&model, 1.0f);
-    expect_true(model.phase == REACH_LOADER_PHASE_GROW, "starts in grow");
-
-    reach_loader_update(&model, 1.0);
-    expect_true(model.phase == REACH_LOADER_PHASE_SLIDE_OUT, "grow advances to slide out");
-
-    reach_loader_update(&model, 1.0);
-    expect_true(model.phase == REACH_LOADER_PHASE_SLIDE_BACK, "slide out advances to slide back");
-
-    reach_loader_update(&model, 1.0);
-    expect_true(model.phase == REACH_LOADER_PHASE_SHRINK, "slide back advances to shrink");
-
-    reach_loader_update(&model, 1.0);
-    expect_true(model.phase == REACH_LOADER_PHASE_GROW, "shrink returns to grow");
-}
-
-static void test_update_reports_and_clamps(void)
-{
-    reach_loader_model model = {};
-    reach_loader_model_init(&model, 1.0f);
-
-    expect_true(reach_loader_update(&model, 0.0) == 0, "zero delta does not animate");
-    expect_true(reach_loader_update(&model, 0.5) == 1, "positive delta animates");
-    expect_near(model.phase_progress, 0.5f, "progress accumulates");
-
-    reach_loader_update(&model, 10000.0);
-    expect_true(model.phase_progress >= 0.0f && model.phase_progress < 1.0f,
-                "long stall leaves progress normalised");
-
-    expect_true(reach_loader_update(nullptr, 1.0) == 0, "null model is rejected");
+    reach_loader_model_init_at(&model, 1, 100);
+    for (int cycle = 0; cycle < 3; ++cycle)
+    {
+        reach_rect_f32 bar = reach_loader_bar_rect_at(&model, make_container(), 100 + cycle * 4);
+        expect_near(bar.x, 10, "each cycle starts at the left edge");
+        expect_near(bar.width, 10, "each cycle starts at minimum width");
+    }
+    reach_rect_f32 delayed = reach_loader_bar_rect_at(&model, make_container(), 10102.5);
+    reach_rect_f32 reference = reach_loader_bar_rect_at(&model, make_container(), 102.5);
+    expect_near(delayed.x, reference.x, "delayed sampling skips whole cycles without drift");
+    expect_near(delayed.width, reference.width, "delayed width follows the absolute epoch");
+    uint64_t generation = model.width.generation;
+    reach_loader_model_reset_at(&model, 200);
+    expect_true(model.width.generation != generation, "reset replaces periodic ownership");
+    reach_rect_f32 reset = reach_loader_bar_rect_at(&model, make_container(), 200);
+    expect_near(reset.x, 10, "reset restores initial origin immediately");
+    expect_near(reset.width, 10, "reset restores minimum width immediately");
 }
 
 static void test_zero_width_container(void)
@@ -134,8 +118,7 @@ int main(void)
 {
     test_phase_endpoints_are_continuous();
     test_bar_never_overflows_container();
-    test_phase_cycle_order();
-    test_update_reports_and_clamps();
+    test_absolute_cycle_and_reset();
     test_zero_width_container();
 
     if (failures != 0)

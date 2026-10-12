@@ -104,6 +104,8 @@ struct reach_d2d_retained_layer
     ComPtr<ABI::Windows::UI::Composition::ICompositionColorBrush> tint_brush;
     ComPtr<ABI::Windows::UI::Composition::ICompositionPropertySet> tint_properties;
     ComPtr<ABI::Windows::UI::Composition::IInsetClip> inset_clip;
+    ComPtr<ABI::Windows::UI::Composition::ICompositionRoundedRectangleGeometry> rounded_geometry;
+    ComPtr<ABI::Windows::UI::Composition::ICompositionGeometricClip> rounded_clip;
     ComPtr<IDCompositionVisual2> dcomp_container;
     ComPtr<IDCompositionVisual2> dcomp_visual;
     ComPtr<IDCompositionSurface> dcomp_surface;
@@ -202,6 +204,9 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
                                      const reach_render_command_buffer *commands);
 void reach_d2d_release_retained(reach_render_backend *backend);
 void reach_d2d_clear_retained_layers(reach_render_backend *backend);
+reach_result reach_d2d_push_group_masks(reach_render_backend *backend, ID2D1RenderTarget *target,
+                                        const reach_render_command_buffer *commands, uint64_t id,
+                                        double now_seconds, uint32_t *out_depth);
 reach_result reach_d2d_presentation_complete(reach_render_backend *backend, uint64_t generation,
                                              int32_t *out_complete);
 void reach_d2d_suspend(reach_render_backend *backend);

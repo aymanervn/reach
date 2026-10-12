@@ -432,15 +432,6 @@ int32_t reach_settings_model_wifi_scroll(reach_settings_model *model, double del
     return model != nullptr ? reach_scrollbar_update(&model->wifi_scrollbar, delta_seconds) : 0;
 }
 
-int32_t reach_settings_model_wifi_loader(reach_settings_model *model, double delta_seconds)
-{
-    if (model == nullptr || model->wifi_status != REACH_SETTINGS_WIFI_STATUS_SCANNING)
-    {
-        return 0;
-    }
-    return reach_loader_update(&model->wifi_loader, delta_seconds);
-}
-
 int32_t reach_settings_model_sample_wifi_animations_at(reach_settings_model *model,
                                                        double now_seconds)
 {

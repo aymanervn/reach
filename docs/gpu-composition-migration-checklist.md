@@ -201,8 +201,20 @@ support expectation is explicitly resolved.
     repaint or resubmit properties. Layer retirement, font replacement and suspension stop bindings;
     root presentation rejects infinite motion. Pure sampling/compiler/crossing checks, both builds,
     all 40 tests and focused native lifetime probes pass. Five full native runs per backend plus
-    existing fallback checks also pass in Debug/Release. Loader
-    consumer migration, existing marquee audit, displayed pixels and product acceptance remain open.
+    existing fallback checks also pass in Debug/Release. Existing marquee audit, displayed pixels
+    and product acceptance remain open; Settings loader consumers are completed below.
+  - [x] Migrate Settings Wi-Fi, Bluetooth, Windows Update and installed-app loaders end to end.
+    Canonical periodic width/translation drive shared fixed-cap sources and a static rounded viewport
+    on both backends. Remove phase state, phase-update APIs and in-flight/scan frame polling. Worker
+    and service completion/progress use a coalesced bootstrap wake event; notifications drain before
+    result consumption. Unsupported backends and tiny bounds use direct geometry from the same
+    motion with explicit sampled demand; minimized rendering suspends sources and offscreen loaders
+    publish no repetition. Both isolated builds and all 40 tests pass. Owned probes cover actual
+    capability selection, notification races, busy pages in two themes/four DPI values, native idle,
+    source reuse/restart/retirement and 136 pixel comparisons. Direct fallback pixels match exactly;
+    retained filtering differences stay at rounded caps and are bounded/inspected. Five full native
+    runs per backend plus existing fallback checks pass in both builds. Displayed pixels, the tiny-bound
+    CPU cost disposition and total product workload acceptance remain in the broader gates.
   - [x] Replace frame-rate caret ticking with shared absolute-time deadline scheduling.
     Settings' Account/Power/Wi-Fi fields and Launcher use one pure blink model, preserving their
     duty cycles and immediate focus/edit resets. Late wakes skip missed cycles; hidden pages,

@@ -746,11 +746,10 @@ static void render_installed_apps_page(const reach_settings_render_input *input,
 
     if (layout->installed_apps_loader_bar.width > 0.0f)
     {
-        reach_rect_f32 bar =
-            reach_loader_bar_rect(&model->installed_apps_loader, layout->installed_apps_loader_bar);
         (void)reach_loader_build_render_commands(
-            layout->installed_apps_loader_bar, bar, {0.0f, 0.0f, 0.0f, 0.0f},
-            reach_theme_accent_color(input->theme, REACH_THEME_ACCENT_BLUE), commands);
+            &model->installed_apps_loader, layout->installed_apps_loader_bar, {},
+            reach_theme_accent_color(input->theme, REACH_THEME_ACCENT_BLUE),
+            input->retained_supported, UINT64_C(0x2800000000000300), commands);
     }
 
     if (layout->installed_app_row_count == 0)
@@ -1007,10 +1006,9 @@ static void render_update_page(const reach_settings_render_input *input,
                 reach_settings_scale(input, 18.0f),
             loader_width, loader_height};
 
-        reach_rect_f32 loader_bar = reach_loader_bar_rect(&model->update_loader, loader_container);
-        reach_rect_f32 loader_origin = {0.0f, 0.0f, 0.0f, 0.0f};
-        (void)reach_loader_build_render_commands(loader_container, loader_bar, loader_origin,
-                                                 accent, commands);
+        (void)reach_loader_build_render_commands(&model->update_loader, loader_container, {},
+                                                 accent, input->retained_supported,
+                                                 UINT64_C(0x2800000000000400), commands);
         return;
     }
     else if (model->update_page_state == REACH_SETTINGS_UPDATE_ERROR &&

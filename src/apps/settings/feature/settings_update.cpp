@@ -131,13 +131,6 @@ void reach_settings_model_begin_update_scan(reach_settings_model *model)
     reach_loader_model_reset(&model->update_loader);
 }
 
-int32_t reach_settings_model_update_loader(reach_settings_model *model, double delta_seconds)
-{
-    if (model == nullptr || model->update_page_state != REACH_SETTINGS_UPDATE_SCANNING)
-        return 0;
-    return reach_loader_update(&model->update_loader, delta_seconds);
-}
-
 void reach_settings_model_apply_update_scan(reach_settings_model *model,
                                             const reach_windows_update_list *updates,
                                             int32_t hresult)

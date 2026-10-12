@@ -191,6 +191,42 @@ static reach_result reach_d2d_execute_tinted_group(reach_render_backend *backend
     return REACH_OK;
 }
 
+reach_result reach_d2d_push_group_masks(reach_render_backend *backend, ID2D1RenderTarget *target,
+                                        const reach_render_command_buffer *commands, uint64_t id,
+                                        double now_seconds, uint32_t *out_depth)
+{
+    *out_depth = 0;
+    const reach_render_group *group = reach_render_command_buffer_group(commands, id);
+    while (group != nullptr)
+    {
+        if (group->has_clip && group->clip_radius > 0)
+        {
+            reach_rect_f32 clip = reach_render_group_clip_at(group, now_seconds);
+            ComPtr<ID2D1RoundedRectangleGeometry> geometry;
+            ComPtr<ID2D1Layer> layer;
+            HRESULT hr = backend->factory->CreateRoundedRectangleGeometry(
+                D2D1::RoundedRect(
+                    D2D1::RectF(clip.x, clip.y, clip.x + clip.width, clip.y + clip.height),
+                    group->clip_radius, group->clip_radius),
+                &geometry);
+            if (SUCCEEDED(hr))
+                hr = target->CreateLayer(&layer);
+            if (FAILED(hr))
+                return REACH_ERROR;
+            reach_transform_f32 parent = reach_render_command_buffer_group_transform_at(
+                commands, group->parent_id, now_seconds);
+            auto transform = D2D1::Matrix3x2F::Scale(parent.scale_x, parent.scale_y) *
+                             D2D1::Matrix3x2F::Translation(parent.offset_x, parent.offset_y);
+            target->PushLayer(D2D1::LayerParameters(D2D1::InfiniteRect(), geometry.Get(),
+                                                    D2D1_ANTIALIAS_MODE_PER_PRIMITIVE, transform),
+                              layer.Get());
+            ++*out_depth;
+        }
+        group = reach_render_command_buffer_group(commands, group->parent_id);
+    }
+    return REACH_OK;
+}
+
 reach_result reach_d2d_execute(reach_render_backend *backend,
                                const reach_render_command_buffer *commands)
 {
@@ -244,13 +280,24 @@ reach_result reach_d2d_execute(reach_render_backend *backend,
             reach_render_command_buffer_group(commands, command.group_id);
         target->SetTransform(content * root);
         reach_rect_f32 clip = {};
-        bool has_clip = reach_render_command_buffer_group_clip_at(commands, command.group_id,
-                                                                  now_seconds, &clip) != 0;
+        bool has_clip = reach_render_command_buffer_group_rectangular_clip_at(
+                            commands, command.group_id, now_seconds, &clip) != 0;
         if (has_clip)
         {
             target->PushAxisAlignedClip(
                 D2D1::RectF(clip.x, clip.y, clip.x + clip.width, clip.y + clip.height),
                 D2D1_ANTIALIAS_MODE_ALIASED);
+        }
+        uint32_t rounded_depth = 0;
+        outcome = reach_d2d_push_group_masks(backend, target, commands, command.group_id,
+                                             now_seconds, &rounded_depth);
+        if (outcome != REACH_OK)
+        {
+            while (rounded_depth-- > 0)
+                target->PopLayer();
+            if (has_clip)
+                target->PopAxisAlignedClip();
+            break;
         }
         reach_transform_f32 transform =
             reach_render_command_buffer_group_transform_at(commands, command.group_id, now_seconds);
@@ -268,6 +315,8 @@ reach_result reach_d2d_execute(reach_render_backend *backend,
             outcome =
                 reach_d2d_execute_tinted_group(backend, target, *group, commands->commands + index,
                                                end - index, opacity, now_seconds);
+            while (rounded_depth-- > 0)
+                target->PopLayer();
             if (has_clip)
                 target->PopAxisAlignedClip();
             index = end - 1;
@@ -288,6 +337,8 @@ reach_result reach_d2d_execute(reach_render_backend *backend,
             outcome = reach_d2d_execute_command(backend, target, &command);
         if (scissor)
             target->PopAxisAlignedClip();
+        while (rounded_depth-- > 0)
+            target->PopLayer();
         if (has_clip)
             target->PopAxisAlignedClip();
     }

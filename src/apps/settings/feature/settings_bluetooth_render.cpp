@@ -201,11 +201,9 @@ void reach_settings_render_bluetooth_page(const reach_settings_render_input *inp
 
     if (layout->bluetooth_loader_bar.width > 0.0f)
     {
-        reach_rect_f32 bar =
-            reach_loader_bar_rect(&model->bluetooth_loader, layout->bluetooth_loader_bar);
-        reach_rect_f32 origin = {0.0f, 0.0f, 0.0f, 0.0f};
-        (void)reach_loader_build_render_commands(layout->bluetooth_loader_bar, bar, origin, accent,
-                                                 commands);
+        (void)reach_loader_build_render_commands(
+            &model->bluetooth_loader, layout->bluetooth_loader_bar, {}, accent,
+            input->retained_supported, UINT64_C(0x2800000000000200), commands);
     }
 
     if (!enabled)

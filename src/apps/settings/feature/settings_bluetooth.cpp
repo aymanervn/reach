@@ -232,15 +232,6 @@ int32_t reach_settings_model_bluetooth_scroll(reach_settings_model *model, doubl
                             : 0;
 }
 
-int32_t reach_settings_model_bluetooth_loader(reach_settings_model *model, double delta_seconds)
-{
-    if (model == nullptr || model->bluetooth_status != REACH_SETTINGS_BLUETOOTH_STATUS_SCANNING)
-    {
-        return 0;
-    }
-    return reach_loader_update(&model->bluetooth_loader, delta_seconds);
-}
-
 int32_t reach_settings_model_sample_bluetooth_animations_at(reach_settings_model *model,
                                                             double now_seconds)
 {

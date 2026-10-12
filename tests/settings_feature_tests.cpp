@@ -645,15 +645,13 @@ static void test_installed_apps_loader(void)
     reach_settings_model_init(model.get());
 
     reach_settings_model_set_installed_apps_busy(model.get(), 1);
-    expect_true(model->installed_apps_loader.phase == REACH_LOADER_PHASE_GROW &&
-                    model->installed_apps_loader.phase_progress == 0.0f,
-                "Applications loading resets its loader");
-    expect_true(reach_settings_model_installed_apps_loader(model.get(), 0.1),
-                "Applications loader advances while busy");
-
+    expect_true(model->installed_apps_loader.width.repeating &&
+                    reach_motion_value_at(&model->installed_apps_loader.width,
+                                          model->installed_apps_loader.width.started_seconds) ==
+                        REACH_LOADER_MINIMUM_WIDTH_RATIO,
+                "Applications loading resets periodic intent to minimum width");
     reach_settings_model_set_installed_apps_busy(model.get(), 0);
-    expect_true(!reach_settings_model_installed_apps_loader(model.get(), 0.1),
-                "Applications loader stops when loading completes");
+    expect_true(!model->installed_apps_busy, "completed loading retires semantic visibility");
 }
 
 static void test_radio_toggle_animations(void)
