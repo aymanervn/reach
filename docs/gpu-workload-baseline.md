@@ -929,3 +929,39 @@ remain separately checked.
 Full native suites pass five runs per backend plus fallback in both optimized and Debug configurations
 with no exclusions (`probe-equality-release.log`, `probe-equality-debug.log`). This fixes an optimized
 cache correctness/efficiency defect; it does not establish total CPU/GPU/power/latency benefit.
+
+
+## Horizontal focal chrome and popup width intent
+
+The shared stretch contract now supports five columns around a rigid focal band, or ordinary edge
+caps containing the complete notch/shadow footprint. Corners, borders and the focal feature retain
+unit scale; straight shoulders resize independently. Source crops partition the original area;
+there are at most fifteen groups, or five with an unchanged uncapped height. No new native effect,
+clock or backend is introduced. Compact/overlapping independent caps remain explicitly unsupported.
+
+Canonical two-slope mappings generalize the existing peak without enlarging `reach_motion`.
+Same-epoch combinations preserve clock/easing/generation and reject active input clamps or different
+breakpoints. Full-range validation includes interior extrema. Popup body/notch intent agrees with
+existing constrained placement across both directions, outside/edge/center owners, tiny and oversized
+widths, reversal and 100/125/150/200% DPI. These pure geometry checks establish the shared contract;
+they do not migrate the Dock popup or Switcher consumers.
+
+Debug/Release builds and all forty test groups pass. Owned full native suites run five times per
+backend plus fallback (`probe-focal-full-debug.log`, `probe-focal-full-release.log`). Native focal
+resize and reversal reuse cached sources, and unchanged settled submissions change no properties.
+Central top/bottom and combined left/right cap readback differs from direct geometry by at most two
+channel values at all four DPI scales. Displayed native pixels and total CPU/GPU/power/memory/latency
+acceptance remain open. Later invalid-input/cap validation changes retain the same valid geometry
+and receive focused geometry/native revalidation.
+
+The current sandbox's MSVC PDB server rejected `/Zi` compilation with C1902. The local Debug cache
+uses `/Z7 /Ob0 /Od /RTC1` and owned probe runners use `/Z7`; tracked build rules and optimized Release
+flags remain unchanged. Tests use a workspace-owned TEMP/TMP directory because the sandbox temp
+path could not create nested fixtures. These are validation-environment adjustments.
+
+Live startup uses the registered shell path `C:\Dev\reach\build\reach.exe --launch` and the matching
+watchdog. The validation host was observed alive with its launch session held open. Computer Use
+returned no targetable Reach surface at that observation; a completed launcher command alone had
+not established durable child lifetime. No displayed-pixel/input acceptance is claimed. Restart
+order and installation-folder reuse are recorded in the checklist; this scope does not reinstall
+or change shell registration.

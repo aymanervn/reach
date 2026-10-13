@@ -182,9 +182,10 @@ static int32_t reach_render_repetition_valid(const reach_render_group *group, in
     for (index = 0; index < sizeof(motions) / sizeof(motions[0]); ++index)
     {
         const reach_motion *motion = motions[index];
-        if (motion->has_peak && (motion->has_peak != 1 || !isfinite(motion->peak_center) ||
-                                 !isfinite(motion->peak_radius) || motion->peak_radius <= 0 ||
-                                 !isfinite(motion->peak_scale) || !isfinite(motion->peak_offset)))
+        if (motion->has_mapping &&
+            (motion->has_mapping != 1 || !isfinite(motion->mapping_center) ||
+             !isfinite(motion->mapping_left_slope) || !isfinite(motion->mapping_right_slope) ||
+             !isfinite(motion->mapping_value)))
             return 0;
         if (motion->repeating && (root || motion->repeating != 1 || motion->generation == 0 ||
                                   !isfinite(motion->started_seconds) || !isfinite(motion->from) ||

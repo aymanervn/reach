@@ -26,11 +26,11 @@ extern "C"
         int32_t repeating;
         double hold_start_seconds;
         double hold_end_seconds;
-        int32_t has_peak;
-        float peak_center;
-        float peak_radius;
-        float peak_scale;
-        float peak_offset;
+        int32_t has_mapping;
+        float mapping_center;
+        float mapping_left_slope;
+        float mapping_right_slope;
+        float mapping_value;
     } reach_motion;
 
     enum
@@ -68,6 +68,13 @@ extern "C"
     reach_motion reach_motion_affine(const reach_motion *motion, float multiplier, float offset);
     reach_result reach_motion_peak(const reach_motion *motion, float center, float radius,
                                    reach_motion *out_motion);
+    reach_result reach_motion_hinge(const reach_motion *motion, float center, float value,
+                                    float left_slope, float right_slope, reach_motion *out_motion);
+    reach_result reach_motion_combine(const reach_motion *first, float first_factor,
+                                      const reach_motion *second, float second_factor, float offset,
+                                      reach_motion *out_motion);
+    reach_result reach_motion_range(const reach_motion *motion, float *out_minimum,
+                                    float *out_maximum);
     reach_motion reach_motion_clamp(const reach_motion *motion, float minimum, float maximum);
     size_t reach_motion_compile_at(const reach_motion *motion, double now_seconds,
                                    reach_motion_segment segments[REACH_MOTION_MAX_SEGMENTS]);

@@ -393,6 +393,85 @@ static void test_retained_tint_samples_one_timeline(void)
                 "disabled tint does not change content");
 }
 
+static void test_focal_stretch_geometry_preserves_fixed_features(void)
+{
+    expect_true(reach_render_stretch_patch_count(nullptr) == 0,
+                "absent stretch descriptors expose no patch allocation");
+    auto buffer = std::make_unique<reach_render_command_buffer>();
+    reach_render_group absent_source = {};
+    reach_render_command absent_command = {};
+    expect_true(reach_render_push_stretched_chrome(buffer.get(), &absent_source, nullptr,
+                                                   &absent_command, 1) == REACH_INVALID_ARGUMENT,
+                "absent descriptor batches reject before dereferencing geometry");
+    for (float dpi : {1.0f, 1.25f, 1.5f, 2.0f})
+        for (int reverse = 0; reverse < 2; ++reverse)
+        {
+            reach_render_group source = {};
+            source.id = 400;
+            source.bounds = {-12 * dpi, -8 * dpi, 600 * dpi, 120 * dpi};
+            reach_render_stretch stretch = {};
+            stretch.left = stretch.right = 32 * dpi;
+            stretch.focal_left = 180 * dpi;
+            stretch.focal_right = 260 * dpi;
+            stretch.anchor_x = 0.5f;
+            reach_motion_start_at(&stretch.width, (reverse ? 900 : 300) * dpi,
+                                  (reverse ? 300 : 900) * dpi, 2, REACH_EASING_EASE_IN_OUT, 10);
+            reach_motion_set(&stretch.height, source.bounds.height);
+            expect_true(reach_motion_hinge(&stretch.width, 440 * dpi, 220 * dpi, 0.5f, 0,
+                                           &stretch.focal_x) == REACH_OK &&
+                            reach_render_stretch_patch_count(&stretch) == 15,
+                        "fixed feature resize exposes five columns on the existing patch contract");
+            for (double now : {10.0, 10.3, 10.7, 11.0, 11.5, 12.0})
+            {
+                float width = reach_motion_value_at(&stretch.width, now);
+                float focus = fminf(width * 0.5f, 220 * dpi);
+                float left = source.bounds.x - (width - source.bounds.width) * 0.5f;
+                float expected[] = {left,
+                                    left + stretch.left,
+                                    left + focus - 40 * dpi,
+                                    left + focus + 40 * dpi,
+                                    left + width - stretch.right,
+                                    left + width};
+                for (size_t column = 0; column < 5; ++column)
+                {
+                    reach_render_group patch = {};
+                    expect_true(reach_render_stretch_patch(&source, &stretch, 5 + column, &patch) ==
+                                    REACH_OK,
+                                "focus patches accept both directions across the breakpoint");
+                    reach_point_f32 scale = reach_render_group_scale_at(&patch, now);
+                    expect_near(patch.bounds.x + reach_motion_value_at(&patch.x, now),
+                                expected[column], 0.001f,
+                                "patch translation shares the anchored width timeline");
+                    expect_near(patch.bounds.width * scale.x,
+                                expected[column + 1] - expected[column], 0.001f,
+                                "stretch shoulders meet the fixed corners and focal feature");
+                    expect_near(scale.y, 1, 0.00001f, "fixed height never stretches the feature");
+                    if (column == 0 || column == 2 || column == 4)
+                        expect_near(scale.x, 1, 0.00001f,
+                                    "corners and central feature retain their source pixels");
+                }
+            }
+            reach_render_group patch = {};
+            stretch.focal_left = stretch.left;
+            expect_true(reach_render_stretch_patch(&source, &stretch, 7, &patch) ==
+                            REACH_INVALID_ARGUMENT,
+                        "overlapping corner and feature caps require a separate geometry decision");
+        }
+    reach_render_group source = {};
+    source.id = 100;
+    source.bounds = {0, 0, 200, 100};
+    reach_render_stretch stretch = {};
+    stretch.left = stretch.right = 30;
+    reach_motion width = {};
+    reach_motion_start_at(&width, 0, 2, 2, REACH_EASING_EASE_IN_OUT, 10);
+    expect_true(reach_motion_hinge(&width, 1, 50, -150, 150, &stretch.width) == REACH_OK,
+                "nonmonotonic dimension fixture");
+    reach_motion_set(&stretch.height, 100);
+    reach_render_group patch = {};
+    expect_true(reach_render_stretch_patch(&source, &stretch, 4, &patch) == REACH_INVALID_ARGUMENT,
+                "dimension validation rejects an interior compact size despite safe endpoints");
+}
+
 static void test_stretch_geometry_preserves_caps_and_anchor(void)
 {
     for (float dpi : {1.0f, 1.25f, 1.5f, 2.0f})
@@ -658,6 +737,50 @@ static void test_retained_command_preflight_preserves_batch_atomicity(void)
                 "text source padding is pixel aligned and contains glyph overhang");
 }
 
+static void test_popup_width_motion_matches_constrained_placement(void)
+{
+    for (float dpi : {1.0f, 1.25f, 1.5f, 2.0f})
+        for (int direction : {REACH_POPUP_DROP_DOWN, REACH_POPUP_DROP_UP})
+            for (float owner : {0.0f, 110.0f, 180.0f, 490.0f, 810.0f, 890.0f, 1100.0f})
+                for (int reverse = 0; reverse < 2; ++reverse)
+                {
+                    reach_popup_anchor anchor = {};
+                    anchor.monitor = {100 * dpi, 50 * dpi, 800 * dpi, 700 * dpi};
+                    anchor.button = {(owner - 20) * dpi, 0, 40 * dpi, 30 * dpi};
+                    anchor.bar_edge_y = 600 * dpi;
+                    anchor.direction = direction;
+                    reach_motion width = {}, notch = {};
+                    reach_motion_start_at(&width, (reverse ? 1000 : 20) * dpi,
+                                          (reverse ? 20 : 1000) * dpi, 2, REACH_EASING_EASE_IN_OUT,
+                                          10);
+                    width = reach_motion_clamp(&width, 30 * dpi, 900 * dpi);
+                    reach_rect_motion bounds = {};
+                    expect_true(reach_popup_width_motion(&anchor, &width, 180 * dpi, 8 * dpi, dpi,
+                                                         &bounds, &notch) == REACH_OK,
+                                "popup width derives physical placement and notch intent");
+                    for (int sample = 0; sample <= 80; ++sample)
+                    {
+                        double now = 10 + sample / 40.0;
+                        reach_rect_f32 expected =
+                            reach_popup_place(&anchor, reach_motion_value_at(&width, now),
+                                              180 * dpi, 8 * dpi)
+                                .bounds;
+                        reach_rect_f32 actual = reach_rect_motion_value_at(&bounds, now);
+                        expect_near(actual.x, expected.x, 0.001f,
+                                    "native and input X retain existing monitor clamping");
+                        expect_near(actual.width, expected.width, 0.001f,
+                                    "width intent preserves physical monitor capacity");
+                        expect_near(actual.y, expected.y, 0.001f,
+                                    "width resize preserves upward and downward placement");
+                        expect_near(reach_motion_value_at(&notch, now),
+                                    reach_popup_clamp_notch_center_scaled(owner * dpi - expected.x,
+                                                                          expected.width, dpi),
+                                    0.001f,
+                                    "notch follows the owner and existing corner clearance");
+                    }
+                }
+}
+
 static void test_popup_height_motion_matches_constrained_placement(void)
 {
     for (float dpi : {1.0f, 1.25f, 1.5f, 2.0f})
@@ -746,7 +869,9 @@ int main(void)
 {
     test_group_equality_preserves_intent_without_padding();
     test_stretch_geometry_preserves_caps_and_anchor();
+    test_focal_stretch_geometry_preserves_fixed_features();
     test_popup_height_motion_matches_constrained_placement();
+    test_popup_width_motion_matches_constrained_placement();
     test_group_hierarchy_samples_one_geometry_timeline();
     test_retained_command_preflight_preserves_batch_atomicity();
     test_group_hierarchy_rejects_ambiguous_ownership_and_order();

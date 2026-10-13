@@ -22,14 +22,24 @@ static int32_t reach_render_stretch_fixed(const reach_motion *motion, float expe
 static reach_motion reach_render_stretch_scale(const reach_motion *motion, float caps, float band)
 {
     reach_motion result = *motion;
-    result.from = (motion->from - caps) / band;
-    result.to = (motion->to - caps) / band;
+    if (result.has_mapping)
+    {
+        result.mapping_left_slope /= band;
+        result.mapping_right_slope /= band;
+        result.mapping_value = (motion->mapping_value - caps) / band;
+    }
+    else
+    {
+        result.from = (motion->from - caps) / band;
+        result.to = (motion->to - caps) / band;
+    }
     if (result.has_limits)
     {
         result.minimum = (motion->minimum - caps) / band;
         result.maximum = (motion->maximum - caps) / band;
     }
-    if (result.from == result.to)
+    float minimum = 0.0f, maximum = 0.0f;
+    if (reach_motion_range(&result, &minimum, &maximum) == REACH_OK && minimum == maximum)
         result = reach_render_stretch_motion(
             motion, 0.0f, reach_motion_value_at(&result, result.started_seconds));
     return result;
@@ -38,18 +48,66 @@ static reach_motion reach_render_stretch_scale(const reach_motion *motion, float
 static int32_t reach_render_stretch_axis_valid(float size, float near_inset, float far_inset,
                                                const reach_motion *motion, float anchor)
 {
+    float minimum = 0.0f, maximum = 0.0f;
     return isfinite(size) && size > 0.0f && size <= 16384.0f && roundf(size) == size &&
            isfinite(near_inset) && near_inset >= 0.0f && roundf(near_inset) == near_inset &&
            isfinite(far_inset) && far_inset >= 0.0f && roundf(far_inset) == far_inset &&
-           near_inset + far_inset < size && motion->generation != 0 && isfinite(motion->from) &&
-           isfinite(motion->to) &&
-           (!motion->has_limits || (isfinite(motion->minimum) && isfinite(motion->maximum) &&
-                                    motion->minimum <= motion->maximum)) &&
-           fminf(motion->has_limits ? fminf(motion->maximum, fmaxf(motion->minimum, motion->from))
-                                    : motion->from,
-                 motion->has_limits ? fminf(motion->maximum, fmaxf(motion->minimum, motion->to))
-                                    : motion->to) > near_inset + far_inset &&
-           isfinite(anchor) && anchor >= 0.0f && anchor <= 1.0f;
+           near_inset + far_inset < size && motion->generation != 0 &&
+           reach_motion_range(motion, &minimum, &maximum) == REACH_OK &&
+           minimum > near_inset + far_inset && isfinite(anchor) && anchor >= 0.0f && anchor <= 1.0f;
+}
+
+size_t reach_render_stretch_patch_count(const reach_render_stretch *stretch)
+{
+    return stretch == 0 ? 0 : stretch->focal_x.generation != 0 ? 15 : 9;
+}
+
+static reach_result reach_render_stretch_focal_axis(const reach_render_group *source,
+                                                    const reach_render_stretch *stretch,
+                                                    size_t column, reach_render_group *patch)
+{
+    float fixed_width = stretch->focal_right - stretch->focal_left;
+    float half = fixed_width * 0.5f;
+    reach_motion leading = reach_motion_affine(&stretch->focal_x, 1, -half - stretch->left);
+    reach_motion trailing = {0};
+    float minimum = 0, maximum = 0;
+    if (!isfinite(stretch->focal_left) || !isfinite(stretch->focal_right) ||
+        roundf(stretch->focal_left) != stretch->focal_left ||
+        roundf(stretch->focal_right) != stretch->focal_right ||
+        stretch->focal_left <= stretch->left || fixed_width <= 0 ||
+        stretch->focal_right >= source->bounds.width - stretch->right ||
+        reach_motion_range(&leading, &minimum, &maximum) != REACH_OK || minimum <= 0 ||
+        reach_motion_combine(&stretch->width, 1, &stretch->focal_x, -1, -half - stretch->right,
+                             &trailing) != REACH_OK ||
+        reach_motion_range(&trailing, &minimum, &maximum) != REACH_OK || minimum <= 0)
+        return REACH_INVALID_ARGUMENT;
+    float starts[] = {0,
+                      stretch->left,
+                      stretch->focal_left,
+                      stretch->focal_right,
+                      source->bounds.width - stretch->right,
+                      source->bounds.width};
+    reach_motion start = {0};
+    if (column < 2)
+        reach_motion_set(&start, starts[column]);
+    else if (column < 4)
+        start = reach_motion_affine(&stretch->focal_x, 1, column == 2 ? -half : half);
+    else
+        start = reach_motion_affine(&stretch->width, 1, -stretch->right);
+    float source_offset = source->x.generation ? reach_motion_value_at(&source->x, 0) : 0;
+    if (reach_motion_combine(&start, 1, &stretch->width, -stretch->anchor_x,
+                             stretch->anchor_x * source->bounds.width - starts[column] +
+                                 source_offset,
+                             &patch->x) != REACH_OK)
+        return REACH_INVALID_ARGUMENT;
+    patch->bounds.x = source->bounds.x + starts[column];
+    patch->bounds.width = starts[column + 1] - starts[column];
+    if (column == 1 || column == 3)
+        patch->scale =
+            reach_render_stretch_scale(column == 1 ? &leading : &trailing, 0, patch->bounds.width);
+    else
+        patch->scale = reach_render_stretch_motion(&stretch->width, 0, 1);
+    return REACH_OK;
 }
 
 reach_result reach_render_stretch_patch(const reach_render_group *source,
@@ -57,9 +115,12 @@ reach_result reach_render_stretch_patch(const reach_render_group *source,
                                         reach_render_group *out_patch)
 {
     float source_x[4], source_y[4], factor_x, factor_y;
-    size_t column = patch_index % 3, row = patch_index / 3;
-    if (source == 0 || stretch == 0 || out_patch == 0 || patch_index >= 9 || source->id == 0 ||
-        source->id > UINT64_C(0x7ffffffffffffff7) || !isfinite(source->bounds.x) ||
+    if (stretch == 0)
+        return REACH_INVALID_ARGUMENT;
+    size_t count = reach_render_stretch_patch_count(stretch), columns = count / 3;
+    size_t column = patch_index % columns, row = patch_index / columns;
+    if (source == 0 || stretch == 0 || out_patch == 0 || patch_index >= count || source->id == 0 ||
+        source->id > UINT64_C(0x7fffffffffffffff) - (count - 1) || !isfinite(source->bounds.x) ||
         !isfinite(source->bounds.y) || roundf(source->bounds.x) != source->bounds.x ||
         roundf(source->bounds.y) != source->bounds.y ||
         !reach_render_stretch_axis_valid(source->bounds.width, stretch->left, stretch->right,
@@ -82,9 +143,8 @@ reach_result reach_render_stretch_patch(const reach_render_group *source,
     *out_patch = *source;
     out_patch->id = source->id + patch_index;
     out_patch->bounds =
-        (reach_rect_f32){source_x[column], source_y[row], source_x[column + 1] - source_x[column],
-                         source_y[row + 1] - source_y[row]};
-    factor_x = (column == 2 ? 1.0f : 0.0f) - stretch->anchor_x;
+        (reach_rect_f32){source_x[0], source_y[row], 0, source_y[row + 1] - source_y[row]};
+    factor_x = (column == columns - 1 ? 1.0f : 0.0f) - stretch->anchor_x;
     factor_y = (row == 2 ? 1.0f : 0.0f) - stretch->anchor_y;
     out_patch->x = reach_render_stretch_motion(
         &stretch->width, factor_x,
@@ -94,11 +154,21 @@ reach_result reach_render_stretch_patch(const reach_render_group *source,
         &stretch->height, factor_y,
         -source->bounds.height * factor_y +
             (source->y.generation ? reach_motion_value_at(&source->y, 0.0) : 0.0f));
-    if (column == 1)
+    if (columns == 5)
+    {
+        if (reach_render_stretch_focal_axis(source, stretch, column, out_patch) != REACH_OK)
+            return REACH_INVALID_ARGUMENT;
+    }
+    else if (column == 1)
         out_patch->scale = reach_render_stretch_scale(
-            &stretch->width, stretch->left + stretch->right, out_patch->bounds.width);
+            &stretch->width, stretch->left + stretch->right, source_x[2] - source_x[1]);
     else
         out_patch->scale = reach_render_stretch_motion(&stretch->width, 0.0f, 1.0f);
+    if (columns == 3)
+    {
+        out_patch->bounds.x = source_x[column];
+        out_patch->bounds.width = source_x[column + 1] - source_x[column];
+    }
     if (row == 1)
         out_patch->scale_y = reach_render_stretch_scale(
             &stretch->height, stretch->top + stretch->bottom, out_patch->bounds.height);
@@ -123,16 +193,13 @@ static int32_t reach_render_stretch_command_valid(const reach_render_group *sour
                                                   const reach_render_command *command)
 {
     float extent = 0.0f, top_notch = 0.0f, bottom_notch = 0.0f;
-    int32_t width_changes =
-        reach_motion_value_at(&stretch->width, stretch->width.started_seconds) !=
-            source->bounds.width ||
-        reach_motion_value_at(&stretch->width, reach_motion_deadline(&stretch->width)) !=
-            source->bounds.width;
-    int32_t height_changes =
-        reach_motion_value_at(&stretch->height, stretch->height.started_seconds) !=
-            source->bounds.height ||
-        reach_motion_value_at(&stretch->height, reach_motion_deadline(&stretch->height)) !=
-            source->bounds.height;
+    float minimum = 0, maximum = 0;
+    if (reach_motion_range(&stretch->width, &minimum, &maximum) != REACH_OK)
+        return 0;
+    int32_t width_changes = minimum != source->bounds.width || maximum != source->bounds.width;
+    if (reach_motion_range(&stretch->height, &minimum, &maximum) != REACH_OK)
+        return 0;
+    int32_t height_changes = minimum != source->bounds.height || maximum != source->bounds.height;
     if (command->type != REACH_RENDER_COMMAND_RECT &&
         command->type != REACH_RENDER_COMMAND_NOTCHED_ROUNDED_RECT &&
         command->type != REACH_RENDER_COMMAND_SHADOW)
@@ -144,8 +211,6 @@ static int32_t reach_render_stretch_command_valid(const reach_render_group *sour
         return 0;
     if (command->notch_width > 0.0f && command->notch_height > 0.0f)
     {
-        if (width_changes)
-            return 0;
         if (command->notch_side == REACH_NOTCH_SIDE_TOP)
             top_notch = command->notch_height;
         else
@@ -157,7 +222,25 @@ static int32_t reach_render_stretch_command_valid(const reach_render_group *sour
                                command->blur_radius, command->color};
         extent = reach_theme_shadow_extent(&shadow, 1.0f);
     }
-    if (width_changes &&
+    int32_t horizontal_motion = width_changes || stretch->focal_x.generation != 0;
+    if (horizontal_motion && command->notch_width > 0 && command->notch_height > 0)
+    {
+        float center = command->notch_center_x - source->bounds.x;
+        float half = command->notch_width * 0.5f + extent;
+        if (!isfinite(center) || !isfinite(half))
+            return 0;
+        if (stretch->focal_x.generation != 0)
+        {
+            if (center - half < stretch->focal_left || center + half > stretch->focal_right ||
+                center != (stretch->focal_left + stretch->focal_right) * 0.5f)
+                return 0;
+        }
+        else if (center - half < 0 || center + half > source->bounds.width ||
+                 (center + half > stretch->left &&
+                  center - half < source->bounds.width - stretch->right))
+            return 0;
+    }
+    if (horizontal_motion &&
         (stretch->left < command->rect.x - source->bounds.x + command->radius + extent ||
          stretch->right < source->bounds.x + source->bounds.width - command->rect.x -
                               command->rect.width + command->radius + extent))
@@ -176,13 +259,13 @@ reach_result reach_render_push_stretched_chrome(reach_render_command_buffer *buf
                                                 const reach_render_command *commands,
                                                 size_t command_count)
 {
-    reach_render_group patches[9];
-    size_t index, at, patch_count = 0;
-    if (buffer == 0 || commands == 0 || command_count == 0 ||
+    reach_render_group patches[15];
+    size_t index, at, patch_count = 0, slots = reach_render_stretch_patch_count(stretch);
+    if (buffer == 0 || source == 0 || stretch == 0 || commands == 0 || command_count == 0 ||
         command_count > REACH_MAX_RENDER_COMMANDS || buffer->current_group_id != 0 ||
         buffer->count > REACH_MAX_RENDER_COMMANDS || buffer->group_count > REACH_MAX_RENDER_GROUPS)
         return REACH_INVALID_ARGUMENT;
-    for (index = 0; index < 9; ++index)
+    for (index = 0; index < slots; ++index)
     {
         if (reach_render_stretch_patch(source, stretch, index, &patches[index]) != REACH_OK)
             return REACH_INVALID_ARGUMENT;
@@ -198,7 +281,7 @@ reach_result reach_render_push_stretched_chrome(reach_render_command_buffer *buf
     for (at = 0; at < command_count; ++at)
         if (!reach_render_stretch_command_valid(source, stretch, &commands[at]))
             return REACH_INVALID_ARGUMENT;
-    for (index = 0; index < 9; ++index)
+    for (index = 0; index < slots; ++index)
     {
         reach_render_group *patch = &patches[index];
         if (patch->bounds.width <= 0.0f || patch->bounds.height <= 0.0f)

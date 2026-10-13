@@ -42,6 +42,10 @@ extern "C"
     reach_result reach_popup_height_motion(const reach_popup_anchor *anchor, float width,
                                            const reach_motion *height, float margin,
                                            reach_rect_motion *out_bounds);
+    reach_result reach_popup_width_motion(const reach_popup_anchor *anchor,
+                                          const reach_motion *width, float height, float margin,
+                                          float dpi_scale, reach_rect_motion *out_bounds,
+                                          reach_motion *out_notch_center);
 
     typedef struct reach_popup_background_input
     {

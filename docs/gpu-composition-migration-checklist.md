@@ -66,6 +66,16 @@ support expectation is explicitly resolved.
     order and validate parent ownership; reparenting and parent-content retirement reuse children.
     Debug builds, all 39 tests and five full native runs per backend plus HWND fallback pass.
     Quick Settings height/section integration is implemented; displayed-pixel/product acceptance remains pending.
+  - [x] Extend fixed-cap chrome with a rigid horizontal focal band and combined edge caps.
+    Five columns preserve notch, corners, border and shadow while straight shoulders resize;
+    unchanged height requires only five actual groups. Canonical two-slope mapping, same-epoch
+    combination and full-range validation reuse the existing bounded compiler and both adapters.
+    Shared popup width intent preserves monitor-clamped body/notch placement at four DPI scales,
+    either edge, outside anchors, tiny widths and both drop directions. Both builds/all 40 tests
+    and five full native runs per backend plus fallback pass. Central/edge notch readback differs
+    by at most two channel values; native growth/reversal reuses sources and settled submissions
+    change no properties. Consumer integration, overlapping-cap transitions, compact animated
+    chrome, displayed native pixels and total product cost remain in the parent gates.
 - [ ] Decide whether supported live-preview composition meets behavior and efficiency requirements;
   document the selected compositor or optimized hybrid design for Dock, Switcher and Stage.
   - [x] Select the existing DWM port with retained Reach visuals and active-only native motion.
@@ -355,3 +365,10 @@ decision. No checklist item authorizes unrelated cleanup or visible behavior cha
 
 Validation must not terminate a running Reach instance without explicit authorization in the
 current instruction; each authorization permits one termination.
+
+Current GPU goal exception: the user explicitly authorizes restarts throughout this goal.
+Always stop `reachWatchdog.exe` first and wait for its exit, then stop Reach and wait for its exit.
+Launch from the registered installation folder, currently `C:\Dev\reach\build`, with `--launch`;
+start the matching watchdog from that same folder. Reuse this installation for later validations;
+do not change registration or reinstall as part of an ordinary restart. Verify actual process
+lifetime before treating startup as successful.
