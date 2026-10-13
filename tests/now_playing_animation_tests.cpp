@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstdio>
 #include <initializer_list>
+#include <memory>
 
 static int failures = 0;
 
@@ -75,7 +76,8 @@ static void test_overflow_uses_one_gpu_animation()
         reach_top_bar_now_playing_render_input input = fixture.input(1);
         input.dpi_scale = dpi;
         reach_top_bar_now_playing_update_marquee(&input, &input.marquee, 10);
-        reach_render_command_buffer commands = {};
+        auto commands_storage = std::make_unique<reach_render_command_buffer>();
+        reach_render_command_buffer &commands = *commands_storage;
 
         expect_true(reach_top_bar_now_playing_build_render_commands(&input, &commands) == REACH_OK,
                     "GPU render commands build");
@@ -113,7 +115,8 @@ static void test_unavailable_gpu_animation_stays_static()
 {
     now_playing_fixture fixture;
     reach_top_bar_now_playing_render_input input = fixture.input(0);
-    reach_render_command_buffer commands = {};
+    auto commands_storage = std::make_unique<reach_render_command_buffer>();
+    reach_render_command_buffer &commands = *commands_storage;
 
     expect_true(reach_top_bar_now_playing_build_render_commands(&input, &commands) == REACH_OK,
                 "static render commands build");

@@ -932,7 +932,7 @@ static void test_group_equality_preserves_intent_without_padding(void)
     for (size_t at = offsetof(reach_render_group, has_tint) + sizeof(second.has_tint);
          at < offsetof(reach_render_group, tint); ++at)
         bytes[at] = 0xa5;
-    for (size_t at = offsetof(reach_render_group, tint_rgb_target) + sizeof(second.tint_rgb_target);
+    for (size_t at = offsetof(reach_render_group, shadow) + sizeof(second.shadow);
          at < sizeof(second); ++at)
         bytes[at] = 0xa5;
     expect_true(reach_render_group_equal(&first, &second),
@@ -964,7 +964,8 @@ static void test_group_equality_preserves_intent_without_padding(void)
 
 static void test_textbox_caret_reference_ownership(void)
 {
-    reach_render_command_buffer buffer = {};
+    auto buffer_storage = std::make_unique<reach_render_command_buffer>();
+    reach_render_command_buffer &buffer = *buffer_storage;
     reach_render_command textbox = {};
     textbox.type = REACH_RENDER_COMMAND_TEXTBOX;
     textbox.rect = {10, 10, 100, 30};
@@ -998,8 +999,67 @@ static void test_textbox_caret_reference_ownership(void)
                 "a caret body stays a single source so splitting preserves painter order");
 }
 
+static void test_shadow_source_ownership(void)
+{
+    auto storage = std::make_unique<reach_render_command_buffer>();
+    auto &buffer = *storage;
+    reach_render_group shadow = {};
+    shadow.id = 900;
+    shadow.bounds = {0, 0, 120, 90};
+    shadow.has_shadow = 1;
+    shadow.shadow = {0, 2, 6, {0.1f, 0.2f, 0.3f, 0.5f}};
+    expect_true(reach_render_command_buffer_begin_group(&buffer, &shadow) == REACH_OK,
+                "shadow parent declares a bounded source envelope");
+    reach_render_command_buffer_end_group(&buffer);
+    reach_render_group source = {};
+    source.id = 901;
+    source.parent_id = 900;
+    source.bounds = {10, 10, 100, 60};
+    expect_true(reach_render_command_buffer_begin_group(&buffer, &source) == REACH_OK,
+                "source geometry remains an ordinary child");
+    reach_render_command command = {};
+    command.type = REACH_RENDER_COMMAND_RECT;
+    command.rect = source.bounds;
+    command.color = {1, 1, 1, 1};
+    expect_true(reach_render_command_buffer_push(&buffer, &command) == REACH_OK,
+                "shadow geometry retains normal painter ownership");
+    reach_render_command_buffer_end_group(&buffer);
+    expect_true(reach_render_command_buffer_validate_groups(&buffer) == REACH_OK &&
+                    reach_render_command_buffer_group_shadow(&buffer, 901) == &buffer.groups[0],
+                "source descendants resolve one filter owner");
+    buffer.commands[0].group_id = 900;
+    expect_true(reach_render_command_buffer_validate_groups(&buffer) == REACH_INVALID_ARGUMENT,
+                "a filter owner cannot also paint its source");
+    buffer.commands[0].group_id = 901;
+    buffer.groups[1].has_shadow = 1;
+    buffer.groups[1].shadow = shadow.shadow;
+    expect_true(reach_render_command_buffer_validate_groups(&buffer) == REACH_INVALID_ARGUMENT,
+                "nested filters cannot silently alter source ownership");
+    buffer.groups[1].has_shadow = 0;
+    buffer.commands[0].type = REACH_RENDER_COMMAND_TEXT;
+    expect_true(reach_render_command_buffer_validate_groups(&buffer) == REACH_INVALID_ARGUMENT,
+                "the shape source contract rejects unsupported paint kinds");
+    buffer.commands[0].type = REACH_RENDER_COMMAND_RECT;
+    buffer.groups[0].shadow.blur = -1;
+    expect_true(reach_render_command_buffer_validate_groups(&buffer) == REACH_INVALID_ARGUMENT,
+                "invalid blur is rejected before backend allocation");
+    buffer.groups[0].shadow = shadow.shadow;
+    buffer.groups[0].has_tint = 1;
+    expect_true(reach_render_command_buffer_validate_groups(&buffer) == REACH_INVALID_ARGUMENT,
+                "filter output tint is not confused with source alpha");
+    buffer.groups[0].has_tint = 0;
+    auto changed = buffer.groups[0];
+    changed.shadow.color.a = 0.7f;
+    expect_true(!reach_render_group_equal(&buffer.groups[0], &changed),
+                "shadow material changes invalidate retained intent");
+    buffer.groups[0].has_shadow = changed.has_shadow = 0;
+    expect_true(reach_render_group_equal(&buffer.groups[0], &changed),
+                "disabled shadow material does not cause property churn");
+}
+
 int main(void)
 {
+    test_shadow_source_ownership();
     test_textbox_caret_reference_ownership();
     test_group_equality_preserves_intent_without_padding();
     test_stretch_geometry_preserves_caps_and_anchor();

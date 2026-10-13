@@ -13,6 +13,8 @@ void reach_d2d_destroy(reach_render_backend *backend)
     reach_d2d_clear_shadow_cache(backend);
     reach_d2d_release_shadow_bake_context(backend);
     reach_d2d_release_retained(backend);
+    backend->shadow_fallback_context.Reset();
+    backend->shadow_fallback_parent_device = nullptr;
 
     if (backend->d2d_context != nullptr)
     {

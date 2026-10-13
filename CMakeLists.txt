@@ -207,6 +207,7 @@ add_library(reach_windows_adapters STATIC
     src/adapters/windows/render_d2d/render_d2d_svg_document.cpp
     src/adapters/windows/render_d2d/render_d2d_shapes.cpp
     src/adapters/windows/render_d2d/render_d2d_shadow.cpp
+    src/adapters/windows/render_d2d/render_d2d_shadow_scene.cpp
     src/adapters/windows/render_d2d/render_d2d_text.cpp
     src/adapters/windows/render_d2d/render_d2d_commands.cpp
     src/adapters/windows/render_d2d/render_d2d_retained.cpp

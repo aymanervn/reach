@@ -15,6 +15,7 @@
 
 #include <stdint.h>
 #include <stdio.h>
+#include <memory>
 
 enum fake_window_call_kind
 {
@@ -1103,7 +1104,8 @@ static void test_popup_surface_retains_presentation(void)
     surface.renderer.ops.end_frame = fake_end_frame;
     surface.renderer.ops.execute = fake_execute;
 
-    reach_render_command_buffer content = {};
+    auto content_storage = std::make_unique<reach_render_command_buffer>();
+    reach_render_command_buffer &content = *content_storage;
     reach_render_command command = {};
     command.type = REACH_RENDER_COMMAND_RECT;
     command.color = {0.1f, 0.2f, 0.3f, 0.8f};

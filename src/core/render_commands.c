@@ -20,7 +20,14 @@ int32_t reach_render_group_equal(const reach_render_group *first, const reach_re
         !reach_render_rect_equal(first->clip, second->clip) ||
         first->clip_radius != second->clip_radius ||
         first->clip_uniform_radius != second->clip_uniform_radius ||
-        first->has_tint != second->has_tint ||
+        first->has_tint != second->has_tint || first->has_shadow != second->has_shadow ||
+        (first->has_shadow && (first->shadow.offset_x != second->shadow.offset_x ||
+                               first->shadow.offset_y != second->shadow.offset_y ||
+                               first->shadow.blur != second->shadow.blur ||
+                               first->shadow.color.r != second->shadow.color.r ||
+                               first->shadow.color.g != second->shadow.color.g ||
+                               first->shadow.color.b != second->shadow.color.b ||
+                               first->shadow.color.a != second->shadow.color.a)) ||
         !reach_motion_equal(&first->tint_rgb_mix, &second->tint_rgb_mix) ||
         first->tint_rgb_target.r != second->tint_rgb_target.r ||
         first->tint_rgb_target.g != second->tint_rgb_target.g ||
@@ -193,9 +200,43 @@ reach_render_command_buffer_group(const reach_render_command_buffer *buffer, uin
     return 0;
 }
 
+const reach_render_group *
+reach_render_command_buffer_group_shadow(const reach_render_command_buffer *buffer, uint64_t id)
+{
+    const reach_render_group *group = reach_render_command_buffer_group(buffer, id);
+    size_t depth = 0;
+    while (group != 0 && depth++ < buffer->group_count)
+    {
+        if (group->has_shadow)
+            return group;
+        group = reach_render_command_buffer_group(buffer, group->parent_id);
+    }
+    return 0;
+}
+
+static int32_t reach_render_shadow_valid(const reach_render_group *group, int32_t root)
+{
+    if (group->has_shadow != 0 && group->has_shadow != 1)
+        return 0;
+    if (!group->has_shadow)
+        return 1;
+    return !root && !group->has_tint && isfinite(group->bounds.x) && isfinite(group->bounds.y) &&
+           isfinite(group->bounds.width) && isfinite(group->bounds.height) &&
+           group->bounds.width > 0 && group->bounds.height > 0 &&
+           isfinite(group->shadow.offset_x) && isfinite(group->shadow.offset_y) &&
+           isfinite(group->shadow.blur) && group->shadow.blur >= 0 &&
+           isfinite(group->shadow.color.r) && isfinite(group->shadow.color.g) &&
+           isfinite(group->shadow.color.b) && isfinite(group->shadow.color.a) &&
+           group->shadow.color.r >= 0 && group->shadow.color.r <= 1 && group->shadow.color.g >= 0 &&
+           group->shadow.color.g <= 1 && group->shadow.color.b >= 0 && group->shadow.color.b <= 1 &&
+           group->shadow.color.a >= 0 && group->shadow.color.a <= 1;
+}
+
 static int32_t reach_render_repetition_valid(const reach_render_group *group, int32_t root)
 {
     size_t index;
+    if (!reach_render_shadow_valid(group, root))
+        return 0;
     if (group->tint_rgb_mix.generation != 0 &&
         (root || !group->has_tint || !isfinite(group->tint_rgb_target.r) ||
          !isfinite(group->tint_rgb_target.g) || !isfinite(group->tint_rgb_target.b) ||
@@ -258,6 +299,7 @@ reach_result reach_render_command_buffer_validate_groups(const reach_render_comm
     int32_t closed[REACH_MAX_RENDER_GROUPS] = {0};
     int32_t drawn[REACH_MAX_RENDER_GROUPS] = {0};
     int32_t descendants_drawn[REACH_MAX_RENDER_GROUPS] = {0};
+    int32_t has_shadow = 0;
     if (buffer == 0 || buffer->group_count > REACH_MAX_RENDER_GROUPS ||
         buffer->count > REACH_MAX_RENDER_COMMANDS ||
         (buffer->has_presentation && (buffer->presentation.parent_id != 0 ||
@@ -272,6 +314,9 @@ reach_result reach_render_command_buffer_validate_groups(const reach_render_comm
         for (other = 0; other < index; ++other)
             if (buffer->groups[other].id == group->id)
                 return REACH_INVALID_ARGUMENT;
+        has_shadow |= group->has_shadow;
+        if (group->has_shadow && reach_render_command_buffer_group_shadow(buffer, group->parent_id))
+            return REACH_INVALID_ARGUMENT;
         if (group->parent_id != 0)
         {
             const reach_render_group *parent =
@@ -286,13 +331,23 @@ reach_result reach_render_command_buffer_validate_groups(const reach_render_comm
     for (index = 0; index < buffer->count; ++index)
     {
         const reach_render_command *command = &buffer->commands[index];
+        const reach_render_group *shadow =
+            has_shadow ? reach_render_command_buffer_group_shadow(buffer, command->group_id) : 0;
+        if (shadow != 0 && (command->group_id == shadow->id ||
+                            (command->type != REACH_RENDER_COMMAND_RECT &&
+                             command->type != REACH_RENDER_COMMAND_TRIANGLE &&
+                             command->type != REACH_RENDER_COMMAND_LINE &&
+                             command->type != REACH_RENDER_COMMAND_NOTCHED_ROUNDED_RECT &&
+                             command->type != REACH_RENDER_COMMAND_CLIPPED_ROUNDED_RECT)))
+            return REACH_INVALID_ARGUMENT;
         if (command->caret_group_id == 0)
             continue;
         const reach_render_group *caret =
             reach_render_command_buffer_group(buffer, command->caret_group_id);
         if (command->type != REACH_RENDER_COMMAND_TEXTBOX || caret == 0 || caret->parent_id != 0 ||
-            caret->has_clip || caret->has_tint || caret->x.generation || caret->y.generation ||
-            caret->scale.generation || caret->scale_y.generation || caret->opacity.generation == 0)
+            caret->has_clip || caret->has_tint || caret->has_shadow || caret->x.generation ||
+            caret->y.generation || caret->scale.generation || caret->scale_y.generation ||
+            caret->opacity.generation == 0)
             return REACH_INVALID_ARGUMENT;
         const reach_render_group *body =
             reach_render_command_buffer_group(buffer, command->group_id);

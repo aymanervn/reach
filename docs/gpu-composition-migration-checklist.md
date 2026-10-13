@@ -106,6 +106,15 @@ support expectation is explicitly resolved.
       repaints per phase; 276 contained CPU/GPU/power samples support further implementation but
       do not prove final efficiency. Production ownership, failure handling, full chrome appearance,
       large/finite product workloads and consumer integration remain open.
+    - [x] Implement the retained shape-shadow contract through both adapters and fallback.
+      Neutral groups own bounded shape alpha; adapters retain caster/effect/output separately.
+      Parameter updates, output retargets, disable/re-enable and reparenting reuse ordinary sources;
+      retirement clears ownership/nominal bytes. Core checks reject invalid ownership/material and
+      unsupported paint/nesting. Displayed native motion, four-DPI hardware/software source pixels,
+      actual HWND capture and bounded-allocation rejection/recovery pass. Fix HWND double DPI scaling
+      and test-local render-buffer stack overflow exposed by descriptor growth. Both builds/all 40
+      tests, full native regressions and installed reachctl restart pass. Shared chrome, complete
+      width consumers, intermediate product appearance and final total-cost acceptance remain open.
 - [ ] Decide whether supported live-preview composition meets behavior and efficiency requirements;
   document the selected compositor or optimized hybrid design for Dock, Switcher and Stage.
   - [x] Select the existing DWM port with retained Reach visuals and active-only native motion.

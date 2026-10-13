@@ -1,6 +1,6 @@
 # Compact retained shadow design
 
-Date: 2026-10-13. Status: capability selected; production integration and acceptance pending.
+Date: 2026-10-13. Status: retained shadow group implemented; shared chrome/consumer integration and acceptance pending.
 
 ## Decision
 
@@ -25,9 +25,9 @@ the supported surface-brush offset path succeeds. Do not generalize that failure
 effect. The public render contract should expose the required shadow semantics, not an arbitrary
 platform effect graph.
 
-## Production ownership to implement
+## Production ownership
 
-- Extend the neutral retained group with optional existing Reach shadow metrics. A group's source
+- The neutral retained group carries optional existing Reach shadow metrics. A group's source
   subtree supplies alpha; its visible output is the shifted, blurred, colored shadow with the
   unshifted alpha removed. Preserve ordinary ancestor translation, scale, opacity and output clips.
 - The adapter owns the caster container, source surface/brush, effect factory/brush or DC graph,
@@ -35,15 +35,36 @@ platform effect graph.
   the existing retained planner. Shadow parameters invalidate the effect; time alone does not.
 - Bound capture/filter extents to the maximum source geometry plus resolved shadow padding. Include
   additional surfaces in resource accounting and limits. Preserve reuse on geometry retargets.
-- Supply the same source/cutout operation in the existing CPU renderer for unsupported backends.
-  Validate parameters, reference ownership and unsupported nesting before rendering. Define and
-  verify any restrictions instead of silently ignoring an ancestor or child property.
+- The fallback uses D2D source/cutout effects with the same event-time geometry. It shares a hardware
+  context when possible, otherwise uses WARP and bounded transfer into the HWND target. Shapes are
+  rectangles, clipped/notched rounded rectangles, triangles and lines; own paint, output tint,
+  nested filters and presentation-root filters are rejected before rendering. Capture/source
+  bounds share the existing 128 MiB budget; fallback temporary bitmap bounds are checked separately.
 - Shared popup chrome builds body and notch alpha from the same canonical rectangle/radius/notch
   intent as its visible fills and borders. The circular compact clip option is implemented in
   818e85b. Preserve edge notch placement, zero-area collapse and both drop directions.
 - Finish Dock/Switcher consumers, DWM destinations, controls, title trimming, runtime demand and
   obsolete-track removal through their full data paths. A renderer helper alone does not complete
   those checklist items.
+
+## Production verification
+
+Production owned-window checks follow canonical child motion without application submissions or
+source repaint. Root retargets, material changes, disable/re-enable and reparenting preserve source
+identity; empty scenes retire effect ownership and nominal bytes. An oversized capture fails before
+allocation and a later valid publication recovers. Both native backends and shared-hardware/WARP
+fallback pixels are checked across four DPI scales and both notch directions. Actual HWND capture
+also passes after its target DPI was corrected from the observed desktop default 120 to 96.
+
+The source recipe extends its notch one physical pixel inside the body while preserving the exterior
+triangle slopes. Separate antialiased masks meeting at a fractional edge otherwise leave a partial
+alpha seam and produce an interior shadow. That join belongs in shared chrome; the filter consumes
+actual subtree alpha. Header/body/complete consumer appearance still requires its own verification.
+
+The descriptor adds 32 bytes per group: 2,216 → 2,248; buffer 1,006,600 → 1,013,800 (+7,200 / 0.72%).
+A Release host-layout fixture exceeded the default 1 MiB stack after this increase. Its exit code was
+0xC00000FD. Remaining test-local render buffers now use heap ownership; production buffers already
+belong to heap-owned applications. No test behavior was added for that allocation correction.
 
 ## Pixel and motion evidence
 

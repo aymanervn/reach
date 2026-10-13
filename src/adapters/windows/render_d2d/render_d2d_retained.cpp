@@ -1002,7 +1002,7 @@ static void record_retained_bytes(reach_render_backend *backend)
         return;
     uint64_t bytes = 0;
     for (const auto &layer : backend->retained_layers)
-        bytes += (uint64_t)layer.width * layer.height * 4;
+        bytes += (uint64_t)layer.width * layer.height * 4 + layer.shadow_bytes;
     reach_workload_adjust_retained_bytes((int64_t)bytes -
                                          (int64_t)backend->reported_retained_bytes);
     backend->reported_retained_bytes = bytes;
@@ -1187,15 +1187,19 @@ static HRESULT sync_layer(reach_render_backend *backend, reach_d2d_retained_laye
                           size_t count, reach_point_f32 parent_origin, bool allow_text_snap)
 {
     if (!isfinite(group.bounds.width) || !isfinite(group.bounds.height) ||
-        group.bounds.width > 16384.0f || group.bounds.height > 16384.0f)
+        group.bounds.width > REACH_D2D_MAX_SURFACE_DIMENSION ||
+        group.bounds.height > REACH_D2D_MAX_SURFACE_DIMENSION)
         return E_INVALIDARG;
     UINT width = count != 0 ? (UINT)std::max(1.0f, ceilf(group.bounds.width)) : 0;
     UINT height = count != 0 ? (UINT)std::max(1.0f, ceilf(group.bounds.height)) : 0;
-    uint64_t bytes = (uint64_t)width * height * 4;
+    uint64_t shadow_bytes = group.has_shadow ? (uint64_t)ceilf(group.bounds.width) *
+                                                   (uint64_t)ceilf(group.bounds.height) * 4
+                                             : 0;
+    uint64_t bytes = (uint64_t)width * height * 4 + shadow_bytes;
     for (const auto &other : backend->retained_layers)
         if (&other != &layer)
-            bytes += (uint64_t)other.width * other.height * 4;
-    if (bytes > UINT64_C(128) * 1024 * 1024)
+            bytes += (uint64_t)other.width * other.height * 4 + other.shadow_bytes;
+    if (bytes > REACH_D2D_MAX_SURFACE_BYTES)
         return E_OUTOFMEMORY;
     std::vector<reach_render_command> local;
     if (count != 0)
@@ -1297,6 +1301,8 @@ static HRESULT sync_layer(reach_render_backend *backend, reach_d2d_retained_laye
         hr = sync_clip(backend, layer, group, initialized);
     if (SUCCEEDED(hr))
         hr = sync_tint(backend, layer, group, content_changed);
+    if (SUCCEEDED(hr))
+        hr = reach_d2d_sync_shadow(backend, layer, group);
     if (SUCCEEDED(hr))
     {
         layer.group = group;
@@ -1683,10 +1689,13 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
     }
     bool topology_changed =
         !backend->retained_topology_valid || plans.size() != backend->retained_topology.size() ||
-        !std::equal(
-            plans.begin(), plans.end(), backend->retained_topology.begin(),
-            [](const retained_plan &left, const reach_d2d_retained_attachment &right)
-            { return left.group.id == right.id && left.group.parent_id == right.parent_id; });
+        !std::equal(plans.begin(), plans.end(), backend->retained_topology.begin(),
+                    [](const retained_plan &left, const reach_d2d_retained_attachment &right)
+                    {
+                        return left.group.id == right.id &&
+                               left.group.parent_id == right.parent_id &&
+                               left.group.has_shadow == right.has_shadow;
+                    });
     ComPtr<IVisualCollection> children;
     if (topology_changed)
     {
@@ -1715,7 +1724,10 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
                 {
                     ComPtr<IContainerVisual> content;
                     ComPtr<IVisualCollection> descendants;
-                    hr = layer.visual.As(&content);
+                    if (auto *owner = reach_d2d_shadow_wuc_owner(layer))
+                        content = owner;
+                    else
+                        hr = layer.visual.As(&content);
                     if (SUCCEEDED(hr))
                         hr = content->get_Children(&descendants);
                     if (SUCCEEDED(hr))
@@ -1727,7 +1739,8 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
                 else
                 {
                     reach_workload_add(REACH_WORKLOAD_VISUAL_TREE_MUTATIONS, 1);
-                    hr = layer.dcomp_visual->RemoveAllVisuals();
+                    auto *owner = reach_d2d_shadow_dcomp_owner(layer);
+                    hr = (owner ? owner : layer.dcomp_visual.Get())->RemoveAllVisuals();
                 }
                 if (FAILED(hr))
                     return REACH_ERROR;
@@ -1807,7 +1820,10 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
                 ComPtr<IVisual> visual;
                 if (parent != nullptr)
                 {
-                    hr = parent->visual.As(&owner);
+                    if (auto *caster = reach_d2d_shadow_wuc_owner(*parent))
+                        owner = caster;
+                    else
+                        hr = parent->visual.As(&owner);
                     if (SUCCEEDED(hr))
                         hr = owner->get_Children(&siblings);
                 }
@@ -1821,8 +1837,11 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
             }
             else
             {
-                IDCompositionVisual2 *owner = parent != nullptr ? parent->dcomp_visual.Get()
-                                                                : backend->dcomp_scene_visual.Get();
+                IDCompositionVisual2 *owner = parent != nullptr
+                                                  ? reach_d2d_shadow_dcomp_owner(*parent)
+                                                  : backend->dcomp_scene_visual.Get();
+                if (parent != nullptr && owner == nullptr)
+                    owner = parent->dcomp_visual.Get();
                 reach_workload_add(REACH_WORKLOAD_VISUAL_TREE_MUTATIONS, 1);
                 hr = owner->AddVisual(found->dcomp_container.Get(), FALSE, nullptr);
             }
@@ -1832,7 +1851,8 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
         backend->retained_topology.clear();
         backend->retained_topology.reserve(plans.size());
         for (const auto &plan : plans)
-            backend->retained_topology.push_back({plan.group.id, plan.group.parent_id});
+            backend->retained_topology.push_back(
+                {plan.group.id, plan.group.parent_id, plan.group.has_shadow});
         backend->retained_topology_valid = true;
     }
     reach_render_group presentation =

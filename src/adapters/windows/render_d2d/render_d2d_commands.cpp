@@ -264,13 +264,23 @@ reach_result reach_d2d_execute(reach_render_backend *backend,
 
     reach_workload_add(REACH_WORKLOAD_RENDER_EXECUTIONS, 1);
     reach_workload_add(REACH_WORKLOAD_FALLBACK_EXECUTIONS, 1);
+    return reach_d2d_execute_fallback(backend, commands, reach_motion_now_seconds());
+}
+
+reach_result reach_d2d_execute_fallback(reach_render_backend *backend,
+                                        const reach_render_command_buffer *commands,
+                                        double now_seconds)
+{
+    ID2D1RenderTarget *target = reach_d2d_target(backend);
+    if (!backend || !target || !commands ||
+        reach_render_command_buffer_validate_groups(commands) != REACH_OK)
+        return REACH_INVALID_ARGUMENT;
     D2D1::Matrix3x2F content = D2D1::Matrix3x2F::Scale(commands->content_transform.scale_x,
                                                        commands->content_transform.scale_y) *
                                D2D1::Matrix3x2F::Translation(commands->content_transform.offset_x,
                                                              commands->content_transform.offset_y);
     D2D1::Matrix3x2F root = D2D1::Matrix3x2F::Identity();
     float root_opacity = 1.0f;
-    double now_seconds = reach_motion_now_seconds();
     if (commands->has_presentation)
     {
         const reach_render_group &group = commands->presentation;
@@ -283,16 +293,22 @@ reach_result reach_d2d_execute(reach_render_backend *backend,
         root_opacity =
             group.opacity.generation ? reach_motion_value_at(&group.opacity, now_seconds) : 1.0f;
     }
+    bool has_shadow = false;
+    for (size_t index = 0; index < commands->group_count; ++index)
+        has_shadow = has_shadow || commands->groups[index].has_shadow;
     reach_result outcome = REACH_OK;
     for (size_t index = 0; index < commands->count && outcome == REACH_OK; ++index)
     {
         reach_render_command command = commands->commands[index];
-        const reach_render_group *group =
-            reach_render_command_buffer_group(commands, command.group_id);
+        const reach_render_group *shadow =
+            has_shadow ? reach_render_command_buffer_group_shadow(commands, command.group_id)
+                       : nullptr;
+        uint64_t owner_id = shadow ? shadow->id : command.group_id;
+        const reach_render_group *group = reach_render_command_buffer_group(commands, owner_id);
         target->SetTransform(content * root);
         reach_rect_f32 clip = {};
         bool has_clip = reach_render_command_buffer_group_rectangular_clip_at(
-                            commands, command.group_id, now_seconds, &clip) != 0;
+                            commands, owner_id, now_seconds, &clip) != 0;
         if (has_clip)
         {
             target->PushAxisAlignedClip(
@@ -300,8 +316,8 @@ reach_result reach_d2d_execute(reach_render_backend *backend,
                 D2D1_ANTIALIAS_MODE_ALIASED);
         }
         uint32_t rounded_depth = 0;
-        outcome = reach_d2d_push_group_masks(backend, target, commands, command.group_id,
-                                             now_seconds, &rounded_depth);
+        outcome = reach_d2d_push_group_masks(backend, target, commands, owner_id, now_seconds,
+                                             &rounded_depth);
         if (outcome != REACH_OK)
         {
             while (rounded_depth-- > 0)
@@ -311,13 +327,29 @@ reach_result reach_d2d_execute(reach_render_backend *backend,
             break;
         }
         reach_transform_f32 transform =
-            reach_render_command_buffer_group_transform_at(commands, command.group_id, now_seconds);
+            reach_render_command_buffer_group_transform_at(commands, owner_id, now_seconds);
         D2D1::Matrix3x2F local =
             D2D1::Matrix3x2F::Scale(transform.scale_x, transform.scale_y) *
             D2D1::Matrix3x2F::Translation(transform.offset_x, transform.offset_y);
         target->SetTransform(local * content * root);
         float opacity = root_opacity * reach_render_command_buffer_group_opacity_at(
-                                           commands, command.group_id, now_seconds);
+                                           commands, owner_id, now_seconds);
+        if (shadow)
+        {
+            size_t end = index + 1;
+            while (end < commands->count &&
+                   reach_render_command_buffer_group_shadow(
+                       commands, commands->commands[end].group_id) == shadow)
+                ++end;
+            outcome = reach_d2d_draw_group_shadow(backend, commands, *shadow, index, end - index,
+                                                  opacity, now_seconds);
+            while (rounded_depth-- > 0)
+                target->PopLayer();
+            if (has_clip)
+                target->PopAxisAlignedClip();
+            index = end - 1;
+            continue;
+        }
         float caret_opacity = 1;
         if (command.caret_group_id != 0)
         {
