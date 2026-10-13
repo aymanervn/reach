@@ -85,7 +85,7 @@ void reach_settings_model_set_light_theme(reach_settings_model *model, int32_t e
         return;
     }
     model->display_light_theme = enabled ? 1 : 0;
-    reach_animation_manager_set(&model->display_theme_animation, 0, enabled ? 1.0f : 0.0f);
+    reach_motion_set(&model->display_theme_selection, enabled ? 1.0f : 0.0f);
 }
 
 int32_t reach_settings_model_light_theme(const reach_settings_model *model)
@@ -101,9 +101,8 @@ int32_t reach_settings_model_select_light_theme(reach_settings_model *model, int
         return 0;
     }
     model->display_light_theme = light_theme;
-    float current = reach_animation_manager_value(&model->display_theme_animation, 0);
-    reach_animation_manager_start(&model->display_theme_animation, 0, current,
-                                  light_theme ? 1.0f : 0.0f, 0.18, REACH_EASING_EASE_OUT);
+    reach_motion_animate_to(&model->display_theme_selection, light_theme ? 1.0f : 0.0f, 0.18,
+                            REACH_EASING_EASE_OUT);
     return 1;
 }
 
@@ -164,20 +163,4 @@ int32_t reach_settings_model_select_windows_app_theme(reach_settings_model *mode
     }
     model->display_windows_app_theme = preference;
     return 1;
-}
-
-int32_t reach_settings_model_sample_display_animations_at(reach_settings_model *model,
-                                                          double now_seconds)
-{
-    if (model == nullptr || !reach_settings_model_display_animations_active(model))
-    {
-        return 0;
-    }
-    reach_animation_manager_sample_at(&model->display_theme_animation, now_seconds);
-    return 1;
-}
-
-int32_t reach_settings_model_display_animations_active(const reach_settings_model *model)
-{
-    return model != nullptr && reach_animation_manager_any_active(&model->display_theme_animation);
 }

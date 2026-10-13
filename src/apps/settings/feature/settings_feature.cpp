@@ -73,8 +73,8 @@ void reach_settings_model_init(reach_settings_model *model)
     model->power_focused_timer = -1;
     model->account_focused_field = -1;
     model->hovered_button = REACH_SETTINGS_HIT_NONE;
-    reach_animation_manager_init(&model->display_theme_animation, &model->display_theme_track, 1);
-    reach_animation_manager_init(&model->top_bar_style_animation, &model->top_bar_style_track, 1);
+    reach_motion_set(&model->display_theme_selection, 0);
+    reach_motion_set(&model->top_bar_style_selection, 0);
     reach_motion_set(&model->top_bar_mode_toggle, 1.0f);
     reach_motion_set(&model->button_press_feedback, 0.0f);
     reach_pressable_init(&model->button_pressable);

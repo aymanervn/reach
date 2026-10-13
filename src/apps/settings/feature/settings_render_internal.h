@@ -6,7 +6,7 @@
 #include "reach/features/common/ui_controls.h"
 
 float reach_settings_scale(const reach_settings_render_input *input, float value);
-uint64_t reach_settings_toggle_group_id(int32_t hit, size_t index);
+uint64_t reach_settings_control_group_id(int32_t hit, size_t index);
 reach_color reach_settings_color_with_alpha(reach_color color, float alpha);
 
 void reach_settings_push_rect(reach_render_command_buffer *commands, reach_rect_f32 rect,

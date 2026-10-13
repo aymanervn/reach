@@ -141,9 +141,10 @@ static reach_result reach_d2d_execute_tinted_group(reach_render_backend *backend
         return REACH_ERROR;
     reach_color tint = reach_render_group_tint_at(&group, now_seconds);
     tint.a *= opacity;
-    if (count == 1 && commands[0].type == REACH_RENDER_COMMAND_RECT &&
-        commands[0].stroke_width <= 0 && commands[0].rect.x >= group.bounds.x &&
-        commands[0].rect.y >= group.bounds.y &&
+    if (count == 1 &&
+        (commands[0].type == REACH_RENDER_COMMAND_TEXT ||
+         (commands[0].type == REACH_RENDER_COMMAND_RECT && commands[0].stroke_width <= 0)) &&
+        commands[0].rect.x >= group.bounds.x && commands[0].rect.y >= group.bounds.y &&
         commands[0].rect.x + commands[0].rect.width <= group.bounds.x + group.bounds.width &&
         commands[0].rect.y + commands[0].rect.height <= group.bounds.y + group.bounds.height)
     {

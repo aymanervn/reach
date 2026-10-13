@@ -268,13 +268,11 @@ extern "C"
         int32_t display_bundled_font;
         reach_motion display_font_toggle;
         int32_t display_light_theme;
-        reach_animation_track display_theme_track;
-        reach_animation_manager display_theme_animation;
+        reach_motion display_theme_selection;
         reach_config_theme_preference display_windows_system_theme;
         reach_config_theme_preference display_windows_app_theme;
         reach_config_top_bar_style top_bar_style;
-        reach_animation_track top_bar_style_track;
-        reach_animation_manager top_bar_style_animation;
+        reach_motion top_bar_style_selection;
         reach_config_top_bar_mode top_bar_mode;
         reach_motion top_bar_mode_toggle;
         int32_t hovered_button;
@@ -620,9 +618,6 @@ extern "C"
     reach_settings_model_windows_app_theme(const reach_settings_model *model);
     int32_t reach_settings_model_select_windows_app_theme(reach_settings_model *model,
                                                           reach_config_theme_preference preference);
-    int32_t reach_settings_model_sample_display_animations_at(reach_settings_model *model,
-                                                              double now_seconds);
-    int32_t reach_settings_model_display_animations_active(const reach_settings_model *model);
     void reach_settings_model_scroll_display(reach_settings_model *model, float delta);
     int32_t reach_settings_model_display_scroll(reach_settings_model *model, double delta_seconds);
     void reach_settings_model_set_top_bar_style(reach_settings_model *model,
@@ -635,9 +630,6 @@ extern "C"
                                                reach_config_top_bar_mode mode);
     reach_config_top_bar_mode reach_settings_model_top_bar_mode(const reach_settings_model *model);
     int32_t reach_settings_model_toggle_top_bar_mode(reach_settings_model *model);
-    int32_t reach_settings_model_sample_top_bar_animations_at(reach_settings_model *model,
-                                                              double now_seconds);
-    int32_t reach_settings_model_top_bar_animations_active(const reach_settings_model *model);
     int32_t reach_settings_model_power_dirty(const reach_settings_model *model);
     void reach_settings_model_power_mark_applied(reach_settings_model *model);
 

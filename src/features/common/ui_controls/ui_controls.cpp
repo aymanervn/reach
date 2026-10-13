@@ -53,9 +53,9 @@ reach_result reach_ui_feedback_render(reach_render_command_buffer *commands, uin
     return result;
 }
 
-static void reach_ui_push_text(reach_render_command_buffer *commands, reach_rect_f32 rect,
-                               const uint16_t *text, float size, int32_t weight, int32_t alignment,
-                               reach_color color)
+static reach_render_command reach_ui_text_command(reach_rect_f32 rect, const uint16_t *text,
+                                                  float size, int32_t weight, int32_t alignment,
+                                                  reach_color color)
 {
     reach_render_command command = {};
     command.type = REACH_RENDER_COMMAND_TEXT;
@@ -66,6 +66,15 @@ static void reach_ui_push_text(reach_render_command_buffer *commands, reach_rect
     command.text_ellipsis = 1;
     command.color = color;
     reach_copy_utf16(command.text, 260, text);
+    return command;
+}
+
+static void reach_ui_push_text(reach_render_command_buffer *commands, reach_rect_f32 rect,
+                               const uint16_t *text, float size, int32_t weight, int32_t alignment,
+                               reach_color color)
+{
+    reach_render_command command =
+        reach_ui_text_command(rect, text, size, weight, alignment, color);
     (void)reach_render_command_buffer_push(commands, &command);
 }
 
@@ -237,29 +246,24 @@ int32_t reach_ui_segmented_control_index_at(reach_rect_f32 bounds, size_t item_c
     return index < item_count ? (int32_t)index : -1;
 }
 
-void reach_ui_segmented_control_render(reach_render_command_buffer *commands, reach_rect_f32 bounds,
-                                       const uint16_t *const *labels, size_t item_count,
-                                       const reach_ui_segmented_control_style *style,
-                                       float selection_position)
+reach_result reach_ui_segmented_control_motion_render(reach_render_command_buffer *commands,
+                                                      reach_rect_f32 bounds,
+                                                      const uint16_t *const *labels,
+                                                      size_t item_count,
+                                                      const reach_ui_segmented_control_style *style,
+                                                      uint64_t id, const reach_motion *position)
 {
     if (commands == nullptr || labels == nullptr || item_count == 0 || style == nullptr ||
+        position == nullptr || id == 0 || id > UINT64_C(0x7fffffffffffffff) - item_count ||
         bounds.width <= 0.0f || bounds.height <= 0.0f)
     {
-        return;
+        return REACH_INVALID_ARGUMENT;
     }
-    float maximum = (float)(item_count - 1);
-    if (selection_position < 0.0f)
-    {
-        selection_position = 0.0f;
-    }
-    if (selection_position > maximum)
-    {
-        selection_position = maximum;
-    }
+    uint64_t parent = commands->current_group_id;
+    reach_motion progress = reach_motion_clamp(position, 0, (float)(item_count - 1));
     float radius = bounds.height * 0.5f;
     reach_ui_push_rect(commands, bounds, radius, style->track);
     reach_rect_f32 selected = reach_ui_segmented_control_item_bounds(bounds, item_count, 0);
-    selected.x += selected.width * selection_position;
     float maximum_inset = fminf(selected.width, selected.height) * 0.5f;
     float inset = style->selection_inset;
     if (inset < 0.0f)
@@ -274,17 +278,61 @@ void reach_ui_segmented_control_render(reach_render_command_buffer *commands, re
     selected.y += inset;
     selected.width -= inset * 2.0f;
     selected.height -= inset * 2.0f;
-    reach_ui_push_rect(commands, selected, selected.height * 0.5f, style->selection);
-
+    reach_render_command shape = {};
+    shape.type = REACH_RENDER_COMMAND_RECT;
+    shape.rect = selected;
+    shape.radius = selected.height * 0.5f;
+    shape.color = style->selection;
+    reach_rect_f32 source = {};
+    if (!reach_render_retained_command_bounds(&shape, &source))
+        return REACH_INVALID_ARGUMENT;
+    reach_render_group selection = {};
+    selection.id = id;
+    selection.parent_id = parent;
+    selection.bounds = source;
+    selection.x = reach_motion_affine(&progress, bounds.width / (float)item_count, 0);
+    reach_result result = reach_render_command_buffer_begin_group(commands, &selection);
+    if (result != REACH_OK)
+        return result;
+    result = reach_render_command_buffer_push(commands, &shape);
+    reach_render_command_buffer_end_group(commands);
+    commands->current_group_id = parent;
+    if (result != REACH_OK)
+        return result;
     for (size_t index = 0; index < item_count; ++index)
     {
-        float distance = fabsf(selection_position - (float)index);
-        float selection = distance < 1.0f ? 1.0f - distance : 0.0f;
+        reach_motion weight = {};
+        if (index == 0 || index + 1 == item_count)
+        {
+            weight = index == 0 ? reach_motion_affine(position, -1, 1)
+                                : reach_motion_affine(position, 1, 2 - (float)item_count);
+            weight = reach_motion_clamp(&weight, 0, 1);
+        }
+        else
+        {
+            result = reach_motion_peak(position, (float)index, 1, &weight);
+            if (result != REACH_OK)
+                return result;
+        }
         reach_rect_f32 item = reach_ui_segmented_control_item_bounds(bounds, item_count, index);
-        reach_ui_push_text(commands, item, labels[index], style->text_size, style->text_weight,
-                           REACH_TEXT_ALIGNMENT_CENTER,
-                           reach_theme_color_mix(style->text, style->selected_text, selection));
+        reach_render_command text =
+            reach_ui_text_command(item, labels[index], style->text_size, style->text_weight,
+                                  REACH_TEXT_ALIGNMENT_CENTER, {1, 1, 1, 1});
+        if (!reach_render_retained_command_bounds(&text, &source))
+            return REACH_INVALID_ARGUMENT;
+        reach_render_group group = reach_ui_color_group(id + 1 + index, source, style->text,
+                                                        style->selected_text, &weight);
+        group.parent_id = parent;
+        result = reach_render_command_buffer_begin_group(commands, &group);
+        if (result != REACH_OK)
+            return result;
+        result = reach_render_command_buffer_push(commands, &text);
+        reach_render_command_buffer_end_group(commands);
+        commands->current_group_id = parent;
+        if (result != REACH_OK)
+            return result;
     }
+    return REACH_OK;
 }
 
 void reach_ui_toggle_render(reach_render_command_buffer *commands, reach_rect_f32 bounds,
