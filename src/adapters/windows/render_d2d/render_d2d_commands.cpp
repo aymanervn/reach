@@ -209,12 +209,16 @@ reach_result reach_d2d_push_group_masks(reach_render_backend *backend, ID2D1Rend
         if (group->has_clip && group->clip_radius > 0)
         {
             reach_rect_f32 clip = reach_render_group_clip_at(group, now_seconds);
+            reach_motion radius_x = {}, radius_y = {};
+            if (reach_render_group_clip_radii_motion(group, &radius_x, &radius_y) != REACH_OK)
+                return REACH_ERROR;
             ComPtr<ID2D1RoundedRectangleGeometry> geometry;
             ComPtr<ID2D1Layer> layer;
             HRESULT hr = backend->factory->CreateRoundedRectangleGeometry(
                 D2D1::RoundedRect(
                     D2D1::RectF(clip.x, clip.y, clip.x + clip.width, clip.y + clip.height),
-                    group->clip_radius, group->clip_radius),
+                    reach_motion_value_at(&radius_x, now_seconds),
+                    reach_motion_value_at(&radius_y, now_seconds)),
                 &geometry);
             if (SUCCEEDED(hr))
                 hr = target->CreateLayer(&layer);

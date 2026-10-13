@@ -532,12 +532,6 @@ static void stop_clip_motion(reach_d2d_retained_layer &layer)
     stop_rounded_clip_motion(layer);
 }
 
-static reach_motion rounded_radius_motion(const reach_motion &extent, float radius)
-{
-    reach_motion half = reach_motion_affine(&extent, 0.5f, 0);
-    return reach_motion_clamp(&half, 0, radius);
-}
-
 static HRESULT sync_clip(reach_render_backend *backend, reach_d2d_retained_layer &layer,
                          const reach_render_group &group, bool initialized)
 {
@@ -566,7 +560,8 @@ static HRESULT sync_clip(reach_render_backend *backend, reach_d2d_retained_layer
     unsigned mask = !initialized || !layer.group.has_clip ||
                             group.clip.width != layer.group.clip.width ||
                             group.clip.height != layer.group.clip.height ||
-                            group.clip_radius != layer.group.clip_radius
+                            (group.clip_radius != layer.group.clip_radius ||
+                             group.clip_uniform_radius != layer.group.clip_uniform_radius)
                         ? 15
                         : 0;
     for (size_t edge = 0; edge < REACH_RENDER_CLIP_EDGE_COUNT; ++edge)
@@ -579,12 +574,15 @@ static HRESULT sync_clip(reach_render_backend *backend, reach_d2d_retained_layer
         reach_rect_motion bounds = {};
         if (reach_render_group_clip_motion(&group, &bounds) != REACH_OK)
             return E_INVALIDARG;
+        reach_motion radius_x = {}, radius_y = {};
+        if (reach_render_group_clip_radii_motion(&group, &radius_x, &radius_y) != REACH_OK)
+            return E_INVALIDARG;
         reach_motion motions[] = {reach_motion_affine(&bounds.x, 1, -group.clip.x),
                                   reach_motion_affine(&bounds.y, 1, -group.clip.y),
                                   bounds.width,
                                   bounds.height,
-                                  rounded_radius_motion(bounds.width, group.clip_radius),
-                                  rounded_radius_motion(bounds.height, group.clip_radius)};
+                                  radius_x,
+                                  radius_y};
         reach_workload_add(REACH_WORKLOAD_PROPERTY_SUBMISSIONS, 1);
         ComPtr<ICompositor5> geometry_factory;
         ComPtr<ICompositor6> clip_factory;
@@ -695,7 +693,9 @@ static HRESULT sync_clip(reach_render_backend *backend, reach_d2d_retained_layer
             return hr;
         }
     }
-    if (created || !initialized || group.clip_radius != layer.group.clip_radius ||
+    if (created || !initialized ||
+        (group.clip_radius != layer.group.clip_radius ||
+         group.clip_uniform_radius != layer.group.clip_uniform_radius) ||
         (group.clip_radius > 0 && mask != 0))
     {
         reach_motion radius_x = {}, radius_y = {};
@@ -703,11 +703,8 @@ static HRESULT sync_clip(reach_render_backend *backend, reach_d2d_retained_layer
         reach_motion_set(&radius_y, group.clip_radius);
         if (group.clip_radius > 0)
         {
-            reach_rect_motion bounds = {};
-            if (reach_render_group_clip_motion(&group, &bounds) != REACH_OK)
+            if (reach_render_group_clip_radii_motion(&group, &radius_x, &radius_y) != REACH_OK)
                 return E_INVALIDARG;
-            radius_x = rounded_radius_motion(bounds.width, group.clip_radius);
-            radius_y = rounded_radius_motion(bounds.height, group.clip_radius);
         }
         ComPtr<IDCompositionAnimation> x_animation, y_animation;
         hr = dcomp_motion(backend, radius_x, &x_animation);

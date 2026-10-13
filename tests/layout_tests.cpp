@@ -712,6 +712,51 @@ static void test_rounded_clip_motion_preserves_compact_axes(void)
         }
 }
 
+static void test_uniform_clip_radii_share_geometry_motion(void)
+{
+    for (int easing = REACH_EASING_EASE_IN; easing <= REACH_EASING_EASE_IN_OUT; ++easing)
+        for (int reverse = 0; reverse < 2; ++reverse)
+            for (int uniform = 0; uniform < 2; ++uniform)
+            {
+                reach_motion progress = {};
+                reach_motion_start_at(&progress, reverse ? 1 : 0, reverse ? 0 : 1, 2,
+                                      (reach_easing)easing, 10);
+                reach_render_group group = {};
+                group.has_clip = 1;
+                group.clip = {0, 0, 120, 40};
+                group.clip_radius = 12;
+                group.clip_uniform_radius = uniform;
+                group.clip_insets[REACH_RENDER_CLIP_RIGHT] = reach_motion_affine(&progress, 120, 0);
+                group.clip_insets[REACH_RENDER_CLIP_BOTTOM] =
+                    reach_motion_affine(&progress, -100, 0);
+                reach_motion x = {}, y = {};
+                expect_true(reach_render_group_clip_radii_motion(&group, &x, &y) == REACH_OK,
+                            "clip radii derive from one canonical geometry epoch");
+                for (int index = 0; index <= 80; ++index)
+                {
+                    double now = 10 + index / 40.0;
+                    reach_rect_f32 clip = reach_render_group_clip_at(&group, now);
+                    float radius_x = fminf(12, clip.width / 2);
+                    float radius_y = fminf(12, clip.height / 2);
+                    if (uniform)
+                        radius_x = radius_y = fminf(radius_x, radius_y);
+                    expect_near(reach_motion_value_at(&x, now), radius_x, 0.0001f,
+                                "horizontal radius preserves selected compact semantics");
+                    expect_near(reach_motion_value_at(&y, now), radius_y, 0.0001f,
+                                "vertical radius preserves selected compact semantics");
+                }
+                reach_motion_start_at(&group.clip_insets[REACH_RENDER_CLIP_BOTTOM], 0, 30, 2,
+                                      (reach_easing)easing, 10.1);
+                expect_true(reach_render_group_clip_radii_motion(&group, &x, &y) ==
+                                (uniform ? REACH_INVALID_ARGUMENT : REACH_OK),
+                            "coupled radii reject incompatible axis epochs without approximation");
+                group.clip_uniform_radius = 2;
+                expect_true(reach_render_group_clip_radii_motion(&group, &x, &y) ==
+                                REACH_INVALID_ARGUMENT,
+                            "invalid compact radius policy is rejected");
+            }
+}
+
 static void test_group_hierarchy_rejects_ambiguous_ownership_and_order(void)
 {
     auto storage = std::make_unique<reach_render_command_buffer>();
@@ -880,7 +925,8 @@ static void test_group_equality_preserves_intent_without_padding(void)
     reach_motion_set(&first.opacity, 1);
     reach_render_group second = first;
     unsigned char *bytes = reinterpret_cast<unsigned char *>(&second);
-    for (size_t at = offsetof(reach_render_group, clip_radius) + sizeof(second.clip_radius);
+    for (size_t at =
+             offsetof(reach_render_group, clip_uniform_radius) + sizeof(second.clip_uniform_radius);
          at < offsetof(reach_render_group, clip_insets); ++at)
         bytes[at] = 0xa5;
     for (size_t at = offsetof(reach_render_group, has_tint) + sizeof(second.has_tint);
@@ -894,6 +940,10 @@ static void test_group_equality_preserves_intent_without_padding(void)
     second.parent_id = 20;
     expect_true(!reach_render_group_equal(&first, &second),
                 "changed hierarchy keeps distinct ownership");
+    second = first;
+    second.clip_uniform_radius = 1;
+    expect_true(!reach_render_group_equal(&first, &second),
+                "compact radius policy remains distinct");
     second = first;
     reach_motion_set(&second.clip_insets[REACH_RENDER_CLIP_BOTTOM], 12);
     expect_true(!reach_render_group_equal(&first, &second), "clip intent remains distinct");
@@ -960,6 +1010,7 @@ int main(void)
     test_retained_command_preflight_preserves_batch_atomicity();
     test_group_hierarchy_rejects_ambiguous_ownership_and_order();
     test_rounded_clip_motion_preserves_compact_axes();
+    test_uniform_clip_radii_share_geometry_motion();
     test_retained_tint_samples_one_timeline();
     test_animated_clip_samples_absolute_geometry();
     test_dock_reserves_side_safe_margins();
