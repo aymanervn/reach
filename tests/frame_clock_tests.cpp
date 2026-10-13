@@ -273,6 +273,101 @@ static void test_repeating_motion_affine_crossing_and_retirement(void)
                 "invalid repetition retires to an immediate endpoint");
 }
 
+static void test_discrete_repetition_sampling_compilation_and_crossing(void)
+{
+    reach_motion motion = {};
+    reach_motion_repeat_at(&motion, 1, 0, 0, 0.5, 0.25, REACH_EASING_EASE_IN_OUT, 10);
+    expect_true(motion.repeating && reach_motion_cycle_seconds(&motion) == 0.75 &&
+                    reach_motion_active_at(&motion, 1000000),
+                "zero-travel repetition uses the existing holds and lifetime");
+    expect_true(reach_motion_value_at(&motion, 9) == 1 &&
+                    reach_motion_value_at(&motion, 10.499) == 1 &&
+                    reach_motion_value_at(&motion, 10.5) == 0 &&
+                    reach_motion_value_at(&motion, 10.749) == 0 &&
+                    reach_motion_value_at(&motion, 10.75) == 1,
+                "discrete holds switch exactly at their boundaries without interpolation");
+    for (double now : {9.0, 10.0, 10.25, 10.5, 10.625, 1000.0})
+    {
+        reach_motion_segment pieces[REACH_MOTION_MAX_REPEAT_SEGMENTS] = {};
+        size_t count = reach_motion_compile_repeat_at(&motion, now, pieces);
+        expect_true(count >= 2 && count <= 3 && pieces[0].start == 0 &&
+                        pieces[count - 1].end == 0.75,
+                    "discrete rotated compilation spans exactly one cycle");
+        for (size_t index = 0; index < count; ++index)
+        {
+            const auto &piece = pieces[index];
+            expect_true(piece.linear == 0 && piece.quadratic == 0 && piece.cubic == 0 &&
+                            piece.end_value == pieces[(index + 1) % count].value,
+                        "constant pieces carry the next boundary value for native step easing");
+            double sample = (piece.start + piece.end) * 0.5;
+            expect_true(piece.value == reach_motion_value_at(&motion, fmax(now, 10) + sample),
+                        "compiled hold values match canonical sampling after a delayed start");
+        }
+    }
+    expect_true(reach_motion_time_to_value_at(&motion, 0, 9) == 1.5 &&
+                    reach_motion_time_to_value_at(&motion, 0, 10.25) == 0.25 &&
+                    reach_motion_time_to_value_at(&motion, 1, 10.625) == 0.125 &&
+                    isinf(reach_motion_time_to_value_at(&motion, 0.5f, 10.25)),
+                "crossing reports exact switches and rejects values skipped by a jump");
+    reach_motion mapped = {};
+    expect_true(reach_motion_hinge(&motion, 0.5f, 3, 2, -2, &mapped) == REACH_OK &&
+                    mapped.repeating && !reach_motion_active_at(&mapped, 10),
+                "mapping an unvisited intermediate peak cannot manufacture discrete travel");
+    float low = 0, high = 0;
+    expect_true(reach_motion_range(&mapped, &low, &high) == REACH_OK && low == 2 && high == 2,
+                "discrete mapped range contains only visited endpoints");
+    mapped = reach_motion_affine(&motion, -3, 5);
+    expect_true(mapped.started_seconds == 10 && mapped.generation == motion.generation &&
+                    reach_motion_time_to_value_at(&mapped, 5, 10.25) == 0.25,
+                "affine discrete motion retains epoch and exact endpoint crossing");
+    uint64_t generation = motion.generation;
+    reach_motion_animate_to_at(&motion, 1, 0.2, REACH_EASING_EASE_OUT, 10.625);
+    expect_true(!motion.repeating && motion.from == 0 && motion.generation != generation,
+                "finite retarget retires discrete repetition from its current endpoint");
+}
+
+static void test_discrete_repetition_agrees_with_blink_deadlines(void)
+{
+    for (double visible : {0.53, 0.55})
+    {
+        reach_blink blink = {};
+        reach_blink_reset_at(&blink, visible, visible == 0.55 ? 0.45 : 0.53, 64);
+        reach_motion motion = {};
+        reach_motion_repeat_at(&motion, 1, 0, 0, blink.visible_seconds, blink.hidden_seconds,
+                               REACH_EASING_EASE_IN_OUT, blink.started_seconds);
+        for (int boundary = 0; boundary < 12; ++boundary)
+        {
+            double now = blink.deadline_seconds;
+            reach_blink_update_at(&blink, now);
+            expect_true(reach_motion_value_at(&motion, now) == blink.visible,
+                        "discrete sampling agrees with existing nonbinary caret deadlines");
+            reach_motion_segment pieces[REACH_MOTION_MAX_REPEAT_SEGMENTS] = {};
+            size_t count = reach_motion_compile_repeat_at(&motion, now, pieces);
+            expect_true(count > 0 && pieces[0].value == blink.visible,
+                        "delayed native compilation begins at the same caret boundary value");
+        }
+    }
+}
+
+static void test_discrete_repetition_validation_and_constant_holds(void)
+{
+    reach_motion motion = {};
+    reach_motion_repeat_at(&motion, 1, 0, 0, 0, 0.5, REACH_EASING_EASE_OUT, 10);
+    expect_true(!motion.repeating && reach_motion_value_at(&motion, 10) == 0,
+                "missing initial hold normalizes to the remaining constant endpoint");
+    reach_motion_repeat_at(&motion, 1, 0, 0, 0.5, 0, REACH_EASING_EASE_OUT, 10);
+    expect_true(!motion.repeating && reach_motion_value_at(&motion, 10) == 1,
+                "missing final hold normalizes to the initial constant endpoint");
+    for (double travel : {-1.0, (double)INFINITY, (double)NAN})
+    {
+        reach_motion_repeat_at(&motion, 1, 0, travel, 0.5, 0.5, REACH_EASING_EASE_OUT, 10);
+        expect_true(!motion.repeating && reach_motion_value_at(&motion, 10) == 0,
+                    "invalid travel retires repetition to the endpoint");
+    }
+    reach_motion_repeat_at(&motion, 1, 0, 0, 0.5, 0.5, REACH_EASING_EASE_OUT, NAN);
+    expect_true(!motion.repeating, "invalid repetition epoch cannot reach native compilation");
+}
+
 int main(void)
 {
     test_frame_rate_policy();
@@ -286,5 +381,8 @@ int main(void)
     test_animation_immediate_reset_and_invalid_sample();
     test_repeating_motion_compilation_and_limits();
     test_repeating_motion_affine_crossing_and_retirement();
+    test_discrete_repetition_sampling_compilation_and_crossing();
+    test_discrete_repetition_validation_and_constant_holds();
+    test_discrete_repetition_agrees_with_blink_deadlines();
     return failures != 0;
 }

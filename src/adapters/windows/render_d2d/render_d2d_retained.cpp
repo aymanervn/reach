@@ -228,10 +228,23 @@ static HRESULT wuc_motion(reach_render_backend *backend, IInspectable *visual,
             distance != 0.0f ? 1.0f - (float)(end_derivative * dt / (3.0 * distance)) : 1.0f};
         ComPtr<ICubicBezierEasingFunction> cubic;
         ComPtr<ICompositionEasingFunction> easing;
-        hr = backend->compositor->CreateCubicBezierEasingFunction(control1, control2, &cubic);
-        if (SUCCEEDED(hr))
+        if (distance != 0 && segment.linear == 0 && segment.quadratic == 0 && segment.cubic == 0)
         {
-            hr = cubic.As(&easing);
+            ComPtr<ICompositor2> factory;
+            ComPtr<IStepEasingFunction> step;
+            hr = backend->compositor.As(&factory);
+            if (SUCCEEDED(hr))
+                hr = factory->CreateStepEasingFunctionWithStepCount(1, &step);
+            if (SUCCEEDED(hr))
+                hr = step->put_IsFinalStepSingleFrame(true);
+            if (SUCCEEDED(hr))
+                hr = step.As(&easing);
+        }
+        else
+        {
+            hr = backend->compositor->CreateCubicBezierEasingFunction(control1, control2, &cubic);
+            if (SUCCEEDED(hr))
+                hr = cubic.As(&easing);
         }
         if (SUCCEEDED(hr))
         {
