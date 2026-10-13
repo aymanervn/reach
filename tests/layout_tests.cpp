@@ -886,8 +886,7 @@ static void test_group_equality_preserves_intent_without_padding(void)
     for (size_t at = offsetof(reach_render_group, has_tint) + sizeof(second.has_tint);
          at < offsetof(reach_render_group, tint); ++at)
         bytes[at] = 0xa5;
-    for (size_t at = offsetof(reach_render_group, repeat_travel_seconds) +
-                     sizeof(second.repeat_travel_seconds);
+    for (size_t at = offsetof(reach_render_group, tint_rgb_target) + sizeof(second.tint_rgb_target);
          at < sizeof(second); ++at)
         bytes[at] = 0xa5;
     expect_true(reach_render_group_equal(&first, &second),
@@ -909,7 +908,7 @@ static void test_group_equality_preserves_intent_without_padding(void)
     reach_motion_set(&second.tint_rgb_mix, 0.5f);
     expect_true(!reach_render_group_equal(&first, &second), "RGB mix intent remains distinct");
     second = first;
-    second.repeat_travel_seconds = 2;
+    reach_motion_repeat_at(&second.x, 0, 10, 2, 1, 1, REACH_EASING_EASE_IN_OUT, 10);
     expect_true(!reach_render_group_equal(&first, &second), "repeat intent remains distinct");
 }
 

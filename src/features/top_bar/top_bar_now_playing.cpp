@@ -5,6 +5,7 @@
 #include "reach/features/common/now_playing_artwork.h"
 
 #include <math.h>
+#include <string.h>
 #include <new>
 
 static const float REACH_TOP_BAR_NOW_PLAYING_COVER_WIDTH = 0.70f;
@@ -18,6 +19,7 @@ struct reach_top_bar_now_playing
     reach_top_bar_now_playing_model model;
     reach_top_bar_now_playing_layout layout;
     uint64_t observed_generation;
+    reach_motion marquee;
 };
 
 static reach_rect_f32 reach_top_bar_now_playing_rect(float x, float y, float width, float height)
@@ -46,13 +48,16 @@ static void reach_top_bar_now_playing_push_rect(reach_render_command_buffer *com
 static void reach_top_bar_now_playing_push_text(reach_render_command_buffer *commands,
                                                 reach_rect_f32 rect, const uint16_t *value,
                                                 float size, int32_t weight, int32_t alignment,
-                                                reach_color color, reach_rect_f32 clip)
+                                                reach_color color, reach_rect_f32 clip,
+                                                const reach_motion *motion = nullptr)
 {
     reach_render_group group = {};
     group.id = UINT64_C(0x4000000000000001);
     group.bounds = rect;
     group.has_clip = 1;
     group.clip = clip;
+    if (motion != nullptr)
+        group.x = *motion;
     reach_render_command_buffer_begin_group(commands, &group);
     reach_render_command command = {};
     command.type = REACH_RENDER_COMMAND_TEXT;
@@ -66,31 +71,27 @@ static void reach_top_bar_now_playing_push_text(reach_render_command_buffer *com
     reach_render_command_buffer_end_group(commands);
 }
 
-static void reach_top_bar_now_playing_push_marquee(reach_render_command_buffer *commands,
-                                                   reach_rect_f32 rect, const uint16_t *value,
-                                                   float size, int32_t weight, reach_color color,
-                                                   reach_rect_f32 clip, float overflow,
-                                                   float dpi_scale)
+void reach_top_bar_now_playing_update_marquee(const reach_top_bar_now_playing_render_input *input,
+                                              reach_motion *motion, double now_seconds)
 {
-    reach_render_command command = {};
-    reach_render_group group = {};
-    group.id = UINT64_C(0x4000000000000001);
-    group.bounds = rect;
-    group.has_clip = 1;
-    group.clip = clip;
-    group.repeat_offset_x = -overflow;
-    group.repeat_hold_seconds = REACH_TOP_BAR_NOW_PLAYING_MARQUEE_HOLD_SECONDS;
-    group.repeat_travel_seconds = overflow / (REACH_TOP_BAR_NOW_PLAYING_MARQUEE_SPEED * dpi_scale);
-    reach_render_command_buffer_begin_group(commands, &group);
-    command.type = REACH_RENDER_COMMAND_TEXT;
-    command.rect = rect;
-    command.color = color;
-    command.text_size = size;
-    command.text_weight = weight;
-    command.text_alignment = REACH_TEXT_ALIGNMENT_LEADING;
-    reach_copy_utf16(command.text, 260, value);
-    (void)reach_render_command_buffer_push(commands, &command);
-    reach_render_command_buffer_end_group(commands);
+    if (input == nullptr || motion == nullptr || input->model == nullptr ||
+        input->layout == nullptr)
+        return;
+    float dpi = input->dpi_scale > 0 ? input->dpi_scale : 1;
+    float overflow = input->layout->text_advance - input->layout->text.width;
+    if (!input->animate_text || !input->model->visible || input->layout->text.width <= 0 ||
+        input->layout->play_pause_button.width <= 0 ||
+        overflow <= REACH_TOP_BAR_NOW_PLAYING_MIN_OVERFLOW * dpi)
+    {
+        if (motion->generation == 0 || motion->repeating || motion->to != 0)
+            reach_motion_set(motion, 0);
+        return;
+    }
+    double travel = overflow / (REACH_TOP_BAR_NOW_PLAYING_MARQUEE_SPEED * dpi);
+    if (!motion->repeating || motion->to != -overflow || motion->duration_seconds != travel)
+        reach_motion_repeat_at(
+            motion, 0, -overflow, travel, REACH_TOP_BAR_NOW_PLAYING_MARQUEE_HOLD_SECONDS,
+            REACH_TOP_BAR_NOW_PLAYING_MARQUEE_HOLD_SECONDS, REACH_EASING_EASE_IN_OUT, now_seconds);
 }
 
 static float reach_top_bar_now_playing_text_advance(const reach_text_measure_port *measure,
@@ -295,21 +296,10 @@ reach_top_bar_now_playing_build_render_commands(const reach_top_bar_now_playing_
     reach_rect_f32 text = input->layout->text;
     text.width =
         input->layout->text_advance > text.width ? input->layout->text_advance : text.width;
-    float overflow = input->layout->text_advance - input->layout->text.width;
-    if (input->animate_text && overflow > REACH_TOP_BAR_NOW_PLAYING_MIN_OVERFLOW * dpi_scale)
-    {
-        reach_top_bar_now_playing_push_marquee(out_commands, text, input->model->line,
-                                               REACH_TEXT_SIZE_MEDIUM * dpi_scale,
-                                               REACH_TEXT_WEIGHT_BOLD, theme->now_playing_title,
-                                               input->layout->text, overflow, dpi_scale);
-    }
-    else
-    {
-        reach_top_bar_now_playing_push_text(out_commands, text, input->model->line,
-                                            REACH_TEXT_SIZE_MEDIUM * dpi_scale,
-                                            REACH_TEXT_WEIGHT_BOLD, REACH_TEXT_ALIGNMENT_LEADING,
-                                            theme->now_playing_title, input->layout->text);
-    }
+    reach_top_bar_now_playing_push_text(
+        out_commands, text, input->model->line, REACH_TEXT_SIZE_MEDIUM * dpi_scale,
+        REACH_TEXT_WEIGHT_BOLD, REACH_TEXT_ALIGNMENT_LEADING, theme->now_playing_title,
+        input->layout->text, input->animate_text ? &input->marquee : nullptr);
 
     reach_vector_icon_id icons[3] = {REACH_VECTOR_ICON_PREVIOUS,
                                      input->model->playback == REACH_MEDIA_PLAYBACK_PLAYING
@@ -398,6 +388,7 @@ void reach_top_bar_now_playing_reset(reach_top_bar_now_playing *now_playing)
     reach_top_bar_now_playing_model_init(&now_playing->model);
     now_playing->layout = {};
     now_playing->observed_generation = 0;
+    reach_motion_set(&now_playing->marquee, 0);
 }
 
 void reach_top_bar_now_playing_sync(reach_top_bar_now_playing *now_playing,
@@ -433,6 +424,8 @@ void reach_top_bar_now_playing_sync(reach_top_bar_now_playing *now_playing,
     next.previous_enabled = snapshot.previous_enabled;
     next.play_pause_enabled = snapshot.play_pause_enabled;
     next.next_enabled = snapshot.next_enabled;
+    if (memcmp(next.line, now_playing->model.line, sizeof(next.line)) != 0 || !next.visible)
+        reach_motion_set(&now_playing->marquee, 0);
     now_playing->model = next;
     now_playing->observed_generation = snapshot.generation;
     out->changed = 1;
@@ -512,5 +505,8 @@ reach_result reach_top_bar_now_playing_append_render_commands(
     input.layout = &now_playing->layout;
     input.dpi_scale = ctx->dpi_scale;
     input.animate_text = ctx->animate_text;
+    reach_top_bar_now_playing_update_marquee(&input, &now_playing->marquee,
+                                             reach_motion_now_seconds());
+    input.marquee = now_playing->marquee;
     return reach_top_bar_now_playing_build_render_commands(&input, out_commands);
 }

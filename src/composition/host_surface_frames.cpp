@@ -148,6 +148,9 @@ static void reach_host_fill_surface_context(reach_host *host, const reach_featur
     out->dpi_scale = reach_host_layout_dpi_scale(host);
     out->icon_size_px = reach_host_icon_size_px(host);
     out->bounds_valid = desc->surface->bounds_valid;
+    out->retained_supported =
+        desc->surface->renderer.ops.retained_supported != nullptr &&
+        desc->surface->renderer.ops.retained_supported(desc->surface->renderer.backend);
     out->preferred_front_source = desc->native_overlay_front_source;
 }
 

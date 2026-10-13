@@ -271,6 +271,7 @@ extern "C"
         const reach_theme *theme;
         float dpi_scale;
         int32_t icon_size_px;
+        int32_t retained_supported;
     } reach_top_bar_render_context;
 
     reach_result reach_top_bar_append_render_commands(reach_top_bar *top_bar,

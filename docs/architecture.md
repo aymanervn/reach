@@ -457,13 +457,17 @@ compilation preserve phase; the compiler rotates one complete cycle to the submi
 Both compositors repeat the resulting keyframes/cubics without application ticks. Root presentation
 remains finite so completion ownership is well-defined. Retiring or replacing retained sources stops
 periodic transform, opacity, clip and tint bindings before releasing the layer; font replacement
-uses the same cleanup. Now Playing's marquee retains its existing clipped native cycle descriptor:
-Windows Composition uses its established custom Bezier easing and DirectComposition its established
-smoothstep cubics. Logical overflow, speed and the overflow threshold scale together with DPI;
-endpoint holds remain in seconds. Unchanged submissions preserve the cycle and raster, content edits
-restart it, and disable/hide/font replacement retire its native binding. Its driver requires no
-application frames; the renderer fallback keeps the title static. Canonical curve/phase unification
-and final workload acceptance remain migration work.
+uses the same cleanup. Now Playing's marquee now uses that canonical periodic X intent rather
+than a separate native cycle descriptor. Its capsule owns the absolute epoch and generation;
+unchanged submissions, theme repaint and source recreation preserve phase. A changed title or
+measured overflow starts a fresh cycle with a readable endpoint hold. Both compositors use the
+application's cubic ease-in-out curve, resolving the former WUC Bezier/DC smoothstep difference.
+Logical overflow, speed and threshold scale together with DPI; both endpoint holds remain 1.6
+seconds. Hide, disable, reset and source retirement stop repetition. Generic surface context
+publishes retained-rendering capability, which the registry passes to Top Bar's render context;
+unsupported rendering clears marquee intent and retains static text without CPU frame demand.
+No application tick, alternate animation owner or adapter-local marquee timing remains. Displayed
+appearance and total workload/power acceptance remain migration work.
 
 Settings Wi-Fi, Bluetooth, Windows Update and installed-app loaders publish normalized periodic
 width and translation through the shared loader renderer. Fixed caps preserve the bar radius while

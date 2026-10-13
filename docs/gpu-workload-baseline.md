@@ -1039,3 +1039,47 @@ incorrectly expected a visual-plus-clip update to count as one submission. Fixin
 assumptions yields zero failures; no production frame driver was added or changed for them.
 No Reach process was stopped or directly launched. Displayed consumer appearance and final total
 product workload acceptance remain pending; owned diagnostics do not establish those gates.
+
+
+## Canonical Now Playing marquee
+
+The Now Playing capsule now owns canonical periodic X motion. Both adapters consume the existing
+shared compiler; the three legacy cycle fields, custom WUC Bezier/DC smoothstep drivers and
+preserve-repeat branches are removed. Both now use the application's cubic ease-in-out curve,
+intentionally resolving the old backend difference. Overflow/speed/threshold remain logical and
+endpoint holds remain 1.6 seconds. Title or overflow changes restart at the readable endpoint;
+unchanged source, theme repaint and font/source recreation retain the capsule's absolute phase.
+Generic surface context carries renderer capability through the existing registry adapter to
+Top Bar's render context, keeping unsupported marquee rendering static with no CPU motion demand.
+The remaining Now Playing width animation is a separate outstanding consumer.
+
+Both builds and all forty test groups pass. Existing deterministic coverage checks four DPI values;
+a focused motion-policy check verifies phase identity, holds, changes and disabled/reopened intent.
+Each focused Debug/Release native suite passes eighty cases across both compositors, two themes, four DPI
+values and five repetitions. Owned synthetic media-service/capsule probes verify real source sync,
+unchanged/theme phase, title replacement, disabled/reopened intent and reset. This extends existing
+owned diagnostics rather than adding UI tests. Mid-travel font replacement retains the exact epoch
+and generation. Five full regression runs per backend plus HWND fallback pass in both builds.
+Evidence: `build-marquee-canonical-debug.log`, `build-marquee-canonical-release.log`,
+`test-marquee-canonical-debug.log`, `test-marquee-canonical-release.log`,
+`probe-marquee-canonical-focused-debug.log`, `probe-marquee-canonical-focused-release.log`,
+`probe-marquee-canonical-full-debug.log` and `probe-marquee-canonical-full-release.log`.
+No displayed appearance or total CPU/GPU/power conclusion follows from these structural checks.
+
+
+The x64 size probe now reports a 2208-byte retained group and 1000832-byte command buffer, down
+16 and 3600 bytes respectively after removing the legacy cycle fields. The capsule adds one
+152-byte canonical motion owner; the larger compound-motion storage from the earlier milestone
+still requires the final product memory assessment.
+
+The initial validation restart command was rejected by automatic approval because termination
+required authorization recognized in the current instruction. It did not execute. Read-only
+inspection outside the sandbox showed the existing host/watchdog; sandbox enumeration had returned
+no matching processes and is not authoritative for desktop lifetime checks. After explicit approval
+for one restart, watchdog-first termination and installed-folder `reachctl --start` succeeded.
+Reach PID 18572 and watchdog PID 10584 remained alive on later checks; installed host/Settings hashes
+match the checked Debug builds and both scheduled tasks are running. The existing installation was
+reused. Settings opened from the installed folder and the task-opened window was closed normally.
+Capture still fails with `IGraphicsCaptureItemInterop.CreateForMonitor ... 0x80070057` after refreshed
+selection, so no displayed-pixel/input acceptance is claimed. Future lifetime checks must inspect
+the desktop process view outside the sandbox; never restart based on a sandbox-empty process list.
