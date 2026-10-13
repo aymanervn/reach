@@ -1179,3 +1179,95 @@ desktop process check; installed Reach/Settings hashes match the checked Debug b
 initial automatic-approval rejection did not execute. The user then updated the active goal to
 authorize subsequent goal validation restarts without further permission questions. The first
 installation remains in use; no reinstall or direct host/watchdog launch was performed.
+
+## Independent production caret sources
+
+Settings Account, Power and Wi-Fi fields and Launcher now publish canonical discrete caret opacity
+from their existing `reach_blink` owner. Focus/edit reset increments its generation; fallback
+sampling retains that generation/epoch. Shared textbox command production adds an optional
+`caret_group_id` reference to an ordinary retained opacity descriptor. The adapter resolves only
+the stroke ink from the same bounded cached DWrite layout used to paint text, creates a child of
+the isolated editor source and preserves its natural raster limits, ancestor transforms and clips.
+The editor stays a single-command, tint-free source; validation rejects missing, shared or ambiguous
+caret ownership before native plan construction. A generic line primitive paints the resolved
+stroke without creating a second text layout or a textbox-sized surface. Body caching ignores the
+caret index when the body does not paint it.
+
+Supported Settings and Launcher paths suppress caret advancement and deadline publication. They
+perform no blink-driven application command build, layout, rasterization or submission. Native
+mode/source selection stays inside the feature/render contracts; only the existing registry seam
+passes Launcher's generic renderer capability. Offscreen fields publish no part; minimized/suspended
+rendering retires sources and native bindings. Font recreation retains the absolute epoch/generation.
+Unsupported renderers retain the existing visible-field deadline scheduling and compound paint
+path. Necessary text/layout/ink resolution stays on the CPU at content/input changes and reuses the
+existing 32-format/128-layout caches rather than allocating a new layout on every reconciliation.
+
+Pure non-UI coverage verifies projection identity across deadline sampling, same-time reset,
+retirement and part ownership/preflight. Both builds and all forty test groups pass. Owned actual
+Settings producers cover three caret pages, two themes and four DPI values; only the focused visible
+field owns a part and native scheduling waits indefinitely for other work. Launcher producer,
+capability switching and absent native caret deadline pass; existing focus/edit/page/blur/radio/
+minimized/offscreen and two-wake-per-cycle fallback checks still pass. The scheduler fixture clears
+its deliberately switched native render graph before checking the isolated fallback clock.
+
+The previous committed textbox drawing function is the reference for 128 cases per backend, with
+two fonts/themes and four DPI scales, placeholders, selection, multilingual text, alignment and
+clipped ink. Production layout plus separately composited stroke differs by at most one channel
+value. A further 96 actual native source graphs per backend match the retained baseline pixels
+exactly, including natural editor raster clipping. These checks pass in Debug and Release. A full
+cycle submits/rasterizes nothing; unchanged submission mutates no properties/tree; focus reset
+changes one opacity property with zero raster passes. Font recreation preserves the exact intent,
+and suspension retires every source/binding. The full pre-cache-refinement regression suites pass
+five runs per backend plus HWND fallback; both complete test suites and focused source/pixel suites
+pass after cached-layout reuse. No new UI tests were added.
+
+The x64 command grows from 1016 to 1024 bytes, its fixed buffer from 1000832 to 1004800 bytes
+(3968 bytes, 3.875 KiB), and `reach_blink` from 40 to 48 bytes. Three app buffers therefore add
+11904 bytes before other state. Motion/group sizes stay 152/2208 bytes. The bounded 180 by 32 editor
+scene retains 23040 estimated source bytes versus 23480 with the production caret: 440 additional
+bytes (1.91%). This excludes native object, allocation granularity and driver/cache memory; it is
+not a total-memory result.
+
+Evidence under `build/gpu-composition-migration`: `build-caret-sources-{debug,release}.log`,
+`test-caret-sources-{debug,release}.log`, `probe-caret-sources-{debug,release}.log`,
+`probe-caret-consumers-{debug,release}.log`, `probe-caret-sources-full-{debug,release}.log`,
+`caret_reference.cpp` and `caret-size.cpp`. Displayed blink timing, moving/scaled compositor pixels,
+input/latency and full product CPU/GPU/power/memory acceptance remain open.
+
+The final owned Release comparison uses the real production part for the native method. It repeats
+five six-second phases per method/backend in rotated order with the same small, input-transparent
+32 by 32 scene at opacity 0.01. After excluding each phase's first/last 0.5 seconds, 571 complete
+intervals have valid process/DWM/GPU coverage. DWM CPU again uses the recorded Process V2 fallback.
+Each table entry is the median of five interval-weighted phase means; CPU uses all sixteen logical
+processors and GPU uses the selected-process busiest engine. Package/board power is whole-device.
+
+| Backend | Method | Caret + DWM CPU % | GPU engine % | Package W | GPU board W |
+| --- | --- | ---: | ---: | ---: | ---: |
+| WUC | Compound deadline | 0.5549 | 2.1607 | 33.5914 | 24.0356 |
+| WUC | Separate deadline prototype | 0.5782 | 2.5317 | 33.4216 | 24.1469 |
+| WUC | Production native step | 0.6787 | 2.8244 | 33.7461 | 24.1279 |
+| DC | Compound deadline | 0.6371 | 2.6441 | 33.5119 | 24.0247 |
+| DC | Separate deadline prototype | 0.6167 | 2.1297 | 33.9500 | 23.9726 |
+| DC | Production native step | 0.6838 | 2.6824 | 33.6324 | 24.0592 |
+
+Compound phases perform eleven application submissions/repaints; production phases perform zero
+of either, with the same cached body source. Total workload is inconclusive: GPU ranges overlap
+across methods (0.925–2.927%), background CPU varies 1.704–7.969%, observer CPU phase means are
+0.370–0.411%, and board/package outliers reach 27.060/37.645 W. In particular, the higher WUC native
+GPU median is not evidence of an efficiency win, and this capture does not establish equivalence
+or a meaningful regression threshold. It does not include complete application builds/layout or
+normal visible product presentation. Keep final workload/latency/power gates open and repeat with
+controlled visible product scenarios before final acceptance.
+
+Raw evidence: `caret-production-phases.jsonl`, `caret-production-native.log`,
+`caret-production-system.jsonl`, `caret-production-summary.json`. The initial capture omitted
+`REACH_WORKLOAD_REPORT`, disabling diagnostic counters and failing counter assertions. Its files
+are retained as `caret-production-invalid-*` and excluded from these results. The corrected capture
+enables counters, completes all thirty phases and reports zero diagnostic failures.
+
+
+The installed validation restart used the updated goal authorization without another permission
+question. Watchdog-first termination, checked-binary replacement and installed-folder
+`reachctl --start` succeeded. Reach PID 19168 and watchdog PID 17156 run from the installed folder;
+Reach/Settings hashes match the final checked Debug builds. The existing installation was reused.
+This startup/lifetime check does not establish displayed caret timing or full product interaction.

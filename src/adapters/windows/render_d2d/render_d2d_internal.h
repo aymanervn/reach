@@ -212,7 +212,8 @@ reach_result reach_d2d_presentation_complete(reach_render_backend *backend, uint
                                              int32_t *out_complete);
 void reach_d2d_suspend(reach_render_backend *backend);
 reach_result reach_d2d_execute_commands(reach_render_backend *backend,
-                                        const reach_render_command *commands, size_t count);
+                                        const reach_render_command *commands, size_t count,
+                                        float caret_opacity = 1);
 void reach_d2d_set_ui_font(reach_render_backend *backend, int32_t use_bundled_font);
 reach_result reach_d2d_measure_text(void *context, const uint16_t *text, float text_size,
                                     int32_t text_weight, float *out_width);
@@ -281,8 +282,12 @@ reach_result reach_d2d_draw_text(reach_render_backend *backend,
                                  const reach_render_command *command);
 reach_result reach_d2d_draw_text_to_target(reach_render_backend *backend, ID2D1RenderTarget *target,
                                            const reach_render_command *command);
+reach_result reach_d2d_draw_line(ID2D1RenderTarget *target, const reach_render_command *command);
+reach_result reach_d2d_textbox_caret_line(reach_render_backend *backend,
+                                          const reach_render_command *command,
+                                          reach_render_command *out);
 reach_result reach_d2d_draw_textbox(reach_render_backend *backend,
-                                    const reach_render_command *command);
+                                    const reach_render_command *command, float caret_opacity = 1);
 
 reach_result reach_d2d_execute(reach_render_backend *backend,
                                const reach_render_command_buffer *commands);

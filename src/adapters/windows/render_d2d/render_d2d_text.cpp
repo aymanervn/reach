@@ -426,8 +426,94 @@ reach_result reach_d2d_draw_text(reach_render_backend *backend, const reach_rend
     return reach_d2d_draw_text_to_target(backend, reach_d2d_target(backend), command);
 }
 
+struct reach_d2d_textbox_layout
+{
+    ComPtr<IDWriteTextLayout> layout;
+    float left = 0;
+    float top = 0;
+    UINT32 text_length = 0;
+    bool showing_placeholder = false;
+};
+
+static HRESULT reach_d2d_make_textbox_layout(reach_render_backend *backend,
+                                             const reach_render_command *command,
+                                             reach_d2d_textbox_layout *out)
+{
+    const wchar_t *text = reinterpret_cast<const wchar_t *>(command->text);
+    const wchar_t *placeholder = reinterpret_cast<const wchar_t *>(command->placeholder);
+    const UINT32 text_length = static_cast<UINT32>(wcslen(text));
+    const int32_t showing_placeholder = (text_length == 0);
+    const wchar_t *display = showing_placeholder ? placeholder : text;
+
+    const float font_size = command->text_size > 0.0f ? command->text_size : REACH_TEXT_SIZE_MEDIUM;
+    const DWRITE_FONT_WEIGHT weight = command->text_weight > 0
+                                          ? static_cast<DWRITE_FONT_WEIGHT>(command->text_weight)
+                                          : DWRITE_FONT_WEIGHT_NORMAL;
+
+    const float inset = font_size * 0.5f;
+    const float content_left = command->rect.x + inset;
+    const float content_top = command->rect.y;
+    const float content_width =
+        command->rect.width - inset * 2.0f > 0.0f ? command->rect.width - inset * 2.0f : 0.0f;
+    const float content_height = command->rect.height;
+
+    DWRITE_TEXT_ALIGNMENT alignment = DWRITE_TEXT_ALIGNMENT_LEADING;
+    if (command->text_alignment == REACH_TEXT_ALIGNMENT_CENTER)
+    {
+        alignment = DWRITE_TEXT_ALIGNMENT_CENTER;
+    }
+    else if (command->text_alignment == REACH_TEXT_ALIGNMENT_TRAILING)
+    {
+        alignment = DWRITE_TEXT_ALIGNMENT_TRAILING;
+    }
+    HRESULT hr = reach_d2d_cached_layout(backend, display, font_size, (int32_t)weight,
+                                         content_width, content_height, (int32_t)alignment,
+                                         DWRITE_PARAGRAPH_ALIGNMENT_CENTER, 0,
+                                         out->layout.ReleaseAndGetAddressOf());
+    if (FAILED(hr) || out->layout == nullptr)
+        return FAILED(hr) ? hr : E_FAIL;
+    out->left = content_left;
+    out->top = content_top;
+    out->text_length = text_length;
+    out->showing_placeholder = showing_placeholder != 0;
+    return S_OK;
+}
+
+static bool reach_d2d_textbox_caret(const reach_d2d_textbox_layout &text,
+                                    const reach_render_command *command, reach_render_command *out)
+{
+    UINT32 position = text.showing_placeholder
+                          ? 0
+                          : std::min(text.text_length, (UINT32)std::max(0, command->caret_index));
+    FLOAT x = 0, y = 0;
+    DWRITE_HIT_TEST_METRICS metrics = {};
+    if (FAILED(text.layout->HitTestTextPosition(position, FALSE, &x, &y, &metrics)))
+        return false;
+    *out = {};
+    out->type = REACH_RENDER_COMMAND_LINE;
+    out->rect = {text.left + x, text.top + y, 0, metrics.height};
+    out->stroke_width = 1.5f;
+    out->color = command->text_color;
+    return true;
+}
+
+reach_result reach_d2d_textbox_caret_line(reach_render_backend *backend,
+                                          const reach_render_command *command,
+                                          reach_render_command *out)
+{
+    if (backend == nullptr || backend->text_factory == nullptr || command == nullptr ||
+        out == nullptr)
+        return REACH_INVALID_ARGUMENT;
+    *out = {};
+    reach_d2d_textbox_layout text;
+    if (FAILED(reach_d2d_make_textbox_layout(backend, command, &text)))
+        return REACH_ERROR;
+    (void)reach_d2d_textbox_caret(text, command, out);
+    return REACH_OK;
+}
+
 reach_result reach_d2d_draw_textbox(reach_render_backend *backend,
-                                    const reach_render_command *command)
+                                    const reach_render_command *command, float caret_opacity)
 {
     if (backend == nullptr || command == nullptr)
     {
@@ -462,54 +548,13 @@ reach_result reach_d2d_draw_textbox(reach_render_backend *backend,
         }
     }
 
-    const wchar_t *text = reinterpret_cast<const wchar_t *>(command->text);
-    const wchar_t *placeholder = reinterpret_cast<const wchar_t *>(command->placeholder);
-    const UINT32 text_length = static_cast<UINT32>(wcslen(text));
-    const int32_t showing_placeholder = (text_length == 0);
-    const wchar_t *display = showing_placeholder ? placeholder : text;
-    const UINT32 display_length = static_cast<UINT32>(wcslen(display));
-
-    const float font_size = command->text_size > 0.0f ? command->text_size : REACH_TEXT_SIZE_MEDIUM;
-    const DWRITE_FONT_WEIGHT weight = command->text_weight > 0
-                                          ? static_cast<DWRITE_FONT_WEIGHT>(command->text_weight)
-                                          : DWRITE_FONT_WEIGHT_NORMAL;
-
-    const float inset = font_size * 0.5f;
-    const float content_left = command->rect.x + inset;
-    const float content_top = command->rect.y;
-    const float content_width =
-        command->rect.width - inset * 2.0f > 0.0f ? command->rect.width - inset * 2.0f : 0.0f;
-    const float content_height = command->rect.height;
-
-    IDWriteTextFormat *format = nullptr;
-    HRESULT hr = backend->text_factory->CreateTextFormat(
-        reach_d2d_ui_font_family(backend), reach_d2d_ui_font_collection(backend), weight,
-        DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, font_size, L"", &format);
-    if (FAILED(hr))
-    {
+    reach_d2d_textbox_layout text;
+    if (FAILED(reach_d2d_make_textbox_layout(backend, command, &text)))
         return REACH_ERROR;
-    }
-    DWRITE_TEXT_ALIGNMENT alignment = DWRITE_TEXT_ALIGNMENT_LEADING;
-    if (command->text_alignment == REACH_TEXT_ALIGNMENT_CENTER)
-    {
-        alignment = DWRITE_TEXT_ALIGNMENT_CENTER;
-    }
-    else if (command->text_alignment == REACH_TEXT_ALIGNMENT_TRAILING)
-    {
-        alignment = DWRITE_TEXT_ALIGNMENT_TRAILING;
-    }
-    (void)format->SetTextAlignment(alignment);
-    (void)format->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
-    (void)format->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
-
-    IDWriteTextLayout *layout = nullptr;
-    hr = backend->text_factory->CreateTextLayout(display, display_length, format, content_width,
-                                                 content_height, &layout);
-    format->Release();
-    if (FAILED(hr) || layout == nullptr)
-    {
-        return REACH_ERROR;
-    }
+    IDWriteTextLayout *layout = text.layout.Get();
+    bool showing_placeholder = text.showing_placeholder;
+    float content_left = text.left;
+    float content_top = text.top;
 
     if (!showing_placeholder && command->selection_color.a > 0.0f &&
         command->selection_start != command->selection_end)
@@ -552,40 +597,16 @@ reach_result reach_d2d_draw_textbox(reach_render_backend *backend,
         text_brush->Release();
     }
 
-    if (command->caret_visible)
+    if (command->caret_visible && caret_opacity > 0)
     {
-        UINT32 caret_pos = static_cast<UINT32>(command->caret_index < 0 ? 0 : command->caret_index);
-        if (showing_placeholder)
+        reach_render_command caret = {};
+        if (reach_d2d_textbox_caret(text, command, &caret))
         {
-            caret_pos = 0;
-        }
-        else if (caret_pos > text_length)
-        {
-            caret_pos = text_length;
-        }
-
-        FLOAT caret_x = 0.0f;
-        FLOAT caret_y = 0.0f;
-        DWRITE_HIT_TEST_METRICS caret_metrics = {};
-        if (SUCCEEDED(layout->HitTestTextPosition(showing_placeholder ? 0 : caret_pos, FALSE,
-                                                  &caret_x, &caret_y, &caret_metrics)))
-        {
-            ID2D1SolidColorBrush *caret_brush = nullptr;
-            reach_color caret_color = command->text_color;
-            if (SUCCEEDED(
-                    target->CreateSolidColorBrush(reach_d2d_color(caret_color), &caret_brush)))
-            {
-                float x = content_left + caret_x;
-                float top = content_top + caret_y;
-                float bottom = top + caret_metrics.height;
-                target->DrawLine(D2D1::Point2F(x, top), D2D1::Point2F(x, bottom), caret_brush,
-                                 1.5f);
-                caret_brush->Release();
-            }
+            caret.color.a *= caret_opacity;
+            (void)reach_d2d_draw_line(target, &caret);
         }
     }
 
-    layout->Release();
     return REACH_OK;
 }
 

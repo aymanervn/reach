@@ -459,8 +459,8 @@ Its compiled pieces stay constant until the boundary; WUC uses final-step easing
 constant cubics with native repetition. Sampling, mapped ranges and crossing queries include only
 visited endpoints, so a skipped intermediate value has no crossing and a mapped interior peak
 cannot manufacture activity. A missing hold normalizes to the remaining constant endpoint.
-This capability adds no descriptor fields or alternate clock. Textbox caret integration remains
-separate migration work; existing consumers retain their deadline scheduling.
+This capability adds no descriptor fields or alternate clock. Eligible textboxes use it for
+independent caret opacity; unsupported rendering retains absolute deadline scheduling.
 Both compositors repeat the resulting keyframes/cubics without application ticks. Root presentation
 remains finite so completion ownership is well-defined. Retiring or replacing retained sources stops
 periodic transform, opacity, clip and tint bindings before releasing the layer; font replacement
@@ -509,8 +509,13 @@ tick is needed to advance compositor motion. The adapter owns native visuals, dr
 native animation objects, and completion resources. It compares localized commands independently
 of presentation properties, preserves painter order by splitting static runs around explicit
 groups and individual ungrouped textboxes, and releases the superseded swap chain after constructing
-the retained scene. Textbox edits and caret boundaries repaint only their editor source; explicit
-groups retain feature-declared ownership. Surfaces
+the retained scene. Textbox edits repaint their editor source. An optional `caret_group_id`
+references a dedicated opacity descriptor; the adapter resolves a small stroke source from the
+same cached DWrite layout and parents it to the editor, preserving its raster limits and ancestor
+transforms/clips. Caret boundaries change native opacity without application frames or repaint.
+The body is an ungrouped editor or a single-command, tint-free group; the referenced caret owner
+cannot paint other content. Validation rejects ambiguous ownership before renderer dereference.
+Explicit groups otherwise retain feature-declared ownership. Surfaces
 are bounded to 128 MiB per renderer and 16,384 pixels per dimension. Retired groups are removed
 before replacements are allocated. Processed cover artwork uses a 24-entry, 16 MiB cache, while
 ordinary text and measurement share 32 text formats and 128 layouts with bounded string lengths.
@@ -635,15 +640,23 @@ scalar tracks, advancement and frame demand are removed; Settings' existing fall
 samples the same published descriptors. Immediate stateless toggles retain the static shared
 control. Settings row expansion and segmented selectors still use scalar tracks.
 
-Caret visibility uses the pure `reach_blink` deadline model on the shared monotonic clock. Focus
-and edit events reset a visible interval; late wakes sample the current phase without accumulating
-frame deltas or replaying missed flips. Power/Account keep their 0.55/0.45-second duty cycle, while
-Wi-Fi and Launcher keep 0.53-second intervals. Page changes and blur retire inactive clocks;
-Launcher closing/hidden reset stops its clock. Settings includes only a visible focused field's
-deadline in its idle wait, with client-coordinate viewport checks and minimized/radio-off filtering.
-It requests a frame at a due boundary, then returns to idle. Other input/content invalidation
-still renders normally. The compound textbox renderer retains its current caret drawing;
-independent retained caret content and its cost comparison remain a migration acceptance question.
+Caret phase, duty cycle and generation belong to `reach_blink`. Focus and edit events publish a
+new visible interval/generation. `reach_blink_opacity` projects that owner into canonical discrete
+repetition; fallback deadline sampling leaves the same epoch/generation unchanged. Power/Account
+keep 0.55/0.45-second holds; Wi-Fi and Launcher keep 0.53-second intervals. Shared textbox rendering
+publishes a retained stroke part only for the focused visible field. Settings and Launcher suppress
+caret updates/deadlines on supported renderers, so blinking performs no application command build,
+layout, rasterization or submission. Input and content changes still render normally. The generic
+surface context supplies Launcher capability through its existing registry seam.
+
+Page changes and blur stop inactive owners; ordinary Launcher close/reset stops its owner. Offscreen
+Settings fields publish no caret part, and minimized rendering/surface suspension retires native
+bindings and sources. Font/source recreation preserves the absolute phase and generation. These
+visibility paths retain the existing logical timing policy rather than introducing another clock.
+Unsupported rendering samples the same phase at visible-field deadlines, skips missed flips and
+returns to idle between boundaries; native mode never advances the fallback snapshot for blinking.
+The compound drawing path remains necessary for that unsupported renderer. Source/consumer checks
+pass; displayed timing and total product workload/power acceptance remain migration work.
 
 Dock and Top Bar press feedback emits a separate flat retained group, copying item placement
 for moving icons. Shared UI feedback owns the group descriptor; the icon helper retains its
@@ -694,7 +707,8 @@ motion; retarget or suspension retires them. The runtime suspends failed composi
 ordinary capsule close cleanup, and stops querying once the capsule clears its lifecycle deadline.
 HUD's fixed lifetime uses its deadline independently of completion, so the hold
 requires no animation frames and another action restarts the complete lifetime. Launcher caret
-blinking also uses a deadline. Renderers without composition sample the same finite group contract
+blinking uses native retained opacity when supported and deadlines in fallback. Renderers without
+composition sample the same finite group contract
 in a duration-limited CPU fallback; repeating marquee motion remains static there.
 
 Text-dependent layout consumes `reach_text_measure_port`. The DirectWrite renderer supplies the

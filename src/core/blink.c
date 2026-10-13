@@ -6,6 +6,8 @@ void reach_blink_stop(reach_blink *blink)
 {
     if (blink != 0)
     {
+        if (blink->deadline_seconds > 0 || blink->visible)
+            ++blink->generation;
         blink->started_seconds = 0.0;
         blink->deadline_seconds = 0.0;
         blink->visible = 0;
@@ -26,6 +28,7 @@ void reach_blink_reset_at(reach_blink *blink, double visible_seconds, double hid
         reach_blink_stop(blink);
         return;
     }
+    ++blink->generation;
     blink->started_seconds = now_seconds;
     blink->deadline_seconds = now_seconds + visible_seconds;
     blink->visible_seconds = visible_seconds;
@@ -52,4 +55,17 @@ int32_t reach_blink_update_at(reach_blink *blink, double now_seconds)
     blink->visible = visible;
     blink->deadline_seconds = deadline;
     return changed;
+}
+
+reach_motion reach_blink_opacity(const reach_blink *blink)
+{
+    reach_motion motion = {0};
+    if (blink == 0 || blink->deadline_seconds <= 0)
+        reach_motion_set(&motion, 0);
+    else
+        reach_motion_repeat_at(&motion, 1, 0, 0, blink->visible_seconds, blink->hidden_seconds,
+                               REACH_EASING_EASE_IN_OUT, blink->started_seconds);
+    if (blink != 0 && blink->generation != 0)
+        motion.generation = blink->generation;
+    return motion;
 }

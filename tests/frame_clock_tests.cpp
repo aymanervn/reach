@@ -368,6 +368,27 @@ static void test_discrete_repetition_validation_and_constant_holds(void)
     expect_true(!motion.repeating, "invalid repetition epoch cannot reach native compilation");
 }
 
+static void test_blink_projection_identity_reset_and_stop(void)
+{
+    reach_blink blink = {};
+    reach_blink_reset_at(&blink, 0.55, 0.45, 64);
+    reach_motion first = reach_blink_opacity(&blink);
+    reach_blink_update_at(&blink, blink.deadline_seconds);
+    reach_motion updated = reach_blink_opacity(&blink);
+    expect_true(reach_motion_equal(&first, &updated) && first.generation == blink.generation &&
+                    first.started_seconds == 64,
+                "fallback deadline sampling preserves canonical phase and generation");
+    reach_blink_reset_at(&blink, 0.55, 0.45, 64);
+    updated = reach_blink_opacity(&blink);
+    expect_true(!reach_motion_equal(&first, &updated) && updated.generation != first.generation,
+                "focus reset publishes a new generation even at the same event timestamp");
+    reach_blink_stop(&blink);
+    updated = reach_blink_opacity(&blink);
+    expect_true(!updated.repeating && updated.generation == blink.generation &&
+                    reach_motion_value_at(&updated, 64) == 0,
+                "stopping retires canonical repetition to an explicit zero endpoint");
+}
+
 int main(void)
 {
     test_frame_rate_policy();
@@ -384,5 +405,6 @@ int main(void)
     test_discrete_repetition_sampling_compilation_and_crossing();
     test_discrete_repetition_validation_and_constant_holds();
     test_discrete_repetition_agrees_with_blink_deadlines();
+    test_blink_projection_identity_reset_and_stop();
     return failures != 0;
 }

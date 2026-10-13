@@ -118,7 +118,10 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
         command.selection_end = input->selection_end;
         reach_copy_utf16(command.text, 260, model->query);
         reach_copy_utf16(command.placeholder, 128, (const uint16_t *)L"Search for anything");
-        reach_render_command_buffer_push(out_commands, &command);
+        result = reach_render_push_textbox(out_commands, &command, UINT64_C(0x2900000000030000),
+                                           input->caret_retained ? &input->caret_opacity : nullptr);
+        if (result != REACH_OK)
+            return result;
     }
 
     if (model->query[0] == 0)
@@ -315,6 +318,7 @@ reach_result reach_launcher_append_render_commands(reach_launcher *launcher,
         return REACH_INVALID_ARGUMENT;
     }
 
+    reach_launcher_set_retained_supported(launcher, ctx->retained_supported);
     reach_launcher_state *state = reach_launcher_state_mut(launcher);
 
     const size_t icon_overscan_rows = 4;
@@ -345,6 +349,8 @@ reach_result reach_launcher_append_render_commands(reach_launcher *launcher,
     input.text_alignment_leading = REACH_TEXT_ALIGNMENT_LEADING;
     input.caret_index = state->launcher_text_edit.caret;
     input.caret_visible = state->launcher_caret_visible;
+    input.caret_retained = ctx->retained_supported && state->model.open;
+    input.caret_opacity = reach_launcher_caret_opacity(launcher);
     reach_text_edit_selection_range(&state->launcher_text_edit, &input.selection_start,
                                     &input.selection_end);
     input.results_expansion = reach_launcher_results_expansion(launcher);

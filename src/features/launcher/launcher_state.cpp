@@ -27,6 +27,7 @@ struct reach_launcher
     reach_motion surface_scale;
     double surface_deadline;
     reach_blink caret;
+    int32_t caret_retained;
     reach_launcher_state state;
     reach_search_service *search;
     uint32_t search_generation;
@@ -236,7 +237,7 @@ int32_t reach_launcher_arrange(reach_launcher *launcher, const reach_launcher_ar
 
 reach_result
 reach_launcher_append_surface_render_commands(reach_launcher *launcher, const reach_theme *theme,
-                                              float dpi_scale,
+                                              float dpi_scale, int32_t retained_supported,
                                               reach_render_command_buffer *out_commands)
 {
     if (launcher == nullptr || !launcher->pointer_layout_valid)
@@ -247,6 +248,7 @@ reach_launcher_append_surface_render_commands(reach_launcher *launcher, const re
     render.theme = theme;
     render.layout = &launcher->pointer_layout;
     render.dpi_scale = dpi_scale;
+    render.retained_supported = retained_supported;
     return reach_launcher_append_render_commands(launcher, &render, out_commands);
 }
 
@@ -865,6 +867,8 @@ static int32_t reach_launcher_update_caret(reach_launcher *launcher)
     }
     if (launcher->caret.deadline_seconds <= 0.0)
         reach_launcher_reset_caret(launcher);
+    if (launcher->caret_retained)
+        return 0;
     int32_t changed = reach_blink_update_at(&launcher->caret, reach_motion_now_seconds());
     launcher->state.launcher_caret_visible = launcher->caret.visible;
     return changed;
@@ -1358,7 +1362,8 @@ static void reach_launcher_capsule_surface_geometry(const void *capsule,
                                                         reach_launcher_results_expansion(launcher);
     out->deadline_seconds = launcher->surface_deadline;
     out->wait_for_presentation = !launcher->surface_target_open;
-    if (launcher->state.model.open && launcher->caret.deadline_seconds > 0.0 &&
+    if (!launcher->caret_retained && launcher->state.model.open &&
+        launcher->caret.deadline_seconds > 0.0 &&
         (out->deadline_seconds <= 0.0 || launcher->caret.deadline_seconds < out->deadline_seconds))
     {
         out->deadline_seconds = launcher->caret.deadline_seconds;
@@ -1393,4 +1398,15 @@ const reach_feature_capsule_ops *reach_launcher_capsule_ops(void)
         reach_launcher_capsule_presentation_visible,
     };
     return &ops;
+}
+
+reach_motion reach_launcher_caret_opacity(const reach_launcher *launcher)
+{
+    return reach_blink_opacity(launcher != nullptr ? &launcher->caret : nullptr);
+}
+
+void reach_launcher_set_retained_supported(reach_launcher *launcher, int32_t supported)
+{
+    if (launcher != nullptr)
+        launcher->caret_retained = supported != 0;
 }

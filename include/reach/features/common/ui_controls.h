@@ -2,6 +2,7 @@
 #define REACH_FEATURES_COMMON_UI_CONTROLS_H
 
 #include "reach/core/render_commands.h"
+#include "reach/core/blink.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -58,6 +59,9 @@ extern "C"
         const uint16_t *suffix;
         float suffix_width;
         int32_t text_alignment;
+        const reach_blink *caret;
+        uint64_t caret_id;
+        reach_rect_f32 caret_viewport;
         int32_t caret_index;
         int32_t caret_visible;
         int32_t selection_start;

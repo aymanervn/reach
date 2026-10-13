@@ -463,5 +463,16 @@ void reach_ui_textbox_render(reach_render_command_buffer *commands, reach_rect_f
     command.selection_end = state->selection_end;
     reach_copy_utf16(command.text, 260, state->text);
     reach_copy_utf16(command.placeholder, 128, state->placeholder);
-    (void)reach_render_command_buffer_push(commands, &command);
+    auto overlaps = [&](reach_rect_f32 viewport)
+    {
+        return box.x < viewport.x + viewport.width && box.x + box.width > viewport.x &&
+               box.y < viewport.y + viewport.height && box.y + box.height > viewport.y;
+    };
+    bool retained_caret = state->caret != nullptr && state->caret->deadline_seconds > 0 &&
+                          box.width > 0 && box.height > 0 &&
+                          (state->caret_viewport.width <= 0 || overlaps(state->caret_viewport)) &&
+                          (!commands->has_scissor || overlaps(commands->scissor_rect));
+    reach_motion opacity = reach_blink_opacity(state->caret);
+    (void)reach_render_push_textbox(commands, &command, state->caret_id,
+                                    retained_caret ? &opacity : nullptr);
 }

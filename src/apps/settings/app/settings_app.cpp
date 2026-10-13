@@ -2895,6 +2895,9 @@ static double reach_settings_app_caret_deadline(const reach_settings_app *app)
     if (app == nullptr || (app->window.ops.is_minimized != nullptr &&
                            app->window.ops.is_minimized(app->window.window)))
         return 0.0;
+    if (app->renderer.ops.retained_supported != nullptr &&
+        app->renderer.ops.retained_supported(app->renderer.backend))
+        return 0.0;
     double deadline = reach_settings_model_caret_deadline(&app->model);
     if (deadline <= 0.0)
         return 0.0;

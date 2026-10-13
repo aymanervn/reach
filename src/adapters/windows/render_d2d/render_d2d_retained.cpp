@@ -1086,6 +1086,14 @@ static HRESULT draw_layer(reach_render_backend *backend, reach_d2d_retained_laye
 static reach_rect_f32 command_bounds(const reach_render_command &command)
 {
     reach_rect_f32 rect = command.rect;
+    if (command.type == REACH_RENDER_COMMAND_LINE)
+    {
+        float padding = command.stroke_width * 0.5f + 1;
+        rect.x = std::min(command.rect.x, command.rect.x + command.rect.width) - padding;
+        rect.y = std::min(command.rect.y, command.rect.y + command.rect.height) - padding;
+        rect.width = fabsf(command.rect.width) + padding * 2;
+        rect.height = fabsf(command.rect.height) + padding * 2;
+    }
     if (command.type == REACH_RENDER_COMMAND_SHADOW)
     {
         float margin = ceilf(command.blur_radius * 3.0f) + 2.0f;
@@ -1584,6 +1592,7 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
         reach_render_group group;
         const reach_render_command *commands = nullptr;
         size_t count = 0;
+        std::vector<reach_render_command> owned;
     };
     std::vector<retained_plan> plans;
     auto plan_for = [&](uint64_t id)
@@ -1630,6 +1639,47 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
                 existing->group = group;
                 existing->commands = commands->commands + index;
                 existing->count = end - index;
+            }
+        }
+        if (first.caret_group_id != 0 && group.bounds.width > 0 && group.bounds.height > 0)
+        {
+            auto base = plan_for(group.id);
+            base->owned.assign(1, first);
+            base->owned[0].caret_visible = 0;
+            base->owned[0].caret_index = 0;
+            base->owned[0].caret_group_id = 0;
+            base->commands = base->owned.data();
+            base->count = 1;
+            reach_render_command line = {};
+            if (reach_d2d_textbox_caret_line(backend, &first, &line) != REACH_OK)
+                return REACH_ERROR;
+            if (line.type != REACH_RENDER_COMMAND_NONE && line.rect.height > 0 && line.color.a > 0)
+            {
+                line.has_scissor = first.has_scissor;
+                line.scissor_rect = first.scissor_rect;
+                reach_rect_f32 ink = run_bounds(&line, 1);
+                reach_rect_f32 raster = {group.bounds.x, group.bounds.y, ceilf(group.bounds.width),
+                                         ceilf(group.bounds.height)};
+                float right = std::min(ink.x + ink.width, raster.x + raster.width);
+                float bottom = std::min(ink.y + ink.height, raster.y + raster.height);
+                ink.x = std::max(ink.x, raster.x);
+                ink.y = std::max(ink.y, raster.y);
+                ink.width = std::max(0.0f, right - ink.x);
+                ink.height = std::max(0.0f, bottom - ink.y);
+                if (ink.width > 0 && ink.height > 0)
+                {
+                    retained_plan caret = {};
+                    caret.group =
+                        *reach_render_command_buffer_group(commands, first.caret_group_id);
+                    caret.group.parent_id = group.id;
+                    caret.group.bounds = ink;
+                    caret.group.has_clip = 1;
+                    caret.group.clip = raster;
+                    caret.owned.push_back(line);
+                    caret.commands = caret.owned.data();
+                    caret.count = 1;
+                    plans.push_back(std::move(caret));
+                }
             }
         }
         index = end;
