@@ -965,3 +965,39 @@ returned no targetable Reach surface at that observation; a completed launcher c
 not established durable child lifetime. No displayed-pixel/input acceptance is claimed. Restart
 order and installation-folder reuse are recorded in the checklist; this scope does not reinstall
 or change shell registration.
+
+
+## Animated rounded viewport bounds
+
+`reach_render_group_clip_motion` derives a rectangle from compatible paired insets, including
+nonnegative collapse. Existing WUC rounded geometry animates offset, size and independently bounded
+radii; DC animates its existing clip edges/radii. No new descriptor fields, property sets, sources,
+clock or application frame loop are added. Reversal reuses rasters; settled submissions mutate no
+properties/tree; periodic geometry bindings stop when clipping is disabled or the layer retires.
+
+Both builds/all forty test groups pass. Five full runs per backend plus fallback pass in Debug and
+Release (`probe-rounded-motion-full-debug.log`, `probe-rounded-motion-full-release.log`); focused
+final probes also check complete collapse and explicit compact radii against original geometry.
+Twenty-four sampled sizes per backend cover six widths at four DPI scales. Fallback and reconstructed
+cached coverage match the established scalar/static rounded viewport exactly. An additional direct
+rounded-fill comparison exposes the existing mask/primitive antialias difference, at most 39 channel
+values at rounded edges. `rounded-compare.png` was inspected; shape extent and interior coverage agree.
+This is a consumer appearance consideration, not a relaxed viewport comparison tolerance or proof
+of displayed WUC/DC pixels. Complete Dock/Switcher width fitting and compact shadow behavior remain open.
+
+The previous direct-launched validation host exited with code 1. The registry subsequently reported
+Explorer and no Reach/watchdog process. The user clarified that direct launching conflicts with
+Explorer and they had killed Reach; watchdog recovery can also restore Explorer. No crash event
+established a separate code fault. Future setup uses the existing folder's `reachctl --install`
+with the user's first administrator approval, then `reachctl --start`. Restarts stop the watchdog
+before Reach and use `reachctl --start`; direct executable/watchdog launch is prohibited. Previous
+startup observations do not establish valid installed-session or displayed-product acceptance.
+
+
+The corrected installed-session setup succeeded: `C:\Dev\reach\build\reachctl.exe --install` returned
+zero after administrator approval, and `reachctl --start` returned zero from the same folder.
+The same host/watchdog PIDs remained alive on later checks and both scheduled tasks were running;
+Settings opened from the installed sibling path. Computer Use monitor capture still failed with
+`0x80070057` on a refreshed-window retry, so displayed/input acceptance remains unresolved.
+Only the first setup installs; subsequent validation restarts use watchdog-first termination and
+`reachctl --start`. No direct launch or additional reinstall is needed.

@@ -76,6 +76,14 @@ support expectation is explicitly resolved.
     by at most two channel values; native growth/reversal reuses sources and settled submissions
     change no properties. Consumer integration, overlapping-cap transitions, compact animated
     chrome, displayed native pixels and total product cost remain in the parent gates.
+  - [x] Support animated rounded viewport bounds on both native backends.
+    Shared canonical clip geometry validates paired epochs and collapsed extents. WUC animates
+    geometry offset/size/radii; DC animates matching edges/radii. Reversal reuses sources, settled
+    intent changes no properties/tree, and clip disable/repetition retirement stops native bindings.
+    Both builds/all 40 tests, full five-run native suites per backend plus fallback and focused
+    compact/collapse checks pass. Six widths/four DPI scales match established static viewport
+    pixels exactly. Direct rounded-fill edge AA differs by at most 39 and was inspected; consumer
+    appearance, compact shadows, complete width fitting and total workload acceptance remain open.
 - [ ] Decide whether supported live-preview composition meets behavior and efficiency requirements;
   document the selected compositor or optimized hybrid design for Dock, Switcher and Stage.
   - [x] Select the existing DWM port with retained Reach visuals and active-only native motion.
@@ -368,7 +376,10 @@ current instruction; each authorization permits one termination.
 
 Current GPU goal exception: the user explicitly authorizes restarts throughout this goal.
 Always stop `reachWatchdog.exe` first and wait for its exit, then stop Reach and wait for its exit.
-Launch from the registered installation folder, currently `C:\Dev\reach\build`, with `--launch`;
-start the matching watchdog from that same folder. Reuse this installation for later validations;
-do not change registration or reinstall as part of an ordinary restart. Verify actual process
-lifetime before treating startup as successful.
+Use `reachctl --install` from `C:\Dev\reach\build` for the first setup, with the user's administrator
+approval, then `reachctl --start` from that same folder. Every subsequent start/restart also uses
+`reachctl --start` from the installed folder. Never launch `reach.exe` or the watchdog directly;
+`reachctl` owns the installed session transition and watchdog startup. Reuse the installation;
+do not reinstall during ordinary restarts. Verify actual process lifetime before treating startup
+as successful. The user explicitly corrected direct-launch validation because it conflicts with
+Explorer and disrupts their desktop.

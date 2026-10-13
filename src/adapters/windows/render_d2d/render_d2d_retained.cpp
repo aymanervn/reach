@@ -49,6 +49,14 @@ static void stop_wuc_repetition(IInspectable *value, const wchar_t *name)
         WindowsDeleteString(property);
 }
 
+static void stop_rounded_clip_motion(reach_d2d_retained_layer &layer)
+{
+    const wchar_t *properties[] = {L"Offset.X", L"Offset.Y",       L"Size.X",
+                                   L"Size.Y",   L"CornerRadius.X", L"CornerRadius.Y"};
+    for (const auto *property : properties)
+        stop_wuc_repetition(layer.rounded_geometry.Get(), property);
+}
+
 static void stop_layer_repetition(reach_render_backend *backend, reach_d2d_retained_layer &layer)
 {
     const reach_render_group &group = layer.group;
@@ -75,6 +83,12 @@ static void stop_layer_repetition(reach_render_backend *backend, reach_d2d_retai
         if (group.tint_rgb_mix.repeating)
             stop_wuc_repetition(layer.tint_properties.Get(), L"Mix");
         const wchar_t *clips[] = {L"LeftInset", L"TopInset", L"RightInset", L"BottomInset"};
+        for (const auto &motion : group.clip_insets)
+            if (motion.repeating)
+            {
+                stop_rounded_clip_motion(layer);
+                break;
+            }
         const wchar_t *tints[] = {L"Red", L"Green", L"Blue", L"Alpha"};
         for (size_t index = 0; index < 4; ++index)
         {
@@ -108,6 +122,21 @@ static void stop_layer_repetition(reach_render_backend *backend, reach_d2d_retai
         }
         if (layer.dcomp_clip != nullptr)
         {
+            bool rounded = group.clip_radius > 0;
+            bool clip_repeating = false;
+            for (const auto &motion : group.clip_insets)
+                clip_repeating = clip_repeating || motion.repeating;
+            if (rounded && clip_repeating)
+            {
+                (void)layer.dcomp_clip->SetTopLeftRadiusX(0.0f);
+                (void)layer.dcomp_clip->SetTopLeftRadiusY(0.0f);
+                (void)layer.dcomp_clip->SetTopRightRadiusX(0.0f);
+                (void)layer.dcomp_clip->SetTopRightRadiusY(0.0f);
+                (void)layer.dcomp_clip->SetBottomLeftRadiusX(0.0f);
+                (void)layer.dcomp_clip->SetBottomLeftRadiusY(0.0f);
+                (void)layer.dcomp_clip->SetBottomRightRadiusX(0.0f);
+                (void)layer.dcomp_clip->SetBottomRightRadiusY(0.0f);
+            }
             if (group.clip_insets[0].repeating)
                 (void)layer.dcomp_clip->SetLeft(0.0f);
             if (group.clip_insets[1].repeating)
@@ -482,11 +511,18 @@ static HRESULT sync_tint(reach_render_backend *backend, reach_d2d_retained_layer
     return hr;
 }
 
-static void stop_inset_clip(reach_d2d_retained_layer &layer)
+static void stop_clip_motion(reach_d2d_retained_layer &layer)
 {
     const wchar_t *properties[] = {L"LeftInset", L"TopInset", L"RightInset", L"BottomInset"};
     for (const auto *property : properties)
         stop_wuc_repetition(layer.inset_clip.Get(), property);
+    stop_rounded_clip_motion(layer);
+}
+
+static reach_motion rounded_radius_motion(const reach_motion &extent, float radius)
+{
+    reach_motion half = reach_motion_affine(&extent, 0.5f, 0);
+    return reach_motion_clamp(&half, 0, radius);
 }
 
 static HRESULT sync_clip(reach_render_backend *backend, reach_d2d_retained_layer &layer,
@@ -506,7 +542,7 @@ static HRESULT sync_clip(reach_render_backend *backend, reach_d2d_retained_layer
             hr = layer.dcomp_container->SetClip((IDCompositionClip *)nullptr);
         if (SUCCEEDED(hr))
         {
-            stop_inset_clip(layer);
+            stop_clip_motion(layer);
             layer.inset_clip.Reset();
             layer.rounded_geometry.Reset();
             layer.rounded_clip.Reset();
@@ -514,13 +550,28 @@ static HRESULT sync_clip(reach_render_backend *backend, reach_d2d_retained_layer
         }
         return hr;
     }
+    unsigned mask = !initialized || !layer.group.has_clip ||
+                            group.clip.width != layer.group.clip.width ||
+                            group.clip.height != layer.group.clip.height ||
+                            group.clip_radius != layer.group.clip_radius
+                        ? 15
+                        : 0;
+    for (size_t edge = 0; edge < REACH_RENDER_CLIP_EDGE_COUNT; ++edge)
+        if (!reach_motion_equal(&group.clip_insets[edge], &layer.group.clip_insets[edge]))
+            mask |= 1u << edge;
     if (group.clip_radius > 0 && backend->compositor != nullptr)
     {
-        if (initialized && layer.rounded_clip != nullptr &&
-            group.clip_radius == layer.group.clip_radius &&
-            group.clip.width == layer.group.clip.width &&
-            group.clip.height == layer.group.clip.height)
+        if (mask == 0 && layer.rounded_clip != nullptr)
             return S_OK;
+        reach_rect_motion bounds = {};
+        if (reach_render_group_clip_motion(&group, &bounds) != REACH_OK)
+            return E_INVALIDARG;
+        reach_motion motions[] = {reach_motion_affine(&bounds.x, 1, -group.clip.x),
+                                  reach_motion_affine(&bounds.y, 1, -group.clip.y),
+                                  bounds.width,
+                                  bounds.height,
+                                  rounded_radius_motion(bounds.width, group.clip_radius),
+                                  rounded_radius_motion(bounds.height, group.clip_radius)};
         reach_workload_add(REACH_WORKLOAD_PROPERTY_SUBMISSIONS, 1);
         ComPtr<ICompositor5> geometry_factory;
         ComPtr<ICompositor6> clip_factory;
@@ -529,10 +580,20 @@ static HRESULT sync_clip(reach_render_backend *backend, reach_d2d_retained_layer
             hr = backend->compositor.As(&clip_factory);
         if (SUCCEEDED(hr) && layer.rounded_geometry == nullptr)
             hr = geometry_factory->CreateRoundedRectangleGeometry(&layer.rounded_geometry);
+        double now = motion_sample_time(backend);
         if (SUCCEEDED(hr))
-            hr = layer.rounded_geometry->put_Size({group.clip.width, group.clip.height});
+            hr = layer.rounded_geometry->put_Offset(
+                {reach_motion_value_at(&motions[0], now), reach_motion_value_at(&motions[1], now)});
         if (SUCCEEDED(hr))
-            hr = layer.rounded_geometry->put_CornerRadius({group.clip_radius, group.clip_radius});
+            hr = layer.rounded_geometry->put_Size(
+                {reach_motion_value_at(&motions[2], now), reach_motion_value_at(&motions[3], now)});
+        if (SUCCEEDED(hr))
+            hr = layer.rounded_geometry->put_CornerRadius(
+                {reach_motion_value_at(&motions[4], now), reach_motion_value_at(&motions[5], now)});
+        const wchar_t *properties[] = {L"Offset.X", L"Offset.Y",       L"Size.X",
+                                       L"Size.Y",   L"CornerRadius.X", L"CornerRadius.Y"};
+        for (size_t at = 0; at < 6 && SUCCEEDED(hr); ++at)
+            hr = wuc_motion(backend, layer.rounded_geometry.Get(), properties[at], motions[at]);
         ComPtr<ICompositionGeometry> geometry;
         if (SUCCEEDED(hr))
             hr = layer.rounded_geometry.As(&geometry);
@@ -548,26 +609,20 @@ static HRESULT sync_clip(reach_render_backend *backend, reach_d2d_retained_layer
             hr = container->put_Clip(clip.Get());
         if (SUCCEEDED(hr))
         {
-            stop_inset_clip(layer);
+            const wchar_t *insets[] = {L"LeftInset", L"TopInset", L"RightInset", L"BottomInset"};
+            for (const auto *property : insets)
+                stop_wuc_repetition(layer.inset_clip.Get(), property);
             layer.inset_clip.Reset();
         }
         return hr;
     }
-    unsigned mask = !initialized || !layer.group.has_clip ||
-                            group.clip.width != layer.group.clip.width ||
-                            group.clip.height != layer.group.clip.height ||
-                            group.clip_radius != layer.group.clip_radius
-                        ? 15
-                        : 0;
-    for (size_t edge = 0; edge < REACH_RENDER_CLIP_EDGE_COUNT; ++edge)
-        if (!reach_motion_equal(&group.clip_insets[edge], &layer.group.clip_insets[edge]))
-            mask |= 1u << edge;
     if (mask == 0)
         return S_OK;
     reach_workload_add(REACH_WORKLOAD_PROPERTY_SUBMISSIONS, 1);
     HRESULT hr = S_OK;
     if (backend->compositor != nullptr)
     {
+        stop_clip_motion(layer);
         layer.rounded_geometry.Reset();
         layer.rounded_clip.Reset();
         if (layer.inset_clip == nullptr)
@@ -627,24 +682,49 @@ static HRESULT sync_clip(reach_render_backend *backend, reach_d2d_retained_layer
             return hr;
         }
     }
-    if (created || !initialized || group.clip_radius != layer.group.clip_radius)
+    if (created || !initialized || group.clip_radius != layer.group.clip_radius ||
+        (group.clip_radius > 0 && mask != 0))
     {
+        reach_motion radius_x = {}, radius_y = {};
+        reach_motion_set(&radius_x, group.clip_radius);
+        reach_motion_set(&radius_y, group.clip_radius);
+        if (group.clip_radius > 0)
+        {
+            reach_rect_motion bounds = {};
+            if (reach_render_group_clip_motion(&group, &bounds) != REACH_OK)
+                return E_INVALIDARG;
+            radius_x = rounded_radius_motion(bounds.width, group.clip_radius);
+            radius_y = rounded_radius_motion(bounds.height, group.clip_radius);
+        }
+        ComPtr<IDCompositionAnimation> x_animation, y_animation;
+        hr = dcomp_motion(backend, radius_x, &x_animation);
         if (SUCCEEDED(hr))
-            hr = layer.dcomp_clip->SetTopLeftRadiusX(group.clip_radius);
+            hr = dcomp_motion(backend, radius_y, &y_animation);
+        float x = reach_motion_value(&radius_x), y = reach_motion_value(&radius_y);
         if (SUCCEEDED(hr))
-            hr = layer.dcomp_clip->SetTopLeftRadiusY(group.clip_radius);
+            hr = x_animation ? layer.dcomp_clip->SetTopLeftRadiusX(x_animation.Get())
+                             : layer.dcomp_clip->SetTopLeftRadiusX(x);
         if (SUCCEEDED(hr))
-            hr = layer.dcomp_clip->SetTopRightRadiusX(group.clip_radius);
+            hr = y_animation ? layer.dcomp_clip->SetTopLeftRadiusY(y_animation.Get())
+                             : layer.dcomp_clip->SetTopLeftRadiusY(y);
         if (SUCCEEDED(hr))
-            hr = layer.dcomp_clip->SetTopRightRadiusY(group.clip_radius);
+            hr = x_animation ? layer.dcomp_clip->SetTopRightRadiusX(x_animation.Get())
+                             : layer.dcomp_clip->SetTopRightRadiusX(x);
         if (SUCCEEDED(hr))
-            hr = layer.dcomp_clip->SetBottomLeftRadiusX(group.clip_radius);
+            hr = y_animation ? layer.dcomp_clip->SetTopRightRadiusY(y_animation.Get())
+                             : layer.dcomp_clip->SetTopRightRadiusY(y);
         if (SUCCEEDED(hr))
-            hr = layer.dcomp_clip->SetBottomLeftRadiusY(group.clip_radius);
+            hr = x_animation ? layer.dcomp_clip->SetBottomLeftRadiusX(x_animation.Get())
+                             : layer.dcomp_clip->SetBottomLeftRadiusX(x);
         if (SUCCEEDED(hr))
-            hr = layer.dcomp_clip->SetBottomRightRadiusX(group.clip_radius);
+            hr = y_animation ? layer.dcomp_clip->SetBottomLeftRadiusY(y_animation.Get())
+                             : layer.dcomp_clip->SetBottomLeftRadiusY(y);
         if (SUCCEEDED(hr))
-            hr = layer.dcomp_clip->SetBottomRightRadiusY(group.clip_radius);
+            hr = x_animation ? layer.dcomp_clip->SetBottomRightRadiusX(x_animation.Get())
+                             : layer.dcomp_clip->SetBottomRightRadiusX(x);
+        if (SUCCEEDED(hr))
+            hr = y_animation ? layer.dcomp_clip->SetBottomRightRadiusY(y_animation.Get())
+                             : layer.dcomp_clip->SetBottomRightRadiusY(y);
     }
     for (size_t edge = 0; edge < REACH_RENDER_CLIP_EDGE_COUNT && SUCCEEDED(hr); ++edge)
     {

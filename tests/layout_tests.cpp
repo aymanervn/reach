@@ -660,8 +660,56 @@ static void test_group_hierarchy_samples_one_geometry_timeline(void)
     expect_true(reach_render_command_buffer_validate_groups(&buffer) == REACH_OK,
                 "static rounded body clips are supported");
     reach_motion_start_at(&buffer.groups[2].clip_insets[0], 0, 2, 1, REACH_EASING_EASE_IN_OUT, 10);
+    expect_true(reach_render_command_buffer_validate_groups(&buffer) == REACH_OK,
+                "rounded clips accept canonical animated insets");
+    reach_rect_motion clip_motion = {};
+    expect_true(reach_render_group_clip_motion(&buffer.groups[2], &clip_motion) == REACH_OK,
+                "rounded geometry derives the same canonical viewport as event-time sampling");
+    for (double now : {10.0, 10.2, 10.5, 11.0})
+    {
+        reach_rect_f32 sampled = reach_render_group_clip_at(&buffer.groups[2], now);
+        reach_rect_f32 derived = reach_rect_motion_value_at(&clip_motion, now);
+        expect_near(derived.x, sampled.x, 0.0001f, "animated rounded clip origin agrees");
+        expect_near(derived.width, sampled.width, 0.0001f, "animated rounded clip extent agrees");
+    }
+    reach_motion_start_at(&buffer.groups[2].clip_insets[REACH_RENDER_CLIP_RIGHT], 0, 5, 1,
+                          REACH_EASING_EASE_IN_OUT, 10.1);
     expect_true(reach_render_command_buffer_validate_groups(&buffer) == REACH_INVALID_ARGUMENT,
-                "rounded clips reject unsupported animated insets");
+                "rounded axis geometry rejects incompatible inset epochs instead of approximating");
+}
+
+static void test_rounded_clip_motion_preserves_compact_axes(void)
+{
+    for (int easing = REACH_EASING_EASE_IN; easing <= REACH_EASING_EASE_IN_OUT; ++easing)
+        for (int reverse = 0; reverse < 2; ++reverse)
+        {
+            reach_motion progress = {};
+            reach_motion_start_at(&progress, reverse ? 1 : 0, reverse ? 0 : 1, 2,
+                                  (reach_easing)easing, 10);
+            reach_render_group group = {};
+            group.has_clip = 1;
+            group.clip = {-24, 40, 120, 40};
+            group.clip_radius = 12;
+            group.clip_insets[0] = reach_motion_affine(&progress, 12, 0);
+            group.clip_insets[2] = reach_motion_affine(&progress, 120, 0);
+            group.clip_insets[3] = reach_motion_affine(&progress, 50, 0);
+            reach_motion_set(&group.clip_insets[1], 5);
+            reach_rect_motion clip = {};
+            expect_true(reach_render_group_clip_motion(&group, &clip) == REACH_OK,
+                        "rounded geometry accepts paired insets sharing one physical epoch");
+            for (int index = 0; index <= 80; ++index)
+            {
+                double now = 10 + index / 40.0;
+                float value = reach_motion_value_at(&progress, now);
+                reach_rect_f32 sampled = reach_rect_motion_value_at(&clip, now);
+                expect_near(sampled.x, -24 + 12 * value, 0.0001f,
+                            "rounded clip offsets preserve their viewport origin");
+                expect_near(sampled.width, fmaxf(0, 120 - 132 * value), 0.0001f,
+                            "rounded widths retain both insets and clamp collapsed extents");
+                expect_near(sampled.height, fmaxf(0, 35 - 50 * value), 0.0001f,
+                            "rounded heights preserve constant padding and independent collapse");
+            }
+        }
 }
 
 static void test_group_hierarchy_rejects_ambiguous_ownership_and_order(void)
@@ -875,6 +923,7 @@ int main(void)
     test_group_hierarchy_samples_one_geometry_timeline();
     test_retained_command_preflight_preserves_batch_atomicity();
     test_group_hierarchy_rejects_ambiguous_ownership_and_order();
+    test_rounded_clip_motion_preserves_compact_axes();
     test_retained_tint_samples_one_timeline();
     test_animated_clip_samples_absolute_geometry();
     test_dock_reserves_side_safe_margins();

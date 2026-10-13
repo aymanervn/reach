@@ -461,8 +461,11 @@ and final workload acceptance remain migration work.
 Settings Wi-Fi, Bluetooth, Windows Update and installed-app loaders publish normalized periodic
 width and translation through the shared loader renderer. Fixed caps preserve the bar radius while
 the middle stretches; a static rounded viewport preserves container coverage. Retained groups expose
-`clip_radius` for static rounded body clipping; animated rounded insets and rounded root clips are
-rejected. Windows Composition uses a geometric clip and DirectComposition a rounded rectangle clip.
+`clip_radius` for rounded body clipping. `reach_render_group_clip_motion` derives canonical origin
+and nonnegative size from paired insets; each rounded axis requires compatible epochs or constants.
+Windows Composition animates rounded geometry offset, size and independently clamped corner radii;
+DirectComposition animates the corresponding clip edges and radii. Rounded root clips remain
+unsupported. Removing clipping and retiring repetitions stop the native geometry bindings.
 Fallback drawing applies rounded ancestor masks separately from hard rectangular ancestor clips,
 so a rectangular bounding approximation cannot cut away rounded antialiasing. Small bounds whose
 minimum bar width cannot contain fixed caps publish sampled clipped geometry and set
