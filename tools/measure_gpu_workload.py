@@ -473,7 +473,7 @@ def collect(arguments):
                 current = {p.label: p.sample() for p in processes + [observer]}
                 now = time.perf_counter()
                 elapsed = now - previous_time
-                row = {"type": "sample", "elapsed_seconds": now - started, "interval_seconds": elapsed,
+                row = {"type": "sample", "qpc_seconds": now, "elapsed_seconds": now - started, "interval_seconds": elapsed,
                        "collector_elapsed_seconds": now - sampling_started, "processes": {}, "observer": {},
                        "gpu_counters": selected_counter_rows(raw, {p.pid for p in processes} | {observer.pid}, counter_processes),
                        "system_gpu": engine_totals(all_gpu_items, gpu_pids) if "gpu_engines" in raw["counters"] else {"status": "unavailable"},

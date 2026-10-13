@@ -1083,3 +1083,58 @@ reused. Settings opened from the installed folder and the task-opened window was
 Capture still fails with `IGraphicsCaptureItemInterop.CreateForMonitor ... 0x80070057` after refreshed
 selection, so no displayed-pixel/input acceptance is claimed. Future lifetime checks must inspect
 the desktop process view outside the sandbox; never restart based on a sandbox-empty process list.
+
+## Owned caret source and execution comparison
+
+The Release diagnostic compares the existing compound textbox at blink deadlines, a separate
+caret source at the same deadlines, and that source with native step opacity. Each backend runs
+five six-second phases per method in rotated order. The input-transparent diagnostic window is
+32 by 32 pixels with root opacity 0.01; the editor source is 180 by 32 pixels. It does not open
+Settings, send input or change the installed Reach instance. These conditions intentionally limit
+desktop disturbance and also limit what the measurements establish.
+
+Both backends pass 128 offscreen pixel comparisons covering two fonts, four DPI scales, two themes,
+selection, placeholders, alignment, multilingual text and clipped carets. Composing the isolated
+stroke over the caret-hidden textbox differs from the original compound source by at most one
+channel value; 24 cases per backend have empty/clipped ink. Each ordinary phase performs eleven
+application submissions. The compound source repaints eleven times; the separate source repaints
+zero times. Native step opacity performs zero application submissions or raster passes during the
+phase. Estimated retained source bytes are 23,040 versus 23,440, an increase of 400 bytes (1.74%).
+Every phase retires its sources successfully. This prototype is not shipped caret integration.
+
+The workload collector now includes absolute `qpc_seconds` alongside its relative timestamps,
+allowing native phase boundaries to be joined to raw samples. For this capture, retain only sample
+intervals wholly inside each phase after excluding its first and last 0.5 seconds. There are 571
+usable intervals, 19 per phase except one with 20; all report valid selected-process GPU coverage.
+Caret CPU uses process times; DWM CPU uses the recorded Process V2 fallback after direct access was
+denied. Each table entry is the median of five interval-weighted phase means. CPU percentages use
+all sixteen logical processors. GPU uses the busiest selected-process engine on the active adapter,
+not a sum of independent engines. Package and board power cover the whole machine's package/GPU.
+
+| Backend | Method | Caret + DWM CPU % | GPU engine % | Package W | GPU board W |
+| --- | --- | ---: | ---: | ---: | ---: |
+| WUC | Compound deadline | 0.4732 | 0.6554 | 31.9378 | 22.5289 |
+| WUC | Separate deadline | 0.6374 | 0.6592 | 31.8756 | 22.4967 |
+| WUC | Separate native step | 0.5140 | 0.6906 | 31.9299 | 22.4871 |
+| DC | Compound deadline | 0.5343 | 0.7227 | 31.9323 | 22.7932 |
+| DC | Separate deadline | 0.6992 | 0.6781 | 32.0029 | 22.7428 |
+| DC | Separate native step | 0.4523 | 0.7309 | 31.8727 | 22.7593 |
+
+Phase ranges overlap substantially: combined CPU is 0.329–0.781%, GPU engine utilization
+0.423–0.854%, and background system CPU varies from 0.715–2.712%. One DC compound phase has a
+26.628 W board-power mean while the other phases are around 22–23 W. Per-phase caret CPU is mostly
+below the process-time measurement resolution, with occasional 15.625/31.25 ms increments.
+Collector calls take 4.6–83.8 ms; observer CPU phase means are 0–0.0206%. The capture therefore
+establishes removal of application/raster work and a small source-memory cost, but does not establish
+a total CPU/GPU/power improvement or regression. It does not measure presentation latency, full
+application command/layout work, displayed blink timing, battery behavior or a fully visible editor.
+
+Evidence under `build/gpu-composition-migration`: `caret_comparison_probe.inc`,
+`probe-caret-comparison-pixels-release.log`, `caret-comparison-phases.jsonl`,
+`caret-comparison-native.log`, `caret-comparison-system.jsonl` and `caret-comparison-summary.json`.
+The native execution prototype uses WUC step easing and DC constant cubic pieces with repetition;
+the current canonical compiler still models continuous travel. Production integration must reuse
+shared textbox layout/ink geometry and canonical intent, preserve exact discrete blink timing,
+focus/edit resets, visibility retirement and fallback scheduling, then repeat the comparison with
+real visible product workloads. Independent caret composition and the final CPU disposition remain
+open; this bounded comparison does not close the repetition or product-acceptance gates.

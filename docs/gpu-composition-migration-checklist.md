@@ -307,6 +307,13 @@ support expectation is explicitly resolved.
     pixels differ from direct drawing by at most one channel value. Both builds, all 40 tests and
     five full native runs per backend plus fallback pass in Debug/Release. Independent caret
     composition, displayed pixels and total product cost remain pending.
+  - [x] Compare owned compound, isolated-deadline and native-step caret execution.
+    Five rotated phases per method/backend and 256 offscreen pixel cases pass. Isolation removes
+    eleven textbox repaints per phase; native stepping also removes eleven application submissions,
+    at 400 extra estimated source bytes. QPC-aligned process/DWM/GPU/package/board measurements have
+    valid coverage, but overlapping ranges and the small translucent scene do not establish a total
+    product cost difference. The workload baseline records the conditions and limits. Shared caret
+    source/intent integration, displayed blink behavior and final CPU disposition remain pending.
 
 ## 5. Reveal, resize and layout motion
 
