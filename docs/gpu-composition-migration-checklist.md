@@ -95,7 +95,17 @@ support expectation is explicitly resolved.
     An owned-window prototype renders the existing interior cutout on both compositors. Three widths
     match within two channel values outside a one-pixel geometry edge; edge differences reach 23.
     These are private experiments, not production capabilities or accepted product appearance.
-    Notches, animated captures, failure/recreation, resource cost and consumer checks remain open.
+    Arbitrary notch anchors, intermediate frames, failure/recreation, product resource cost and
+    consumer checks remain open.
+    - [x] Select the bounded single-source shadow graph and verify displayed source motion.
+      The [compact shadow design](gpu-compact-shadow-design.md) replaces the three-surface WUC
+      experiment with one alpha surface and records the matching DC graph. Forty-eight displayed
+      wide/narrow/wide states at four DPI scales and both notch directions follow canonical motion
+      with zero application submissions/source repaints. An exact reference explains two cached
+      fractional-DPI mismatches. Twelve repeated Release workload phases remove 70 submissions and
+      repaints per phase; 276 contained CPU/GPU/power samples support further implementation but
+      do not prove final efficiency. Production ownership, failure handling, full chrome appearance,
+      large/finite product workloads and consumer integration remain open.
 - [ ] Decide whether supported live-preview composition meets behavior and efficiency requirements;
   document the selected compositor or optimized hybrid design for Dock, Switcher and Stage.
   - [x] Select the existing DWM port with retained Reach visuals and active-only native motion.
