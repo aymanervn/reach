@@ -29,6 +29,9 @@
 
 using Microsoft::WRL::ComPtr;
 
+constexpr uint64_t REACH_D2D_MAX_SURFACE_BYTES = UINT64_C(128) * 1024 * 1024;
+constexpr float REACH_D2D_MAX_SURFACE_DIMENSION = 16384.0f;
+
 struct reach_d2d_icon_cache_entry
 {
     uint64_t icon_id;
@@ -91,9 +94,13 @@ struct reach_d2d_cover_entry
     ComPtr<ID2D1Bitmap1> bitmap;
 };
 
+struct reach_d2d_shadow_scene;
+
 struct reach_d2d_retained_layer
 {
     uint64_t id = 0;
+    std::shared_ptr<reach_d2d_shadow_scene> shadow_scene;
+    uint64_t shadow_bytes = 0;
     reach_render_group group = {};
     std::vector<reach_render_command> commands;
     ComPtr<ABI::Windows::UI::Composition::IContainerVisual> container;
@@ -128,6 +135,7 @@ struct reach_d2d_retained_attachment
 {
     uint64_t id;
     uint64_t parent_id;
+    int32_t has_shadow;
 };
 
 struct reach_render_backend
@@ -163,6 +171,8 @@ struct reach_render_backend
     reach_transform_f32 scene_content_transform = {};
     bool has_scene_content_transform = false;
     double motion_sample_seconds = 0;
+    ComPtr<ID2D1DeviceContext> shadow_fallback_context;
+    ID2D1Device *shadow_fallback_parent_device = nullptr;
     uint64_t reported_retained_bytes = 0;
     ComPtr<ABI::Windows::UI::Composition::IContainerVisual> scene_visual;
     ComPtr<IDCompositionVisual2> dcomp_scene_visual;
@@ -263,6 +273,18 @@ reach_result reach_d2d_fill_notched_rounded_rect(ID2D1RenderTarget *target,
 
 reach_result reach_d2d_draw_shadow(reach_render_backend *backend,
                                    const reach_render_command *command);
+HRESULT reach_d2d_sync_shadow(reach_render_backend *backend, reach_d2d_retained_layer &layer,
+                              const reach_render_group &group);
+ABI::Windows::UI::Composition::IContainerVisual *
+reach_d2d_shadow_wuc_owner(reach_d2d_retained_layer &layer);
+IDCompositionVisual2 *reach_d2d_shadow_dcomp_owner(reach_d2d_retained_layer &layer);
+reach_result reach_d2d_draw_group_shadow(reach_render_backend *backend,
+                                         const reach_render_command_buffer *commands,
+                                         const reach_render_group &group, size_t first,
+                                         size_t count, float opacity, double now_seconds);
+reach_result reach_d2d_execute_fallback(reach_render_backend *backend,
+                                        const reach_render_command_buffer *commands,
+                                        double now_seconds);
 void reach_d2d_clear_shadow_cache(reach_render_backend *backend);
 void reach_d2d_release_shadow_bake_context(reach_render_backend *backend);
 reach_result reach_wuc_apply_content_clip(reach_render_backend *backend,

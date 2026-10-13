@@ -527,6 +527,19 @@ membership, painter order, parent ownership or font-source replacement rebuild i
 valid only after every attachment succeeds, and suspension clears that ownership. Scene content
 matrices use named-field comparison and submit only when changed or recreated.
 
+A retained group may own a shadow-only shape subtree through `has_shadow` and existing Reach shadow
+metrics. Its ordinary descendant rectangles, clipped/notched rounded rectangles, triangles and lines
+supply alpha. The filter shifts/blurs/colors that alpha and removes the unshifted source; the parent
+retains normal output placement, opacity, scale and clipping. Own paint, nested filters, output tint
+and root-presentation filters are rejected. Both native adapters retain the caster/effect/output
+separately and route children to it. Parameter changes preserve sources; disable/reparent/retirement
+use the existing tree ownership. Nominal capture bounds participate in the shared 128 MiB limit.
+Unsupported composition uses the same fixed-time source renderer and D2D effects. It shares a
+hardware effect context when available, or uses WARP and bounded bitmap transfer for an HWND target.
+Those targets also use 96 DPI because command coordinates are already physical pixels. Source joins
+must overlap inside their geometry where separate antialiased masks would otherwise leave holes;
+filtering preserves the supplied subtree alpha rather than inventing an opaque interior.
+
 Group clips retain a stationary viewport and four independent absolute-time inset descriptors.
 Windows Composition animates the cached `InsetClip` properties; DirectComposition animates a cached
 rectangle clip, mapping right/bottom insets to native edge coordinates. Removing clipping retires

@@ -83,6 +83,7 @@ reach_result reach_d2d_create_target(reach_render_backend *backend)
 
     if (SUCCEEDED(hr))
     {
+        backend->target->SetDpi(96, 96);
         backend->target_width = width;
         backend->target_height = height;
     }
