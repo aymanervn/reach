@@ -321,6 +321,15 @@ support expectation is explicitly resolved.
     Both builds/all forty tests and focused native reuse/reset/retirement checks pass; existing
     continuous compositor/fallback regressions also pass. This completes the shared timing
     capability, not independent caret sources, consumer integration or product acceptance.
+  - [x] Migrate Settings Account/Power/Wi-Fi and Launcher caret sources and scheduling end to end.
+    Shared textbox parts resolve a small stroke from the existing cached DWrite layout and inherit
+    editor clips/transforms. Canonical opacity preserves focus/edit generation and phase across
+    source/font recreation. Supported paths publish no caret update/deadline or periodic application
+    submission; unsupported paths retain visible-field deadlines. Both builds/all forty tests,
+    previous-renderer pixels, actual retained-source graphs, owner reuse/reset/suspension and real
+    consumer producer/scheduler checks pass. Bounded repeated production-path captures remove eleven
+    submissions/repaints per phase but do not prove total product cost or displayed timing; those
+    remain in the broader acceptance gates.
 
 ## 5. Reveal, resize and layout motion
 

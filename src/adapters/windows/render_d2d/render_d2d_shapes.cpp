@@ -571,3 +571,15 @@ reach_result reach_d2d_draw_clipped_rounded_rect(ID2D1RenderTarget *target,
 
     return SUCCEEDED(hr) ? REACH_OK : REACH_ERROR;
 }
+
+reach_result reach_d2d_draw_line(ID2D1RenderTarget *target, const reach_render_command *command)
+{
+    ComPtr<ID2D1SolidColorBrush> brush;
+    if (FAILED(target->CreateSolidColorBrush(reach_d2d_color(command->color), &brush)))
+        return REACH_ERROR;
+    target->DrawLine(D2D1::Point2F(command->rect.x, command->rect.y),
+                     D2D1::Point2F(command->rect.x + command->rect.width,
+                                   command->rect.y + command->rect.height),
+                     brush.Get(), command->stroke_width);
+    return REACH_OK;
+}

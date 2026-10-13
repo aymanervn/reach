@@ -254,6 +254,28 @@ reach_result reach_render_command_buffer_validate_groups(const reach_render_comm
                 return REACH_INVALID_ARGUMENT;
         }
     }
+    for (index = 0; index < buffer->count; ++index)
+    {
+        const reach_render_command *command = &buffer->commands[index];
+        if (command->caret_group_id == 0)
+            continue;
+        const reach_render_group *caret =
+            reach_render_command_buffer_group(buffer, command->caret_group_id);
+        if (command->type != REACH_RENDER_COMMAND_TEXTBOX || caret == 0 || caret->parent_id != 0 ||
+            caret->has_clip || caret->has_tint || caret->x.generation || caret->y.generation ||
+            caret->scale.generation || caret->scale_y.generation || caret->opacity.generation == 0)
+            return REACH_INVALID_ARGUMENT;
+        const reach_render_group *body =
+            reach_render_command_buffer_group(buffer, command->group_id);
+        if (body != 0 && body->has_tint)
+            return REACH_INVALID_ARGUMENT;
+        for (other = 0; other < buffer->count; ++other)
+            if (buffer->commands[other].group_id == caret->id ||
+                (other != index && (buffer->commands[other].caret_group_id == caret->id ||
+                                    (command->group_id != 0 &&
+                                     buffer->commands[other].group_id == command->group_id))))
+                return REACH_INVALID_ARGUMENT;
+    }
     for (index = 0; index < buffer->count;)
     {
         uint64_t id = buffer->commands[index].group_id;
@@ -658,6 +680,32 @@ reach_result reach_render_command_buffer_push(reach_render_command_buffer *buffe
     }
     buffer->count += 1;
     return REACH_OK;
+}
+
+reach_result reach_render_push_textbox(reach_render_command_buffer *buffer,
+                                       const reach_render_command *command, uint64_t caret_id,
+                                       const reach_motion *caret_opacity)
+{
+    if (buffer == 0 || command == 0 || command->type != REACH_RENDER_COMMAND_TEXTBOX)
+        return REACH_INVALID_ARGUMENT;
+    if (caret_opacity == 0 || caret_id == 0)
+        return reach_render_command_buffer_push(buffer, command);
+    if (buffer->count >= REACH_MAX_RENDER_COMMANDS)
+        return REACH_ERROR;
+    reach_render_group caret = {0};
+    caret.id = caret_id;
+    caret.bounds = command->rect;
+    caret.opacity = *caret_opacity;
+    uint64_t parent = buffer->current_group_id;
+    buffer->current_group_id = 0;
+    reach_result result = reach_render_command_buffer_begin_group(buffer, &caret);
+    buffer->current_group_id = parent;
+    if (result != REACH_OK)
+        return result;
+    reach_render_command textbox = *command;
+    textbox.caret_group_id = caret_id;
+    textbox.caret_visible = 1;
+    return reach_render_command_buffer_push(buffer, &textbox);
 }
 
 int32_t reach_render_retained_command_bounds(const reach_render_command *command,

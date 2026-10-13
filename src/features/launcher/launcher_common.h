@@ -23,6 +23,8 @@ int32_t reach_launcher_take_search_results(reach_launcher *launcher,
                                            int32_t *out_error);
 reach_icon_service *reach_launcher_icons(reach_launcher *launcher);
 uint32_t reach_launcher_search_generation(const reach_launcher *launcher);
+void reach_launcher_set_retained_supported(reach_launcher *launcher, int32_t supported);
+reach_motion reach_launcher_caret_opacity(const reach_launcher *launcher);
 float reach_launcher_results_expansion(const reach_launcher *launcher);
 
 static inline size_t reach_launcher_visible_result_count(const reach_launcher_model *model)

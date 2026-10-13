@@ -81,7 +81,8 @@ extern "C"
         REACH_RENDER_COMMAND_BLURRED_IMAGE = 14,
         REACH_RENDER_COMMAND_TEXTBOX = 15,
         REACH_RENDER_COMMAND_ARC_STROKE = 16,
-        REACH_RENDER_COMMAND_SHADOW = 17
+        REACH_RENDER_COMMAND_SHADOW = 17,
+        REACH_RENDER_COMMAND_LINE = 18
     } reach_render_command_type;
 
     typedef enum reach_render_corner_mask
@@ -198,6 +199,7 @@ extern "C"
         reach_color text_color;
         reach_color placeholder_color;
         reach_color selection_color;
+        uint64_t caret_group_id;
         int32_t caret_index;
         int32_t caret_visible;
         int32_t selection_start;
@@ -220,6 +222,10 @@ extern "C"
         reach_render_group presentation;
         int32_t requires_content_sampling;
     } reach_render_command_buffer;
+
+    reach_result reach_render_push_textbox(reach_render_command_buffer *buffer,
+                                           const reach_render_command *command, uint64_t caret_id,
+                                           const reach_motion *caret_opacity);
 
     void reach_render_command_buffer_clear(reach_render_command_buffer *buffer);
     int32_t reach_render_command_buffer_motion_active(const reach_render_command_buffer *buffer);

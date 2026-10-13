@@ -69,6 +69,8 @@ extern "C"
         float dpi_scale;
         int32_t text_alignment_leading;
 
+        reach_motion caret_opacity;
+        int32_t caret_retained;
         int32_t caret_index;
         int32_t caret_visible;
         int32_t selection_start;
@@ -94,15 +96,15 @@ extern "C"
         const reach_theme *theme;
         const reach_launcher_layout *layout;
         float dpi_scale;
+        int32_t retained_supported;
     } reach_launcher_render_context;
 
     reach_result reach_launcher_append_render_commands(reach_launcher *launcher,
                                                        const reach_launcher_render_context *ctx,
                                                        reach_render_command_buffer *out_commands);
-    reach_result
-    reach_launcher_append_surface_render_commands(reach_launcher *launcher,
-                                                  const reach_theme *theme, float dpi_scale,
-                                                  reach_render_command_buffer *out_commands);
+    reach_result reach_launcher_append_surface_render_commands(
+        reach_launcher *launcher, const reach_theme *theme, float dpi_scale,
+        int32_t retained_supported, reach_render_command_buffer *out_commands);
 #ifdef __cplusplus
 }
 #endif

@@ -912,8 +912,45 @@ static void test_group_equality_preserves_intent_without_padding(void)
     expect_true(!reach_render_group_equal(&first, &second), "repeat intent remains distinct");
 }
 
+static void test_textbox_caret_reference_ownership(void)
+{
+    reach_render_command_buffer buffer = {};
+    reach_render_command textbox = {};
+    textbox.type = REACH_RENDER_COMMAND_TEXTBOX;
+    textbox.rect = {10, 10, 100, 30};
+    reach_motion opacity = {};
+    reach_motion_repeat_at(&opacity, 1, 0, 0, 0.55, 0.45, REACH_EASING_EASE_IN_OUT, 10);
+    expect_true(reach_render_push_textbox(&buffer, &textbox, 100, &opacity) == REACH_OK &&
+                    buffer.current_group_id == 0 &&
+                    reach_render_command_buffer_validate_groups(&buffer) == REACH_OK,
+                "textbox part references one retained opacity owner without opening a paint group");
+    buffer.commands[0].caret_group_id = 101;
+    expect_true(reach_render_command_buffer_validate_groups(&buffer) == REACH_INVALID_ARGUMENT,
+                "a missing caret owner is rejected before renderer dereference");
+    buffer.commands[0].caret_group_id = 100;
+    buffer.commands[0].group_id = 100;
+    expect_true(reach_render_command_buffer_validate_groups(&buffer) == REACH_INVALID_ARGUMENT,
+                "caret ownership cannot also paint the editor body");
+    buffer.commands[0].group_id = 0;
+    reach_render_group body = {};
+    body.id = 200;
+    body.bounds = textbox.rect;
+    expect_true(reach_render_command_buffer_begin_group(&buffer, &body) == REACH_OK,
+                "body owner registration succeeds");
+    reach_render_command_buffer_end_group(&buffer);
+    buffer.commands[0].group_id = 200;
+    reach_render_command sibling = {};
+    sibling.type = REACH_RENDER_COMMAND_RECT;
+    sibling.rect = textbox.rect;
+    sibling.group_id = 200;
+    expect_true(reach_render_command_buffer_push(&buffer, &sibling) == REACH_OK &&
+                    reach_render_command_buffer_validate_groups(&buffer) == REACH_INVALID_ARGUMENT,
+                "a caret body stays a single source so splitting preserves painter order");
+}
+
 int main(void)
 {
+    test_textbox_caret_reference_ownership();
     test_group_equality_preserves_intent_without_padding();
     test_stretch_geometry_preserves_caps_and_anchor();
     test_focal_stretch_geometry_preserves_fixed_features();

@@ -1007,7 +1007,8 @@ static reach_result reach_launcher_surface_render(void *capsule,
                                                   reach_render_command_buffer *out_commands)
 {
     return reach_launcher_append_surface_render_commands(static_cast<reach_launcher *>(capsule),
-                                                         ctx->theme, ctx->dpi_scale, out_commands);
+                                                         ctx->theme, ctx->dpi_scale,
+                                                         ctx->retained_supported, out_commands);
 }
 
 static const reach_feature_surface_ops reach_launcher_surface_ops = {

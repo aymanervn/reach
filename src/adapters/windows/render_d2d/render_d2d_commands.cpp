@@ -5,7 +5,8 @@
 
 static reach_result reach_d2d_execute_command(reach_render_backend *backend,
                                               ID2D1RenderTarget *target,
-                                              const reach_render_command *command)
+                                              const reach_render_command *command,
+                                              float caret_opacity = 1)
 {
     if (command->type == REACH_RENDER_COMMAND_BLURRED_IMAGE)
     {
@@ -60,6 +61,9 @@ static reach_result reach_d2d_execute_command(reach_render_backend *backend,
         return REACH_OK;
     }
 
+    if (command->type == REACH_RENDER_COMMAND_LINE)
+        return reach_d2d_draw_line(target, command);
+
     if (command->type == REACH_RENDER_COMMAND_RECT)
     {
         return reach_d2d_fill_rect_or_rounded_rect(target, command);
@@ -82,7 +86,7 @@ static reach_result reach_d2d_execute_command(reach_render_backend *backend,
 
     if (command->type == REACH_RENDER_COMMAND_TEXTBOX)
     {
-        return reach_d2d_draw_textbox(backend, command);
+        return reach_d2d_draw_textbox(backend, command, caret_opacity);
     }
 
     return REACH_OK;
@@ -94,7 +98,8 @@ static int32_t reach_d2d_scissor_visible(const reach_render_command *command)
 }
 
 reach_result reach_d2d_execute_commands(reach_render_backend *backend,
-                                        const reach_render_command *commands, size_t count)
+                                        const reach_render_command *commands, size_t count,
+                                        float caret_opacity)
 {
     ID2D1RenderTarget *target = reach_d2d_target(backend);
     for (size_t index = 0; index < count; ++index)
@@ -112,7 +117,7 @@ reach_result reach_d2d_execute_commands(reach_render_backend *backend,
                             command->scissor_rect.y + command->scissor_rect.height),
                 D2D1_ANTIALIAS_MODE_ALIASED);
         }
-        reach_result result = reach_d2d_execute_command(backend, target, command);
+        reach_result result = reach_d2d_execute_command(backend, target, command, caret_opacity);
         if (command->has_scissor)
         {
             target->PopAxisAlignedClip();
@@ -129,7 +134,8 @@ static reach_result reach_d2d_execute_tinted_group(reach_render_backend *backend
                                                    ID2D1RenderTarget *target,
                                                    const reach_render_group &group,
                                                    const reach_render_command *commands,
-                                                   size_t count, float opacity, double now_seconds)
+                                                   size_t count, float opacity, double now_seconds,
+                                                   float caret_opacity)
 {
     if (!isfinite(group.bounds.width) || !isfinite(group.bounds.height) ||
         group.bounds.width <= 0.0f || group.bounds.height <= 0.0f ||
@@ -167,7 +173,7 @@ static reach_result reach_d2d_execute_tinted_group(reach_render_backend *backend
     coverage->SetTransform(D2D1::Matrix3x2F::Translation(-group.bounds.x, -group.bounds.y));
     ID2D1RenderTarget *previous = backend->command_target;
     backend->command_target = coverage.Get();
-    reach_result result = reach_d2d_execute_commands(backend, commands, count);
+    reach_result result = reach_d2d_execute_commands(backend, commands, count, caret_opacity);
     backend->command_target = previous;
     hr = coverage->EndDraw();
     if (result != REACH_OK)
@@ -308,6 +314,13 @@ reach_result reach_d2d_execute(reach_render_backend *backend,
         target->SetTransform(local * content * root);
         float opacity = root_opacity * reach_render_command_buffer_group_opacity_at(
                                            commands, command.group_id, now_seconds);
+        float caret_opacity = 1;
+        if (command.caret_group_id != 0)
+        {
+            const reach_render_group *caret =
+                reach_render_command_buffer_group(commands, command.caret_group_id);
+            caret_opacity = reach_motion_value_at(&caret->opacity, now_seconds);
+        }
         if (group != nullptr && group->has_tint)
         {
             size_t end = index + 1;
@@ -315,7 +328,7 @@ reach_result reach_d2d_execute(reach_render_backend *backend,
                 ++end;
             outcome =
                 reach_d2d_execute_tinted_group(backend, target, *group, commands->commands + index,
-                                               end - index, opacity, now_seconds);
+                                               end - index, opacity, now_seconds, caret_opacity);
             while (rounded_depth-- > 0)
                 target->PopLayer();
             if (has_clip)
@@ -335,7 +348,7 @@ reach_result reach_d2d_execute(reach_render_backend *backend,
                             command.scissor_rect.y + command.scissor_rect.height),
                 D2D1_ANTIALIAS_MODE_ALIASED);
         if (!command.has_scissor || scissor)
-            outcome = reach_d2d_execute_command(backend, target, &command);
+            outcome = reach_d2d_execute_command(backend, target, &command, caret_opacity);
         if (scissor)
             target->PopAxisAlignedClip();
         while (rounded_depth-- > 0)
