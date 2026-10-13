@@ -116,6 +116,34 @@ reach_rect_f32 reach_render_group_clip_at(const reach_render_group *group, doubl
     return clip;
 }
 
+reach_result reach_render_group_clip_motion(const reach_render_group *group,
+                                            reach_rect_motion *out_clip)
+{
+    if (group == 0 || out_clip == 0 || !group->has_clip || !isfinite(group->clip.x) ||
+        !isfinite(group->clip.y) || !isfinite(group->clip.width) || !isfinite(group->clip.height) ||
+        group->clip.width < 0 || group->clip.height < 0)
+        return REACH_INVALID_ARGUMENT;
+    reach_rect_motion clip = {0};
+    clip.x = reach_motion_affine(&group->clip_insets[REACH_RENDER_CLIP_LEFT], 1, group->clip.x);
+    clip.y = reach_motion_affine(&group->clip_insets[REACH_RENDER_CLIP_TOP], 1, group->clip.y);
+    if (reach_motion_combine(&group->clip_insets[REACH_RENDER_CLIP_LEFT], -1,
+                             &group->clip_insets[REACH_RENDER_CLIP_RIGHT], -1, group->clip.width,
+                             &clip.width) != REACH_OK ||
+        reach_motion_combine(&group->clip_insets[REACH_RENDER_CLIP_TOP], -1,
+                             &group->clip_insets[REACH_RENDER_CLIP_BOTTOM], -1, group->clip.height,
+                             &clip.height) != REACH_OK)
+        return REACH_INVALID_ARGUMENT;
+    float minimum = 0, maximum = 0;
+    if (reach_motion_range(&clip.width, &minimum, &maximum) != REACH_OK)
+        return REACH_INVALID_ARGUMENT;
+    clip.width = reach_motion_clamp(&clip.width, 0, fmaxf(0, maximum));
+    if (reach_motion_range(&clip.height, &minimum, &maximum) != REACH_OK)
+        return REACH_INVALID_ARGUMENT;
+    clip.height = reach_motion_clamp(&clip.height, 0, fmaxf(0, maximum));
+    *out_clip = clip;
+    return REACH_OK;
+}
+
 int32_t reach_render_command_buffer_motion_active(const reach_render_command_buffer *buffer)
 {
     size_t index;
@@ -158,11 +186,12 @@ static int32_t reach_render_repetition_valid(const reach_render_group *group, in
         return 0;
     if (!isfinite(group->clip_radius) || group->clip_radius < 0 || (root && group->clip_radius > 0))
         return 0;
-    if (group->clip_radius > 0)
-        for (index = 0; index < REACH_RENDER_CLIP_EDGE_COUNT; ++index)
-            if (group->clip_insets[index].duration_seconds > 0 ||
-                group->clip_insets[index].from != 0 || group->clip_insets[index].to != 0)
-                return 0;
+    if (group->has_clip && group->clip_radius > 0)
+    {
+        reach_rect_motion clip = {0};
+        if (reach_render_group_clip_motion(group, &clip) != REACH_OK)
+            return 0;
+    }
     if (group->x.repeating && group->repeat_travel_seconds > 0)
         return 0;
     const reach_motion *motions[] = {&group->x,

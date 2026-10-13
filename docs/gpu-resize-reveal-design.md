@@ -110,6 +110,27 @@ This capability supports independent viewport/content motion. Complete section p
 popup geometry/monitor constraints, deadline reconciliation and input integration remain consumer
 work, and displayed compositor pixels remain part of final acceptance.
 
+## Animated rounded viewports
+
+Rounded group clips support canonical inset motion on both backends. The shared
+`reach_render_group_clip_motion` derives origin and nonnegative width/height from paired insets.
+Each axis must combine exactly through the existing same-epoch motion contract; incompatible
+epochs, active paired clamps or breakpoints are rejected before native mutation. Different axes
+can own independent epochs. Ordinary rectangular clips retain independent edge motion.
+
+WUC animates geometric-clip offset, size and corner radii. DC animates rectangle-clip edges and
+radii. Each radius is limited to half its current axis size, preserving compact rounded geometry
+without scaling child text or icons. Clip disable, replacement and repetition retirement stop the
+native bindings. Existing descriptor activity/fallback sampling supplies lifetime and deadlines;
+no property set, timer, source buffer or animation owner is added. Rounded root clips remain unsupported.
+
+Pure geometry checks cover reversal, all finite easings, paired insets, collapsed extents and invalid
+epochs. Owned native checks cover compact motion/reversal, settled deduplication, repetition and
+retirement. Offscreen fallback/cached coverage matches the former static viewport at six widths
+and four DPI scales. A direct rounded primitive has different edge antialiasing from the established
+viewport mask; the inspected comparison records this as a consumer appearance consideration.
+This solves animated rounded clipping, not compact notched shadows or complete popup width fitting.
+
 ## Validation and limits
 
 Source-command validation accepts rounded/notched fills and shadows. A moving axis must keep enough

@@ -2,6 +2,7 @@
 #define REACH_CORE_RENDER_COMMANDS_H
 
 #include "reach/core/theme.h"
+#include "reach/core/animated_rect.h"
 #include "reach/core/ui_layout.h"
 #include "reach/support/motion.h"
 
@@ -242,6 +243,8 @@ extern "C"
                                                           uint64_t id, double now_seconds,
                                                           reach_rect_f32 *out_clip);
     reach_rect_f32 reach_render_group_clip_at(const reach_render_group *group, double now_seconds);
+    reach_result reach_render_group_clip_motion(const reach_render_group *group,
+                                                reach_rect_motion *out_clip);
     int32_t reach_render_group_equal(const reach_render_group *first,
                                      const reach_render_group *second);
     reach_color reach_render_group_tint_at(const reach_render_group *group, double now_seconds);
