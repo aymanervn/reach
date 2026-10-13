@@ -12,6 +12,13 @@ extern "C"
 {
 #endif
 
+    enum
+    {
+        REACH_MOTION_MAX_EXTRA_KNOTS = 7,
+        REACH_MOTION_MAX_SEGMENTS = 32,
+        REACH_MOTION_MAX_REPEAT_SEGMENTS = 68
+    };
+
     typedef struct reach_motion
     {
         float from;
@@ -31,13 +38,10 @@ extern "C"
         float mapping_left_slope;
         float mapping_right_slope;
         float mapping_value;
+        int32_t mapping_extra_count;
+        float mapping_extra_centers[REACH_MOTION_MAX_EXTRA_KNOTS];
+        float mapping_extra_deltas[REACH_MOTION_MAX_EXTRA_KNOTS];
     } reach_motion;
-
-    enum
-    {
-        REACH_MOTION_MAX_SEGMENTS = 8,
-        REACH_MOTION_MAX_REPEAT_SEGMENTS = 20
-    };
 
     typedef struct reach_motion_segment
     {
@@ -75,6 +79,10 @@ extern "C"
                                       reach_motion *out_motion);
     reach_result reach_motion_range(const reach_motion *motion, float *out_minimum,
                                     float *out_maximum);
+    reach_result reach_motion_min(const reach_motion *first, const reach_motion *second,
+                                  reach_motion *out_motion);
+    reach_result reach_motion_max(const reach_motion *first, const reach_motion *second,
+                                  reach_motion *out_motion);
     reach_motion reach_motion_clamp(const reach_motion *motion, float minimum, float maximum);
     size_t reach_motion_compile_at(const reach_motion *motion, double now_seconds,
                                    reach_motion_segment segments[REACH_MOTION_MAX_SEGMENTS]);

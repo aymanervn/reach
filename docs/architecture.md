@@ -426,16 +426,23 @@ scroll and native choreography timing remain separate migration responsibilities
 Switcher width preserves pre-sample activity when deciding redraw, so a late
 wake still publishes the terminal visual state after sampling clears its active flag.
 
-Canonical motion supports a two-slope mapping through `reach_motion_hinge`, preserving its epoch,
-easing and generation. `reach_motion_peak` uses it to brighten and dim a label. Mapping is followed
-by output limits and can be transformed affinely. Peak input limits must enclose its support;
-general hinges require inactive input limits. Nested mappings are rejected. `reach_motion_combine`
-adds compatible same-epoch properties and constants without a second animation owner, rejecting
-active input clamps and incompatible breakpoints. `reach_motion_range` includes interior extrema.
-The shared compiler splits at the mapping center and clamp crossings into at most eight finite pieces or
-twenty rotated-cycle pieces; both native backends consume those same cubic segments. Crossing
-queries find the first future crossing on either slope, and equal visible endpoints do not suppress
-an intervening periodic peak. Retarget the source intent and derive mapped properties again.
+Canonical motion supports continuous piecewise affine mappings, preserving epoch, easing and
+generation. `reach_motion_hinge` constructs two slopes meeting at one center; `reach_motion_peak`
+uses that shape to brighten and dim a label. Constructors require ordinary input with compatible
+limits. `reach_motion_combine` adds same-epoch properties, including active output clamps and
+different breakpoints. `reach_motion_min` and `reach_motion_max` enforce moving constraints.
+Constants need no common clock; incompatible moving epochs and more than eight slope breakpoints
+are rejected without changing the output. The descriptor stores seven additional slope changes;
+unused storage does not affect retained intent identity. Output limits and affine transforms retain
+the full mapping. `reach_motion_range` includes every interior extremum.
+
+The shared compiler splits at mapping knots, clamp crossings and the easing midpoint into at most
+32 finite pieces or 68 rotated-cycle pieces. Both native backends consume those same cubic segments.
+CPU input/fallback samples use the same descriptor; crossing queries find the first future crossing,
+and equal visible endpoints do not suppress intervening periodic peaks. Retarget the source intent
+and derive mapped properties again. This extends the existing animation owner rather than adding a
+second clock, native graph or application frame loop. Descriptor memory cost and product workload
+acceptance are recorded in `gpu-workload-baseline.md`.
 
 Settings Reach-theme and Top Bar style selectors use canonical position intent and shared retained
 segmented controls. Cached selection coverage translates; fixed labels use RGBA tint, with a peak

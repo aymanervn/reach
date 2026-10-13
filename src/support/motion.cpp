@@ -1,14 +1,42 @@
 #include "reach/support/motion.h"
 
 #include <math.h>
+#include <initializer_list>
+
+static bool reach_motion_mapping_valid(const reach_motion *motion)
+{
+    if (!motion->has_mapping)
+        return motion->mapping_extra_count == 0;
+    if (!isfinite(motion->mapping_center) || !isfinite(motion->mapping_value) ||
+        !isfinite(motion->mapping_left_slope) || !isfinite(motion->mapping_right_slope) ||
+        motion->mapping_extra_count < 0 ||
+        motion->mapping_extra_count > REACH_MOTION_MAX_EXTRA_KNOTS)
+        return false;
+    float previous = motion->mapping_center;
+    for (int32_t at = 0; at < motion->mapping_extra_count; ++at)
+    {
+        float center = motion->mapping_extra_centers[at];
+        if (!isfinite(center) || !isfinite(motion->mapping_extra_deltas[at]) || center <= previous)
+            return false;
+        previous = center;
+    }
+    return true;
+}
 
 static float reach_motion_limit(const reach_motion *motion, float value)
 {
     if (motion->has_mapping)
+    {
+        float raw = value;
         value = motion->mapping_value +
-                (value - motion->mapping_center) * (value < motion->mapping_center
-                                                        ? motion->mapping_left_slope
-                                                        : motion->mapping_right_slope);
+                (raw - motion->mapping_center) * (raw < motion->mapping_center
+                                                      ? motion->mapping_left_slope
+                                                      : motion->mapping_right_slope);
+        for (int32_t at = 0; at < motion->mapping_extra_count && at < REACH_MOTION_MAX_EXTRA_KNOTS;
+             ++at)
+            value += fmaxf(0, raw - motion->mapping_extra_centers[at]) *
+                     motion->mapping_extra_deltas[at];
+    }
     return motion->has_limits ? fminf(motion->maximum, fmaxf(motion->minimum, value)) : value;
 }
 
@@ -16,6 +44,14 @@ int32_t reach_motion_equal(const reach_motion *first, const reach_motion *second
 {
     if (first == second)
         return 1;
+    if (first == nullptr || second == nullptr || first->mapping_extra_count < 0 ||
+        first->mapping_extra_count > REACH_MOTION_MAX_EXTRA_KNOTS ||
+        first->mapping_extra_count != second->mapping_extra_count)
+        return 0;
+    for (int32_t at = 0; at < first->mapping_extra_count; ++at)
+        if (first->mapping_extra_centers[at] != second->mapping_extra_centers[at] ||
+            first->mapping_extra_deltas[at] != second->mapping_extra_deltas[at])
+            return 0;
     return first != nullptr && second != nullptr && first->from == second->from &&
            first->to == second->to && first->started_seconds == second->started_seconds &&
            first->duration_seconds == second->duration_seconds && first->easing == second->easing &&
@@ -86,6 +122,9 @@ reach_motion reach_motion_affine(const reach_motion *motion, float multiplier, f
         result.mapping_left_slope *= multiplier;
         result.mapping_right_slope *= multiplier;
         result.mapping_value = result.mapping_value * multiplier + offset;
+        for (int32_t at = 0; at < result.mapping_extra_count && at < REACH_MOTION_MAX_EXTRA_KNOTS;
+             ++at)
+            result.mapping_extra_deltas[at] *= multiplier;
     }
     else
     {
@@ -107,8 +146,8 @@ reach_motion reach_motion_affine(const reach_motion *motion, float multiplier, f
 reach_result reach_motion_peak(const reach_motion *motion, float center, float radius,
                                reach_motion *out_motion)
 {
-    if (motion == nullptr || out_motion == nullptr || motion->has_mapping || !isfinite(center) ||
-        !isfinite(radius) || radius <= 0 ||
+    if (motion == nullptr || out_motion == nullptr || !reach_motion_mapping_valid(motion) ||
+        motion->has_mapping || !isfinite(center) || !isfinite(radius) || radius <= 0 ||
         (motion->has_limits &&
          (motion->minimum > center - radius || motion->maximum < center + radius)))
         return REACH_INVALID_ARGUMENT;
@@ -133,9 +172,7 @@ reach_result reach_motion_range(const reach_motion *motion, float *out_minimum, 
         !isfinite(motion->from) || !isfinite(motion->to) ||
         (motion->has_limits && (!isfinite(motion->minimum) || !isfinite(motion->maximum) ||
                                 motion->minimum > motion->maximum)) ||
-        (motion->has_mapping &&
-         (!isfinite(motion->mapping_center) || !isfinite(motion->mapping_value) ||
-          !isfinite(motion->mapping_left_slope) || !isfinite(motion->mapping_right_slope))))
+        !reach_motion_mapping_valid(motion))
         return REACH_INVALID_ARGUMENT;
     float first = reach_motion_limit(motion, motion->from);
     float last = reach_motion_limit(motion, motion->to);
@@ -153,6 +190,17 @@ reach_result reach_motion_range(const reach_motion *motion, float *out_minimum, 
     }
     if (!isfinite(minimum) || !isfinite(maximum))
         return REACH_INVALID_ARGUMENT;
+    for (int32_t at = 0; at < motion->mapping_extra_count; ++at)
+    {
+        float center = motion->mapping_extra_centers[at];
+        if (center <= fminf(motion->from, motion->to) || center >= fmaxf(motion->from, motion->to))
+            continue;
+        float value = reach_motion_limit(motion, center);
+        if (!isfinite(value))
+            return REACH_INVALID_ARGUMENT;
+        minimum = fminf(minimum, value);
+        maximum = fmaxf(maximum, value);
+    }
     *out_minimum = minimum;
     *out_maximum = maximum;
     return REACH_OK;
@@ -178,8 +226,9 @@ static bool reach_motion_remove_inactive_limits(reach_motion *motion)
 reach_result reach_motion_hinge(const reach_motion *motion, float center, float value,
                                 float left_slope, float right_slope, reach_motion *out_motion)
 {
-    if (motion == nullptr || out_motion == nullptr || motion->has_mapping || !isfinite(center) ||
-        !isfinite(value) || !isfinite(left_slope) || !isfinite(right_slope))
+    if (motion == nullptr || out_motion == nullptr || !reach_motion_mapping_valid(motion) ||
+        motion->has_mapping || !isfinite(center) || !isfinite(value) || !isfinite(left_slope) ||
+        !isfinite(right_slope))
         return REACH_INVALID_ARGUMENT;
     reach_motion result = *motion;
     if (!reach_motion_remove_inactive_limits(&result))
@@ -196,6 +245,237 @@ reach_result reach_motion_hinge(const reach_motion *motion, float center, float 
         reach_motion_set(&result, reach_motion_limit(&result, result.to));
     *out_motion = result;
     return REACH_OK;
+}
+
+static bool reach_motion_same_epoch(const reach_motion &a, const reach_motion &b)
+{
+    return a.started_seconds == b.started_seconds && a.duration_seconds == b.duration_seconds &&
+           a.easing == b.easing && a.generation == b.generation && a.repeating == b.repeating &&
+           a.hold_start_seconds == b.hold_start_seconds && a.hold_end_seconds == b.hold_end_seconds;
+}
+
+static void reach_motion_line(const reach_motion &motion, double raw, double &slope, double &offset)
+{
+    slope = 1;
+    offset = 0;
+    if (motion.has_mapping)
+    {
+        slope =
+            raw < motion.mapping_center ? motion.mapping_left_slope : motion.mapping_right_slope;
+        offset = motion.mapping_value - slope * motion.mapping_center;
+        for (int32_t at = 0; at < motion.mapping_extra_count; ++at)
+            if (raw >= motion.mapping_extra_centers[at])
+            {
+                slope += motion.mapping_extra_deltas[at];
+                offset -=
+                    (double)motion.mapping_extra_deltas[at] * motion.mapping_extra_centers[at];
+            }
+    }
+    double value = slope * raw + offset;
+    if (motion.has_limits && (value <= motion.minimum || value >= motion.maximum))
+    {
+        offset = fmin(motion.maximum, fmax(motion.minimum, value));
+        slope = 0;
+    }
+}
+
+struct reach_motion_boundaries
+{
+    float values[64];
+    size_t count;
+
+    bool add(double value, float low, float high)
+    {
+        float point = (float)value;
+        if (!isfinite(point) || point <= low || point >= high)
+            return true;
+        for (size_t at = 0; at < count; ++at)
+            if (values[at] == point)
+                return true;
+        if (count == 64)
+            return false;
+        size_t at = count++;
+        while (at > 0 && values[at - 1] > point)
+        {
+            values[at] = values[at - 1];
+            --at;
+        }
+        values[at] = point;
+        return true;
+    }
+};
+
+static bool reach_motion_raw_boundaries(const reach_motion &motion, reach_motion_boundaries &points)
+{
+    float low = fminf(motion.from, motion.to), high = fmaxf(motion.from, motion.to);
+    if (motion.has_mapping)
+    {
+        if (!points.add(motion.mapping_center, low, high))
+            return false;
+        for (int32_t at = 0; at < motion.mapping_extra_count; ++at)
+            if (!points.add(motion.mapping_extra_centers[at], low, high))
+                return false;
+    }
+    if (!motion.has_limits)
+        return true;
+    reach_motion unbounded = motion;
+    unbounded.has_limits = 0;
+    reach_motion_boundaries original = points;
+    for (size_t at = 0; at <= original.count; ++at)
+    {
+        float begin = at == 0 ? low : original.values[at - 1];
+        float end = at == original.count ? high : original.values[at];
+        double slope = 0, offset = 0;
+        reach_motion_line(unbounded, ((double)begin + end) * 0.5, slope, offset);
+        if (slope == 0)
+            continue;
+        for (float limit : {motion.minimum, motion.maximum})
+        {
+            double root = (limit - offset) / slope;
+            if (root > begin && root < end && !points.add(root, low, high))
+                return false;
+        }
+    }
+    return true;
+}
+
+static reach_result reach_motion_compose(const reach_motion &a, float a_factor,
+                                         const reach_motion &b, float b_factor, float offset,
+                                         int selection, reach_motion *out_motion)
+{
+    if (!reach_motion_same_epoch(a, b) || a.from == a.to || b.from == b.to)
+        return REACH_INVALID_ARGUMENT;
+    float low = fminf(a.from, a.to), high = fmaxf(a.from, a.to);
+    double ratio = ((double)b.to - b.from) / ((double)a.to - a.from);
+    double shift = b.from - ratio * a.from;
+    reach_motion_boundaries a_points = {}, b_points = {}, points = {};
+    if (!reach_motion_raw_boundaries(a, a_points) || !reach_motion_raw_boundaries(b, b_points))
+        return REACH_INVALID_ARGUMENT;
+    for (size_t at = 0; at < a_points.count; ++at)
+        if (!points.add(a_points.values[at], low, high))
+            return REACH_INVALID_ARGUMENT;
+    for (size_t at = 0; at < b_points.count; ++at)
+        if (!points.add((b_points.values[at] - shift) / ratio, low, high))
+            return REACH_INVALID_ARGUMENT;
+    auto lines =
+        [&](double raw, double &a_slope, double &a_offset, double &b_slope, double &b_offset)
+    {
+        reach_motion_line(a, raw, a_slope, a_offset);
+        reach_motion_line(b, raw * ratio + shift, b_slope, b_offset);
+        b_offset += b_slope * shift;
+        b_slope *= ratio;
+    };
+    if (selection != 0)
+    {
+        reach_motion_boundaries original = points;
+        for (size_t at = 0; at <= original.count; ++at)
+        {
+            float begin = at == 0 ? low : original.values[at - 1];
+            float end = at == original.count ? high : original.values[at];
+            double sa = 0, oa = 0, sb = 0, ob = 0;
+            lines(((double)begin + end) * 0.5, sa, oa, sb, ob);
+            if (sa != sb)
+            {
+                double root = (ob - oa) / (sa - sb);
+                if (root > begin && root < end && !points.add(root, low, high))
+                    return REACH_INVALID_ARGUMENT;
+            }
+        }
+    }
+    reach_motion result = a;
+    result.has_limits = 0;
+    result.minimum = result.maximum = 0;
+    result.has_mapping = 0;
+    result.mapping_extra_count = 0;
+    auto output = [&](double raw)
+    {
+        float av = reach_motion_limit(&a, (float)raw);
+        float bv = reach_motion_limit(&b, (float)(raw * ratio + shift));
+        return selection < 0   ? fminf(av, bv)
+               : selection > 0 ? fmaxf(av, bv)
+                               : a_factor * av + b_factor * bv + offset;
+    };
+    float previous_slope = 0;
+    for (size_t at = 0; at <= points.count; ++at)
+    {
+        float begin = at == 0 ? low : points.values[at - 1];
+        float end = at == points.count ? high : points.values[at];
+        double middle = ((double)begin + end) * 0.5;
+        double sa = 0, oa = 0, sb = 0, ob = 0;
+        lines(middle, sa, oa, sb, ob);
+        float slope =
+            (float)(selection == 0 ? a_factor * sa + b_factor * sb
+                                   : ((selection < 0 ? sa * middle + oa <= sb * middle + ob
+                                                     : sa * middle + oa >= sb * middle + ob)
+                                          ? sa
+                                          : sb));
+        if (!isfinite(slope))
+            return REACH_INVALID_ARGUMENT;
+        if (at > 0 && slope != previous_slope)
+        {
+            if (!result.has_mapping)
+            {
+                result.has_mapping = 1;
+                result.mapping_center = begin;
+                result.mapping_value = output(begin);
+                result.mapping_left_slope = previous_slope;
+                result.mapping_right_slope = slope;
+            }
+            else
+            {
+                if (result.mapping_extra_count == REACH_MOTION_MAX_EXTRA_KNOTS)
+                    return REACH_INVALID_ARGUMENT;
+                int32_t index = result.mapping_extra_count++;
+                result.mapping_extra_centers[index] = begin;
+                result.mapping_extra_deltas[index] = slope - previous_slope;
+            }
+        }
+        previous_slope = slope;
+    }
+    if (!result.has_mapping)
+    {
+        result.from = output(a.from);
+        result.to = output(a.to);
+        result.mapping_center = result.mapping_value = 0;
+        result.mapping_left_slope = result.mapping_right_slope = 0;
+    }
+    float minimum = 0, maximum = 0;
+    if (reach_motion_range(&result, &minimum, &maximum) != REACH_OK)
+        return REACH_INVALID_ARGUMENT;
+    *out_motion = result;
+    return REACH_OK;
+}
+
+static reach_result reach_motion_select(const reach_motion *first, const reach_motion *second,
+                                        int selection, reach_motion *out_motion)
+{
+    if (first == nullptr || second == nullptr || out_motion == nullptr)
+        return REACH_INVALID_ARGUMENT;
+    float a_min = 0, a_max = 0, b_min = 0, b_max = 0;
+    if (reach_motion_range(first, &a_min, &a_max) != REACH_OK ||
+        reach_motion_range(second, &b_min, &b_max) != REACH_OK)
+        return REACH_INVALID_ARGUMENT;
+    if (a_min == a_max)
+    {
+        *out_motion = reach_motion_clamp(second, selection < 0 ? fminf(a_min, b_min) : a_min,
+                                         selection < 0 ? a_min : fmaxf(a_min, b_max));
+        return REACH_OK;
+    }
+    if (b_min == b_max)
+        return reach_motion_select(second, first, selection, out_motion);
+    return reach_motion_compose(*first, 1, *second, 1, 0, selection, out_motion);
+}
+
+reach_result reach_motion_min(const reach_motion *first, const reach_motion *second,
+                              reach_motion *out_motion)
+{
+    return reach_motion_select(first, second, -1, out_motion);
+}
+
+reach_result reach_motion_max(const reach_motion *first, const reach_motion *second,
+                              reach_motion *out_motion)
+{
+    return reach_motion_select(first, second, 1, out_motion);
 }
 
 reach_result reach_motion_combine(const reach_motion *first, float first_factor,
@@ -226,11 +506,12 @@ reach_result reach_motion_combine(const reach_motion *first, float first_factor,
         *out_motion = result;
         return REACH_OK;
     }
-    if (!reach_motion_remove_inactive_limits(&a) || !reach_motion_remove_inactive_limits(&b) ||
-        a.started_seconds != b.started_seconds || a.duration_seconds != b.duration_seconds ||
-        a.easing != b.easing || a.generation != b.generation || a.repeating != b.repeating ||
-        a.hold_start_seconds != b.hold_start_seconds || a.hold_end_seconds != b.hold_end_seconds)
+    if (!reach_motion_same_epoch(a, b))
         return REACH_INVALID_ARGUMENT;
+    if (!reach_motion_remove_inactive_limits(&a) || !reach_motion_remove_inactive_limits(&b) ||
+        a.mapping_extra_count != 0 || b.mapping_extra_count != 0)
+        return reach_motion_compose(*first, first_factor, *second, second_factor, offset, 0,
+                                    out_motion);
     if (!a.has_mapping && !b.has_mapping)
     {
         reach_motion result = a;
@@ -244,7 +525,8 @@ reach_result reach_motion_combine(const reach_motion *first, float first_factor,
     if (!a.has_mapping)
         return reach_motion_combine(&b, second_factor, &a, first_factor, offset, out_motion);
     if (b.has_mapping && (a.from != b.from || a.to != b.to || a.mapping_center != b.mapping_center))
-        return REACH_INVALID_ARGUMENT;
+        return reach_motion_compose(*first, first_factor, *second, second_factor, offset, 0,
+                                    out_motion);
     float slope = (b.to - b.from) / (a.to - a.from);
     float b_value = b.has_mapping ? b.mapping_value : b.from + slope * (a.mapping_center - a.from);
     reach_motion result = a;
@@ -265,9 +547,19 @@ static bool reach_motion_travels(const reach_motion *motion)
     float to = reach_motion_limit(motion, motion->to);
     if (from != to)
         return true;
-    return motion->has_mapping && motion->mapping_center > fminf(motion->from, motion->to) &&
-           motion->mapping_center < fmaxf(motion->from, motion->to) &&
-           reach_motion_limit(motion, motion->mapping_center) != from;
+    if (!motion->has_mapping)
+        return false;
+    if (motion->mapping_center > fminf(motion->from, motion->to) &&
+        motion->mapping_center < fmaxf(motion->from, motion->to) &&
+        reach_motion_limit(motion, motion->mapping_center) != from)
+        return true;
+    for (int32_t at = 0; at < motion->mapping_extra_count && at < REACH_MOTION_MAX_EXTRA_KNOTS;
+         ++at)
+        if (motion->mapping_extra_centers[at] > fminf(motion->from, motion->to) &&
+            motion->mapping_extra_centers[at] < fmaxf(motion->from, motion->to) &&
+            reach_motion_limit(motion, motion->mapping_extra_centers[at]) != from)
+            return true;
+    return false;
 }
 
 reach_motion reach_motion_clamp(const reach_motion *motion, float minimum, float maximum)
@@ -297,10 +589,9 @@ size_t reach_motion_compile_at(const reach_motion *motion, double now_seconds,
 {
     if (motion == nullptr || segments == nullptr || !isfinite(now_seconds) ||
         !isfinite(motion->started_seconds) || !isfinite(motion->duration_seconds) ||
-        !isfinite(motion->from) || !isfinite(motion->to) ||
-        (motion->has_mapping &&
-         (!isfinite(motion->mapping_center) || !isfinite(motion->mapping_left_slope) ||
-          !isfinite(motion->mapping_right_slope) || !isfinite(motion->mapping_value))))
+        !isfinite(motion->from) || !isfinite(motion->to) || !reach_motion_mapping_valid(motion) ||
+        (motion->has_limits && (!isfinite(motion->minimum) || !isfinite(motion->maximum) ||
+                                motion->minimum > motion->maximum)))
         return 0;
     double elapsed = fmax(0.0, now_seconds - motion->started_seconds);
     double duration = motion->duration_seconds;
@@ -325,30 +616,11 @@ size_t reach_motion_compile_at(const reach_motion *motion, double now_seconds,
                 boundaries[boundary_count++] = at;
         }
     };
-    if (motion->has_mapping)
-        add_boundary(motion->mapping_center);
-    if (motion->has_limits)
-    {
-        float limits[] = {motion->minimum, motion->maximum};
-        for (float limit : limits)
-        {
-            if (!motion->has_mapping)
-                add_boundary(limit);
-            else
-            {
-                float slopes[] = {motion->mapping_left_slope, motion->mapping_right_slope};
-                for (size_t side = 0; side < 2; ++side)
-                    if (slopes[side] != 0)
-                    {
-                        double value = motion->mapping_center +
-                                       ((double)limit - motion->mapping_value) / slopes[side];
-                        if (side == 0 ? value <= motion->mapping_center
-                                      : value >= motion->mapping_center)
-                            add_boundary(value);
-                    }
-            }
-        }
-    }
+    reach_motion_boundaries raw_boundaries = {};
+    if (!reach_motion_raw_boundaries(*motion, raw_boundaries))
+        return 0;
+    for (size_t at = 0; at < raw_boundaries.count; ++at)
+        add_boundary(raw_boundaries.values[at]);
     for (size_t index = 1; index < boundary_count; ++index)
     {
         double value = boundaries[index];
@@ -400,13 +672,8 @@ size_t reach_motion_compile_at(const reach_motion *motion, double now_seconds,
                                                          d * end_t * end_t * end_t)));
         double multiplier = 1;
         double offset = 0;
-        if (motion->has_mapping)
-        {
-            multiplier = middle_value < motion->mapping_center ? motion->mapping_left_slope
-                                                               : motion->mapping_right_slope;
-            offset = motion->mapping_value - multiplier * motion->mapping_center;
-            middle_value = middle_value * multiplier + offset;
-        }
+        reach_motion_line(*motion, middle_value, multiplier, offset);
+        middle_value = middle_value * multiplier + offset;
         if (motion->has_limits &&
             (middle_value <= motion->minimum || middle_value >= motion->maximum))
             segment.value = fminf(motion->maximum, fmaxf(motion->minimum, (float)middle_value));
@@ -464,6 +731,9 @@ reach_motion_compile_repeat_at(const reach_motion *motion, double now_seconds,
     double cycle = reach_motion_cycle_seconds(motion);
     if (cycle <= 0 || segments == nullptr || !isfinite(now_seconds) ||
         !isfinite(motion->started_seconds) || !isfinite(motion->from) || !isfinite(motion->to) ||
+        !reach_motion_mapping_valid(motion) ||
+        (motion->has_limits && (!isfinite(motion->minimum) || !isfinite(motion->maximum) ||
+                                motion->minimum > motion->maximum)) ||
         !reach_motion_travels(motion))
         return 0;
     double phase = fmod(fmax(0.0, now_seconds - motion->started_seconds), cycle);

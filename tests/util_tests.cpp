@@ -321,14 +321,15 @@ static void test_hinge_motion_and_same_epoch_combination(void)
            "different clocks are rejected instead of approximated");
     other = reach_motion_clamp(&width, 200, 500);
     expect(reach_motion_hinge(&other, 320, 160, 0.5f, 0, &result) == REACH_INVALID_ARGUMENT &&
-               reach_motion_combine(&focus, 1, &other, 1, 0, &result) == REACH_INVALID_ARGUMENT,
-           "active input clamps cannot silently become a different curve");
+               reach_motion_combine(&focus, 1, &other, 1, 0, &result) == REACH_OK,
+           "paired output clamps compose exactly while nested input mapping stays unsupported");
     other = reach_motion_clamp(&width, 100, 700);
     expect(reach_motion_hinge(&other, 320, 160, 0.5f, 0, &result) == REACH_OK,
            "inactive input clamps can be removed exactly");
     expect(reach_motion_hinge(&width, 400, 200, 0.5f, 0, &other) == REACH_OK &&
-               reach_motion_combine(&focus, 1, &other, 1, 0, &result) == REACH_INVALID_ARGUMENT,
-           "different breakpoints require a richer representation and are rejected");
+               reach_motion_combine(&focus, 1, &other, 1, 0, &result) == REACH_OK &&
+               result.mapping_extra_count == 1,
+           "different breakpoints compose through bounded canonical mapping");
     reach_motion_set(&other, 7);
     expect(reach_motion_combine(&focus, 1, &other, 2, 3, &result) == REACH_OK &&
                reach_motion_value_at(&result, 11) == reach_motion_value_at(&focus, 11) + 17,
@@ -341,6 +342,165 @@ static void test_hinge_motion_and_same_epoch_combination(void)
     other.mapping_value = NAN;
     expect(reach_motion_range(&other, &minimum, &maximum) == REACH_INVALID_ARGUMENT,
            "malformed mappings cannot pass geometry validation through masked NaNs");
+}
+
+static void test_composed_fitting_motion_preserves_constraints(void)
+{
+    for (int easing = REACH_EASING_EASE_IN; easing <= REACH_EASING_EASE_IN_OUT; ++easing)
+        for (int reverse = 0; reverse < 2; ++reverse)
+        {
+            reach_motion progress = {}, body = {};
+            reach_motion_start_at(&progress, reverse ? 1 : 0, reverse ? 0 : 1, 2,
+                                  (reach_easing)easing, 10);
+            reach_motion width = reach_motion_affine(&progress, 644, 96);
+            expect(reach_motion_hinge(&width, 148, 736, -0.5f, -1, &body) == REACH_OK,
+                   "monitor edge placement derives from the width epoch");
+            body = reach_motion_clamp(&body, 116, 884);
+            reach_motion fit = reach_motion_affine(&width, 1.0f / 700, -26.0f / 700);
+            fit = reach_motion_clamp(&fit, 0, 1);
+            reach_motion reflow = reach_motion_affine(&progress, -360, 360);
+            reach_motion position = {}, upper = {};
+            expect(reach_motion_combine(&body, 1, &fit, 180, 13, &position) == REACH_OK &&
+                       reach_motion_combine(&position, 1, &reflow, 1, 0, &position) == REACH_OK &&
+                       reach_motion_combine(&body, 1, &width, 1, -13, &upper) == REACH_OK &&
+                       reach_motion_combine(&upper, 1, &fit, -220, 0, &upper) == REACH_OK,
+                   "placement fitting and reflow share one exact descriptor");
+            reach_motion lower = reach_motion_affine(&body, 1, 13);
+            expect(reach_motion_max(&position, &lower, &position) == REACH_OK &&
+                       reach_motion_min(&position, &upper, &position) == REACH_OK,
+                   "moving viewport bounds constrain reflow without a sampled frame loop");
+            for (double elapsed : {0.0, 0.3, 1.0, 1.9})
+            {
+                reach_motion_segment pieces[REACH_MOTION_MAX_SEGMENTS] = {};
+                size_t count = reach_motion_compile_at(&position, 10 + elapsed, pieces);
+                expect(count > 0 && count <= REACH_MOTION_MAX_SEGMENTS,
+                       "composed fitting compiles to bounded native polynomials");
+                for (size_t at = 0; at < count; ++at)
+                    for (int sample = 0; sample <= 20; ++sample)
+                    {
+                        auto piece = pieces[at];
+                        double t = (piece.end - piece.start) * sample / 20;
+                        double now = 10 + elapsed + piece.start + t;
+                        float p = reach_motion_value_at(&progress, now), w = 96 + 644 * p;
+                        float x = fmaxf(116, fminf(884, w <= 148 ? 810 - w * 0.5f : 884 - w));
+                        float scale = fminf(1, fmaxf(0, (w - 26) / 700));
+                        float expected = fminf(x + w - 13 - 220 * scale,
+                                               fmaxf(x + 13, x + 13 + 180 * scale + 360 * (1 - p)));
+                        double native = piece.value + piece.linear * t + piece.quadratic * t * t +
+                                        piece.cubic * t * t * t;
+                        expect(fabs(native - expected) < 0.001 &&
+                                   fabsf(reach_motion_value_at(&position, now) - expected) < 0.001f,
+                               "GPU polynomial and CPU projection match independent fitting math");
+                    }
+            }
+        }
+}
+
+static void test_composed_periodic_motion_preserves_phase(void)
+{
+    for (int easing = REACH_EASING_EASE_IN; easing <= REACH_EASING_EASE_IN_OUT; ++easing)
+    {
+        reach_motion progress = {}, first = {}, second = {}, combined = {};
+        reach_motion_repeat_at(&progress, 0, 1, 1, 0.1, 0.2, (reach_easing)easing, 10);
+        expect(reach_motion_peak(&progress, 0.25f, 0.2f, &first) == REACH_OK &&
+                   reach_motion_peak(&progress, 0.7f, 0.2f, &second) == REACH_OK &&
+                   reach_motion_combine(&first, 1, &second, 1, 0, &combined) == REACH_OK,
+               "multiple periodic peaks share one canonical phase");
+        expect(combined.mapping_extra_count > 0 && reach_motion_active_at(&combined, 10) &&
+                   reach_motion_value_at(&combined, 10) == 0,
+               "equal visible endpoints retain interior multi-knot activity");
+        for (double elapsed : {0.0, 0.37, 1.1, 1.23, 1.9, 2.29, 9.7})
+        {
+            reach_motion_segment pieces[REACH_MOTION_MAX_REPEAT_SEGMENTS] = {};
+            size_t count = reach_motion_compile_repeat_at(&combined, 10 + elapsed, pieces);
+            expect(count > 0 && count <= REACH_MOTION_MAX_REPEAT_SEGMENTS,
+                   "rotated multi-knot cycles stay within compiler capacity");
+            for (size_t at = 0; at < count; ++at)
+                for (int sample = 0; sample <= 10; ++sample)
+                {
+                    auto piece = pieces[at];
+                    double t = (piece.end - piece.start) * sample / 10;
+                    double now = 10 + elapsed + piece.start + t;
+                    float p = reach_motion_value_at(&progress, now);
+                    float expected = fmaxf(0, 1 - fabsf(p - 0.25f) / 0.2f) +
+                                     fmaxf(0, 1 - fabsf(p - 0.7f) / 0.2f);
+                    double native = piece.value + piece.linear * t + piece.quadratic * t * t +
+                                    piece.cubic * t * t * t;
+                    expect(fabs(native - expected) < 0.00001 &&
+                               fabsf(reach_motion_value_at(&combined, now) - expected) < 0.00001f,
+                           "periodic GPU pieces preserve both peaks and endpoint holds");
+                }
+        }
+        double wait = reach_motion_time_to_value_at(&combined, 0.5f, 10);
+        expect(wait > 0 && wait < 1.1 &&
+                   fabsf(reach_motion_value_at(&combined, 10 + wait) - 0.5f) < 0.00001f,
+               "crossing queries find the first future composed peak");
+        float interrupted = reach_motion_value_at(&combined, 10.4);
+        reach_motion_animate_to_at(&combined, 0, 0.2, REACH_EASING_EASE_OUT, 10.4);
+        expect(combined.from == interrupted && !combined.repeating && !combined.has_mapping &&
+                   combined.mapping_extra_count == 0,
+               "retarget retires composed repetition continuously");
+    }
+}
+
+static void test_composed_motion_capacity_and_identity(void)
+{
+    reach_motion source = {}, combined = {}, hinge = {};
+    reach_motion_start_at(&source, 0, 1, 1, REACH_EASING_EASE_IN_OUT, 10);
+    reach_motion_set(&combined, 0);
+    for (int knot = 1; knot <= REACH_MOTION_MAX_EXTRA_KNOTS + 1; ++knot)
+    {
+        expect(reach_motion_hinge(&source, knot * 0.1f, 0, 0, 1, &hinge) == REACH_OK &&
+                   reach_motion_combine(&combined, 1, &hinge, 1, 0, &combined) == REACH_OK,
+               "bounded knot capacity accepts exact in-place composition");
+    }
+    expect(combined.mapping_extra_count == REACH_MOTION_MAX_EXTRA_KNOTS,
+           "full mapping capacity is represented explicitly");
+    reach_motion unchanged = combined;
+    expect(reach_motion_hinge(&source, 0.9f, 0, 0, 1, &hinge) == REACH_OK &&
+               reach_motion_combine(&combined, 1, &hinge, 1, 0, &combined) ==
+                   REACH_INVALID_ARGUMENT &&
+               reach_motion_equal(&combined, &unchanged),
+           "excess knots reject without changing aliased output");
+    reach_motion_segment pieces[REACH_MOTION_MAX_SEGMENTS] = {};
+    expect(reach_motion_compile_at(&combined, 10, pieces) > 0,
+           "full mapping capacity compiles within the finite bound");
+    unchanged.mapping_extra_deltas[0] += 1;
+    expect(!reach_motion_equal(&combined, &unchanged),
+           "active extra knots participate in retained intent identity");
+    unchanged = source;
+    unchanged.mapping_extra_centers[0] = NAN;
+    unchanged.mapping_extra_deltas[0] = NAN;
+    expect(reach_motion_equal(&source, &unchanged),
+           "unused mapping storage does not invalidate unchanged retained intent");
+    float low = 0, high = 0;
+    for (int invalid = 0; invalid < 3; ++invalid)
+    {
+        unchanged = combined;
+        if (invalid == 0)
+            unchanged.mapping_extra_count = REACH_MOTION_MAX_EXTRA_KNOTS + 1;
+        else if (invalid == 1)
+            unchanged.mapping_extra_centers[0] = unchanged.mapping_center;
+        else
+            unchanged.mapping_extra_deltas[0] = NAN;
+        expect(reach_motion_range(&unchanged, &low, &high) == REACH_INVALID_ARGUMENT &&
+                   reach_motion_compile_at(&unchanged, 10, pieces) == 0,
+               "malformed compound metadata is rejected before compilation");
+        unchanged.repeating = 1;
+        reach_motion_segment repeated[REACH_MOTION_MAX_REPEAT_SEGMENTS] = {};
+        expect(reach_motion_compile_repeat_at(&unchanged, 10, repeated) == 0,
+               "malformed cycles cannot compile only their endpoint holds");
+    }
+    reach_motion independent = source;
+    unchanged = source;
+    unchanged.mapping_extra_count = 1;
+    expect(reach_motion_hinge(&unchanged, 0.5f, 0, 0, 1, &hinge) == REACH_INVALID_ARGUMENT &&
+               reach_motion_peak(&unchanged, 0.5f, 0.2f, &hinge) == REACH_INVALID_ARGUMENT,
+           "mapping constructors reject orphaned compound metadata");
+    independent.started_seconds += 0.01;
+    expect(reach_motion_min(&combined, &independent, &unchanged) == REACH_INVALID_ARGUMENT &&
+               reach_motion_max(&combined, &independent, &unchanged) == REACH_INVALID_ARGUMENT,
+           "moving constraints cannot silently mix animation epochs");
 }
 
 static void test_motion_equality_preserves_identity_without_padding(void)
@@ -380,6 +540,9 @@ static void test_motion_equality_preserves_identity_without_padding(void)
 
 int main(void)
 {
+    test_composed_periodic_motion_preserves_phase();
+    test_composed_motion_capacity_and_identity();
+    test_composed_fitting_motion_preserves_constraints();
     test_hinge_motion_and_same_epoch_combination();
     test_peak_motion_compilation_and_crossings();
     test_motion_equality_preserves_identity_without_padding();

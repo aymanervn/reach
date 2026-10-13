@@ -115,6 +115,14 @@ support expectation is explicitly resolved.
     consume the limits; the old adapter-local compiler is removed. Debug builds, all 39 tests and
     five full native runs per backend plus HWND fallback pass. Quick Settings height/section
     integration is implemented; displayed-pixel/product-performance acceptance remains pending.
+  - [x] Support exact same-epoch fitting and moving viewport constraints in canonical motion.
+    Bounded multi-knot maps combine active clamps, different breakpoints and moving min/max bounds;
+    both compositors and CPU input/fallback reuse the existing compiler and owner. Independent
+    fitting and periodic/capacity tests pass. Both builds, all 40 test groups and five full native
+    runs per backend plus fallback pass in Debug/Release. Reversal reuses rasters/tree; settled and
+    repeated intent submits no properties; hiding retires periodic bindings. Descriptor memory
+    cost is recorded in the workload baseline. Complete Dock/Switcher consumer integration,
+    compact shadows, title trimming and total product workload acceptance remain open.
 - [ ] Separate content/layout invalidation, compositor submission, native placement and input updates
   in both application loops; pure compositor motion must not request periodic application frames.
   - [x] Separate native preview root-presentation sampling from retained content frames.
