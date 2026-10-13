@@ -1153,11 +1153,11 @@ static bool text_snap_transform(const reach_render_group &group)
         return motion.generation == 0 ||
                (motion.duration_seconds <= 0
                     ? reach_motion_value_at(&motion, 0) == 1
-                    : !motion.has_peak && motion.from == 1 && motion.to == 1);
+                    : !motion.has_mapping && motion.from == 1 && motion.to == 1);
     };
     return unit(group.scale) && unit(reach_render_group_y_scale(&group)) &&
            (group.x.generation == 0 ||
-            (!group.x.has_peak && group.x.from == 0 && group.x.to == 0)) &&
+            (!group.x.has_mapping && group.x.from == 0 && group.x.to == 0)) &&
            group.repeat_travel_seconds <= 0;
 }
 

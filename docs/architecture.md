@@ -426,11 +426,13 @@ scroll and native choreography timing remain separate migration responsibilities
 Switcher width preserves pre-sample activity when deciding redraw, so a late
 wake still publishes the terminal visual state after sampling clears its active flag.
 
-Canonical motion also supports a bounded peak mapping through `reach_motion_peak`: the same source
-position can brighten and dim a label while retaining its epoch, easing and generation. Mapping
-is followed by output limits and can be transformed affinely. Input limits are accepted only when
-they enclose the complete peak support; nested peaks and narrower input clamps are rejected.
-The shared compiler splits at the peak and clamp crossings into at most eight finite pieces or
+Canonical motion supports a two-slope mapping through `reach_motion_hinge`, preserving its epoch,
+easing and generation. `reach_motion_peak` uses it to brighten and dim a label. Mapping is followed
+by output limits and can be transformed affinely. Peak input limits must enclose its support;
+general hinges require inactive input limits. Nested mappings are rejected. `reach_motion_combine`
+adds compatible same-epoch properties and constants without a second animation owner, rejecting
+active input clamps and incompatible breakpoints. `reach_motion_range` includes interior extrema.
+The shared compiler splits at the mapping center and clamp crossings into at most eight finite pieces or
 twenty rotated-cycle pieces; both native backends consume those same cubic segments. Crossing
 queries find the first future crossing on either slope, and equal visible endpoints do not suppress
 an intervening periodic peak. Retarget the source intent and derive mapped properties again.
@@ -541,15 +543,19 @@ values, and fixed-cap dimension normalization preserves the same limits. Retarge
 bounded visible value before starting a new ordinary intent. This shared curve capability preserves
 delayed/saturated section fades; complete reveal consumer integration remains migration work.
 
-`reach_render_push_stretched_chrome` partitions fixed raster source bounds into up to nine retained
+`reach_render_push_stretched_chrome` partitions fixed raster source bounds into up to fifteen retained
 groups. Corners retain unit scale, straight edges stretch on one axis and the center stretches on
 both. Canonical dimension motion determines patch placement and scaling about a declared anchor;
 source crops remain unchanged during resize and reversal. Geometry and source-content validation
-reject insufficient corner/shadow caps, compact destinations, text/icons and horizontal notch
-stretching before modifying the command buffer. Physical source coordinates and caps are integer
-pixels. `reach_render_stretch_patch` exposes the same pure geometry for deterministic sampling.
-This shared primitive is implemented; complete popup/section consumers and small-shape or
-horizontal-notch capabilities remain migration work. See `docs/gpu-resize-reveal-design.md`.
+reject insufficient corner/shadow caps, compact destinations and text/icons before modifying the
+command buffer. Ordinary chrome uses three columns; focal chrome uses five, retaining a rigid
+central feature while its straight shoulders stretch independently. Horizontal notches must fit
+that focal band or a fixed edge cap, including shadow coverage. Physical source coordinates and
+caps are integer pixels. `reach_render_stretch_patch` exposes deterministic geometry and its count
+API exposes the nine/fifteen ID allocation. Dimensions validate their full mapped ranges.
+`reach_popup_width_motion` shares monitor-constrained body/notch intent with event-time placement.
+Complete popup/section consumers, overlapping-cap transitions and small animated shapes remain
+migration work. See `docs/gpu-resize-reveal-design.md`.
 
 Explicit render groups can tint their rasterized alpha coverage with four normalized RGBA motion
 channels. Windows Composition retains a surface mask, color brush and property-set expression;

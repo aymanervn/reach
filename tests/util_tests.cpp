@@ -262,6 +262,87 @@ static void test_peak_motion_compilation_and_crossings(void)
            "unsupported nested mapping and invalid peak radius are rejected");
 }
 
+static void test_hinge_motion_and_same_epoch_combination(void)
+{
+    for (int easing = REACH_EASING_EASE_IN; easing <= REACH_EASING_EASE_IN_OUT; ++easing)
+        for (int reverse = 0; reverse < 2; ++reverse)
+        {
+            reach_motion width = {}, focus = {}, shoulder = {};
+            reach_motion_start_at(&width, reverse ? 600 : 180, reverse ? 180 : 600, 2,
+                                  (reach_easing)easing, 10);
+            expect(reach_motion_hinge(&width, 320, 160, 0.5f, 0, &focus) == REACH_OK &&
+                       reach_motion_combine(&width, 1, &focus, -1, -30, &shoulder) == REACH_OK,
+                   "fixed focus and stretch shoulder derive from one width epoch");
+            expect(shoulder.generation == width.generation &&
+                       shoulder.started_seconds == width.started_seconds &&
+                       shoulder.duration_seconds == width.duration_seconds,
+                   "combination preserves original generation and physical timeline");
+            float minimum = 0, maximum = 0;
+            expect(reach_motion_range(&shoulder, &minimum, &maximum) == REACH_OK && minimum == 60 &&
+                       maximum == 410,
+                   "derived resize range covers both sides of the focus breakpoint");
+            reach_motion limited = reach_motion_clamp(&shoulder, 90, 350);
+            for (double elapsed : {0.0, 0.3, 1.0, 1.9})
+            {
+                reach_motion_segment pieces[REACH_MOTION_MAX_SEGMENTS] = {};
+                size_t count = reach_motion_compile_at(&limited, 10 + elapsed, pieces);
+                expect(count > 0 && count <= REACH_MOTION_MAX_SEGMENTS,
+                       "hinge and output clamps fit the existing bounded compiler");
+                for (size_t index = 0; index < count; ++index)
+                    for (int sample = 0; sample <= 20; ++sample)
+                    {
+                        auto piece = pieces[index];
+                        double t = (piece.end - piece.start) * sample / 20;
+                        double now = 10 + elapsed + piece.start + t;
+                        float w = reach_motion_value_at(&width, now);
+                        float expected = fminf(350, fmaxf(90, w - fminf(w / 2, 160) - 30));
+                        double actual = piece.value + piece.linear * t + piece.quadratic * t * t +
+                                        piece.cubic * t * t * t;
+                        expect(fabs(actual - expected) < 0.0002 &&
+                                   fabsf(reach_motion_value_at(&limited, now) - expected) < 0.0002f,
+                               "native resize pieces match independent geometry on both slopes");
+                    }
+            }
+            reach_motion doubled = {};
+            expect(reach_motion_combine(&focus, 2, &focus, -1, 4, &doubled) == REACH_OK,
+                   "matching mapped properties combine exactly");
+            for (double now : {10.0, 10.4, 11.0, 11.9, 12.0})
+                expect(fabsf(reach_motion_value_at(&doubled, now) -
+                             reach_motion_value_at(&focus, now) - 4) < 0.0001f,
+                       "mapped combination preserves pointwise values");
+        }
+    reach_motion width = {}, focus = {}, other = {}, result = {};
+    reach_motion_start_at(&width, 180, 600, 2, REACH_EASING_EASE_IN_OUT, 10);
+    expect(reach_motion_hinge(&width, 320, 160, 0.5f, 0, &focus) == REACH_OK,
+           "valid hinge construction");
+    other = width;
+    other.started_seconds += 0.01;
+    expect(reach_motion_combine(&focus, 1, &other, 1, 0, &result) == REACH_INVALID_ARGUMENT,
+           "different clocks are rejected instead of approximated");
+    other = reach_motion_clamp(&width, 200, 500);
+    expect(reach_motion_hinge(&other, 320, 160, 0.5f, 0, &result) == REACH_INVALID_ARGUMENT &&
+               reach_motion_combine(&focus, 1, &other, 1, 0, &result) == REACH_INVALID_ARGUMENT,
+           "active input clamps cannot silently become a different curve");
+    other = reach_motion_clamp(&width, 100, 700);
+    expect(reach_motion_hinge(&other, 320, 160, 0.5f, 0, &result) == REACH_OK,
+           "inactive input clamps can be removed exactly");
+    expect(reach_motion_hinge(&width, 400, 200, 0.5f, 0, &other) == REACH_OK &&
+               reach_motion_combine(&focus, 1, &other, 1, 0, &result) == REACH_INVALID_ARGUMENT,
+           "different breakpoints require a richer representation and are rejected");
+    reach_motion_set(&other, 7);
+    expect(reach_motion_combine(&focus, 1, &other, 2, 3, &result) == REACH_OK &&
+               reach_motion_value_at(&result, 11) == reach_motion_value_at(&focus, 11) + 17,
+           "constant terms do not require clock ownership");
+    float minimum = 0, maximum = 0;
+    expect(reach_motion_hinge(&width, 320, 0, -1, 1, &other) == REACH_OK &&
+               reach_motion_range(&other, &minimum, &maximum) == REACH_OK && minimum == 0 &&
+               maximum == 280,
+           "range includes interior extrema rather than just endpoints");
+    other.mapping_value = NAN;
+    expect(reach_motion_range(&other, &minimum, &maximum) == REACH_INVALID_ARGUMENT,
+           "malformed mappings cannot pass geometry validation through masked NaNs");
+}
+
 static void test_motion_equality_preserves_identity_without_padding(void)
 {
     reach_motion first = {};
@@ -290,7 +371,7 @@ static void test_motion_equality_preserves_identity_without_padding(void)
                !reach_motion_equal(&first, &second),
            "peak mapping remains part of canonical intent identity");
     first = second;
-    second.peak_center += 0.1f;
+    second.mapping_center += 0.1f;
     expect(!reach_motion_equal(&first, &second),
            "changed peak geometry invalidates retained properties");
     second = reach_motion_clamp(&first, 0.2f, 0.8f);
@@ -299,6 +380,7 @@ static void test_motion_equality_preserves_identity_without_padding(void)
 
 int main(void)
 {
+    test_hinge_motion_and_same_epoch_combination();
     test_peak_motion_compilation_and_crossings();
     test_motion_equality_preserves_identity_without_padding();
     test_motion_retarget_uses_one_event_time();

@@ -64,6 +64,9 @@ extern "C"
         float anchor_y;
         reach_motion width;
         reach_motion height;
+        float focal_left;
+        float focal_right;
+        reach_motion focal_x;
     } reach_render_stretch;
 
     typedef enum reach_render_command_type
@@ -245,6 +248,7 @@ extern "C"
     reach_motion reach_render_group_y_scale(const reach_render_group *group);
     reach_point_f32 reach_render_group_scale_at(const reach_render_group *group,
                                                 double now_seconds);
+    size_t reach_render_stretch_patch_count(const reach_render_stretch *stretch);
     reach_result reach_render_stretch_patch(const reach_render_group *source,
                                             const reach_render_stretch *stretch, size_t patch_index,
                                             reach_render_group *out_patch);

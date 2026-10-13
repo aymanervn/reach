@@ -139,6 +139,67 @@ reach_result reach_popup_height_motion(const reach_popup_anchor *anchor, float w
     return REACH_OK;
 }
 
+reach_result reach_popup_width_motion(const reach_popup_anchor *anchor, const reach_motion *width,
+                                      float height, float margin, float dpi_scale,
+                                      reach_rect_motion *out_bounds, reach_motion *out_notch_center)
+{
+    if (anchor == nullptr || width == nullptr || out_bounds == nullptr ||
+        out_notch_center == nullptr || width->generation == 0 || width->has_mapping ||
+        !isfinite(height) || height <= 0 || !isfinite(margin) || margin < 0 ||
+        !isfinite(dpi_scale) || dpi_scale <= 0 || !isfinite(anchor->button.x) ||
+        !isfinite(anchor->button.width) || !isfinite(anchor->monitor.x) ||
+        !isfinite(anchor->monitor.y) || !isfinite(anchor->monitor.width) ||
+        !isfinite(anchor->monitor.height) || !isfinite(anchor->bar_edge_y))
+        return REACH_INVALID_ARGUMENT;
+    reach_rect_motion result = {};
+    result.width = *width;
+    bool constrained = anchor->monitor.width > 0 && anchor->monitor.height > 0;
+    float horizontal_margin = margin * 2 < anchor->monitor.width ? margin : 0;
+    float left = anchor->monitor.x + horizontal_margin;
+    float right = anchor->monitor.x + anchor->monitor.width - horizontal_margin;
+    if (constrained)
+        result.width = reach_motion_clamp(width, 0, right - left);
+    float minimum = 0, maximum = 0;
+    if (reach_motion_range(&result.width, &minimum, &maximum) != REACH_OK || minimum <= 0)
+        return REACH_INVALID_ARGUMENT;
+    reach_popup_placement narrow = reach_popup_place(anchor, minimum, height, margin);
+    reach_popup_placement wide = reach_popup_place(anchor, maximum, height, margin);
+    reach_motion raw_width = *width;
+    raw_width.has_limits = 0;
+    float owner = anchor->button.x + anchor->button.width * 0.5f;
+    bool near_left = !constrained || owner <= (left + right) * 0.5f;
+    if (near_left)
+        result.x = reach_motion_affine(&raw_width, -0.5f, owner);
+    else
+    {
+        float threshold = 2 * (right - owner);
+        if (reach_motion_hinge(&raw_width, threshold, right - threshold, -0.5f, -1, &result.x) !=
+            REACH_OK)
+            return REACH_INVALID_ARGUMENT;
+    }
+    result.x = reach_motion_clamp(&result.x, fminf(narrow.bounds.x, wide.bounds.x),
+                                  fmaxf(narrow.bounds.x, wide.bounds.x));
+    reach_motion_set(&result.y, narrow.bounds.y);
+    reach_motion_set(&result.height, narrow.bounds.height);
+    float clearance = reach_popup_radius_scaled(reach_theme_default(), dpi_scale) +
+                      reach_popup_notch_width_scaled(dpi_scale);
+    float distance =
+        constrained ? fmaxf(clearance, near_left ? owner - left : right - owner) : maximum;
+    reach_motion notch = {};
+    if (reach_motion_hinge(&raw_width, 2 * distance, distance, 0.5f, near_left ? 0 : 1, &notch) !=
+        REACH_OK)
+        return REACH_INVALID_ARGUMENT;
+    float narrow_notch = reach_popup_clamp_notch_center_scaled(owner - narrow.bounds.x,
+                                                               narrow.bounds.width, dpi_scale);
+    float wide_notch =
+        reach_popup_clamp_notch_center_scaled(owner - wide.bounds.x, wide.bounds.width, dpi_scale);
+    notch = reach_motion_clamp(&notch, fminf(narrow_notch, wide_notch),
+                               fmaxf(narrow_notch, wide_notch));
+    *out_bounds = result;
+    *out_notch_center = notch;
+    return REACH_OK;
+}
+
 float reach_popup_notch_width(void)
 {
     return 18.0f;

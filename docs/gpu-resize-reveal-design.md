@@ -1,6 +1,6 @@
 # GPU resize and reveal
 
-Status: fixed-cap chrome, bounded curves, viewport/content hierarchy and animated group insets implemented; complete feature consumers and the
+Status: fixed-cap and focal chrome, bounded curves, viewport/content hierarchy and animated group insets implemented; complete feature consumers and the
 remaining compact-shape/notched-width capabilities are pending. This does not close the migration
 capability or final performance gates.
 
@@ -8,7 +8,8 @@ capability or final performance gates.
 
 Resize eligible chrome through retained patches over a fixed raster source. Keep content in its own
 unscaled groups, using existing movement, opacity, tint and viewport descriptors for reveal.
-`reach_render_push_stretched_chrome` partitions a source into at most nine ordered groups. The four
+`reach_render_push_stretched_chrome` partitions a source into nine ordered groups, or fifteen when
+an independent fixed-width focal band is declared. The four
 corners keep their pixels, straight edges stretch only along their length and the center stretches
 on both axes. No text, icons or live thumbnails enter the stretched source.
 
@@ -20,7 +21,15 @@ projection use one sample time, and native envelopes accommodate both axes.
 The stretch descriptor owns dimension curves, fixed source insets and normalized X/Y anchors.
 Left/top anchors are 0, centers are 0.5 and right/bottom anchors are 1. Dimension changes derive each
 patch's displacement and scale, preserving the declared anchor through interrupted growth or
-shrink. Stable IDs occupy the source ID through source ID + 8. Empty edge/corner patches are skipped.
+shrink. Stable IDs occupy the source ID through source ID + 8, or + 14 for focal chrome.
+`reach_render_stretch_patch_count` exposes that allocation. Empty edge/corner patches are skipped.
+
+Optional integer `focal_left`/`focal_right` source boundaries retain a notch or another rigid feature.
+`focal_x` describes its destination center relative to the resized source's left edge. The five
+columns keep both corners and the focal band rigid while stretching the two straight shoulders.
+An unchanged height can use zero top/bottom caps, producing only five actual groups. A notch held
+entirely inside a near/far cap can instead use the ordinary three-column layout. Validation includes
+its shadow footprint. Overlapping independent caps or nonpositive shoulder ranges remain rejected.
 
 Physical source coordinates, dimensions and insets must be integer pixels. Scale DPI metrics and
 resolve pixel-aligned source chrome before publishing it; do not treat these as fixed DP values.
@@ -30,8 +39,8 @@ layout and preserve the feature's final border alignment.
 The source is rasterized once per content/theme/font/DPI/source-geometry change. Width/height-only
 intent submits native property changes over those cached crops. Existing raster comparison,
 clip/tint ownership, retirement, painter order and renderer memory limits remain canonical. Source
-patch area totals the original source area; there are up to nine native layers and finite property
-curves, not nine full-size copies. CPU owns intent, constraints and input sampling.
+patch area totals the original source area; there are up to fifteen native layers and finite property
+curves, rather than full-source copies. CPU owns intent, constraints and input sampling.
 
 This uses the existing retained renderer on both backends instead of introducing separate brush,
 atlas, effect or clock systems. The additional node and submission cost is bounded, with shared
@@ -45,12 +54,23 @@ or duration. Affine mapping carries and reverses its limits when needed. This pr
 reveal's delayed fade and early saturation: opacity is `clamp((progress - 0.10) / 0.65, 0, 1)`;
 its slide is derived from that bounded opacity, rather than raw progress.
 
-`reach_motion_compile_at` emits at most four cubic/constant segments, split at the easing midpoint
-and limit crossings. Both native backends consume that shared compiler; the old adapter-local
+`reach_motion_compile_at` emits at most eight cubic/constant segments, split at the easing midpoint,
+mapping center and limit crossings. Both native backends consume that shared compiler; the old adapter-local
 compiler is removed. Native final keyframes use bounded endpoints. CPU fallback/input samples the
 same descriptor, and normalized fixed-cap scale carries its bounds without losing exact unit scale.
 Visual saturation does not shorten the owner's completion deadline. Starting or retargeting creates
 a new ordinary intent; a retarget samples the current bounded visible value and clears derived limits.
+
+`reach_motion_hinge` derives two slopes meeting at one center from ordinary canonical intent.
+`reach_motion_peak` uses that representation for a bounded tent. `reach_motion_combine` adds affine
+terms sharing the same clock, easing and generation; constants need no common clock. Active input
+clamps and incompatible mapped breakpoints are rejected instead of approximated. `reach_motion_range`
+includes the interior extremum and output limits; resize validation and scale normalization use it.
+
+`reach_popup_width_motion` derives monitor-clamped body bounds and notch position from one width
+epoch. Its piecewise placement preserves existing `reach_popup_place` geometry at either monitor
+edge, outside anchors, tiny widths and both drop directions. It uses physical margin and DPI metrics;
+rendering, native placement and input consumers still need end-to-end migration.
 
 Pure tests compare all three easings in both directions, mid-flight submission, constant clamps,
 negative affine mapping, retarget continuity and native polynomials against CPU samples. Native
@@ -94,8 +114,9 @@ work, and displayed compositor pixels remain part of final acceptance.
 
 Source-command validation accepts rounded/notched fills and shadows. A moving axis must keep enough
 fixed pixels for every corner and its shadow extent. Source and destination centers remain positive;
-unsupported compact sizes are rejected instead of squeezing corners. Horizontal notch stretching is
-rejected; vertical resize keeps the fixed notch, its corner geometry and its shadow.
+unsupported compact sizes are rejected instead of squeezing corners. Horizontal notch resize
+requires the notch and its shadow to fit a rigid focal band or edge cap; vertical resize keeps the
+fixed notch, its corner geometry and its shadow.
 
 The helper validates capacity, source geometry and stable-ID collisions before appending anything.
 It copies each command with its source crop, intersecting existing scissors, and retains any outer
@@ -108,8 +129,9 @@ fallback renderer behavior; the primitive does not add hardware shadows to a ren
 capability.
 
 Small shapes whose caps would overlap need an appropriate shared native-geometry mechanism or a
-measured, specifically justified CPU responsibility. Horizontal notch motion needs fixed notch
-geometry and anchored/clamped positioning; the current nine-patch helper cannot stretch it safely.
+measured, specifically justified CPU responsibility. Horizontal notch motion uses fixed focal or
+combined edge-cap geometry with anchored/clamped positioning. Transitions across overlapping-cap
+regimes and compact animated chrome remain unresolved.
 Complete popup integration must also preserve monitor clamping, envelope/viewport geometry and
 input alignment. Root presentation clips remain unsupported. Do not assume these remaining cases
 are solved by independent scale alone.
