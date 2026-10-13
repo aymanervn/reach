@@ -979,6 +979,7 @@ static reach_result reach_top_bar_surface_render(void *capsule,
                                                  reach_render_command_buffer *out_commands)
 {
     reach_top_bar_render_context render = {};
+    render.retained_supported = ctx->retained_supported;
     render.theme = ctx->theme;
     render.dpi_scale = ctx->dpi_scale;
     render.icon_size_px = ctx->icon_size_px;

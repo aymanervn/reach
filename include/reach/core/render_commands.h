@@ -50,9 +50,6 @@ extern "C"
         reach_motion tint[REACH_RENDER_COLOR_CHANNEL_COUNT];
         reach_motion tint_rgb_mix;
         reach_color tint_rgb_target;
-        float repeat_offset_x;
-        float repeat_hold_seconds;
-        float repeat_travel_seconds;
     } reach_render_group;
 
     typedef struct reach_render_stretch

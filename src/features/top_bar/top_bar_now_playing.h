@@ -46,6 +46,7 @@ typedef struct reach_top_bar_now_playing_render_input
     const reach_top_bar_now_playing_layout *layout;
     float dpi_scale;
     int32_t animate_text;
+    reach_motion marquee;
 } reach_top_bar_now_playing_render_input;
 
 typedef struct reach_top_bar_now_playing_render_context
@@ -69,6 +70,8 @@ reach_now_playing_action
 reach_top_bar_now_playing_hit_test(const reach_top_bar_now_playing_model *model,
                                    const reach_top_bar_now_playing_layout *layout, int32_t x,
                                    int32_t y);
+void reach_top_bar_now_playing_update_marquee(const reach_top_bar_now_playing_render_input *input,
+                                              reach_motion *motion, double now_seconds);
 reach_result
 reach_top_bar_now_playing_build_render_commands(const reach_top_bar_now_playing_render_input *input,
                                                 reach_render_command_buffer *out_commands);

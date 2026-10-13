@@ -282,6 +282,15 @@ support expectation is explicitly resolved.
     pass; all 40 tests pass in Debug/Release. Preserve the established WUC Bezier and DC smoothstep
     curves. Canonical curve/phase unification, displayed appearance and total workload/power
     acceptance remain open; this audit does not close the shared-motion or repetition gates.
+  - [x] Unify Now Playing marquee curve, phase and lifecycle through canonical repetition.
+    The capsule owns absolute motion; both backends reuse shared piecewise compilation. Remove
+    legacy cycle fields and adapter timing. Preserve logical overflow/speed/holds and unchanged
+    phase; title/extent changes begin a fresh readable hold. Renderer capability keeps unsupported
+    execution static without CPU frames. Both builds/all 40 tests, eighty focused native cases
+    per build, owned media-service/capsule checks and five full regression runs per backend plus
+    fallback pass in Debug/Release. The approved installed-folder restart succeeded and the same
+    host/watchdog PIDs remained alive. Screenshot capture still fails with 0x80070057; displayed
+    appearance and total product/power acceptance remain in the parent gates.
   - [x] Replace frame-rate caret ticking with shared absolute-time deadline scheduling.
     Settings' Account/Power/Wi-Fi fields and Launcher use one pure blink model, preserving their
     duty cycles and immediate focus/edit resets. Late wakes skip missed cycles; hidden pages,

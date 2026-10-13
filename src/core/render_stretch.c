@@ -132,7 +132,7 @@ reach_result reach_render_stretch_patch(const reach_render_group *source,
         !reach_render_stretch_fixed(&source->scale, 1.0f) ||
         !reach_render_stretch_fixed(&source->scale_y, 1.0f) || !isfinite(source->x.to) ||
         !isfinite(source->y.to) || source->x.duration_seconds > 0.0 ||
-        source->y.duration_seconds > 0.0 || source->repeat_travel_seconds > 0.0f)
+        source->y.duration_seconds > 0.0)
         return REACH_INVALID_ARGUMENT;
     source_x[0] = source->bounds.x;
     source_x[1] = source_x[0] + stretch->left;

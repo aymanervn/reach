@@ -60,7 +60,7 @@ static void stop_rounded_clip_motion(reach_d2d_retained_layer &layer)
 static void stop_layer_repetition(reach_render_backend *backend, reach_d2d_retained_layer &layer)
 {
     const reach_render_group &group = layer.group;
-    bool x = group.x.repeating || group.repeat_travel_seconds > 0;
+    bool x = group.x.repeating;
     const reach_motion motions[] = {group.x, group.y, group.opacity, group.scale,
                                     reach_render_group_y_scale(&group)};
     bool active = x || group.tint_rgb_mix.repeating;
@@ -766,7 +766,7 @@ static HRESULT sync_clip(reach_render_backend *backend, reach_d2d_retained_layer
 
 static HRESULT wuc_properties(reach_render_backend *backend, IInspectable *inspectable,
                               const reach_render_group &group, float base_x, float base_y,
-                              bool preserve_repeat = false, unsigned mask = 31)
+                              unsigned mask = 31)
 {
     reach_workload_add(REACH_WORKLOAD_PROPERTY_SUBMISSIONS, 1);
     ComPtr<IVisual> visual;
@@ -792,7 +792,7 @@ static HRESULT wuc_properties(reach_render_backend *backend, IInspectable *inspe
     }
     reach_motion x = reach_motion_affine(&group.x, 1.0f, base_x);
     reach_motion y = reach_motion_affine(&group.y, 1.0f, base_y);
-    if (SUCCEEDED(hr) && !preserve_repeat && (mask & 1))
+    if (SUCCEEDED(hr) && (mask & 1))
         hr = wuc_motion(backend, inspectable, L"Offset.X", x);
     if (SUCCEEDED(hr) && (mask & 2))
         hr = wuc_motion(backend, inspectable, L"Offset.Y", y);
@@ -807,13 +807,11 @@ static HRESULT wuc_properties(reach_render_backend *backend, IInspectable *inspe
 
 static HRESULT dcomp_properties(reach_render_backend *backend, IDCompositionVisual2 *visual,
                                 IDCompositionScaleTransform *scale, const reach_render_group &group,
-                                float base_x, float base_y, bool preserve_repeat = false,
-                                unsigned mask = 31)
+                                float base_x, float base_y, unsigned mask = 31)
 {
     reach_workload_add(REACH_WORKLOAD_PROPERTY_SUBMISSIONS, 1);
-    HRESULT hr = preserve_repeat || !(mask & 1)
-                     ? S_OK
-                     : visual->SetOffsetX(base_x + scalar_value(backend, group.x, 0.0f));
+    HRESULT hr =
+        !(mask & 1) ? S_OK : visual->SetOffsetX(base_x + scalar_value(backend, group.x, 0.0f));
     if (SUCCEEDED(hr) && (mask & 2))
         hr = visual->SetOffsetY(base_y + scalar_value(backend, group.y, 0.0f));
     ComPtr<IDCompositionVisual3> opacity;
@@ -831,7 +829,7 @@ static HRESULT dcomp_properties(reach_render_backend *backend, IDCompositionVisu
     motions[1] = reach_motion_affine(&group.y, 1.0f, base_y);
     for (size_t index = 0; index < 5 && SUCCEEDED(hr); ++index)
     {
-        if ((mask & (1u << index)) == 0 || (index == 0 && preserve_repeat))
+        if ((mask & (1u << index)) == 0)
             continue;
         ComPtr<IDCompositionAnimation> animation;
         HRESULT motion_hr = dcomp_motion(backend, motions[index], &animation);
@@ -1072,81 +1070,6 @@ static HRESULT draw_layer(reach_render_backend *backend, reach_d2d_retained_laye
     return S_OK;
 }
 
-static HRESULT repeat_motion(reach_render_backend *backend, reach_d2d_retained_layer &layer,
-                             const reach_render_group &group, float base_x)
-{
-    float hold = group.repeat_hold_seconds;
-    float travel = group.repeat_travel_seconds;
-    float cycle = 2.0f * (hold + travel);
-    if (travel <= 0.0f || hold < 0.0f || group.repeat_offset_x == 0.0f)
-        return S_OK;
-    reach_workload_add(REACH_WORKLOAD_PROPERTY_SUBMISSIONS, 1);
-    if (backend->compositor != nullptr)
-    {
-        ComPtr<IScalarKeyFrameAnimation> scalar;
-        ComPtr<IKeyFrameAnimation> keyframes;
-        ComPtr<ICompositionAnimation> animation;
-        ComPtr<ICompositionObject> object;
-        ComPtr<ICubicBezierEasingFunction> cubic;
-        ComPtr<ICompositionEasingFunction> easing;
-        HRESULT hr = backend->compositor->CreateScalarKeyFrameAnimation(&scalar);
-        if (SUCCEEDED(hr))
-            hr = scalar.As(&keyframes);
-        if (SUCCEEDED(hr))
-            hr = keyframes->put_Duration({(INT64)((double)cycle * 10000000.0)});
-        if (SUCCEEDED(hr))
-            hr = keyframes->put_IterationBehavior(AnimationIterationBehavior_Forever);
-        if (SUCCEEDED(hr))
-            hr = backend->compositor->CreateCubicBezierEasingFunction({0.645f, 0.045f},
-                                                                      {0.355f, 1.0f}, &cubic);
-        if (SUCCEEDED(hr))
-            hr = cubic.As(&easing);
-        if (SUCCEEDED(hr))
-            hr = scalar->InsertKeyFrame(0.0f, base_x);
-        if (SUCCEEDED(hr) && hold > 0.0f)
-            hr = scalar->InsertKeyFrame(hold / cycle, base_x);
-        if (SUCCEEDED(hr))
-            hr = scalar->InsertKeyFrameWithEasingFunction(
-                (hold + travel) / cycle, base_x + group.repeat_offset_x, easing.Get());
-        if (SUCCEEDED(hr) && hold > 0.0f)
-            hr = scalar->InsertKeyFrame((hold * 2.0f + travel) / cycle,
-                                        base_x + group.repeat_offset_x);
-        if (SUCCEEDED(hr))
-            hr = scalar->InsertKeyFrameWithEasingFunction(1.0f, base_x, easing.Get());
-        if (SUCCEEDED(hr))
-            hr = scalar.As(&animation);
-        if (SUCCEEDED(hr))
-            hr = layer.visual.As(&object);
-        HSTRING property = nullptr;
-        if (SUCCEEDED(hr))
-            hr = WindowsCreateString(L"Offset.X", 8, &property);
-        if (SUCCEEDED(hr))
-            hr = object->StartAnimation(property, animation.Get());
-        if (property != nullptr)
-            WindowsDeleteString(property);
-        return hr;
-    }
-    ComPtr<IDCompositionAnimation> animation;
-    HRESULT hr = backend->dcomp_device->CreateAnimation(&animation);
-    float inverse = 1.0f / travel;
-    float quadratic = 3.0f * group.repeat_offset_x * inverse * inverse;
-    float cubic = -2.0f * group.repeat_offset_x * inverse * inverse * inverse;
-    if (SUCCEEDED(hr) && hold > 0.0f)
-        hr = animation->AddCubic(0.0, base_x, 0.0f, 0.0f, 0.0f);
-    if (SUCCEEDED(hr))
-        hr = animation->AddCubic(hold, base_x, 0.0f, quadratic, cubic);
-    if (SUCCEEDED(hr) && hold > 0.0f)
-        hr = animation->AddCubic(hold + travel, base_x + group.repeat_offset_x, 0.0f, 0.0f, 0.0f);
-    if (SUCCEEDED(hr))
-        hr = animation->AddCubic(hold * 2.0f + travel, base_x + group.repeat_offset_x, 0.0f,
-                                 -quadratic, -cubic);
-    if (SUCCEEDED(hr))
-        hr = animation->AddRepeat(cycle, cycle);
-    if (SUCCEEDED(hr))
-        hr = layer.dcomp_visual->SetOffsetX(animation.Get());
-    return hr;
-}
-
 static reach_rect_f32 command_bounds(const reach_render_command &command)
 {
     reach_rect_f32 rect = command.rect;
@@ -1238,7 +1161,7 @@ static bool text_snap_transform(const reach_render_group &group)
     return unit(group.scale) && unit(reach_render_group_y_scale(&group)) &&
            (group.x.generation == 0 ||
             (!group.x.has_mapping && group.x.from == 0 && group.x.to == 0)) &&
-           group.repeat_travel_seconds <= 0;
+           !group.x.repeating;
 }
 
 static HRESULT sync_layer(reach_render_backend *backend, reach_d2d_retained_layer &layer,
@@ -1316,13 +1239,6 @@ static HRESULT sync_layer(reach_render_backend *backend, reach_d2d_retained_laye
     float anchor_y = group.has_clip ? group.clip.y : group.bounds.y;
     float base_x = group.bounds.x - anchor_x;
     float base_y = group.bounds.y - anchor_y + text_phase_y;
-    float old_base_x = layer.group.has_clip ? layer.group.bounds.x - layer.group.clip.x : 0.0f;
-    bool repeat_changed = layer.group.repeat_offset_x != group.repeat_offset_x ||
-                          layer.group.repeat_hold_seconds != group.repeat_hold_seconds ||
-                          layer.group.repeat_travel_seconds != group.repeat_travel_seconds ||
-                          old_base_x != base_x ||
-                          (content_changed && group.repeat_travel_seconds > 0.0f);
-    bool preserve_repeat = group.repeat_travel_seconds > 0.0f && !repeat_changed;
     reach_render_group previous = layer.group;
     if (previous.has_clip)
         previous.bounds.y += layer.text_presentation_phase_y;
@@ -1330,8 +1246,6 @@ static HRESULT sync_layer(reach_render_backend *backend, reach_d2d_retained_laye
     unsigned mask = property_mask(group, previous, base_x, comparison_y, initialized);
     if (text_phase_changed)
         mask |= 2;
-    if (layer.group.repeat_travel_seconds > 0.0f && group.repeat_travel_seconds <= 0.0f)
-        mask |= 1;
     if (SUCCEEDED(hr) && geometry_changed && backend->compositor != nullptr)
     {
         ComPtr<IVisual> container;
@@ -1350,8 +1264,7 @@ static HRESULT sync_layer(reach_render_backend *backend, reach_d2d_retained_laye
             hr = container->put_Size({group.clip.width, group.clip.height});
         }
         if (SUCCEEDED(hr) && mask != 0)
-            hr = wuc_properties(backend, layer.visual.Get(), group, base_x, base_y, preserve_repeat,
-                                mask);
+            hr = wuc_properties(backend, layer.visual.Get(), group, base_x, base_y, mask);
     }
     else if (SUCCEEDED(hr) && geometry_changed)
     {
@@ -1360,16 +1273,12 @@ static HRESULT sync_layer(reach_render_backend *backend, reach_d2d_retained_laye
             hr = layer.dcomp_container->SetOffsetY(anchor_y - parent_origin.y);
         if (SUCCEEDED(hr) && mask != 0)
             hr = dcomp_properties(backend, layer.dcomp_visual.Get(), layer.dcomp_scale.Get(), group,
-                                  base_x, base_y, preserve_repeat, mask);
+                                  base_x, base_y, mask);
     }
     if (SUCCEEDED(hr) && geometry_changed)
         hr = sync_clip(backend, layer, group, initialized);
     if (SUCCEEDED(hr))
         hr = sync_tint(backend, layer, group, content_changed);
-    if (SUCCEEDED(hr) && repeat_changed && group.repeat_travel_seconds > 0.0f)
-    {
-        hr = repeat_motion(backend, layer, group, base_x);
-    }
     if (SUCCEEDED(hr))
     {
         layer.group = group;
@@ -1931,12 +1840,12 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
             if (SUCCEEDED(hr))
                 hr = root->put_CenterPoint({center_x, center_y, 0.0f});
             if (SUCCEEDED(hr))
-                hr = wuc_properties(
-                    backend, backend->root_visual.Get(), presentation, 0.0f, 0.0f, false,
-                    animation_changed
-                        ? 31
-                        : property_mask(presentation, backend->scene_presentation, 0.0f, 0.0f,
-                                        backend->has_scene_presentation != 0));
+                hr = wuc_properties(backend, backend->root_visual.Get(), presentation, 0.0f, 0.0f,
+                                    animation_changed
+                                        ? 31
+                                        : property_mask(presentation, backend->scene_presentation,
+                                                        0.0f, 0.0f,
+                                                        backend->has_scene_presentation != 0));
         }
         else
         {
@@ -1945,7 +1854,7 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
                 hr = backend->scene_scale->SetCenterY(center_y);
             if (SUCCEEDED(hr))
                 hr = dcomp_properties(backend, backend->dcomp_visual, backend->scene_scale.Get(),
-                                      presentation, 0.0f, 0.0f, false,
+                                      presentation, 0.0f, 0.0f,
                                       property_mask(presentation, backend->scene_presentation, 0.0f,
                                                     0.0f, backend->has_scene_presentation != 0));
         }

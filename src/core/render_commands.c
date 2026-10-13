@@ -23,9 +23,6 @@ int32_t reach_render_group_equal(const reach_render_group *first, const reach_re
         first->tint_rgb_target.r != second->tint_rgb_target.r ||
         first->tint_rgb_target.g != second->tint_rgb_target.g ||
         first->tint_rgb_target.b != second->tint_rgb_target.b ||
-        first->repeat_offset_x != second->repeat_offset_x ||
-        first->repeat_hold_seconds != second->repeat_hold_seconds ||
-        first->repeat_travel_seconds != second->repeat_travel_seconds ||
         !reach_motion_equal(&first->x, &second->x) || !reach_motion_equal(&first->y, &second->y) ||
         !reach_motion_equal(&first->opacity, &second->opacity) ||
         !reach_motion_equal(&first->scale, &second->scale) ||
@@ -192,8 +189,6 @@ static int32_t reach_render_repetition_valid(const reach_render_group *group, in
         if (reach_render_group_clip_motion(group, &clip) != REACH_OK)
             return 0;
     }
-    if (group->x.repeating && group->repeat_travel_seconds > 0)
-        return 0;
     const reach_motion *motions[] = {&group->x,
                                      &group->y,
                                      &group->opacity,

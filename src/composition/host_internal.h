@@ -256,6 +256,7 @@ typedef struct reach_feature_surface_context
     float anchor_bar_height;
     int32_t anchor_direction;
     int32_t anchor_valid;
+    int32_t retained_supported;
     int32_t content_transform_active;
     reach_window_id preferred_front_source;
 } reach_feature_surface_context;

@@ -60,6 +60,7 @@ struct now_playing_fixture
         value.layout = &layout;
         value.dpi_scale = 1.0f;
         value.animate_text = animate_text;
+        reach_top_bar_now_playing_update_marquee(&value, &value.marquee, 10);
         return value;
     }
 };
@@ -73,22 +74,23 @@ static void test_overflow_uses_one_gpu_animation()
         fixture.layout.text_advance *= dpi;
         reach_top_bar_now_playing_render_input input = fixture.input(1);
         input.dpi_scale = dpi;
+        reach_top_bar_now_playing_update_marquee(&input, &input.marquee, 10);
         reach_render_command_buffer commands = {};
 
         expect_true(reach_top_bar_now_playing_build_render_commands(&input, &commands) == REACH_OK,
                     "GPU render commands build");
         const reach_render_group *animated = nullptr;
         for (size_t index = 0; index < commands.group_count; ++index)
-            if (commands.groups[index].repeat_travel_seconds > 0.0f)
+            if (commands.groups[index].x.repeating)
                 animated = &commands.groups[index];
         expect_true(animated != nullptr, "overflow uses one animated text layer");
         if (animated != nullptr)
         {
-            expect_near(animated->repeat_offset_x, -52.0 * dpi, 0.0001,
+            expect_near(animated->x.to, -52.0 * dpi, 0.0001,
                         "animation travels the exact overflow");
-            expect_near(animated->repeat_hold_seconds, 1.6, 0.0001,
+            expect_near(animated->x.hold_start_seconds, 1.6, 0.0001,
                         "animation retains its endpoint hold");
-            expect_near(animated->repeat_travel_seconds, 2.0, 0.0001,
+            expect_near(animated->x.duration_seconds, 2.0, 0.0001,
                         "animation retains its logical movement speed at every DPI");
         }
         size_t text_count = 0;
@@ -98,10 +100,11 @@ static void test_overflow_uses_one_gpu_animation()
         expect_true(text_count == 1, "GPU path does not draw duplicate text");
         fixture.layout.text_advance = fixture.layout.text.width + 0.75f * dpi;
         reach_render_command_buffer_clear(&commands);
+        reach_top_bar_now_playing_update_marquee(&input, &input.marquee, 11);
         expect_true(reach_top_bar_now_playing_build_render_commands(&input, &commands) == REACH_OK,
                     "sub-threshold overflow remains static at every DPI");
         for (size_t index = 0; index < commands.group_count; ++index)
-            expect_true(commands.groups[index].repeat_travel_seconds == 0,
+            expect_true(!commands.groups[index].x.repeating,
                         "overflow threshold stays in logical pixels");
     }
 }
@@ -122,12 +125,48 @@ static void test_unavailable_gpu_animation_stays_static()
     }
     bool repeating = false;
     for (size_t index = 0; index < commands.group_count; ++index)
-        repeating |= commands.groups[index].repeat_travel_seconds > 0.0f;
+        repeating |= commands.groups[index].x.repeating;
     expect_true(!repeating, "static path emits no animation command");
+}
+
+static void test_marquee_retains_one_phase_and_retires_disabled_intent()
+{
+    now_playing_fixture fixture;
+    auto input = fixture.input(1);
+    reach_motion original = input.marquee;
+    reach_top_bar_now_playing_update_marquee(&input, &input.marquee, 15);
+    expect_true(reach_motion_equal(&original, &input.marquee),
+                "unchanged submissions preserve the original phase and generation");
+    expect_true(input.marquee.easing == REACH_EASING_EASE_IN_OUT,
+                "both native backends use canonical cubic easing");
+    expect_near(reach_motion_value_at(&input.marquee, 11.6), 0, 0.0001,
+                "first endpoint retains its full hold");
+    expect_near(reach_motion_value_at(&input.marquee, 12.6), -26, 0.0001,
+                "canonical motion reaches the midpoint at half travel");
+    expect_near(reach_motion_value_at(&input.marquee, 13.8), -52, 0.0001,
+                "far endpoint retains its full hold");
+    fixture.layout.text.width += 10;
+    reach_top_bar_now_playing_update_marquee(&input, &input.marquee, 15);
+    expect_true(input.marquee.started_seconds == 15 &&
+                    input.marquee.generation == original.generation + 1,
+                "changed overflow starts a fresh content-fitting cycle");
+    input.animate_text = 0;
+    reach_top_bar_now_playing_update_marquee(&input, &input.marquee, 16);
+    expect_true(!input.marquee.repeating && !reach_motion_active_at(&input.marquee, 16),
+                "hidden or unsupported rendering clears repetition without CPU frames");
+    original = input.marquee;
+    reach_top_bar_now_playing_update_marquee(&input, &input.marquee, 17);
+    expect_true(reach_motion_equal(&original, &input.marquee),
+                "unchanged disabled intent does not submit another generation");
+    input.animate_text = 1;
+    reach_top_bar_now_playing_update_marquee(&input, &input.marquee, 18);
+    expect_true(input.marquee.repeating && input.marquee.started_seconds == 18,
+                "reopening begins at the readable endpoint with a fresh hold");
 }
 
 int main()
 {
+    test_marquee_retains_one_phase_and_retires_disabled_intent();
     test_overflow_uses_one_gpu_animation();
     test_unavailable_gpu_animation_stays_static();
     if (failures != 0)
