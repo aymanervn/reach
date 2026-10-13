@@ -939,7 +939,8 @@ unit scale; straight shoulders resize independently. Source crops partition the 
 there are at most fifteen groups, or five with an unchanged uncapped height. No new native effect,
 clock or backend is introduced. Compact/overlapping independent caps remain explicitly unsupported.
 
-Canonical two-slope mappings generalize the existing peak without enlarging `reach_motion`.
+At the focal-band milestone, two-slope mappings generalized the existing peak without enlarging
+`reach_motion`. The subsequent compound-fitting extension below records its added storage.
 Same-epoch combinations preserve clock/easing/generation and reject active input clamps or different
 breakpoints. Full-range validation includes interior extrema. Popup body/notch intent agrees with
 existing constrained placement across both directions, outside/edge/center owners, tiny and oversized
@@ -959,12 +960,10 @@ uses `/Z7 /Ob0 /Od /RTC1` and owned probe runners use `/Z7`; tracked build rules
 flags remain unchanged. Tests use a workspace-owned TEMP/TMP directory because the sandbox temp
 path could not create nested fixtures. These are validation-environment adjustments.
 
-Live startup uses the registered shell path `C:\Dev\reach\build\reach.exe --launch` and the matching
-watchdog. The validation host was observed alive with its launch session held open. Computer Use
-returned no targetable Reach surface at that observation; a completed launcher command alone had
-not established durable child lifetime. No displayed-pixel/input acceptance is claimed. Restart
-order and installation-folder reuse are recorded in the checklist; this scope does not reinstall
-or change shell registration.
+An earlier validation directly launched the registered executable and watchdog. That did not
+follow the required installed-session protocol and does not establish valid startup acceptance.
+The corrected `reachctl --install` / `reachctl --start` sequence is recorded below; never repeat
+direct launch. No displayed-pixel/input acceptance is claimed.
 
 
 ## Animated rounded viewport bounds
@@ -1001,3 +1000,42 @@ Settings opened from the installed sibling path. Computer Use monitor capture st
 `0x80070057` on a refreshed-window retry, so displayed/input acceptance remains unresolved.
 Only the first setup installs; subsequent validation restarts use watchdog-first termination and
 `reachctl --start`. No direct launch or additional reinstall is needed.
+
+
+## Compound fitting and moving constraints
+
+Canonical motion now combines active output clamps and multiple mapping breakpoints from the same
+layout epoch. Shared min/max operations flatten moving viewport constraints. Both adapters consume
+the existing cubic compiler; no feature branch, second clock, native expression graph, timer or
+source allocation is introduced. Capacity is bounded at eight slope breakpoints, 32 finite pieces
+and 68 rotated-cycle pieces; incompatible moving epochs and excess knots reject without changing
+an aliased output. Existing two-slope paths retain their fast combination path.
+
+Focused non-UI tests compare independent popup placement/fitting/reflow math at delayed submission
+in both directions and all three easings, within 0.001 physical pixel. Periodic tests verify multiple
+peaks, endpoint holds, phase rotation, first crossings and interruption; capacity and malformed
+metadata tests cover identity and failure without output mutation. This capability does not yet
+migrate Dock/Switcher popup width, compact shadow rendering or title trimming.
+
+The x64 size probe reports `reach_motion` growing from 96 to 152 bytes, a retained group from 1440
+to 2224 bytes, and a fixed-capacity command buffer from 828032 to 1004432 bytes. This is 176400
+additional bytes (172.3 KiB, 21.3%) per buffer, plus 784 bytes per retained layer descriptor and other
+motion owners. Reach owns two such buffers in its heap-allocated host; Settings owns one in its
+heap-allocated app. Their combined buffer increase is 529200 bytes before layer/state copies.
+Unused knot storage remains inline and is ignored by semantic equality. This is a
+bounded shared-capability cost, not evidence of lower total memory or energy use; final product
+memory/CPU/GPU/power gates remain open.
+
+
+Both builds and all forty test groups pass (`build-composed-motion-final-debug.log`,
+`build-composed-motion-final-release.log`, `test-composed-motion-final-debug.log`,
+`test-composed-motion-final-release.log`). Corrected native suites pass five runs on WUC and DC plus
+HWND fallback in Debug and Release (`probe-composed-motion-full-debug.log`,
+`probe-composed-motion-full-release.log`). Each growth/reversal pair reuses source pixels and scene
+topology, with four submissions: one visual and one rounded-clip update per publish. Settled and
+unchanged repeated submissions mutate no properties/tree; hiding retires periodic visual and
+rounded-geometry bindings. The diagnostic initially reset constant scale on every publish, then
+incorrectly expected a visual-plus-clip update to count as one submission. Fixing those diagnostic
+assumptions yields zero failures; no production frame driver was added or changed for them.
+No Reach process was stopped or directly launched. Displayed consumer appearance and final total
+product workload acceptance remain pending; owned diagnostics do not establish those gates.

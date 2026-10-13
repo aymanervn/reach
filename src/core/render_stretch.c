@@ -27,6 +27,8 @@ static reach_motion reach_render_stretch_scale(const reach_motion *motion, float
         result.mapping_left_slope /= band;
         result.mapping_right_slope /= band;
         result.mapping_value = (motion->mapping_value - caps) / band;
+        for (int32_t at = 0; at < result.mapping_extra_count; ++at)
+            result.mapping_extra_deltas[at] /= band;
     }
     else
     {

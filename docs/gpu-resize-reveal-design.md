@@ -54,18 +54,21 @@ or duration. Affine mapping carries and reverses its limits when needed. This pr
 reveal's delayed fade and early saturation: opacity is `clamp((progress - 0.10) / 0.65, 0, 1)`;
 its slide is derived from that bounded opacity, rather than raw progress.
 
-`reach_motion_compile_at` emits at most eight cubic/constant segments, split at the easing midpoint,
-mapping center and limit crossings. Both native backends consume that shared compiler; the old adapter-local
-compiler is removed. Native final keyframes use bounded endpoints. CPU fallback/input samples the
+`reach_motion_compile_at` emits at most 32 cubic/constant segments, split at the easing midpoint,
+mapping knots and limit crossings. Rotated periodic cycles use at most 68 segments. Both native
+backends consume that shared compiler; the old adapter-local compiler is removed. Native final keyframes use bounded endpoints. CPU fallback/input samples the
 same descriptor, and normalized fixed-cap scale carries its bounds without losing exact unit scale.
 Visual saturation does not shorten the owner's completion deadline. Starting or retargeting creates
 a new ordinary intent; a retarget samples the current bounded visible value and clears derived limits.
 
 `reach_motion_hinge` derives two slopes meeting at one center from ordinary canonical intent.
 `reach_motion_peak` uses that representation for a bounded tent. `reach_motion_combine` adds affine
-terms sharing the same clock, easing and generation; constants need no common clock. Active input
-clamps and incompatible mapped breakpoints are rejected instead of approximated. `reach_motion_range`
-includes the interior extremum and output limits; resize validation and scale normalization use it.
+terms sharing the same clock, easing and generation; constants need no common clock. Active output
+clamps and different breakpoints flatten into one continuous piecewise affine descriptor, with at
+most eight slope breakpoints. `reach_motion_min` and `reach_motion_max` add intersections for moving
+viewport bounds. Incompatible epochs and excess knots are rejected without modifying the output;
+curves are not approximated or assigned another animation owner. `reach_motion_range` includes all
+interior extrema and output limits; resize validation and scale normalization use it.
 
 `reach_popup_width_motion` derives monitor-clamped body bounds and notch position from one width
 epoch. Its piecewise placement preserves existing `reach_popup_place` geometry at either monitor
@@ -115,8 +118,9 @@ work, and displayed compositor pixels remain part of final acceptance.
 Rounded group clips support canonical inset motion on both backends. The shared
 `reach_render_group_clip_motion` derives origin and nonnegative width/height from paired insets.
 Each axis must combine exactly through the existing same-epoch motion contract; incompatible
-epochs, active paired clamps or breakpoints are rejected before native mutation. Different axes
-can own independent epochs. Ordinary rectangular clips retain independent edge motion.
+epochs and compound mappings exceeding the bounded knot capacity are rejected before native
+mutation. Active paired clamps and compatible moving bounds share the canonical compiler.
+Different axes can own independent epochs. Ordinary rectangular clips retain independent edge motion.
 
 WUC animates geometric-clip offset, size and corner radii. DC animates rectangle-clip edges and
 radii. Each radius is limited to half its current axis size, preserving compact rounded geometry
