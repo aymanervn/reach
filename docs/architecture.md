@@ -454,6 +454,13 @@ Settings control ids preserve the four-subsource allocation used by toggles and 
 Finite and periodic properties share `reach_motion`. Periodic intent adds forward/backward travel
 with independent endpoint holds and an absolute epoch. CPU sampling, affine mapping and bounded
 compilation preserve phase; the compiler rotates one complete cycle to the submission time.
+Zero travel with positive holds represents discrete endpoint switching through that same intent.
+Its compiled pieces stay constant until the boundary; WUC uses final-step easing and DC uses
+constant cubics with native repetition. Sampling, mapped ranges and crossing queries include only
+visited endpoints, so a skipped intermediate value has no crossing and a mapped interior peak
+cannot manufacture activity. A missing hold normalizes to the remaining constant endpoint.
+This capability adds no descriptor fields or alternate clock. Textbox caret integration remains
+separate migration work; existing consumers retain their deadline scheduling.
 Both compositors repeat the resulting keyframes/cubics without application ticks. Root presentation
 remains finite so completion ownership is well-defined. Retiring or replacing retained sources stops
 periodic transform, opacity, clip and tint bindings before releasing the layer; font replacement

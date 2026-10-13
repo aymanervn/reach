@@ -314,6 +314,13 @@ support expectation is explicitly resolved.
     valid coverage, but overlapping ranges and the small translucent scene do not establish a total
     product cost difference. The workload baseline records the conditions and limits. Shared caret
     source/intent integration, displayed blink behavior and final CPU disposition remain pending.
+  - [x] Support exact discrete repetition through canonical intent and both native compilers.
+    Zero travel reuses positive endpoint holds, generation, phase rotation and lifetime cleanup;
+    no descriptor fields or application clock are added. Pure checks cover existing caret duty
+    cycles at their absolute deadlines, mapped ranges, skipped values, delayed starts and retargets.
+    Both builds/all forty tests and focused native reuse/reset/retirement checks pass; existing
+    continuous compositor/fallback regressions also pass. This completes the shared timing
+    capability, not independent caret sources, consumer integration or product acceptance.
 
 ## 5. Reveal, resize and layout motion
 
@@ -399,6 +406,8 @@ Validation must not terminate a running Reach instance without explicit authoriz
 current instruction; each authorization permits one termination.
 
 Current GPU goal exception: the user explicitly authorizes restarts throughout this goal.
+The user reaffirmed this exception on 2026-10-13 and explicitly said no further restart permission
+questions are needed during the active goal. This exception does not authorize direct host launches.
 Always stop `reachWatchdog.exe` first and wait for its exit, then stop Reach and wait for its exit.
 Use `reachctl --install` from `C:\Dev\reach\build` for the first setup, with the user's administrator
 approval, then `reachctl --start` from that same folder. Every subsequent start/restart also uses

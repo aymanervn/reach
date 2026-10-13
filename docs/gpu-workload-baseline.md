@@ -1133,8 +1133,49 @@ Evidence under `build/gpu-composition-migration`: `caret_comparison_probe.inc`,
 `probe-caret-comparison-pixels-release.log`, `caret-comparison-phases.jsonl`,
 `caret-comparison-native.log`, `caret-comparison-system.jsonl` and `caret-comparison-summary.json`.
 The native execution prototype uses WUC step easing and DC constant cubic pieces with repetition;
-the current canonical compiler still models continuous travel. Production integration must reuse
+the canonical compiler at the comparison revision still models continuous travel. Production integration must reuse
 shared textbox layout/ink geometry and canonical intent, preserve exact discrete blink timing,
 focus/edit resets, visibility retirement and fallback scheduling, then repeat the comparison with
 real visible product workloads. Independent caret composition and the final CPU disposition remain
 open; this bounded comparison does not close the repetition or product-acceptance gates.
+
+## Canonical discrete repetition
+
+`reach_motion_repeat_at` now accepts zero travel with positive endpoint holds. CPU sampling switches
+at the hold boundary; rotated compilation emits two or three constant pieces with explicit next
+boundary values. WUC applies final-step easing to discontinuous boundaries; DC repeats constant
+cubics. Both reuse existing property publication, semantic equality and lifetime retirement.
+There is no extra motion storage, timer, epsilon-duration fade or adapter-owned blink clock.
+Missing holds become a constant endpoint. Mapping/range/activity and crossing queries inspect the
+visited endpoints; skipped intermediate values report no crossing. Finite retargeting begins at the
+current discrete value and retires the prior generation. Continuous loader/marquee curves preserve
+their existing compilation.
+
+Focused pure-clock coverage verifies exact binary-representable boundaries, rotated/future-start
+compilation, affine/mapped ranges, unreachable crossing, constant/invalid holds and interruption.
+It also compares twelve absolute boundaries for each existing 0.55/0.45 and 0.53/0.53 caret duty
+cycle against `reach_blink`. Exact absolute hold/cycle endpoints retain their boundary value despite
+floating-point subtraction, without epsilon-duration motion or phase tolerance.
+Owned native checks cover four delayed submission phases per backend, unchanged binding/source
+reuse, reset to the Wi-Fi duty cycle without repainting and retirement. Native waiting performs no
+application submission. WUC animation controllers are present while active and absent after hide.
+These are compiler/binding checks, not displayed blink timing or an end-to-end textbox migration.
+The shared caret source contract, real consumer integration, fallback scheduling and product
+cost/appearance acceptance remain open.
+
+Both isolated builds and all forty test groups pass. The initial test invocation used the sandbox's
+default temporary directory and failed the two temporary-file fixtures; repeating with the
+established workspace TEMP/TMP passes. Full native suites pass five runs per backend plus HWND
+fallback in Debug/Release. After the absolute-boundary refinement, both complete test suites and
+focused native periodic/discrete suites pass again. Architecture, formatting and whitespace pass.
+Evidence: `build-discrete-{debug,release}.log`, `test-discrete-{debug,release}.log`,
+`probe-discrete-full-{debug,release}.log` and `probe-discrete-focused-{debug,release}.log` under
+`build/gpu-composition-migration`. Installed validation and the real caret source/consumer path are
+separate checks; compiler success does not establish displayed blink behavior or product efficiency.
+
+Installed validation succeeded after one explicitly approved watchdog-first restart through
+`C:\Dev\reach\build\reachctl --start`. Reach PID 7644 and watchdog PID 6792 remained alive on a later
+desktop process check; installed Reach/Settings hashes match the checked Debug binaries. The
+initial automatic-approval rejection did not execute. The user then updated the active goal to
+authorize subsequent goal validation restarts without further permission questions. The first
+installation remains in use; no reinstall or direct host/watchdog launch was performed.

@@ -179,6 +179,12 @@ reach_result reach_motion_range(const reach_motion *motion, float *out_minimum, 
     if (!isfinite(first) || !isfinite(last))
         return REACH_INVALID_ARGUMENT;
     float minimum = fminf(first, last), maximum = fmaxf(first, last);
+    if (motion->repeating && motion->duration_seconds == 0)
+    {
+        *out_minimum = minimum;
+        *out_maximum = maximum;
+        return REACH_OK;
+    }
     if (motion->has_mapping && motion->mapping_center > fminf(motion->from, motion->to) &&
         motion->mapping_center < fmaxf(motion->from, motion->to))
     {
@@ -241,7 +247,8 @@ reach_result reach_motion_hinge(const reach_motion *motion, float center, float 
     float minimum = 0, maximum = 0;
     if (reach_motion_range(&result, &minimum, &maximum) != REACH_OK)
         return REACH_INVALID_ARGUMENT;
-    if (result.duration_seconds <= 0 || result.from == result.to || result.generation == 0)
+    if ((!result.repeating && result.duration_seconds <= 0) || result.from == result.to ||
+        result.generation == 0)
         reach_motion_set(&result, reach_motion_limit(&result, result.to));
     *out_motion = result;
     return REACH_OK;
@@ -547,7 +554,7 @@ static bool reach_motion_travels(const reach_motion *motion)
     float to = reach_motion_limit(motion, motion->to);
     if (from != to)
         return true;
-    if (!motion->has_mapping)
+    if (!motion->has_mapping || (motion->repeating && motion->duration_seconds == 0))
         return false;
     if (motion->mapping_center > fminf(motion->from, motion->to) &&
         motion->mapping_center < fmaxf(motion->from, motion->to) &&
@@ -699,14 +706,21 @@ void reach_motion_repeat_at(reach_motion *motion, float from, float to, double t
     if (motion == nullptr)
         return;
     double cycle = travel_seconds * 2 + hold_start_seconds + hold_end_seconds;
-    if (!isfinite(travel_seconds) || travel_seconds <= 0 || !isfinite(hold_start_seconds) ||
+    if (!isfinite(travel_seconds) || travel_seconds < 0 || !isfinite(hold_start_seconds) ||
         hold_start_seconds < 0 || !isfinite(hold_end_seconds) || hold_end_seconds < 0 ||
-        !isfinite(cycle))
+        !isfinite(cycle) || cycle <= 0 || !isfinite(now_seconds) || !isfinite(from) ||
+        !isfinite(to))
     {
         reach_motion_set(motion, to);
         return;
     }
-    reach_motion_start_at(motion, from, to, travel_seconds, easing, now_seconds);
+    if (from == to || (travel_seconds == 0 && (hold_start_seconds == 0 || hold_end_seconds == 0)))
+    {
+        reach_motion_set(motion, hold_start_seconds == 0 ? to : from);
+        return;
+    }
+    uint64_t generation = motion->generation + 1;
+    *motion = {from, to, now_seconds, travel_seconds, easing, generation};
     motion->repeating = 1;
     motion->hold_start_seconds = hold_start_seconds;
     motion->hold_end_seconds = hold_end_seconds;
@@ -715,13 +729,31 @@ void reach_motion_repeat_at(reach_motion *motion, float from, float to, double t
 double reach_motion_cycle_seconds(const reach_motion *motion)
 {
     if (motion == nullptr || !motion->repeating || !isfinite(motion->duration_seconds) ||
-        motion->duration_seconds <= 0 || !isfinite(motion->hold_start_seconds) ||
+        motion->duration_seconds < 0 || !isfinite(motion->hold_start_seconds) ||
         motion->hold_start_seconds < 0 || !isfinite(motion->hold_end_seconds) ||
-        motion->hold_end_seconds < 0)
+        motion->hold_end_seconds < 0 ||
+        (motion->duration_seconds == 0 &&
+         (motion->hold_start_seconds == 0 || motion->hold_end_seconds == 0)))
         return 0;
     double cycle =
         motion->duration_seconds * 2 + motion->hold_start_seconds + motion->hold_end_seconds;
     return isfinite(cycle) ? cycle : 0;
+}
+
+static double reach_motion_repeat_phase(const reach_motion *motion, double now_seconds,
+                                        double cycle)
+{
+    double elapsed = fmax(0.0, now_seconds - motion->started_seconds);
+    double phase = fmod(elapsed, cycle);
+    if (motion->duration_seconds == 0)
+    {
+        double beginning = motion->started_seconds + floor(elapsed / cycle) * cycle;
+        if (now_seconds >= beginning + cycle)
+            return 0;
+        if (now_seconds == beginning + motion->hold_start_seconds)
+            return motion->hold_start_seconds;
+    }
+    return phase;
 }
 
 size_t
@@ -736,7 +768,7 @@ reach_motion_compile_repeat_at(const reach_motion *motion, double now_seconds,
                                 motion->minimum > motion->maximum)) ||
         !reach_motion_travels(motion))
         return 0;
-    double phase = fmod(fmax(0.0, now_seconds - motion->started_seconds), cycle);
+    double phase = reach_motion_repeat_phase(motion, now_seconds, cycle);
     double end = phase + cycle;
     if (!isfinite(end))
         return 0;
@@ -789,6 +821,9 @@ reach_motion_compile_repeat_at(const reach_motion *motion, double now_seconds,
             }
         }
     }
+    if (motion->duration_seconds == 0)
+        for (size_t index = 0; index < count; ++index)
+            segments[index].end_value = segments[(index + 1) % count].value;
     return count;
 }
 
@@ -803,7 +838,10 @@ float reach_motion_value_at(const reach_motion *motion, double now_seconds)
         double cycle = reach_motion_cycle_seconds(motion);
         if (cycle <= 0 || now_seconds <= motion->started_seconds)
             return reach_motion_limit(motion, motion->from);
-        double phase = fmod(now_seconds - motion->started_seconds, cycle);
+        double phase = reach_motion_repeat_phase(motion, now_seconds, cycle);
+        if (motion->duration_seconds == 0)
+            return reach_motion_limit(motion, phase < motion->hold_start_seconds ? motion->from
+                                                                                 : motion->to);
         if (phase <= motion->hold_start_seconds)
             return reach_motion_limit(motion, motion->from);
         phase -= motion->hold_start_seconds;
@@ -857,6 +895,21 @@ double reach_motion_time_to_value_at(const reach_motion *motion, float target_va
 {
     if (!reach_motion_active_at(motion, now_seconds) || motion->from == motion->to)
         return 0.0;
+    if (motion->repeating && motion->duration_seconds == 0)
+    {
+        if (reach_motion_value_at(motion, now_seconds) == target_value)
+            return 0;
+        float from = reach_motion_limit(motion, motion->from);
+        float to = reach_motion_limit(motion, motion->to);
+        if (target_value != from && target_value != to)
+            return INFINITY;
+        double cycle = reach_motion_cycle_seconds(motion);
+        double phase = reach_motion_repeat_phase(motion, now_seconds, cycle);
+        double boundary = target_value == to ? motion->hold_start_seconds : cycle;
+        if (boundary < phase)
+            boundary += cycle;
+        return fmax(0.0, motion->started_seconds - now_seconds) + boundary - phase;
+    }
     if (motion->has_mapping)
     {
         if (reach_motion_value_at(motion, now_seconds) == target_value)
@@ -899,7 +952,7 @@ double reach_motion_time_to_value_at(const reach_motion *motion, float target_va
         if (target_value < low || target_value > high)
             return INFINITY;
         double cycle = reach_motion_cycle_seconds(motion);
-        double phase = fmod(fmax(0.0, now_seconds - motion->started_seconds), cycle);
+        double phase = reach_motion_repeat_phase(motion, now_seconds, cycle);
         double progress = ((double)target_value - motion->from) / (motion->to - motion->from);
         double forward =
             motion->hold_start_seconds +
