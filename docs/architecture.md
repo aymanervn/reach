@@ -532,7 +532,10 @@ Windows Composition animates the cached `InsetClip` properties; DirectCompositio
 rectangle clip, mapping right/bottom insets to native edge coordinates. Removing clipping retires
 the native clip. `reach_render_group_clip_at` provides the same event-time rectangle to CPU fallback
 and geometry consumers, and active clip motion participates in generic fallback frame demand.
-Root-presentation clipping remains unsupported.
+Root-presentation clipping remains unsupported. Rounded groups default to independent radius
+clamping on each axis. `clip_uniform_radius` selects circular corners whose shared radius follows
+the smaller animated dimension. `reach_render_group_clip_radii_motion` supplies that same canonical
+geometry to both compositors and CPU masks; incompatible axis epochs are rejected.
 
 `reach_render_retain_commands` gives individual paint commands independent cached source groups,
 preserving overlapping paint when ancestor opacity changes. It validates the complete batch before

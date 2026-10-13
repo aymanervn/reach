@@ -84,6 +84,18 @@ support expectation is explicitly resolved.
     compact/collapse checks pass. Six widths/four DPI scales match established static viewport
     pixels exactly. Direct rounded-fill edge AA differs by at most 39 and was inspected; consumer
     appearance, compact shadows, complete width fitting and total workload acceptance remain open.
+  - [x] Support circular corners across compact animated clip dimensions.
+    Shared radius intent couples both axes to the smaller dimension; defaults preserve independent
+    clamping. Both backends and CPU masks use the same derivation and reject incompatible epochs.
+    Both builds/all 40 tests and focused native reversal/repetition/retirement/reuse checks pass.
+    Cached/fallback coverage matches static viewport coverage at six widths/four DPI scales.
+    Installed Reach is restarted through reachctl and verified alive. The descriptor adds 1,800 bytes
+    per render buffer (0.18%). Consumer appearance, shadows and width fitting remain open.
+  - [ ] Resolve compact native shadow appearance and total cost before width consumer integration.
+    An owned-window prototype renders the existing interior cutout on both compositors. Three widths
+    match within two channel values outside a one-pixel geometry edge; edge differences reach 23.
+    These are private experiments, not production capabilities or accepted product appearance.
+    Notches, animated captures, failure/recreation, resource cost and consumer checks remain open.
 - [ ] Decide whether supported live-preview composition meets behavior and efficiency requirements;
   document the selected compositor or optimized hybrid design for Dock, Switcher and Stage.
   - [x] Select the existing DWM port with retained Reach visuals and active-only native motion.

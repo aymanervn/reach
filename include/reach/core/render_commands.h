@@ -45,6 +45,7 @@ extern "C"
         int32_t has_clip;
         reach_rect_f32 clip;
         float clip_radius;
+        int32_t clip_uniform_radius;
         reach_motion clip_insets[REACH_RENDER_CLIP_EDGE_COUNT];
         int32_t has_tint;
         reach_motion tint[REACH_RENDER_COLOR_CHANNEL_COUNT];
@@ -248,6 +249,8 @@ extern "C"
     reach_rect_f32 reach_render_group_clip_at(const reach_render_group *group, double now_seconds);
     reach_result reach_render_group_clip_motion(const reach_render_group *group,
                                                 reach_rect_motion *out_clip);
+    reach_result reach_render_group_clip_radii_motion(const reach_render_group *group,
+                                                      reach_motion *out_x, reach_motion *out_y);
     int32_t reach_render_group_equal(const reach_render_group *first,
                                      const reach_render_group *second);
     reach_color reach_render_group_tint_at(const reach_render_group *group, double now_seconds);

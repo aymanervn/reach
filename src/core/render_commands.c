@@ -18,7 +18,9 @@ int32_t reach_render_group_equal(const reach_render_group *first, const reach_re
         !reach_render_rect_equal(first->bounds, second->bounds) ||
         first->has_clip != second->has_clip ||
         !reach_render_rect_equal(first->clip, second->clip) ||
-        first->clip_radius != second->clip_radius || first->has_tint != second->has_tint ||
+        first->clip_radius != second->clip_radius ||
+        first->clip_uniform_radius != second->clip_uniform_radius ||
+        first->has_tint != second->has_tint ||
         !reach_motion_equal(&first->tint_rgb_mix, &second->tint_rgb_mix) ||
         first->tint_rgb_target.r != second->tint_rgb_target.r ||
         first->tint_rgb_target.g != second->tint_rgb_target.g ||
@@ -141,6 +143,31 @@ reach_result reach_render_group_clip_motion(const reach_render_group *group,
     return REACH_OK;
 }
 
+reach_result reach_render_group_clip_radii_motion(const reach_render_group *group,
+                                                  reach_motion *out_x, reach_motion *out_y)
+{
+    reach_rect_motion clip = {0};
+    if (group == 0 || out_x == 0 || out_y == 0 || !isfinite(group->clip_radius) ||
+        group->clip_radius < 0 ||
+        (group->clip_uniform_radius != 0 && group->clip_uniform_radius != 1) ||
+        reach_render_group_clip_motion(group, &clip) != REACH_OK)
+        return REACH_INVALID_ARGUMENT;
+    reach_motion half_x = reach_motion_affine(&clip.width, 0.5f, 0);
+    reach_motion half_y = reach_motion_affine(&clip.height, 0.5f, 0);
+    reach_motion x = reach_motion_clamp(&half_x, 0, group->clip_radius);
+    reach_motion y = reach_motion_clamp(&half_y, 0, group->clip_radius);
+    if (group->clip_uniform_radius)
+    {
+        reach_motion radius = {0};
+        if (reach_motion_min(&x, &y, &radius) != REACH_OK)
+            return REACH_INVALID_ARGUMENT;
+        x = y = radius;
+    }
+    *out_x = x;
+    *out_y = y;
+    return REACH_OK;
+}
+
 int32_t reach_render_command_buffer_motion_active(const reach_render_command_buffer *buffer)
 {
     size_t index;
@@ -181,12 +208,14 @@ static int32_t reach_render_repetition_valid(const reach_render_group *group, in
          group->tint_rgb_mix.minimum > group->tint_rgb_mix.maximum ||
          group->tint_rgb_mix.minimum < 0 || group->tint_rgb_mix.maximum > 1))
         return 0;
-    if (!isfinite(group->clip_radius) || group->clip_radius < 0 || (root && group->clip_radius > 0))
+    if ((group->clip_uniform_radius != 0 && group->clip_uniform_radius != 1) ||
+        (group->clip_uniform_radius && root) || !isfinite(group->clip_radius) ||
+        group->clip_radius < 0 || (root && group->clip_radius > 0))
         return 0;
     if (group->has_clip && group->clip_radius > 0)
     {
-        reach_rect_motion clip = {0};
-        if (reach_render_group_clip_motion(group, &clip) != REACH_OK)
+        reach_motion radius_x = {0}, radius_y = {0};
+        if (reach_render_group_clip_radii_motion(group, &radius_x, &radius_y) != REACH_OK)
             return 0;
     }
     const reach_motion *motions[] = {&group->x,
