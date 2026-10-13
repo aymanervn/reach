@@ -450,13 +450,13 @@ static void test_display_theme_preferences(void)
                 "Reach theme accepts an explicit light selection");
     expect_true(reach_settings_model_light_theme(model.get()),
                 "Reach theme stores the selected light mode");
-    expect_true(reach_animation_manager_target(&model->display_theme_animation, 0) == 1.0f,
+    expect_true(model->display_theme_selection.to == 1.0f,
                 "Reach theme selector animates toward light");
     expect_true(!reach_settings_model_select_light_theme(model.get(), 1),
                 "reselecting the active Reach theme is unchanged");
     expect_true(reach_settings_model_select_light_theme(model.get(), 0),
                 "Reach theme accepts an explicit dark selection");
-    expect_true(reach_animation_manager_target(&model->display_theme_animation, 0) == 0.0f,
+    expect_true(model->display_theme_selection.to == 0.0f,
                 "Reach theme selector animates toward dark");
 
     expect_true(reach_settings_model_windows_system_theme(model.get()) ==
@@ -610,8 +610,7 @@ static void test_top_bar_preferences(void)
     expect_true(reach_settings_model_top_bar_style(model.get()) ==
                     REACH_CONFIG_TOP_BAR_STYLE_SIMPLE,
                 "top bar style stores simple");
-    expect_true(reach_animation_manager_target(&model->top_bar_style_animation, 0) == 2.0f,
-                "top bar style selector targets simple");
+    expect_true(model->top_bar_style_selection.to == 2.0f, "top bar style selector targets simple");
     expect_true(
         !reach_settings_model_select_top_bar_style(model.get(), (reach_config_top_bar_style)99),
         "top bar style rejects invalid selections");
@@ -620,7 +619,7 @@ static void test_top_bar_preferences(void)
                 "top bar mode toggles to static");
     expect_true(model->top_bar_mode_toggle.to == 0.0f,
                 "static mode presents auto hide as disabled");
-    expect_true(reach_settings_model_top_bar_animations_active(model.get()),
+    expect_true(reach_motion_active(&model->top_bar_style_selection),
                 "top bar preference changes animate their toggles");
 }
 static void test_bluetooth_radio_stops_scan(void)

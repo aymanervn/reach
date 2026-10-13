@@ -213,6 +213,18 @@ support expectation is explicitly resolved.
     coverage within two channel values. Displayed pixels, source memory comparison and total product
     workload acceptance remain in the broader gates.
 
+  - [x] Migrate Settings Reach-theme and Top Bar style selectors through shared retained selection.
+    Canonical position drives cached pill translation and fixed label tint. Shared bounded peak
+    mapping preserves the middle label's brightening/dimming during outer-choice jumps; outer
+    labels keep clamped affine weights. Remove both scalar managers, sampling APIs and frame demand;
+    immediate Windows theme controls reuse constant intent. Both builds, all 40 tests, owned loop/
+    producer checks and five full native runs per backend plus fallback pass. Fallback pixels match
+    exactly across two themes/four DPI scales/nine positions; cached differences stay at glyph AA
+    (at most 17 channel values) and moving rounded edges (48). Other pixels retain the original
+    tolerance. Source reuse, interruption and hidden page retirement pass. Displayed native pixels,
+    product input and total memory/workload acceptance remain open; Computer Use monitor capture
+    failed with `0x80070057` after startup connection was verified.
+
 - [ ] Migrate eligible loaders/repeating effects; select efficient compositor or deadline behavior for
   carets, preserve focus resets and marquee behavior, and stop hidden repetitions.
   - [x] Add canonical periodic properties for retained transforms, opacity, clips and tint.

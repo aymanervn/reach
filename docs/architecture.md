@@ -426,6 +426,22 @@ scroll and native choreography timing remain separate migration responsibilities
 Switcher width preserves pre-sample activity when deciding redraw, so a late
 wake still publishes the terminal visual state after sampling clears its active flag.
 
+Canonical motion also supports a bounded peak mapping through `reach_motion_peak`: the same source
+position can brighten and dim a label while retaining its epoch, easing and generation. Mapping
+is followed by output limits and can be transformed affinely. Input limits are accepted only when
+they enclose the complete peak support; nested peaks and narrower input clamps are rejected.
+The shared compiler splits at the peak and clamp crossings into at most eight finite pieces or
+twenty rotated-cycle pieces; both native backends consume those same cubic segments. Crossing
+queries find the first future crossing on either slope, and equal visible endpoints do not suppress
+an intervening periodic peak. Retarget the source intent and derive mapped properties again.
+
+Settings Reach-theme and Top Bar style selectors use canonical position intent and shared retained
+segmented controls. Cached selection coverage translates; fixed labels use RGBA tint, with a peak
+mapping for interior choices. Outer labels use bounded affine weights, preserving clamped positions.
+The two scalar managers, sampling functions and application frame predicates are removed. Immediate
+Windows system/application theme choices reuse the same primitive with constant intent. Shared
+Settings control ids preserve the four-subsource allocation used by toggles and selectors.
+
 Finite and periodic properties share `reach_motion`. Periodic intent adds forward/backward travel
 with independent endpoint holds and an absolute epoch. CPU sampling, affine mapping and bounded
 compilation preserve phase; the compiler rotates one complete cycle to the submission time.

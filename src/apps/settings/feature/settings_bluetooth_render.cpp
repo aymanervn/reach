@@ -188,7 +188,7 @@ void reach_settings_render_bluetooth_page(const reach_settings_render_input *inp
     toggle_style.knob = input->theme->settings_toggle_knob;
     reach_ui_toggle_motion_render(
         commands, layout->bluetooth_radio_toggle, &toggle_style,
-        reach_settings_toggle_group_id(REACH_SETTINGS_HIT_BLUETOOTH_RADIO_TOGGLE, 0),
+        reach_settings_control_group_id(REACH_SETTINGS_HIT_BLUETOOTH_RADIO_TOGGLE, 0),
         &model->bluetooth_radio_toggle);
 
     reach_ui_button_style scan_style =

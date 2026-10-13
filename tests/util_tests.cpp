@@ -4,6 +4,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <stddef.h>
+#include <initializer_list>
 
 static int failed = 0;
 
@@ -172,6 +173,95 @@ static void test_motion_compilation_matches_cpu_sampling(void)
            "static and absent motion submit no native curve");
 }
 
+static void test_peak_motion_compilation_and_crossings(void)
+{
+    for (int easing = REACH_EASING_EASE_IN; easing <= REACH_EASING_EASE_IN_OUT; ++easing)
+        for (int reverse = 0; reverse < 2; ++reverse)
+        {
+            reach_motion source = {}, peak = {};
+            reach_motion_start_at(&source, reverse ? 3.4f : -1.4f, reverse ? -1.4f : 3.4f, 2,
+                                  (reach_easing)easing, 10);
+            expect(reach_motion_peak(&source, 1, 1, &peak) == REACH_OK,
+                   "peak derives a bounded nonmonotonic mapping from canonical intent");
+            expect(peak.generation == source.generation &&
+                       peak.started_seconds == source.started_seconds,
+                   "peak mapping preserves the owner's clock and generation");
+            reach_motion mapped = reach_motion_affine(&peak, -0.7f, 0.9f);
+            mapped = reach_motion_clamp(&mapped, 0.3f, 0.8f);
+            for (double elapsed : {0.0, 0.3, 1.0, 1.9})
+            {
+                reach_motion_segment pieces[REACH_MOTION_MAX_SEGMENTS] = {};
+                size_t count = reach_motion_compile_at(&mapped, 10 + elapsed, pieces);
+                expect(count > 0 && count <= REACH_MOTION_MAX_SEGMENTS,
+                       "peak compiler has bounded capacity after affine mapping and clamp");
+                for (size_t index = 0; index < count; ++index)
+                    for (int sample = 0; sample <= 20; ++sample)
+                    {
+                        auto piece = pieces[index];
+                        double t = (piece.end - piece.start) * sample / 20;
+                        double actual = piece.value + piece.linear * t + piece.quadratic * t * t +
+                                        piece.cubic * t * t * t;
+                        double now = 10 + elapsed + piece.start + t;
+                        float expected = fminf(
+                            0.8f,
+                            fmaxf(0.3f, 0.9f - 0.7f * fmaxf(0, 1 - fabsf(reach_motion_value_at(
+                                                                             &source, now) -
+                                                                         1))));
+                        expect(fabs(actual - expected) < 0.000004 &&
+                                   fabsf(reach_motion_value_at(&mapped, now) - expected) <
+                                       0.000004f,
+                               "compiled peak pieces and CPU sampling preserve both slopes and "
+                               "plateaus");
+                    }
+            }
+            double crossing = reach_motion_time_to_value_at(&peak, 0.5f, 10);
+            expect(crossing > 0 && crossing < 2 &&
+                       fabsf(reach_motion_value_at(&peak, 10 + crossing) - 0.5f) < 0.00001f,
+                   "peak crossing finds its first future ascending or descending boundary");
+            double second = reach_motion_time_to_value_at(&peak, 0.5f, 10 + crossing + 0.01);
+            expect(second > 0 && fabsf(reach_motion_value_at(&peak, 10 + crossing + 0.01 + second) -
+                                       0.5f) < 0.00001f,
+                   "peak crossing also resolves the opposite slope after the first crossing");
+            expect(reach_motion_value_at(&peak, 12) == 0 && reach_motion_deadline(&peak) == 12,
+                   "equal visible endpoints retain the intervening peak and owner deadline");
+        }
+    reach_motion source = {}, peak = {};
+    reach_motion_repeat_at(&source, 0, 2, 1, 0.2, 0.3, REACH_EASING_EASE_OUT, 10);
+    expect(reach_motion_peak(&source, 1, 1, &peak) == REACH_OK && reach_motion_active_at(&peak, 10),
+           "periodic peak is active even when its visible endpoints are equal");
+    reach_motion_segment pieces[REACH_MOTION_MAX_REPEAT_SEGMENTS] = {};
+    for (double now : {10.0, 10.4, 11.5, 12.3, 13.2})
+    {
+        size_t count = reach_motion_compile_repeat_at(&peak, now, pieces);
+        expect(count > 0 && count <= REACH_MOTION_MAX_REPEAT_SEGMENTS,
+               "rotated periodic peak fits its bounded cycle compiler");
+        for (size_t index = 0; index < count; ++index)
+            for (int sample = 0; sample <= 20; ++sample)
+            {
+                auto piece = pieces[index];
+                double t = (piece.end - piece.start) * sample / 20;
+                double actual = piece.value + piece.linear * t + piece.quadratic * t * t +
+                                piece.cubic * t * t * t;
+                expect(fabs(actual - reach_motion_value_at(&peak, now + piece.start + t)) <
+                           0.000004,
+                       "periodic peak holds and both travel legs agree with CPU sampling");
+            }
+    }
+    reach_motion bounded = reach_motion_clamp(&source, 0, 2);
+    reach_motion bounded_peak = {};
+    expect(reach_motion_peak(&bounded, 1, 1, &bounded_peak) == REACH_OK,
+           "input limits enclosing peak support preserve the exact mapped curve");
+    for (double now : {10.0, 10.4, 11.5, 12.3})
+        expect(reach_motion_value_at(&bounded_peak, now) == reach_motion_value_at(&peak, now),
+               "enclosing input bounds do not alter the peak or its holds");
+    bounded = reach_motion_clamp(&source, 0.5f, 1.5f);
+    expect(reach_motion_peak(&bounded, 1, 1, &bounded_peak) == REACH_INVALID_ARGUMENT,
+           "a clamp inside peak support is rejected rather than silently changing the curve");
+    expect(reach_motion_peak(&peak, 1, 1, &source) == REACH_INVALID_ARGUMENT &&
+               reach_motion_peak(&source, 1, 0, &peak) == REACH_INVALID_ARGUMENT,
+           "unsupported nested mapping and invalid peak radius are rejected");
+}
+
 static void test_motion_equality_preserves_identity_without_padding(void)
 {
     reach_motion first = {};
@@ -196,12 +286,20 @@ static void test_motion_equality_preserves_identity_without_padding(void)
     second = first;
     second.started_seconds += 0.01;
     expect(!reach_motion_equal(&first, &second), "a changed physical timeline remains distinct");
+    expect(reach_motion_peak(&first, 0.5f, 1, &second) == REACH_OK &&
+               !reach_motion_equal(&first, &second),
+           "peak mapping remains part of canonical intent identity");
+    first = second;
+    second.peak_center += 0.1f;
+    expect(!reach_motion_equal(&first, &second),
+           "changed peak geometry invalidates retained properties");
     second = reach_motion_clamp(&first, 0.2f, 0.8f);
     expect(!reach_motion_equal(&first, &second), "visible motion limits remain part of identity");
 }
 
 int main(void)
 {
+    test_peak_motion_compilation_and_crossings();
     test_motion_equality_preserves_identity_without_padding();
     test_motion_retarget_uses_one_event_time();
     test_motion_affine_preserves_the_physical_timeline();

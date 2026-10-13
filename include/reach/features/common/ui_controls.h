@@ -88,11 +88,10 @@ extern "C"
     int32_t reach_ui_segmented_control_index_at(reach_rect_f32 bounds, size_t item_count, float x,
                                                 float y);
 
-    void reach_ui_segmented_control_render(reach_render_command_buffer *commands,
-                                           reach_rect_f32 bounds, const uint16_t *const *labels,
-                                           size_t item_count,
-                                           const reach_ui_segmented_control_style *style,
-                                           float selection_position);
+    reach_result reach_ui_segmented_control_motion_render(
+        reach_render_command_buffer *commands, reach_rect_f32 bounds, const uint16_t *const *labels,
+        size_t item_count, const reach_ui_segmented_control_style *style, uint64_t id,
+        const reach_motion *position);
 
     void reach_ui_textbox_render(reach_render_command_buffer *commands, reach_rect_f32 bounds,
                                  const reach_ui_selection_item_style *style, float selection,

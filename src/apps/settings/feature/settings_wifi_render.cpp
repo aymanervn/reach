@@ -382,7 +382,7 @@ void reach_settings_render_wifi_page(const reach_settings_render_input *input,
         toggle_style.knob = input->theme->settings_toggle_knob;
         reach_ui_toggle_motion_render(
             commands, layout->wifi_radio_toggle, &toggle_style,
-            reach_settings_toggle_group_id(REACH_SETTINGS_HIT_WIFI_RADIO_TOGGLE, 0),
+            reach_settings_control_group_id(REACH_SETTINGS_HIT_WIFI_RADIO_TOGGLE, 0),
             &model->wifi_radio_toggle);
 
         int32_t enabled = model->wifi_radio == REACH_WIFI_RADIO_ON;

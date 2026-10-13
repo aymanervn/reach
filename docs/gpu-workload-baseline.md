@@ -2,6 +2,54 @@
 
 Status: counters verified; full product performance baseline and acceptance pending.
 
+## Settings retained segmented selection
+
+Reach theme and Top Bar style now publish canonical position motion. Cached pill coverage translates
+and fixed text coverage consumes bounded affine/peak RGBA tint. The middle choice still brightens
+then dims during an outer-to-outer jump. Windows system/application theme selection remains immediate.
+Both scalar managers, sampled values and selector frame predicates are removed. `reach_motion_peak`
+adds a bounded nonmonotonic mapping to the existing clock/compiler; it does not add a driver or timer.
+
+Both isolated builds and all 40 tests pass (`build-debug-selectors.log`, `build-release-selectors.log`,
+`test-debug-selectors.log`, `test-release-selectors.log`). Pure checks cover direction/easing,
+late submission, affine/clamped mapping, both peak crossings, equal visible endpoints, periodic
+holds/phase, enclosing input limits and invalid nesting. Existing preference tests verify targets.
+Owned scheduler probes verify actual Settings has no selector-driven native frames while fallback
+requests sampled motion (`probe-selectors-capsule-debug.log`, `probe-selectors-capsule-release.log`).
+
+Actual Settings producer probes cover outer jumps, interruption, theme-position change, unchanged
+submissions and page retirement on both backends. Retargets have zero raster passes; native motion
+advances with no renderer executions. Unchanged settled submissions change neither raster, native
+properties nor trees. The Display page now owns three toggles and four selectors within group capacity.
+
+Offscreen comparisons cover both themes, four DPI scales, fractional placement and nine positions.
+Fallback single-text tint draws directly with the effective sampled brush, matching original pixels
+exactly. Cached text tint differs only at partially covered glyph pixels, by at most 17 channel values;
+white-mask recoloring has different edge coverage from DirectWrite's final-color brush. Moving
+rounded pill filtering reaches 48 channel values. Other pixels and solid text interiors retain the
+strict two-channel tolerance; observed error outside those edge regions is zero. The owned
+`selector-compare.png` artifact was inspected. This is bounded source/composition evidence, not a
+claim of exact displayed compositor pixels. Logs are `probe-selectors-native-debug.log` and
+`probe-selectors-native-release.log`.
+
+Five full native runs per backend plus existing HWND fallback checks pass in both builds
+(`probe-selectors-full-debug.log`, `probe-selectors-full-release.log`). Named-field equality includes
+the new mapping, and text source snapping excludes animated mapped transforms. The native runtime
+record grows from 3,928 to 4,448 bytes; motion descriptors also carry peak metadata. Full product
+memory and total workload acceptance remain pending.
+
+Computer Use launched the actual updated Settings app. Its startup requires a sibling Reach host,
+so the verified host was restarted from the matching build after stopping the watchdog. Settings
+then connected successfully. Monitor capture failed with
+`IGraphicsCaptureItemInterop.CreateForMonitor ... 0x80070057`; accessibility exposes only the custom
+window, so displayed appearance/input acceptance could not be completed. An optimized validation
+copy was attempted from `build/gpu-composition-migration/live-validation`, but its host and watchdog
+subsequently exited. A direct Debug-folder host was then launched with `--launch` and confirmed alive
+through a bounded five-second startup observation. The matching Debug-folder `reachWatchdog.exe` was
+restored. Per the current goal instruction, validation uses the Debug folder and stops the actual
+watchdog executable before restarting Reach. Installation registration is unchanged. The relocated
+copy's termination cause remains unresolved; it is not a proven code regression.
+
 ## Clipboard retained hover and nested RGB tint
 
 Clipboard publishes canonical item hover with stable item-keyed source ids. Shared bordered feedback

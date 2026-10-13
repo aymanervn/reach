@@ -2,7 +2,7 @@
 
 #include "reach/core/typography.h"
 
-uint64_t reach_settings_toggle_group_id(int32_t hit, size_t index)
+uint64_t reach_settings_control_group_id(int32_t hit, size_t index)
 {
     return UINT64_C(0x2000000000000000) | ((uint64_t)hit << 32) | ((uint64_t)index << 2);
 }
