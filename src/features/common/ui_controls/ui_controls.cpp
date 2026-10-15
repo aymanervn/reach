@@ -78,21 +78,128 @@ static void reach_ui_push_text(reach_render_command_buffer *commands, reach_rect
     (void)reach_render_command_buffer_push(commands, &command);
 }
 
+void reach_ui_color_feedback_apply(reach_render_group *group, reach_color from, reach_color to,
+                                   const reach_motion *progress)
+{
+    group->has_tint = 1;
+    float source[] = {from.r, from.g, from.b, from.a};
+    float target[] = {to.r, to.g, to.b, to.a};
+    for (size_t index = 0; index < REACH_RENDER_COLOR_CHANNEL_COUNT; ++index)
+        group->tint[index] =
+            reach_motion_affine(progress, target[index] - source[index], source[index]);
+}
+
 static reach_render_group reach_ui_color_group(uint64_t id, reach_rect_f32 bounds, reach_color from,
                                                reach_color to, const reach_motion *progress)
 {
     reach_render_group group = {};
     group.id = id;
     group.bounds = bounds;
-    group.has_tint = 1;
-    float source[] = {from.r, from.g, from.b, from.a};
-    float target[] = {to.r, to.g, to.b, to.a};
-    for (size_t index = 0; index < REACH_RENDER_COLOR_CHANNEL_COUNT; ++index)
-        group.tint[index] =
-            reach_motion_affine(progress, target[index] - source[index], source[index]);
+    reach_ui_color_feedback_apply(&group, from, to, progress);
     reach_motion_set(&group.opacity, 1.0f);
     reach_motion_set(&group.scale, 1.0f);
     return group;
+}
+
+reach_result reach_ui_motion_background_render(reach_render_command_buffer *commands,
+                                               const reach_rect_motion *bounds, float radius,
+                                               float border, reach_color background,
+                                               reach_color outline, const reach_shadow *shadow,
+                                               float dpi_scale, uint64_t first_id,
+                                               uint64_t parent_id)
+{
+    if (commands == nullptr || bounds == nullptr || commands->current_group_id != 0 ||
+        first_id == 0 || first_id >= UINT64_C(0x8000000000000000) - 7 || !isfinite(dpi_scale) ||
+        dpi_scale <= 0 || !isfinite(border) || border < 0 || !isfinite(radius) || radius < 0)
+        return REACH_INVALID_ARGUMENT;
+    float left = 0, right = 0, top = 0, bottom = 0, minimum = 0, width = 0, height = 0;
+    if (reach_motion_range(&bounds->x, &left, &right) != REACH_OK ||
+        reach_motion_range(&bounds->y, &top, &bottom) != REACH_OK ||
+        reach_motion_range(&bounds->width, &minimum, &width) != REACH_OK || minimum < 0 ||
+        reach_motion_range(&bounds->height, &minimum, &height) != REACH_OK || minimum < 0)
+        return REACH_INVALID_ARGUMENT;
+    if (width <= 0 || height <= 0)
+        return REACH_OK;
+    if (commands->count > REACH_MAX_RENDER_COMMANDS - 3 ||
+        commands->group_count > REACH_MAX_RENDER_GROUPS - 8)
+        return REACH_ERROR;
+    for (size_t index = 0; index < commands->group_count; ++index)
+        if (commands->groups[index].id >= first_id && commands->groups[index].id < first_id + 8)
+            return REACH_INVALID_ARGUMENT;
+    size_t first_group = commands->group_count, first_command = commands->count;
+    int32_t scissored = commands->has_scissor;
+    bool casts = shadow != nullptr && shadow->blur > 0 && shadow->color.a > 0;
+    if (casts && reach_render_command_buffer_group_shadow(commands, parent_id) != nullptr)
+        return REACH_INVALID_ARGUMENT;
+    reach_shadow_pad pad = {};
+    if (casts)
+        pad = reach_theme_shadow_pad(shadow, dpi_scale);
+    reach_rect_f32 capture = {floorf(left - pad.left), floorf(top - pad.top), 0, 0};
+    capture.width = ceilf(right + width + pad.right) - capture.x;
+    capture.height = ceilf(bottom + height + pad.bottom) - capture.y;
+    reach_result result = REACH_OK;
+    if (scissored)
+    {
+        reach_render_group clip = {};
+        clip.id = first_id + 7;
+        clip.parent_id = parent_id;
+        clip.bounds = capture;
+        clip.has_clip = 1;
+        clip.clip = commands->scissor_rect;
+        result = reach_render_command_buffer_begin_group(commands, &clip);
+        reach_render_command_buffer_end_group(commands);
+        parent_id = clip.id;
+        commands->has_scissor = 0;
+    }
+    reach_render_group source = {};
+    source.bounds = {0, 0, ceilf(width), ceilf(height)};
+    if (result == REACH_OK && casts)
+    {
+        reach_render_group caster = {};
+        caster.id = first_id;
+        caster.parent_id = parent_id;
+        caster.bounds = capture;
+        caster.has_shadow = 1;
+        caster.shadow = *shadow;
+        caster.shadow.offset_x *= dpi_scale;
+        caster.shadow.offset_y *= dpi_scale;
+        caster.shadow.blur *= dpi_scale;
+        result = reach_render_command_buffer_begin_group(commands, &caster);
+        reach_render_command_buffer_end_group(commands);
+        source.id = first_id + 1;
+        source.parent_id = caster.id;
+        if (result == REACH_OK)
+            result = reach_render_push_rect_motion(commands, &source, bounds, radius, {1, 1, 1, 1});
+    }
+    bool bordered = border > 0 && outline.a > 0;
+    background.a = outline.a = 1;
+    source.id = first_id + 3;
+    source.parent_id = parent_id;
+    if (result == REACH_OK)
+        result = reach_render_push_rect_motion(commands, &source, bounds, radius,
+                                               bordered ? outline : background);
+    if (result == REACH_OK && bordered && width > border * 2 && height > border * 2)
+    {
+        reach_rect_motion inner = *bounds;
+        inner.x = reach_motion_affine(&inner.x, 1, border);
+        inner.y = reach_motion_affine(&inner.y, 1, border);
+        inner.width = reach_motion_affine(&inner.width, 1, -border * 2);
+        inner.width = reach_motion_clamp(&inner.width, 0, width - border * 2);
+        inner.height = reach_motion_affine(&inner.height, 1, -border * 2);
+        inner.height = reach_motion_clamp(&inner.height, 0, height - border * 2);
+        source.id = first_id + 5;
+        source.bounds.width = ceilf(width - border * 2);
+        source.bounds.height = ceilf(height - border * 2);
+        result = reach_render_push_rect_motion(commands, &source, &inner, fmaxf(0, radius - border),
+                                               background);
+    }
+    commands->has_scissor = scissored;
+    if (result != REACH_OK)
+    {
+        commands->group_count = first_group;
+        commands->count = first_command;
+    }
+    return result;
 }
 
 int32_t reach_ui_color_feedback_begin(reach_render_command_buffer *commands, uint64_t id,

@@ -376,26 +376,20 @@ static reach_result reach_popup_motion_shape(reach_render_command_buffer *out, u
     body.parent_id = parent;
     body.bounds = {inset, inset + (side == REACH_NOTCH_SIDE_TOP ? notch_height : 0), max_width,
                    body_height};
-    body.has_clip = 1;
-    body.clip = body.bounds;
-    body.clip_radius = fmaxf(0, radius - inset);
-    body.clip_uniform_radius = 1;
-    body.clip_insets[REACH_RENDER_CLIP_RIGHT] = reach_motion_affine(&shape_width, -1, max_width);
-    reach_result result = reach_render_command_buffer_begin_group(out, &body);
-    reach_render_command fill = {};
-    fill.type = REACH_RENDER_COMMAND_RECT;
-    fill.rect = body.bounds;
-    fill.color = color;
-    if (result == REACH_OK)
-        result = reach_render_command_buffer_push(out, &fill);
-    reach_render_command_buffer_end_group(out);
+    reach_rect_motion body_motion = {};
+    reach_motion_set(&body_motion.x, body.bounds.x);
+    reach_motion_set(&body_motion.y, body.bounds.y);
+    body_motion.width = shape_width;
+    reach_motion_set(&body_motion.height, body_height);
+    reach_result result =
+        reach_render_push_rect_motion(out, &body, &body_motion, fmaxf(0, radius - inset), color);
     if (result != REACH_OK || notch_width <= 0 || notch_height <= 0)
         return result;
     float overlap = fminf(1, body_height);
     float factor = 1 + overlap / notch_height;
     float source_width = notch_width * factor;
     reach_render_group notch = {};
-    notch.id = id + 1;
+    notch.id = id + 2;
     notch.parent_id = parent;
     notch.bounds = {0,
                     side == REACH_NOTCH_SIDE_TOP ? inset : height - inset - notch_height - overlap,
@@ -517,10 +511,10 @@ reach_result reach_popup_push_width_background(const reach_popup_background_inpu
         outer.a = 1;
         if (result == REACH_OK)
             result = reach_popup_motion_shape(
-                batch.get(), 0, first_group_id + 3, *width, center, input->bounds.height, 0, radius,
+                batch.get(), 0, first_group_id + 4, *width, center, input->bounds.height, 0, radius,
                 notch_width, notch_height, input->notch_side, outer, input->bounds.width);
         if (result == REACH_OK && border > 0 && input->theme->popup_border.a > 0)
-            result = reach_popup_motion_shape(batch.get(), 0, first_group_id + 5, *width, center,
+            result = reach_popup_motion_shape(batch.get(), 0, first_group_id + 7, *width, center,
                                               input->bounds.height, border, radius, notch_width,
                                               notch_height, input->notch_side, background,
                                               input->bounds.width);

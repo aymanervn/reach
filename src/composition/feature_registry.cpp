@@ -1215,7 +1215,6 @@ static int32_t reach_switcher_surface_arrange(void *capsule,
     reach_switcher_arrange_context arrange = {};
     arrange.theme = ctx->theme;
     arrange.monitor_bounds = ctx->monitor_bounds;
-    arrange.last_bounds = ctx->last_bounds;
     arrange.dpi_scale = ctx->dpi_scale;
     arrange.transition_visible = ctx->transition_visible;
     arrange.bounds_valid = ctx->bounds_valid;
@@ -1229,7 +1228,6 @@ static reach_result reach_switcher_surface_render(void *capsule,
     reach_switcher_render_context render = {};
     render.theme = ctx->theme;
     render.icon_size_px = ctx->icon_size_px;
-    render.text_measure = ctx->text_measure;
     return reach_switcher_append_render_commands(static_cast<reach_switcher *>(capsule), &render,
                                                  out_commands);
 }
@@ -1253,19 +1251,15 @@ static reach_result reach_switcher_native_overlay_item(const void *capsule, size
     {
         return REACH_INVALID_ARGUMENT;
     }
-    reach_switcher_thumbnail_placement placement = {};
-    reach_result result = reach_switcher_thumbnail_at(static_cast<const reach_switcher *>(capsule),
-                                                      index, &placement);
-    if (result != REACH_OK)
-    {
-        return result;
-    }
     *out = {};
-    out->source = placement.window;
     out->plane = REACH_WINDOW_THUMBNAIL_PLANE_TARGET;
-    out->placement.destination = placement.destination;
-    out->placement.opacity = 1.0f;
-    out->placement.visible = placement.visible;
+    out->placement.opacity = 1;
+    reach_result result = reach_switcher_thumbnail_motion_at(
+        static_cast<const reach_switcher *>(capsule), index, &out->source, &out->destination_motion,
+        &out->placement.visible);
+    out->has_destination_motion = 1;
+    if (result != REACH_OK)
+        return result;
     return REACH_OK;
 }
 

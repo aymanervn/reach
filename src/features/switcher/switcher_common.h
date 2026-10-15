@@ -7,6 +7,8 @@ typedef struct reach_switcher_card
 {
     reach_window_id window;
     reach_rect_f32 preview;
+    reach_rect_motion preview_motion;
+    uint64_t render_id;
     int32_t preview_visible;
     int32_t selected;
 } reach_switcher_card;
@@ -16,6 +18,8 @@ typedef struct reach_switcher_layout
     reach_switcher_card cards[REACH_SWITCHER_VISIBLE_MAX];
     size_t count;
     float scale;
+    reach_rect_motion body;
+    reach_rect_f32 envelope;
 } reach_switcher_layout;
 
 static const float REACH_SWITCHER_PREVIEW_HEIGHT = 125.0f;

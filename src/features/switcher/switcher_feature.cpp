@@ -1,18 +1,11 @@
 #include "reach/features/switcher.h"
 #include "reach/features/common/presentation.h"
-#include "reach/support/animation.h"
 #include "reach/features/common/window_preview_layout.h"
 
 #include "switcher_common.h"
 
 #include <math.h>
 #include <new>
-
-enum
-{
-    REACH_SWITCHER_ANIMATION_WIDTH = 0,
-    REACH_SWITCHER_ANIMATION_COUNT
-};
 
 typedef enum reach_switcher_action_type
 {
@@ -40,8 +33,12 @@ typedef struct reach_switcher_window_context
 
 struct reach_switcher
 {
-    reach_animation_manager animations;
-    reach_animation_track animation_tracks[REACH_SWITCHER_ANIMATION_COUNT];
+    reach_motion width;
+    reach_rect_f32 monitor;
+    float border;
+    int32_t layout_initialized;
+    int32_t width_cleanup_pending;
+    uint64_t next_card_id = UINT64_C(0x10000);
     reach_feature_transition surface_transition;
     reach_switcher_state state;
     reach_switcher_layout layout;
@@ -84,6 +81,14 @@ static reach_switcher_window_context reach_switcher_service_context(reach_switch
 
 const reach_switcher_state *reach_switcher_state_ptr(const reach_switcher *switcher)
 {
+    if (switcher != nullptr && switcher->layout_initialized)
+    {
+        auto *state = &const_cast<reach_switcher *>(switcher)->state;
+        state->bounds =
+            reach_rect_motion_value_at(&switcher->layout.body, reach_motion_now_seconds());
+        state->bounds.x += switcher->layout.envelope.x;
+        state->bounds.y += switcher->layout.envelope.y;
+    }
     return switcher != nullptr ? &switcher->state : nullptr;
 }
 
@@ -94,13 +99,9 @@ int32_t reach_switcher_is_open(const reach_switcher *switcher)
 
 static void reach_switcher_reset_width_animation(reach_switcher *switcher)
 {
-    reach_animation_manager_reset(&switcher->animations, REACH_SWITCHER_ANIMATION_WIDTH);
-}
-
-static int32_t reach_switcher_width_animation_active(const reach_switcher *switcher)
-{
-    return switcher != nullptr &&
-           reach_animation_manager_active(&switcher->animations, REACH_SWITCHER_ANIMATION_WIDTH);
+    reach_motion_set(&switcher->width, 0);
+    switcher->width_cleanup_pending = 0;
+    switcher->layout_initialized = 0;
 }
 
 static void reach_switcher_capsule_tick(void *capsule, double delta_seconds,
@@ -111,18 +112,23 @@ static void reach_switcher_capsule_tick(void *capsule, double delta_seconds,
     {
         *out = {};
     }
+    int32_t was_visible = reach_feature_transition_visible(&switcher->surface_transition);
     int32_t transition_changed =
         reach_feature_transition_tick(&switcher->surface_transition, delta_seconds);
-    int32_t width_was_active = reach_switcher_width_animation_active(switcher);
-    reach_animation_manager_sample_at(&switcher->animations, reach_motion_now_seconds());
+    if (was_visible && !reach_feature_transition_visible(&switcher->surface_transition) &&
+        !switcher->state.open)
+        reach_switcher_reset_width_animation(switcher);
     if (out != nullptr && transition_changed)
     {
         out->redraw = 1;
         out->request_update = reach_feature_transition_needs_update(&switcher->surface_transition);
     }
-    if (out != nullptr && (width_was_active || reach_switcher_width_animation_active(switcher)))
+    if (switcher->width_cleanup_pending && !reach_motion_active(&switcher->width))
     {
-        out->redraw = 1;
+        reach_motion_set(&switcher->width, switcher->width.to);
+        switcher->width_cleanup_pending = 0;
+        if (out != nullptr)
+            out->redraw = out->request_update = 1;
     }
 }
 
@@ -135,8 +141,7 @@ static int32_t reach_switcher_capsule_needs_frame(const void *capsule)
 {
     const reach_switcher *switcher = static_cast<const reach_switcher *>(capsule);
     return switcher != nullptr &&
-           (reach_feature_transition_needs_update(&switcher->surface_transition) ||
-            reach_switcher_width_animation_active(switcher));
+           reach_feature_transition_needs_update(&switcher->surface_transition);
 }
 
 static int32_t reach_switcher_capsule_presentation_visible(const void *capsule)
@@ -158,9 +163,14 @@ static void reach_switcher_capsule_surface_geometry(const void *capsule,
     {
         return;
     }
-    out->visible_bounds = switcher->state.bounds;
-    out->envelope_bounds = switcher->state.bounds;
+    out->visible_bounds = switcher->layout.envelope;
+    out->envelope_bounds = switcher->layout.envelope;
+    out->has_input_bounds = switcher->layout_initialized;
+    out->input_bounds = switcher->layout.body;
     reach_feature_transition_presentation(&switcher->surface_transition, out);
+    if (switcher->width_cleanup_pending)
+        out->deadline_seconds =
+            fmax(out->deadline_seconds, reach_motion_deadline(&switcher->width));
 }
 
 static reach_switcher_action
@@ -288,8 +298,6 @@ reach_result reach_switcher_create(reach_switcher **out_switcher)
     {
         return REACH_ERROR;
     }
-    reach_animation_manager_init(&switcher->animations, switcher->animation_tracks,
-                                 REACH_SWITCHER_ANIMATION_COUNT);
     reach_feature_transition_init(&switcher->surface_transition,
                                   REACH_FEATURE_TRANSITION_FROM_BELOW);
     *out_switcher = switcher;
@@ -512,54 +520,25 @@ reach_switcher_sync_windows_with_context(reach_switcher *switcher,
     return action;
 }
 
-static reach_rect_f32 reach_switcher_apply_width_animation(
-    reach_switcher *switcher, const reach_switcher_arrange_context *ctx, reach_rect_f32 target)
+static void reach_switcher_retarget_width(reach_switcher *switcher,
+                                          const reach_switcher_arrange_context *ctx, float target,
+                                          int32_t cut, double now)
 {
-    if (!ctx->transition_visible)
+    if (cut || !ctx->transition_visible || switcher->width.to <= 0)
     {
-        return target;
+        if (switcher->width.generation == 0 || switcher->width.to != target ||
+            switcher->width.duration_seconds > 0)
+            reach_motion_set(&switcher->width, target);
+        switcher->width_cleanup_pending = 0;
     }
-
-    float animation_target =
-        reach_animation_manager_target(&switcher->animations, REACH_SWITCHER_ANIMATION_WIDTH);
-    if (!ctx->bounds_valid || animation_target <= 0.0f)
+    else if (switcher->state.open && fabsf(switcher->width.to - target) >= .5f)
     {
-        reach_animation_manager_set(&switcher->animations, REACH_SWITCHER_ANIMATION_WIDTH,
-                                    target.width);
+        reach_motion_animate_to_at(&switcher->width, target, .18, REACH_EASING_EASE_IN_OUT, now);
+        switcher->width_cleanup_pending = 1;
     }
-    else if (switcher->state.open && fabsf(animation_target - target.width) >= 0.5f)
-    {
-        float from = reach_switcher_width_animation_active(switcher)
-                         ? reach_animation_manager_value(&switcher->animations,
-                                                         REACH_SWITCHER_ANIMATION_WIDTH)
-                         : ctx->last_bounds.width;
-        reach_animation_manager_start(&switcher->animations, REACH_SWITCHER_ANIMATION_WIDTH, from,
-                                      target.width, 0.18, REACH_EASING_EASE_IN_OUT);
-    }
-
-    float width = target.width;
-    if (reach_switcher_width_animation_active(switcher))
-    {
-        width =
-            reach_animation_manager_value(&switcher->animations, REACH_SWITCHER_ANIMATION_WIDTH);
-    }
-    else if (reach_animation_manager_target(&switcher->animations, REACH_SWITCHER_ANIMATION_WIDTH) >
-             0.0f)
-    {
-        width =
-            reach_animation_manager_target(&switcher->animations, REACH_SWITCHER_ANIMATION_WIDTH);
-    }
-
-    if (fabsf(width - target.width) < 0.5f)
-    {
-        width = target.width;
-    }
-
-    reach_rect_f32 animated = target;
-    float center = target.x + target.width * 0.5f;
-    animated.width = width;
-    animated.x = center - width * 0.5f;
-    return animated;
+    else if (switcher->state.open && !reach_motion_active_at(&switcher->width, now) &&
+             switcher->width.to != target)
+        reach_motion_set(&switcher->width, target);
 }
 
 const reach_switcher_layout *reach_switcher_card_layout(const reach_switcher *switcher)
@@ -577,21 +556,37 @@ size_t reach_switcher_thumbnail_count(const reach_switcher *switcher)
     return switcher != nullptr ? switcher->layout.count : 0;
 }
 
+reach_result reach_switcher_thumbnail_motion_at(const reach_switcher *switcher, size_t index,
+                                                reach_window_id *out_window,
+                                                reach_rect_motion *out_destination,
+                                                int32_t *out_visible)
+{
+    if (switcher == nullptr || out_window == nullptr || out_destination == nullptr ||
+        out_visible == nullptr || index >= switcher->layout.count)
+        return REACH_INVALID_ARGUMENT;
+    const auto &card = switcher->layout.cards[index];
+    *out_window = card.preview_visible ? card.window : 0;
+    *out_visible = card.preview_visible;
+    *out_destination = card.preview_motion;
+    if (reach_motion_combine(&switcher->layout.body.x, 1, &card.preview_motion.x, 1,
+                             switcher->layout.envelope.x, &out_destination->x) != REACH_OK ||
+        reach_motion_combine(&switcher->layout.body.y, 1, &card.preview_motion.y, 1,
+                             switcher->layout.envelope.y, &out_destination->y) != REACH_OK)
+        return REACH_INVALID_ARGUMENT;
+    return REACH_OK;
+}
+
 reach_result reach_switcher_thumbnail_at(const reach_switcher *switcher, size_t index,
                                          reach_switcher_thumbnail_placement *out)
 {
-    if (switcher == nullptr || out == nullptr || index >= switcher->layout.count)
-    {
+    if (out == nullptr)
         return REACH_INVALID_ARGUMENT;
-    }
-    const reach_switcher_card *card = &switcher->layout.cards[index];
-    *out = {};
-    out->window = card->preview_visible ? card->window : 0;
-    out->destination = card->preview;
-    out->destination.x += switcher->state.bounds.x;
-    out->destination.y += switcher->state.bounds.y;
-    out->visible = card->preview_visible;
-    return REACH_OK;
+    reach_rect_motion motion = {};
+    reach_result result =
+        reach_switcher_thumbnail_motion_at(switcher, index, &out->window, &motion, &out->visible);
+    if (result == REACH_OK)
+        out->destination = reach_rect_motion_value_at(&motion, reach_motion_now_seconds());
+    return result;
 }
 
 static int32_t reach_switcher_update_layout(reach_switcher *switcher,
@@ -605,8 +600,13 @@ static int32_t reach_switcher_update_layout(reach_switcher *switcher,
         const reach_switcher_card *previous = &switcher->layout.cards[index];
         membership_changed |=
             card->window != previous->window || card->preview_visible != previous->preview_visible;
-        changed |= !reach_rect_equal(card->preview, previous->preview) ||
-                   card->selected != previous->selected;
+        changed |=
+            !reach_rect_equal(card->preview, previous->preview) ||
+            !reach_motion_equal(&card->preview_motion.x, &previous->preview_motion.x) ||
+            !reach_motion_equal(&card->preview_motion.y, &previous->preview_motion.y) ||
+            !reach_motion_equal(&card->preview_motion.width, &previous->preview_motion.width) ||
+            !reach_motion_equal(&card->preview_motion.height, &previous->preview_motion.height) ||
+            card->selected != previous->selected;
     }
     if (membership_changed)
     {
@@ -698,32 +698,72 @@ int32_t reach_switcher_arrange(reach_switcher *switcher, const reach_switcher_ar
     target.height = height + padding * 2.0f +
                     (REACH_SWITCHER_LABEL_GAP + REACH_SWITCHER_LABEL_HEIGHT) * scale +
                     border * 2.0f;
-    target.x = ctx->monitor_bounds.x + (ctx->monitor_bounds.width - target.width) * 0.5f;
-    target.y = ctx->monitor_bounds.y + (ctx->monitor_bounds.height - target.height) * 0.5f;
-    reach_rect_f32 bounds = reach_switcher_apply_width_animation(switcher, ctx, target);
-    bounds.width = fminf(bounds.width, ctx->monitor_bounds.width - padding * 2.0f);
-    bounds.x = ctx->monitor_bounds.x + (ctx->monitor_bounds.width - bounds.width) * 0.5f;
-    int32_t changed = !reach_rect_equal(bounds, state->bounds);
-    state->bounds = bounds;
-
+    double now = reach_motion_now_seconds();
+    int32_t cut = !ctx->bounds_valid || !switcher->layout_initialized ||
+                  !reach_rect_equal(switcher->monitor, ctx->monitor_bounds) ||
+                  scale != switcher->layout.scale || border != switcher->border;
+    reach_switcher_retarget_width(switcher, ctx, target.width, cut, now);
+    float minimum = 0, maximum = 0;
+    if (reach_motion_range(&switcher->width, &minimum, &maximum) != REACH_OK)
+        return 0;
     reach_switcher_layout layout = {};
     layout.count = state->visible_count;
     layout.scale = scale;
-    float fit =
-        reach_window_preview_row_scale(row_width, bounds.width - padding * 2.0f - border * 2.0f);
-    float x = (bounds.width - row_width * fit) * 0.5f;
-    float y = border + padding + height * (1.0f - fit) * 0.5f;
+    layout.envelope.width = cut ? maximum : fmaxf(maximum, switcher->layout.envelope.width);
+    layout.envelope.height =
+        cut ? target.height : fmaxf(target.height, switcher->layout.envelope.height);
+    layout.envelope.x =
+        ctx->monitor_bounds.x + (ctx->monitor_bounds.width - layout.envelope.width) * .5f;
+    layout.envelope.y =
+        ctx->monitor_bounds.y + (ctx->monitor_bounds.height - layout.envelope.height) * .5f;
+    layout.body.x = reach_motion_affine(&switcher->width, -.5f, layout.envelope.width * .5f);
+    reach_motion_set(&layout.body.y, (layout.envelope.height - target.height) * .5f);
+    layout.body.width = switcher->width;
+    reach_motion_set(&layout.body.height, target.height);
+    int32_t changed = !reach_rect_equal(layout.envelope, switcher->layout.envelope) ||
+                      !reach_motion_equal(&layout.body.width, &switcher->layout.body.width);
+    reach_motion fit = {};
+    if (row_width > 0)
+    {
+        fit = reach_motion_affine(&switcher->width, 1 / row_width,
+                                  -(padding + border) * 2 / row_width);
+        fit = reach_motion_clamp(&fit, 0, 1);
+    }
+    else
+        reach_motion_set(&fit, 1);
+    float prefix = 0;
     for (size_t visible = 0; visible < layout.count; ++visible)
     {
         size_t index = start + visible;
         reach_switcher_card *card = &layout.cards[visible];
         card->window = state->windows[index];
-        card->preview = {x, y, widths[index] * fit, height * fit};
+        card->preview = {0, 0, widths[index], height};
+        auto center = reach_motion_affine(&switcher->width, .5f, 0);
+        if (reach_motion_combine(&center, 1, &fit, prefix - row_width * .5f, 0,
+                                 &card->preview_motion.x) != REACH_OK)
+            return 0;
+        card->preview_motion.y =
+            reach_motion_affine(&fit, -height * .5f, border + padding + height * .5f);
+        card->preview_motion.width = reach_motion_affine(&fit, widths[index], 0);
+        card->preview_motion.height = reach_motion_affine(&fit, height, 0);
+        for (size_t old = 0; old < switcher->layout.count; ++old)
+            if (switcher->layout.cards[old].window == card->window)
+                card->render_id = switcher->layout.cards[old].render_id;
+        if (card->render_id == 0)
+        {
+            card->render_id = switcher->next_card_id;
+            switcher->next_card_id += 16;
+        }
         card->preview_visible = preview_visible[index];
         card->selected = index == state->selected_index;
-        x += card->preview.width + gap * fit;
+        prefix += widths[index] + gap;
     }
-    return reach_switcher_update_layout(switcher, &layout) | changed;
+    switcher->monitor = ctx->monitor_bounds;
+    switcher->border = border;
+    switcher->layout_initialized = 1;
+    int32_t result = reach_switcher_update_layout(switcher, &layout) | changed;
+    (void)reach_switcher_state_ptr(switcher);
+    return result;
 }
 
 void reach_switcher_force_close(reach_switcher *switcher)

@@ -423,8 +423,8 @@ and activity are CPU presentation state: pending activity survives until a sampl
 endpoint, then stops. `reach_animation_manager_motion` exposes the same intent for retained rendering
 without GPU readback. Settings samples all finite scalar families at one update timestamp. Loader,
 scroll and native choreography timing remain separate migration responsibilities.
-Switcher width preserves pre-sample activity when deciding redraw, so a late
-wake still publishes the terminal visual state after sampling clears its active flag.
+Switcher fitting uses canonical retained motion directly; one endpoint deadline retires its
+width descriptor without periodic capsule redraw or scalar-manager sampling.
 
 Canonical motion supports continuous piecewise affine mappings, preserving epoch, easing and
 generation. `reach_motion_hinge` constructs two slopes meeting at one center; `reach_motion_peak`
@@ -708,9 +708,18 @@ field. Unsupported/over-budget text uses an ordinary source sampled from the sam
 render-port demand includes its required final update. Reach and Settings can sample only that
 source when no other work is dirty, without capsule arrangement or command production. Suspension,
 source removal and font recreation clear sampled-source ownership; finite endpoints return both
-loops to idle. These are shared capabilities; Dock/Switcher consumers, intermediate product pixels
-and total CPU/GPU/power/memory/latency acceptance remain migration work. See
+loops to idle. Switcher consumes these sources for centered labels during fitting. Dock integration,
+complete intermediate product verification and total CPU/GPU/power/memory/latency acceptance remain
+migration work. See
 `docs/gpu-text-width-design.md`.
+
+`reach_render_push_rect_motion` publishes one translation owner and one rounded clipped paint
+source. Width/height insets preserve circular corners and permit collapsed endpoints without
+scaling borders or content. Stable source envelopes bound allocation; collision, parent and range
+checks reject before append. A stationary outer clip preserves an inherited output scissor.
+`reach_ui_motion_background_render` composes these fills with an optional shape-shadow caster and
+opaque outer/inner border semantics. Popup width chrome reuses the same primitive for compact
+body fills; notches retain their independent rigid geometry.
 
 Dock and Top Bar press feedback emits a separate flat retained group, copying item placement
 for moving icons. Shared UI feedback owns the group descriptor; the icon helper retains its
@@ -1077,7 +1086,13 @@ drawn commands, including shadow and retained envelope offsets. It samples retai
 centered scale, and opacity from the existing motion clock. Runtime native-motion demand delivers
 active projection samples and one terminal sample independently of content-frame demand. Switcher
 and Context Menu no longer request content frames solely for preview-linked popup presentation;
-Switcher width and Context Menu body layout still use their pending CPU paths. Settled DWM content
+Switcher width, fitted cards and native destinations share one canonical epoch within a stable
+session envelope. Empty body parents translate retained rounded fills, fixed-thickness outlines,
+proportional fallback icons and independently fitted label viewports. Card source tokens survive
+visible-source reorder; monitor/DPI changes cut stale layout intent. Input bounds and native
+destinations sample the body at event time. Width retargeting preserves continuity, continues during
+the existing close fade and retires once at its endpoint or on hide. Context Menu body layout
+remains on its pending CPU path. Settled DWM content
 updates independently. Stage keeps its capsule-owned exact placement and synchronized close semantics.
 
 Each surface runtime caches its last arrangement inputs, canonical geometry and native projection

@@ -114,6 +114,14 @@ extern "C"
     int32_t reach_ui_color_feedback_begin(reach_render_command_buffer *commands, uint64_t id,
                                           reach_rect_f32 bounds, reach_color from, reach_color to,
                                           const reach_motion *progress);
+    void reach_ui_color_feedback_apply(reach_render_group *group, reach_color from, reach_color to,
+                                       const reach_motion *progress);
+    reach_result reach_ui_motion_background_render(reach_render_command_buffer *commands,
+                                                   const reach_rect_motion *bounds, float radius,
+                                                   float border, reach_color background,
+                                                   reach_color outline, const reach_shadow *shadow,
+                                                   float dpi_scale, uint64_t first_id,
+                                                   uint64_t parent_id);
     reach_result reach_ui_bordered_color_feedback_render(reach_render_command_buffer *commands,
                                                          uint64_t first_id, reach_rect_f32 bounds,
                                                          float radius, float border,
