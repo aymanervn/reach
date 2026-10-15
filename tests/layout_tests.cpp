@@ -1057,6 +1057,46 @@ static void test_shadow_source_ownership(void)
                 "disabled shadow material does not cause property churn");
 }
 
+static void test_rect_motion_source_ownership(void)
+{
+    auto buffer = std::make_unique<reach_render_command_buffer>();
+    reach_render_command_buffer_clear(buffer.get());
+    reach_render_group source = {};
+    source.id = 20;
+    source.bounds = {0, 0, 100, 60};
+    reach_rect_motion rect = {};
+    reach_motion_start_at(&rect.x, 0, 40, .2, REACH_EASING_EASE_IN_OUT, 10);
+    reach_motion_set(&rect.y, 0);
+    reach_motion_start_at(&rect.width, 0, 100, .2, REACH_EASING_EASE_IN_OUT, 10);
+    reach_motion_set(&rect.height, 60);
+    reach_render_command_buffer_set_scissor(buffer.get(), {20, 10, 30, 20});
+    expect_true(reach_render_push_rect_motion(buffer.get(), &source, &rect, 12, {1, 1, 1, 1}) ==
+                        REACH_OK &&
+                    reach_render_command_buffer_validate_groups(buffer.get()) == REACH_OK &&
+                    buffer->has_scissor && !buffer->commands[0].has_scissor,
+                "motion fill retains two owned sources and an output scissor");
+    reach_rect_f32 clip = {};
+    expect_true(reach_render_command_buffer_group_clip_at(buffer.get(), 21, 10.2, &clip) &&
+                    clip.x == 40 && clip.y == 10 && clip.width == 10 && clip.height == 20,
+                "motion fill output scissor stays stationary while its source moves");
+    expect_true(reach_render_push_rect_motion(buffer.get(), &source, &rect, 12, {1, 1, 1, 1}) ==
+                        REACH_INVALID_ARGUMENT &&
+                    buffer->count == 1 && buffer->group_count == 2,
+                "motion fill source collision rejects atomically");
+    reach_render_command_buffer_clear(buffer.get());
+    source.parent_id = 999;
+    expect_true(reach_render_push_rect_motion(buffer.get(), &source, &rect, 12, {1, 1, 1, 1}) ==
+                        REACH_INVALID_ARGUMENT &&
+                    buffer->count == 0 && buffer->group_count == 0,
+                "motion fill rejects a missing parent before append");
+    source.parent_id = 0;
+    reach_motion_set(&rect.width, 101);
+    expect_true(reach_render_push_rect_motion(buffer.get(), &source, &rect, 12, {1, 1, 1, 1}) ==
+                        REACH_INVALID_ARGUMENT &&
+                    buffer->count == 0 && buffer->group_count == 0,
+                "motion fill cannot exceed its source envelope");
+}
+
 static void test_width_text_source_ownership(void)
 {
     auto buffer = std::make_unique<reach_render_command_buffer>();
@@ -1206,6 +1246,7 @@ static void test_popup_width_background_preflight(void)
 
 int main(void)
 {
+    test_rect_motion_source_ownership();
     test_width_text_source_ownership();
     test_popup_width_background_preflight();
     test_shadow_source_ownership();

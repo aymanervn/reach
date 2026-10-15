@@ -410,6 +410,14 @@ support expectation is explicitly resolved.
   verify existing compositor consumers as well as newly migrated paths.
 - [ ] Migrate Dock popup width/reflow and Switcher width fitting using the selected preview design;
   preserve stable source identity, live content, equal heights, variable widths and aligned controls.
+  - [x] Migrate Switcher width fitting through retained chrome/cards/text and canonical native destinations.
+    Implementation removes the scalar width manager, periodic width tick/frame demand and sampled
+    render geometry. Stable source tokens, equal-height aspect fitting, event-time input/native
+    rectangles, monitor/DPI cuts and one endpoint cleanup are verified in the real producer.
+    Both builds/all forty tests and four-DPI/two-theme owned native matrices pass. Intermediate
+    flat colors match exactly; antialias/glyph differences are bounded and inspected. Full renderer
+    regressions and installed validation pass. Live preview alignment and total product
+    acceptance remain in the parent/broader gates.
   - [x] Migrate Dock preview horizontal reflow through retained motion and shared native destinations.
     Stable window parents translate cached card sources; headers, borders, close controls, fallback
     icons, DWM rectangles and event-time hit testing share canonical offsets. Remove the scalar

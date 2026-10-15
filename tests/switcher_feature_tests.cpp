@@ -166,7 +166,6 @@ static void test_switcher_fits_variable_width_previews_and_keeps_selection_visib
     expect_true(reach_switcher_preview_generation(switcher) == generation,
                 "selection within a visible set preserves preview membership");
 
-    arrange.last_bounds = reach_switcher_state_ptr(switcher)->bounds;
     arrange.bounds_valid = 1;
     arrange.monitor_bounds = {100.0f, 50.0f, 600.0f, 360.0f};
     arrange.dpi_scale = 2.0f;
@@ -200,7 +199,6 @@ static void test_switcher_fits_variable_width_previews_and_keeps_selection_visib
                         state->bounds.x + state->bounds.width <=
                             arrange.monitor_bounds.x + arrange.monitor_bounds.width + 0.01f,
                     "constrained Switcher stays inside the monitor");
-        arrange.last_bounds = state->bounds;
     }
 
     event.type = REACH_UI_EVENT_APP_SWITCH_BEGIN;

@@ -10,7 +10,6 @@
 #include "reach/services/window_tracking.h"
 #include "reach/core/theme.h"
 #include "reach/core/ui_events.h"
-#include "reach/ports/text_measure.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -44,11 +43,15 @@ extern "C"
     reach_result reach_switcher_thumbnail_at(const reach_switcher *switcher, size_t index,
                                              reach_switcher_thumbnail_placement *out);
 
+    reach_result reach_switcher_thumbnail_motion_at(const reach_switcher *switcher, size_t index,
+                                                    reach_window_id *out_window,
+                                                    reach_rect_motion *out_destination,
+                                                    int32_t *out_visible);
+
     typedef struct reach_switcher_arrange_context
     {
         const reach_theme *theme;
         reach_rect_f32 monitor_bounds;
-        reach_rect_f32 last_bounds;
         float dpi_scale;
         int32_t transition_visible;
         int32_t bounds_valid;
@@ -75,7 +78,6 @@ extern "C"
     {
         const reach_theme *theme;
         int32_t icon_size_px;
-        reach_text_measure_port text_measure;
     } reach_switcher_render_context;
 
     void reach_switcher_force_close(reach_switcher *switcher);

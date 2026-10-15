@@ -233,6 +233,10 @@ extern "C"
     reach_result reach_render_push_width_text(reach_render_command_buffer *buffer,
                                               const reach_render_command *command,
                                               const reach_render_group *viewport);
+    reach_result reach_render_push_rect_motion(reach_render_command_buffer *buffer,
+                                               const reach_render_group *source,
+                                               const reach_rect_motion *bounds, float radius,
+                                               reach_color color);
 
     void reach_render_command_buffer_clear(reach_render_command_buffer *buffer);
     int32_t reach_render_command_buffer_motion_active(const reach_render_command_buffer *buffer);

@@ -853,6 +853,78 @@ reach_result reach_render_push_width_text(reach_render_command_buffer *buffer,
     return result;
 }
 
+reach_result reach_render_push_rect_motion(reach_render_command_buffer *buffer,
+                                           const reach_render_group *source,
+                                           const reach_rect_motion *bounds, float radius,
+                                           reach_color color)
+{
+    if (buffer == 0 || source == 0 || bounds == 0 || buffer->current_group_id != 0 ||
+        source->id == 0 || source->id >= UINT64_C(0x8000000000000000) - 1 || source->has_clip ||
+        source->has_shadow || source->x.generation || source->y.generation ||
+        source->scale.generation || source->scale_y.generation || !isfinite(radius) || radius < 0 ||
+        !isfinite(source->bounds.x) || !isfinite(source->bounds.y) ||
+        !isfinite(source->bounds.width) || !isfinite(source->bounds.height) ||
+        source->bounds.width <= 0 || source->bounds.height <= 0 || source->bounds.width > 16384 ||
+        source->bounds.height > 16384 || bounds->width.generation == 0 ||
+        bounds->height.generation == 0 ||
+        (source->has_tint && reach_render_command_buffer_group_shadow(buffer, source->parent_id)))
+        return REACH_INVALID_ARGUMENT;
+    float minimum = 0, maximum = 0;
+    if (reach_motion_range(&bounds->width, &minimum, &maximum) != REACH_OK || minimum < 0 ||
+        maximum > source->bounds.width ||
+        reach_motion_range(&bounds->height, &minimum, &maximum) != REACH_OK || minimum < 0 ||
+        maximum > source->bounds.height)
+        return REACH_INVALID_ARGUMENT;
+    if (buffer->count >= REACH_MAX_RENDER_COMMANDS ||
+        buffer->group_count > REACH_MAX_RENDER_GROUPS - 2)
+        return REACH_ERROR;
+    for (size_t index = 0; index < buffer->group_count; ++index)
+        if (buffer->groups[index].id == source->id || buffer->groups[index].id == source->id + 1)
+            return REACH_INVALID_ARGUMENT;
+    reach_render_group position = {0};
+    position.id = source->id;
+    position.parent_id = source->parent_id;
+    position.bounds = source->bounds;
+    position.x = reach_motion_affine(&bounds->x, 1, -source->bounds.x);
+    position.y = reach_motion_affine(&bounds->y, 1, -source->bounds.y);
+    position.has_clip = buffer->has_scissor;
+    position.clip = buffer->scissor_rect;
+    reach_result result = reach_render_command_buffer_check_group(buffer, &position);
+    if (result != REACH_OK)
+        return result;
+    reach_render_group paint = *source;
+    paint.id = source->id + 1;
+    paint.parent_id = position.id;
+    paint.has_clip = 1;
+    paint.clip = source->bounds;
+    paint.clip_radius = radius;
+    paint.clip_uniform_radius = 1;
+    paint.clip_insets[REACH_RENDER_CLIP_RIGHT] =
+        reach_motion_affine(&bounds->width, -1, source->bounds.width);
+    paint.clip_insets[REACH_RENDER_CLIP_BOTTOM] =
+        reach_motion_affine(&bounds->height, -1, source->bounds.height);
+    if (!reach_render_repetition_valid(&paint, 0))
+        return REACH_INVALID_ARGUMENT;
+    size_t first_group = buffer->group_count;
+    result = reach_render_command_buffer_begin_group(buffer, &position);
+    reach_render_command_buffer_end_group(buffer);
+    if (result == REACH_OK)
+        result = reach_render_command_buffer_begin_group(buffer, &paint);
+    reach_render_command fill = {0};
+    fill.type = REACH_RENDER_COMMAND_RECT;
+    fill.rect = source->bounds;
+    fill.color = color;
+    int32_t scissored = buffer->has_scissor;
+    buffer->has_scissor = 0;
+    if (result == REACH_OK)
+        result = reach_render_command_buffer_push(buffer, &fill);
+    buffer->has_scissor = scissored;
+    reach_render_command_buffer_end_group(buffer);
+    if (result != REACH_OK)
+        buffer->group_count = first_group;
+    return result;
+}
+
 int32_t reach_render_retained_command_bounds(const reach_render_command *command,
                                              reach_rect_f32 *out_bounds)
 {

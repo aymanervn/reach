@@ -1280,7 +1280,7 @@ rows with canonical finite lookup. It preserves ordinary font size, character el
 alignment without a second clock. Static fields retain one ordinary source. Active fitting prepares
 needed blocks, retaining prior block identities for retargets. Source owner namespaces survive
 command reordering. The existing 128 MiB nominal aggregate source limit, 16,384-pixel dimensions
-and 451 native-layer bound remain in force. Incremental staging bounds temporary source-command
+and 449 native-layer bound remain in force. Incremental staging bounds temporary source-command
 expansion as well; it does not build an entire oversized graph before selecting fallback.
 
 Oversized/unsupported title graphs retain ordinary text pixels and report renderer-owned sampling
@@ -1315,3 +1315,56 @@ checks also pass (`probe-text-width-bounds-{debug,release}.log`): fifty simultan
 446 native layers and 55,942,400 nominal bytes, selecting six sampled sources. Final serial ctest
 runs pass all forty groups in each build. The installed watchdog-first/reachctl restart is verified
 with matching Reach/Settings hashes; the text-width design records its process lifetime evidence.
+
+
+## Switcher fitting producer — 2026-10-15
+
+Switcher now publishes retained rounded fills, body placement, proportional cards and centered
+width-text viewports inside a stable session envelope. The registry forwards canonical native
+destination rectangles through the existing generic overlay path. Its scalar width manager,
+periodic width tick/redraw and sampled card render geometry are removed. One cleanup deadline
+publishes settled sources; monitor/DPI changes cut stale intent, and surviving window identities
+retain source tokens. The existing close fade continues width motion and hide retires it.
+
+`probe-switcher-width-final-debug.log` is an owned diagnostic of the actual Switcher capsule,
+tracking service, producer and both native renderers: four DPI scales, two themes, source removal
+and restoration, interruption, proportional card/native rectangles at five points in the epoch,
+minimized-source retirement, monitor/DPI cuts and source ownership cleanup. Motion-only intervals
+record zero scalar advances, layouts, command builds and raster passes. Repeated native frames
+also record zero raster/property/tree changes. The ordinary three-card scene uses nineteen native
+layers (twenty with the diagnostic backdrop). It delivers one endpoint redraw/update and then no
+further capsule work. This fixture uses controlled source metadata; displayed live DWM alignment
+remains in the final interaction matrix.
+
+A second snapshot freezes the real production descriptors at the middle of shrink and growth phases and compares
+displayed WUC/DC pixels with the established static Switcher renderer using identical logical
+geometry. Each eight-case phase per backend has zero error in flat interiors/exteriors.
+Antialias/glyph-edge channel differences reach 151 during shrink and 113 during growth. `switcher-width-inspection-{0,1}.png` was
+inspected: geometry, border thickness, corners and label fitting agree; glyph edges show the
+expected fractional-source filtering difference. This bounds the implementation evidence without
+claiming final product appearance or total cost acceptance. The backdrop makes actual product
+pixel coverage explicit rather than accepting arbitrary captured desktop alpha.
+
+Pure ownership checks verify the shared animated fill's parent/ID/range rejection and stationary
+output scissor. Both builds and all forty test groups pass; the existing popup finite/retarget
+matrix reruns after compact body fills begin sharing the same primitive. Final native regression
+and installed-validation evidence follows with the consumer milestone.
+
+Final consumer evidence: `probe-switcher-width-growth-{debug,release}.log` explicitly verifies
+intermediate growing-card/title widths and interruption from active growth. Both report zero
+failures; growth adds one retained text block in the ordinary diagnostic scene. The full renderer
+suites in `probe-switcher-width-full-{debug,release}.log` pass five runs per compositor plus HWND
+fallback. `probe-switcher-popup-regression-{debug,release}.log` passes the shared popup finite/
+retarget matrix. `probe-switcher-popup-scissor-final-release.log` also passes combined repeated,
+finite-retarget and whole-output scissor capture. The first combined scissor run exposed a private
+diagnostic error: clearing its buffer removed the clip, but only the reference reapplied it. The
+corrected diagnostic restores the same clip on every submission; no tolerance was relaxed.
+
+The checked Debug binaries are copied into the existing installed folder after stopping watchdog
+PID 17284 and waiting, then stopping Reach PID 12588 and waiting. Startup uses only that folder's
+`reachctl --start`. Subsequent enumeration verifies watchdog PID 18188 and Reach PID 13112 from
+`C:\Dev\reach\build`. Reach SHA256 is
+`7A27DB97098D2E44CC0CA91A60DC05BD3799D17C682F5937DC8755C99320BB54`; Settings SHA256 is
+`BD52E6A121096CD59E8A8C3BAA369A1AF6476A843CB8451D7A25B70CADDA394F`.
+This closes the scoped implementation milestone; displayed live native alignment and aggregate
+CPU/GPU/power/memory/latency acceptance remain open.

@@ -173,3 +173,14 @@ PID 12588 from `C:\Dev\reach\build`. Reach SHA256 is
 `A629E1AF34ACF741D52E4304DBA2AF14D0D402A447CA8AC662E1B24B3E437D77`; Settings SHA256 is
 `E2E71B6724AE7528D5FB8DAEF09332CE565AFC7CBCC070D5F03BC4DCEF9D9064`.
 Startup/lifetime evidence does not establish full displayed interaction or product efficiency.
+
+
+## First fitting consumer
+
+Switcher now consumes the shared text contract through centered label viewports parented to its
+canonical card/body geometry. Growing-card producer captures at four DPI scales and both themes
+preserve logical width, size, truncation and alignment on both native renderers. Flat regions match
+the established static renderer exactly; fractional glyph edges have the inspected filtering
+difference recorded in the workload baseline. The scalar width path is removed; one endpoint
+cleanup switches settled titles back to ordinary sources. Dock integration and final displayed
+live/product-cost acceptance remain open.
