@@ -69,6 +69,11 @@ extern "C"
                                                     const reach_motion *height, uint64_t parent_id,
                                                     uint64_t first_group_id,
                                                     reach_render_command_buffer *out_commands);
+    reach_result reach_popup_push_width_background(const reach_popup_background_input *input,
+                                                   const reach_motion *width,
+                                                   const reach_motion *notch_center,
+                                                   uint64_t parent_id, uint64_t first_group_id,
+                                                   reach_render_command_buffer *out_commands);
     reach_result reach_popup_push_background(const reach_popup_background_input *input,
                                              reach_render_command_buffer *out_commands);
 

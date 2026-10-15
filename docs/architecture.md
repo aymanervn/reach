@@ -596,8 +596,18 @@ that focal band or a fixed edge cap, including shadow coverage. Physical source 
 caps are integer pixels. `reach_render_stretch_patch` exposes deterministic geometry and its count
 API exposes the nine/fifteen ID allocation. Dimensions validate their full mapped ranges.
 `reach_popup_width_motion` shares monitor-constrained body/notch intent with event-time placement.
-Complete popup/section consumers, overlapping-cap transitions and small animated shapes remain
-migration work. See `docs/gpu-resize-reveal-design.md`.
+`reach_popup_push_width_background` selects rigid focal caps when the complete motion range fits;
+compact ranges use a retained shape-shadow caster and separate opaque border/background fills.
+Rounded body clips and translated/scaled notches share canonical width/anchor intent. The notch
+extends one physical pixel into the body while preserving its exterior slopes. Disabled shadow
+material creates no caster. `input.bounds.width` supplies a stable source envelope, enlarged to
+cover the full motion range; same-envelope retargets reuse source pixels and scene ownership.
+The helper reserves sixteen consecutive group IDs, including an optional final scissor wrapper
+around the complete output and shadow. Combined parent ownership, IDs and capacity are validated
+before an atomic append. DirectComposition rounded clip containers use soft border mode; ordinary
+rectangular clips restore inherited mode. Dock/Switcher integration and product appearance/cost
+acceptance remain migration work. See `docs/gpu-resize-reveal-design.md` and
+`docs/gpu-compact-shadow-design.md`.
 
 Explicit render groups can tint their rasterized alpha coverage with four normalized RGBA motion
 channels. Windows Composition retains a surface mask, color brush and property-set expression;

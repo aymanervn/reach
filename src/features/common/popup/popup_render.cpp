@@ -339,3 +339,227 @@ reach_result reach_popup_push_height_background(const reach_popup_background_inp
     return reach_render_push_stretched_chrome(out_commands, &source, &stretch, commands->commands,
                                               commands->count);
 }
+
+static reach_result reach_popup_motion_shape(reach_render_command_buffer *out, uint64_t parent,
+                                             uint64_t id, const reach_motion &width,
+                                             const reach_motion &center, float height, float inset,
+                                             float radius, float notch_width, float notch_height,
+                                             int32_t side, reach_color color, float envelope_width)
+{
+    float minimum = 0, maximum = 0;
+    if (reach_motion_range(&width, &minimum, &maximum) != REACH_OK)
+        return REACH_INVALID_ARGUMENT;
+    float body_height = height - notch_height - 2 * inset;
+    float max_width = fmaxf(0, fmaxf(maximum, envelope_width) - 2 * inset);
+    if (max_width <= 0 || body_height <= 0)
+        return REACH_OK;
+    auto shape_width = reach_motion_affine(&width, 1, -2 * inset);
+    shape_width = reach_motion_clamp(&shape_width, 0, max_width);
+    auto half = reach_motion_affine(&shape_width, .5f, 0);
+    auto r = reach_motion_clamp(&half, 0, fminf(fmaxf(0, radius - inset), body_height * .5f));
+    auto left_limit = reach_motion_affine(&r, 1, inset);
+    reach_motion right_limit = {};
+    if (reach_motion_combine(&shape_width, 1, &r, -1, inset, &right_limit) != REACH_OK)
+        return REACH_INVALID_ARGUMENT;
+    auto left = reach_motion_affine(&center, 1, -notch_width * .5f);
+    auto right = reach_motion_affine(&center, 1, notch_width * .5f);
+    if (reach_motion_max(&left, &left_limit, &left) != REACH_OK ||
+        reach_motion_min(&right, &right_limit, &right) != REACH_OK)
+        return REACH_INVALID_ARGUMENT;
+    reach_motion span = {}, middle = {};
+    if (reach_motion_combine(&right, 1, &left, -1, 0, &span) != REACH_OK ||
+        reach_motion_combine(&right, .5f, &left, .5f, 0, &middle) != REACH_OK)
+        return REACH_INVALID_ARGUMENT;
+    span = reach_motion_clamp(&span, 0, notch_width);
+    reach_render_group body = {};
+    body.id = id;
+    body.parent_id = parent;
+    body.bounds = {inset, inset + (side == REACH_NOTCH_SIDE_TOP ? notch_height : 0), max_width,
+                   body_height};
+    body.has_clip = 1;
+    body.clip = body.bounds;
+    body.clip_radius = fmaxf(0, radius - inset);
+    body.clip_uniform_radius = 1;
+    body.clip_insets[REACH_RENDER_CLIP_RIGHT] = reach_motion_affine(&shape_width, -1, max_width);
+    reach_result result = reach_render_command_buffer_begin_group(out, &body);
+    reach_render_command fill = {};
+    fill.type = REACH_RENDER_COMMAND_RECT;
+    fill.rect = body.bounds;
+    fill.color = color;
+    if (result == REACH_OK)
+        result = reach_render_command_buffer_push(out, &fill);
+    reach_render_command_buffer_end_group(out);
+    if (result != REACH_OK || notch_width <= 0 || notch_height <= 0)
+        return result;
+    float overlap = fminf(1, body_height);
+    float factor = 1 + overlap / notch_height;
+    float source_width = notch_width * factor;
+    reach_render_group notch = {};
+    notch.id = id + 1;
+    notch.parent_id = parent;
+    notch.bounds = {0,
+                    side == REACH_NOTCH_SIDE_TOP ? inset : height - inset - notch_height - overlap,
+                    source_width, notch_height + overlap};
+    if (reach_motion_combine(&middle, 1, &span, -factor * .5f, 0, &notch.x) != REACH_OK)
+        return REACH_INVALID_ARGUMENT;
+    notch.scale = reach_motion_affine(&span, 1 / notch_width, 0);
+    reach_motion_set(&notch.scale_y, 1);
+    result = reach_render_command_buffer_begin_group(out, &notch);
+    reach_render_command triangle = {};
+    triangle.type = REACH_RENDER_COMMAND_NOTCHED_ROUNDED_RECT;
+    triangle.rect = notch.bounds;
+    triangle.notch_center_x = source_width * .5f;
+    triangle.notch_width = source_width;
+    triangle.notch_height = notch_height + overlap;
+    triangle.notch_side = side;
+    triangle.color = color;
+    if (result == REACH_OK)
+        result = reach_render_command_buffer_push(out, &triangle);
+    reach_render_command_buffer_end_group(out);
+    return result;
+}
+
+reach_result reach_popup_push_width_background(const reach_popup_background_input *input,
+                                               const reach_motion *width,
+                                               const reach_motion *notch_center, uint64_t parent_id,
+                                               uint64_t first_group_id,
+                                               reach_render_command_buffer *out_commands)
+{
+    if (!reach_popup_render_input_valid(input, out_commands) || !width || !notch_center ||
+        width->generation == 0 || notch_center->generation == 0 || first_group_id == 0 ||
+        out_commands->current_group_id != 0 || !isfinite(input->dpi_scale) ||
+        input->dpi_scale <= 0 || !isfinite(input->bounds.width) ||
+        out_commands->count > REACH_MAX_RENDER_COMMANDS ||
+        out_commands->group_count > REACH_MAX_RENDER_GROUPS ||
+        first_group_id >= UINT64_C(0x8000000000000000) - 15)
+        return REACH_INVALID_ARGUMENT;
+    float minimum = 0, maximum = 0;
+    if (reach_motion_range(width, &minimum, &maximum) != REACH_OK || minimum <= 0 ||
+        !isfinite(input->bounds.height) || input->bounds.height <= 0)
+        return REACH_INVALID_ARGUMENT;
+    auto batch = std::unique_ptr<reach_render_command_buffer>(new (std::nothrow)
+                                                                  reach_render_command_buffer());
+    if (!batch)
+        return REACH_ERROR;
+    float radius = reach_popup_radius_scaled(input->theme, input->dpi_scale);
+    float extent = reach_theme_shadow_extent(&input->theme->popup_shadow, input->dpi_scale);
+    float notch_width = reach_popup_notch_width_scaled(input->dpi_scale);
+    float notch_height = reach_popup_notch_height_scaled(input->dpi_scale);
+    if (input->bounds.height <= notch_height)
+        return REACH_INVALID_ARGUMENT;
+    float clearance =
+        reach_popup_radius_scaled(reach_theme_default(), input->dpi_scale) + notch_width;
+    auto near_limit = reach_motion_affine(width, .5f, 0);
+    near_limit = reach_motion_clamp(&near_limit, 0, clearance);
+    reach_motion far_limit = {}, center = *notch_center;
+    if (reach_motion_combine(width, 1, &near_limit, -1, 0, &far_limit) != REACH_OK ||
+        reach_motion_max(&center, &near_limit, &center) != REACH_OK ||
+        reach_motion_min(&center, &far_limit, &center) != REACH_OK)
+        return REACH_INVALID_ARGUMENT;
+    auto pad = reach_theme_shadow_pad(&input->theme->popup_shadow, input->dpi_scale);
+    pad.left = ceilf(pad.left);
+    pad.right = ceilf(pad.right);
+    pad.top = ceilf(pad.top);
+    pad.bottom = ceilf(pad.bottom);
+    reach_render_group source = {};
+    source.id = first_group_id;
+    source.bounds = {-pad.left, -pad.top, 0, ceilf(input->bounds.height + pad.top + pad.bottom)};
+    reach_render_stretch stretch = {};
+    stretch.left = ceilf(pad.left + radius + extent);
+    stretch.right = ceilf(pad.right + radius + extent);
+    float focal_width = ceilf(notch_width + extent * 2);
+    source.bounds.width = stretch.left + stretch.right + focal_width + 2;
+    stretch.focal_left = stretch.left + 1;
+    stretch.focal_right = stretch.focal_left + focal_width;
+    stretch.focal_x = reach_motion_affine(&center, 1, pad.left);
+    stretch.width = reach_motion_affine(width, 1, pad.left + pad.right);
+    reach_motion_set(&stretch.height, source.bounds.height);
+    reach_popup_background_input shape = *input;
+    shape.bounds.width = source.bounds.width - pad.left - pad.right;
+    shape.notch_center_x = (stretch.focal_left + stretch.focal_right) * .5f - pad.left;
+    auto paint = std::unique_ptr<reach_render_command_buffer>(new (std::nothrow)
+                                                                  reach_render_command_buffer());
+    if (!paint)
+        return REACH_ERROR;
+    reach_result result = reach_popup_push_background(&shape, paint.get());
+    if (result == REACH_OK)
+        result = reach_render_push_stretched_chrome(batch.get(), &source, &stretch, paint->commands,
+                                                    paint->count);
+    if (result == REACH_INVALID_ARGUMENT)
+    {
+        reach_render_command_buffer_clear(batch.get());
+        source.bounds.width = ceilf(fmaxf(maximum, input->bounds.width) + pad.left + pad.right);
+        if (input->theme->popup_shadow.blur > 0 && input->theme->popup_shadow.color.a > 0)
+        {
+            source.has_shadow = 1;
+            source.shadow = input->theme->popup_shadow;
+            source.shadow.offset_x *= input->dpi_scale;
+            source.shadow.offset_y *= input->dpi_scale;
+            source.shadow.blur *= input->dpi_scale;
+            result = reach_render_command_buffer_begin_group(batch.get(), &source);
+            reach_render_command_buffer_end_group(batch.get());
+            if (result == REACH_OK)
+                result = reach_popup_motion_shape(batch.get(), source.id, first_group_id + 1,
+                                                  *width, center, input->bounds.height, 0, radius,
+                                                  notch_width, notch_height, input->notch_side,
+                                                  {1, 1, 1, 1}, input->bounds.width);
+        }
+        else
+            result = REACH_OK;
+        float border = reach_theme_border_thickness(input->theme, input->dpi_scale);
+        reach_color background = input->has_background_color_override
+                                     ? input->background_color_override
+                                     : input->theme->popup_background;
+        background.a = 1;
+        reach_color outer = border > 0 && input->theme->popup_border.a > 0
+                                ? input->theme->popup_border
+                                : background;
+        outer.a = 1;
+        if (result == REACH_OK)
+            result = reach_popup_motion_shape(
+                batch.get(), 0, first_group_id + 3, *width, center, input->bounds.height, 0, radius,
+                notch_width, notch_height, input->notch_side, outer, input->bounds.width);
+        if (result == REACH_OK && border > 0 && input->theme->popup_border.a > 0)
+            result = reach_popup_motion_shape(batch.get(), 0, first_group_id + 5, *width, center,
+                                              input->bounds.height, border, radius, notch_width,
+                                              notch_height, input->notch_side, background,
+                                              input->bounds.width);
+    }
+    if (result != REACH_OK)
+        return result;
+    uint64_t root_parent = parent_id;
+    if (out_commands->has_scissor)
+    {
+        if (batch->group_count >= REACH_MAX_RENDER_GROUPS)
+            return REACH_ERROR;
+        reach_render_group clip = {};
+        clip.id = first_group_id + 15;
+        clip.parent_id = parent_id;
+        clip.bounds = {-pad.left, -pad.top,
+                       ceilf(fmaxf(maximum, input->bounds.width) + pad.left + pad.right),
+                       ceilf(input->bounds.height + pad.top + pad.bottom)};
+        clip.has_clip = 1;
+        clip.clip = out_commands->scissor_rect;
+        for (size_t index = batch->group_count; index > 0; --index)
+            batch->groups[index] = batch->groups[index - 1];
+        batch->groups[0] = clip;
+        ++batch->group_count;
+        root_parent = clip.id;
+    }
+    if (batch->group_count > REACH_MAX_RENDER_GROUPS - out_commands->group_count ||
+        batch->count > REACH_MAX_RENDER_COMMANDS - out_commands->count)
+        return REACH_ERROR;
+    *paint = *out_commands;
+    for (size_t index = 0; index < batch->group_count; ++index)
+    {
+        if (batch->groups[index].parent_id == 0 && (!out_commands->has_scissor || index != 0))
+            batch->groups[index].parent_id = root_parent;
+        paint->groups[paint->group_count++] = batch->groups[index];
+    }
+    for (size_t index = 0; index < batch->count; ++index)
+        paint->commands[paint->count++] = batch->commands[index];
+    result = reach_render_command_buffer_validate_groups(paint.get());
+    if (result == REACH_OK)
+        *out_commands = *paint;
+    return result;
+}

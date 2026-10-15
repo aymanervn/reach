@@ -546,7 +546,11 @@ static HRESULT sync_clip(reach_render_backend *backend, reach_d2d_retained_layer
                 hr = container->put_Clip(nullptr);
         }
         else if (layer.dcomp_clip != nullptr)
+        {
             hr = layer.dcomp_container->SetClip((IDCompositionClip *)nullptr);
+            if (SUCCEEDED(hr))
+                hr = layer.dcomp_container->SetBorderMode(DCOMPOSITION_BORDER_MODE_INHERIT);
+        }
         if (SUCCEEDED(hr))
         {
             stop_clip_motion(layer);
@@ -682,6 +686,12 @@ static HRESULT sync_clip(reach_render_backend *backend, reach_d2d_retained_layer
         return hr;
     }
     bool created = layer.dcomp_clip == nullptr;
+    if (created || !initialized || group.clip_radius != layer.group.clip_radius)
+        hr = layer.dcomp_container->SetBorderMode(group.clip_radius > 0
+                                                      ? DCOMPOSITION_BORDER_MODE_SOFT
+                                                      : DCOMPOSITION_BORDER_MODE_INHERIT);
+    if (FAILED(hr))
+        return hr;
     if (created)
     {
         hr = backend->dcomp_device->CreateRectangleClip(&layer.dcomp_clip);
