@@ -1057,8 +1057,95 @@ static void test_shadow_source_ownership(void)
                 "disabled shadow material does not cause property churn");
 }
 
+static void test_popup_width_background_preflight(void)
+{
+    auto storage = std::make_unique<reach_render_command_buffer>();
+    auto &buffer = *storage;
+    reach_render_command_buffer_clear(&buffer);
+    reach_popup_background_input input = {};
+    input.theme = reach_theme_default();
+    input.bounds = {0, 0, 180, 120};
+    input.dpi_scale = 1;
+    input.notch_side = REACH_NOTCH_SIDE_BOTTOM;
+    reach_motion width = {};
+    reach_motion_start_at(&width, 20, 180, .18, REACH_EASING_EASE_IN_OUT, 10);
+    auto notch = reach_motion_affine(&width, .5f, 0);
+    expect_true(reach_popup_push_width_background(&input, &width, &notch, 0, 100, &buffer) ==
+                    REACH_OK,
+                "compact width background composes canonical shape motion");
+    expect_true(reach_render_command_buffer_validate_groups(&buffer) == REACH_OK,
+                "width background preserves neutral source/filter ownership");
+    bool shadow = false;
+    for (size_t index = 0; index < buffer.group_count; ++index)
+        shadow = shadow || buffer.groups[index].has_shadow;
+    expect_true(shadow, "compact width uses shape shadow rather than overlapping rigid caps");
+    size_t count = buffer.count, groups = buffer.group_count;
+    expect_true(reach_popup_push_width_background(&input, &width, &notch, 0, 100, &buffer) ==
+                        REACH_INVALID_ARGUMENT &&
+                    buffer.count == count && buffer.group_count == groups,
+                "group identity collisions leave the append buffer untouched");
+    reach_render_command_buffer_clear(&buffer);
+    expect_true(reach_popup_push_width_background(&input, &width, &notch, 999, 100, &buffer) ==
+                        REACH_INVALID_ARGUMENT &&
+                    buffer.count == 0 && buffer.group_count == 0,
+                "missing parent rejects the entire width background append");
+    reach_render_group parent = {};
+    parent.id = 99;
+    parent.bounds = {0, 0, 220, 160};
+    parent.has_shadow = 1;
+    parent.shadow = input.theme->popup_shadow;
+    expect_true(reach_render_command_buffer_begin_group(&buffer, &parent) == REACH_OK,
+                "shadow parent is valid before attaching compact chrome");
+    reach_render_command_buffer_end_group(&buffer);
+    expect_true(reach_popup_push_width_background(&input, &width, &notch, 99, 100, &buffer) ==
+                        REACH_INVALID_ARGUMENT &&
+                    buffer.count == 0 && buffer.group_count == 1,
+                "nested shadow rejects the entire width background append");
+    reach_render_command_buffer_clear(&buffer);
+    auto theme = *input.theme;
+    theme.popup_shadow.color.a = 0;
+    input.theme = &theme;
+    expect_true(reach_popup_push_width_background(&input, &width, &notch, 0, 100, &buffer) ==
+                        REACH_OK &&
+                    reach_render_command_buffer_validate_groups(&buffer) == REACH_OK,
+                "disabled shadow keeps compact width chrome valid");
+    shadow = false;
+    for (size_t index = 0; index < buffer.group_count; ++index)
+        shadow = shadow || buffer.groups[index].has_shadow;
+    expect_true(!shadow, "disabled shadow allocates no retained filter source");
+    input.theme = reach_theme_default();
+    reach_render_command_buffer_clear(&buffer);
+    reach_rect_f32 scissor = {10, 10, 50, 50};
+    reach_render_command_buffer_set_scissor(&buffer, scissor);
+    expect_true(reach_popup_push_width_background(&input, &width, &notch, 0, 100, &buffer) ==
+                        REACH_OK &&
+                    reach_render_command_buffer_validate_groups(&buffer) == REACH_OK,
+                "scissored width chrome preserves valid retained ownership");
+    const auto *clip = reach_render_command_buffer_group(&buffer, 115);
+    expect_true(clip != nullptr && clip->has_clip && reach_rect_equal(clip->clip, scissor),
+                "scissor clips complete popup output including its shadow");
+    reach_render_command_buffer_clear(&buffer);
+    input.dpi_scale = 0;
+    expect_true(reach_popup_push_width_background(&input, &width, &notch, 0, 100, &buffer) ==
+                        REACH_INVALID_ARGUMENT &&
+                    buffer.count == 0 && buffer.group_count == 0,
+                "invalid DPI rejects width chrome without appending");
+    input.dpi_scale = 1;
+    reach_motion_start_at(&width, 220, 400, .18, REACH_EASING_EASE_IN_OUT, 10);
+    notch = reach_motion_affine(&width, .5f, 0);
+    expect_true(reach_popup_push_width_background(&input, &width, &notch, 0, 100, &buffer) ==
+                        REACH_OK &&
+                    reach_render_command_buffer_validate_groups(&buffer) == REACH_OK,
+                "ordinary width background keeps rigid cap sources");
+    shadow = false;
+    for (size_t index = 0; index < buffer.group_count; ++index)
+        shadow = shadow || buffer.groups[index].has_shadow;
+    expect_true(!shadow, "covered width range avoids an unnecessary live shadow filter");
+}
+
 int main(void)
 {
+    test_popup_width_background_preflight();
     test_shadow_source_ownership();
     test_textbox_caret_reference_ownership();
     test_group_equality_preserves_intent_without_padding();

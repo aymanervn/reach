@@ -115,6 +115,17 @@ support expectation is explicitly resolved.
       and test-local render-buffer stack overflow exposed by descriptor growth. Both builds/all 40
       tests, full native regressions and installed reachctl restart pass. Shared chrome, complete
       width consumers, intermediate product appearance and final total-cost acceptance remain open.
+    - [x] Compose shared popup width chrome across rigid and compact ranges.
+      `reach_popup_push_width_background` shares canonical body/notch intent, stable source envelopes,
+      opaque border/fill semantics and optional whole-output scissoring. Atomic combined preflight
+      rejects ownership/ID/capacity errors; disabled shadows create no filter. DirectComposition
+      rounded clips select soft border mode, resolving the jagged inherited aliased edges. Both
+      builds/all forty tests, four-DPI/two-theme complete-popup matrices, final Debug/Release
+      repeated/finite-retarget captures, scissor captures and full renderer regressions pass.
+      Same-envelope retargets reuse rasters/tree; motion submits/repaints nothing and retirement
+      clears layers/nominal bytes. Flat colors match exactly; remaining antialias edge differences
+      are bounded and inspected. See the compact-shadow design for evidence and limits. Complete
+      Dock/Switcher consumers, intermediate product appearance and total-cost gates remain open.
 - [ ] Decide whether supported live-preview composition meets behavior and efficiency requirements;
   document the selected compositor or optimized hybrid design for Dock, Switcher and Stage.
   - [x] Select the existing DWM port with retained Reach visuals and active-only native motion.

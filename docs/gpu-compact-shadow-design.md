@@ -137,3 +137,51 @@ and probe-shadow-displayed-color-coverage.log
 under build/gpu-composition-migration. An earlier collector started late; its shadow-graph-system.jsonl
 is excluded from the table. Initial reference runs that redirected only command_target are also
 excluded because shadow drawing uses d2d_context.
+
+
+## Shared popup width chrome
+
+`reach_popup_push_width_background` implements complete background/border/shadow production over
+canonical width and notch intent. It first tries rigid focal caps over the full motion range.
+Compact or overlapping-cap ranges use the retained shadow contract with rounded body clips and
+separate notch sources. Opaque outer/inner fills preserve the existing border semantics. Shadow,
+border and background share notch limits, circular compact corners and the physical-pixel overlap.
+Disabled shadows own no caster/filter. A stable caller-supplied source envelope permits finite
+retargets without replacing rasters or the native tree. Existing command-buffer scissors wrap the
+complete result, including shadow. The staged append validates combined ownership and capacity;
+missing parents, shadow ancestry and ID collisions leave the destination unchanged. Sixteen
+consecutive IDs cover either recipe and its optional scissor wrapper.
+
+The complete-popup comparison exposed inherited aliased DirectComposition clip edges. Rounded
+clip containers now select soft border mode and rectangular/no-clip containers restore inheritance.
+See Microsoft's [SetBorderMode contract](https://learn.microsoft.com/en-us/windows/win32/api/dcomp/nf-dcomp-idcompositionvisual-setbordermode).
+This aligns native coverage more closely with WUC without changing ordinary raster edge policy.
+Flat interiors and exteriors match the reference; antialias edge coverage is not bit-identical.
+Dark edge maxima fall from 65 to about 27 channel values; light compact cases reach 40. The saved
+`popup-width-soft-inspection.png` shows the corrected rounded border.
+
+Private evidence in `build/gpu-composition-migration` includes 160-state Debug/Release static
+matrices, final Debug/Release repeated/finite-retarget captures, final Debug scissor captures and
+full Debug/Release renderer regressions. The matrices cover both themes, four DPI scales, both directions
+and centered/constrained off-center anchors. Finite targets of 80dp and 20dp reuse source rasters
+and tree inside the 100dp envelope. Motion alone submits/rasterizes nothing; scene retirement
+clears retained layers and nominal capture bytes. Earlier static matrices predate the final
+stable-envelope/scissor additions; ordinary static geometry did not change. The initial blank
+capture run is excluded because its command buffer was not initialized.
+
+These checks establish the shared chrome capability. Dock/Switcher cards, title trimming, input,
+native alignment, intermediate product appearance and total CPU/GPU/power/memory/latency acceptance
+remain separate gates. Small owned fixtures do not establish final product efficiency.
+
+Resumption verification on 2026-10-15 completes the final Debug finite-retarget diagnostic
+(`probe-popup-width-motion-final-debug.log`) and full Release regression
+(`probe-popup-width-regression-final-release.log`), both with zero failures. Existing Debug/Release
+ctest logs report all forty groups passed. Architecture, formatting and whitespace checks pass.
+
+The authorized installed validation stopped watchdog PID 6516 and awaited exit, then stopped Reach
+PID 8484 and awaited exit. Checked Debug Reach/Settings binaries replaced the installed copies;
+`C:\Dev\reach\build\reachctl --start` reused the installation. Later desktop enumeration verifies
+watchdog PID 12840 and Reach PID 17900 from that folder. Reach SHA256 is
+`3719458E83BFB8BE8D0AFEB6C1D3862317625CFDE5BA850BFCF24AD758F36064`; Settings SHA256 is
+`DBAB09DBB2E6B78A443F52A3B3592C33A89D443BC9CB04FEA77FE7BF029D4EBB`.
+Startup/lifetime and hashes do not establish displayed consumer behavior or final efficiency.
