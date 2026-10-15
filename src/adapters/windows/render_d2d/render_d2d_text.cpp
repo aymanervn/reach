@@ -2,6 +2,8 @@
 
 #include "reach/core/typography.h"
 
+#include <algorithm>
+
 static const wchar_t reach_d2d_font_fallback[] = L"Segoe UI";
 static const wchar_t reach_d2d_bundled_font_family[] = L"JetBrains Mono";
 static const wchar_t *reach_d2d_ui_font_family(reach_render_backend *backend);
@@ -143,6 +145,7 @@ void reach_d2d_set_ui_font(reach_render_backend *backend, int32_t use_bundled_fo
     if (backend->use_bundled_font == (use_bundled_font ? 1 : 0))
         return;
     backend->text_layouts.clear();
+    backend->text_width_layouts.clear();
     backend->text_formats.clear();
     reach_d2d_clear_retained_layers(backend);
     backend->use_bundled_font = use_bundled_font ? 1 : 0;
@@ -264,6 +267,7 @@ void reach_d2d_release_fonts(reach_render_backend *backend)
     if (backend != nullptr)
     {
         backend->text_layouts.clear();
+        backend->text_width_layouts.clear();
         backend->text_formats.clear();
     }
     if (backend == nullptr)
@@ -385,6 +389,87 @@ static HRESULT reach_d2d_command_text_layout(reach_render_backend *backend,
         command->text_weight > 0 ? command->text_weight : DWRITE_FONT_WEIGHT_NORMAL,
         command->rect.width, command->rect.height, alignment, DWRITE_PARAGRAPH_ALIGNMENT_CENTER,
         command->text_ellipsis, out_layout);
+}
+
+reach_result reach_d2d_text_width_layout_for(reach_render_backend *backend,
+                                             const reach_render_command *command,
+                                             const reach_d2d_text_width_layout **out)
+{
+    for (size_t index = 0; index < backend->text_width_layouts.size(); ++index)
+    {
+        const auto &entry = backend->text_width_layouts[index];
+        if (entry.text == (const wchar_t *)command->text && entry.size == command->text_size &&
+            entry.weight == command->text_weight && entry.width == command->rect.width &&
+            entry.height == command->rect.height && entry.alignment == command->text_alignment &&
+            entry.ellipsis == command->text_ellipsis)
+        {
+            auto hit = std::move(backend->text_width_layouts[index]);
+            backend->text_width_layouts.erase(backend->text_width_layouts.begin() + index);
+            backend->text_width_layouts.push_back(std::move(hit));
+            *out = &backend->text_width_layouts.back().layout;
+            return REACH_OK;
+        }
+    }
+    ComPtr<IDWriteTextLayout> layout;
+    HRESULT hr = reach_d2d_command_text_layout(backend, command, &layout);
+    if (FAILED(hr))
+        return REACH_ERROR;
+    reach_d2d_text_width_entry entry = {};
+    entry.text = (const wchar_t *)command->text;
+    entry.size = command->text_size;
+    entry.weight = command->text_weight;
+    entry.width = command->rect.width;
+    entry.height = command->rect.height;
+    entry.alignment = command->text_alignment;
+    entry.ellipsis = command->text_ellipsis;
+    if (command->text_ellipsis)
+    {
+        UINT32 count = 0;
+        (void)layout->GetClusterMetrics(nullptr, 0, &count);
+        if (count > 260)
+            return REACH_ERROR;
+        std::vector<DWRITE_CLUSTER_METRICS> clusters(count);
+        hr = layout->GetClusterMetrics(clusters.data(), count, &count);
+        DWRITE_TRIMMING trimming = {};
+        ComPtr<IDWriteInlineObject> sign;
+        if (SUCCEEDED(hr))
+            hr = layout->GetTrimming(&trimming, &sign);
+        DWRITE_INLINE_OBJECT_METRICS metrics = {};
+        if (SUCCEEDED(hr) && sign != nullptr)
+            hr = sign->GetMetrics(&metrics);
+        DWRITE_TEXT_METRICS text = {};
+        if (SUCCEEDED(hr))
+            hr = layout->GetMetrics(&text);
+        if (FAILED(hr))
+            return REACH_ERROR;
+        float advance = 0;
+        auto add = [&](float value)
+        {
+            if (value > 0 && value < command->rect.width)
+                entry.layout.thresholds.push_back(value);
+        };
+        for (const auto &cluster : clusters)
+        {
+            advance += cluster.width;
+            add(advance + metrics.width);
+        }
+        add(text.width);
+        auto &points = entry.layout.thresholds;
+        std::sort(points.begin(), points.end());
+        points.erase(std::unique(points.begin(), points.end()), points.end());
+    }
+    for (size_t index = 0; index <= entry.layout.thresholds.size(); ++index)
+    {
+        float left = index > 0 ? entry.layout.thresholds[index - 1] : 0;
+        float right = index < entry.layout.thresholds.size() ? entry.layout.thresholds[index]
+                                                             : command->rect.width;
+        entry.layout.widths.push_back(command->text_ellipsis ? (left + right) * .5f : right);
+    }
+    if (backend->text_width_layouts.size() >= 32)
+        backend->text_width_layouts.erase(backend->text_width_layouts.begin());
+    backend->text_width_layouts.push_back(std::move(entry));
+    *out = &backend->text_width_layouts.back().layout;
+    return REACH_OK;
 }
 
 reach_result reach_d2d_draw_text_to_target(reach_render_backend *backend, ID2D1RenderTarget *target,

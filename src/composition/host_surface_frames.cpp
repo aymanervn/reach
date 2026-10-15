@@ -190,15 +190,15 @@ reach_host_execute_registered_surface(reach_host *host, reach_feature_runtime *d
         commands->presentation.bounds = commands->content_rect;
     }
     desc->surface->fallback_animation_active =
-        commands->requires_content_sampling ||
-        ((desc->surface->renderer.ops.retained_supported == nullptr ||
-          !desc->surface->renderer.ops.retained_supported(desc->surface->renderer.backend)) &&
-         reach_render_command_buffer_motion_active(commands));
+        reach_render_backend_content_sampling_active(&desc->surface->renderer, commands);
     if (definition != nullptr && definition->surface.popup_chrome)
     {
-        return reach_host_render_popup_surface(host, desc->definition->id, desc->surface,
-                                               geometry->visible_bounds, geometry->notch_anchor_x,
-                                               geometry->notch_side, commands);
+        result = reach_host_render_popup_surface(host, desc->definition->id, desc->surface,
+                                                 geometry->visible_bounds, geometry->notch_anchor_x,
+                                                 geometry->notch_side, commands);
+        desc->surface->fallback_animation_active =
+            reach_render_backend_content_sampling_active(&desc->surface->renderer, commands);
+        return result;
     }
     if (!geometry->presentation.retained)
     {
@@ -222,6 +222,8 @@ reach_host_execute_registered_surface(reach_host *host, reach_feature_runtime *d
     result = desc->surface->renderer.ops.execute(desc->surface->renderer.backend, commands);
     reach_result end_result =
         desc->surface->renderer.ops.end_frame(desc->surface->renderer.backend);
+    desc->surface->fallback_animation_active =
+        reach_render_backend_content_sampling_active(&desc->surface->renderer, commands);
     return result != REACH_OK ? result : end_result;
 }
 
@@ -660,8 +662,8 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
         return REACH_ERROR;
     }
 
-    int32_t needs_frame =
-        reach_host_surface_needs_frame(desc) || desc->surface->fallback_animation_active;
+    int32_t capsule_needs_frame = reach_host_surface_needs_frame(desc);
+    int32_t needs_frame = capsule_needs_frame || desc->surface->fallback_animation_active;
     int32_t active = reach_host_surface_presented(desc);
     int32_t visible = active;
     int32_t frame_active = active;
@@ -732,9 +734,21 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
     int32_t frame_context_changed =
         render_context_changed ||
         !reach_rect_equal(surface_ctx.last_bounds, desc->layout_context.last_bounds);
-    if (!needs_frame && !host->dirty.layout && !host->dirty.render && !desc->surface->dirty_flags &&
-        !current_geometry.synchronize_presentation && !frame_context_changed)
+    const auto &renderer = desc->surface->renderer;
+    int32_t renderer_sampling = !capsule_needs_frame && renderer.ops.sample_content != nullptr &&
+                                renderer.ops.content_sampling_required != nullptr &&
+                                renderer.ops.content_sampling_required(renderer.backend);
+    if ((!needs_frame || renderer_sampling) && !host->dirty.layout && !host->dirty.render &&
+        !desc->surface->dirty_flags && !current_geometry.synchronize_presentation &&
+        !frame_context_changed)
     {
+        reach_result sampling_result = REACH_OK;
+        if (renderer_sampling)
+        {
+            sampling_result = renderer.ops.sample_content(renderer.backend);
+            desc->surface->fallback_animation_active =
+                renderer.ops.content_sampling_required(renderer.backend);
+        }
         const reach_feature_native_overlay_ops *native_ops =
             desc->definition->surface_ops->native_overlay;
         int32_t native_changed =
@@ -745,7 +759,7 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
             (void)reach_host_sync_native_overlay(host, desc, &current_geometry,
                                                  &desc->native_overlay_context,
                                                  desc->native_overlay_shadow_pad);
-        return REACH_OK;
+        return sampling_result;
     }
     reach_feature_surface_context layout_context = surface_ctx;
     desc->frame_context_valid = 0;

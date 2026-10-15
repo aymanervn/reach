@@ -16,7 +16,8 @@ extern "C"
     {
         REACH_MOTION_MAX_EXTRA_KNOTS = 7,
         REACH_MOTION_MAX_SEGMENTS = 32,
-        REACH_MOTION_MAX_REPEAT_SEGMENTS = 68
+        REACH_MOTION_MAX_REPEAT_SEGMENTS = 68,
+        REACH_MOTION_MAPPING_STEPS = 2
     };
 
     typedef struct reach_motion
@@ -83,6 +84,9 @@ extern "C"
                                   reach_motion *out_motion);
     reach_result reach_motion_max(const reach_motion *first, const reach_motion *second,
                                   reach_motion *out_motion);
+    reach_result reach_motion_lookup(const reach_motion *motion, const float *thresholds,
+                                     const float *values, size_t threshold_count,
+                                     reach_motion *out_motion);
     reach_motion reach_motion_clamp(const reach_motion *motion, float minimum, float maximum);
     size_t reach_motion_compile_at(const reach_motion *motion, double now_seconds,
                                    reach_motion_segment segments[REACH_MOTION_MAX_SEGMENTS]);

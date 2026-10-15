@@ -197,6 +197,7 @@ extern "C"
         int32_t notch_side;
         int32_t text_alignment;
         int32_t text_ellipsis;
+        int32_t text_fit_to_clip;
         uint16_t text[260];
 
         reach_color text_color;
@@ -229,6 +230,9 @@ extern "C"
     reach_result reach_render_push_textbox(reach_render_command_buffer *buffer,
                                            const reach_render_command *command, uint64_t caret_id,
                                            const reach_motion *caret_opacity);
+    reach_result reach_render_push_width_text(reach_render_command_buffer *buffer,
+                                              const reach_render_command *command,
+                                              const reach_render_group *viewport);
 
     void reach_render_command_buffer_clear(reach_render_command_buffer *buffer);
     int32_t reach_render_command_buffer_motion_active(const reach_render_command_buffer *buffer);

@@ -1057,6 +1057,67 @@ static void test_shadow_source_ownership(void)
                 "disabled shadow material does not cause property churn");
 }
 
+static void test_width_text_source_ownership(void)
+{
+    auto buffer = std::make_unique<reach_render_command_buffer>();
+    reach_render_command_buffer_clear(buffer.get());
+    reach_render_command text = {};
+    text.type = REACH_RENDER_COMMAND_TEXT;
+    text.rect = {0, 0, 200, 24};
+    text.text_size = 13;
+    text.text[0] = 'A';
+    reach_render_group viewport = {};
+    viewport.id = 100;
+    viewport.bounds = viewport.clip = text.rect;
+    viewport.has_clip = 1;
+    reach_motion width = {};
+    reach_motion_start_at(&width, 20, 200, .18, REACH_EASING_EASE_IN_OUT, 10);
+    viewport.clip_insets[REACH_RENDER_CLIP_RIGHT] = reach_motion_affine(&width, -1, 200);
+    expect_true(reach_render_push_width_text(buffer.get(), &text, &viewport) == REACH_OK &&
+                    reach_render_command_buffer_validate_groups(buffer.get()) == REACH_OK &&
+                    buffer->commands[0].text_fit_to_clip && buffer->commands[0].text_ellipsis,
+                "width text publishes one owned text source with a canonical viewport");
+    expect_true(reach_render_push_width_text(buffer.get(), &text, &viewport) ==
+                        REACH_INVALID_ARGUMENT &&
+                    buffer->count == 1 && buffer->group_count == 1,
+                "width text identity collision leaves the destination unchanged");
+    buffer->commands[1] = buffer->commands[0];
+    ++buffer->count;
+    expect_true(reach_render_command_buffer_validate_groups(buffer.get()) == REACH_INVALID_ARGUMENT,
+                "width text cannot share its owning viewport with another raster source");
+    reach_render_command_buffer_clear(buffer.get());
+    viewport.parent_id = 999;
+    expect_true(reach_render_push_width_text(buffer.get(), &text, &viewport) ==
+                        REACH_INVALID_ARGUMENT &&
+                    buffer->count == 0 && buffer->group_count == 0,
+                "missing width text parent rejects before append");
+    viewport.parent_id = 0;
+    reach_motion_set(&viewport.clip_insets[REACH_RENDER_CLIP_LEFT], 1);
+    expect_true(reach_render_push_width_text(buffer.get(), &text, &viewport) ==
+                        REACH_INVALID_ARGUMENT &&
+                    buffer->count == 0 && buffer->group_count == 0,
+                "unsupported title origin clipping rejects before append");
+    reach_motion_set(&viewport.clip_insets[REACH_RENDER_CLIP_LEFT], 0);
+    reach_motion_set(&viewport.clip_insets[REACH_RENDER_CLIP_RIGHT], -1);
+    expect_true(reach_render_push_width_text(buffer.get(), &text, &viewport) ==
+                    REACH_INVALID_ARGUMENT,
+                "title width cannot silently exceed its retained source envelope");
+    viewport.clip_insets[REACH_RENDER_CLIP_RIGHT] = reach_motion_affine(&width, -1, 200);
+    reach_render_group shadow = {};
+    shadow.id = 99;
+    shadow.bounds = text.rect;
+    shadow.has_shadow = 1;
+    shadow.shadow = reach_theme_default()->popup_shadow;
+    expect_true(reach_render_command_buffer_begin_group(buffer.get(), &shadow) == REACH_OK,
+                "width text preflight starts from a valid shadow owner");
+    reach_render_command_buffer_end_group(buffer.get());
+    viewport.parent_id = shadow.id;
+    expect_true(reach_render_push_width_text(buffer.get(), &text, &viewport) ==
+                        REACH_INVALID_ARGUMENT &&
+                    buffer->count == 0 && buffer->group_count == 1,
+                "width text rejects shape-shadow ancestry before appending raster content");
+}
+
 static void test_popup_width_background_preflight(void)
 {
     auto storage = std::make_unique<reach_render_command_buffer>();
@@ -1145,6 +1206,7 @@ static void test_popup_width_background_preflight(void)
 
 int main(void)
 {
+    test_width_text_source_ownership();
     test_popup_width_background_preflight();
     test_shadow_source_ownership();
     test_textbox_caret_reference_ownership();
