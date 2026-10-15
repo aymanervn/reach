@@ -538,8 +538,134 @@ static void test_motion_equality_preserves_identity_without_padding(void)
     expect(!reach_motion_equal(&first, &second), "visible motion limits remain part of identity");
 }
 
+static void test_lookup_motion_sampling_compilation_and_retarget(void)
+{
+    const float thresholds[] = {25, 60, 90};
+    const float values[] = {0, -24, -48, 0};
+    for (int easing = REACH_EASING_EASE_IN; easing <= REACH_EASING_EASE_IN_OUT; ++easing)
+        for (int direction = 0; direction < 2; ++direction)
+        {
+            reach_motion source = {}, steps = {};
+            reach_motion_start_at(&source, direction ? 100 : 0, direction ? 0 : 100, 2,
+                                  (reach_easing)easing, 10);
+            expect(reach_motion_lookup(&source, thresholds, values, 3, &steps) == REACH_OK &&
+                       steps.generation == source.generation &&
+                       steps.started_seconds == source.started_seconds &&
+                       steps.duration_seconds == source.duration_seconds,
+                   "finite lookup preserves its source epoch without another motion owner");
+            for (double elapsed : {0.0, 0.27, 0.9, 1.7})
+            {
+                reach_motion_segment pieces[REACH_MOTION_MAX_SEGMENTS] = {};
+                size_t count = reach_motion_compile_at(&steps, 10 + elapsed, pieces);
+                expect(count > 0 && count <= REACH_MOTION_MAX_SEGMENTS,
+                       "lookup compiles through the existing bounded native segment contract");
+                for (size_t index = 0; index < count; ++index)
+                {
+                    const auto &piece = pieces[index];
+                    expect(piece.linear == 0 && piece.quadratic == 0 && piece.cubic == 0 &&
+                               (index == 0 || piece.start == pieces[index - 1].end) &&
+                               (index + 1 == count || piece.end_value == pieces[index + 1].value),
+                           "lookup segments hold exact values and jump at shared boundaries");
+                    for (double fraction : {0.01, 0.25, 0.5, 0.75, 0.99})
+                    {
+                        double now =
+                            10 + elapsed + piece.start + (piece.end - piece.start) * fraction;
+                        float width = reach_motion_value_at(&source, now);
+                        size_t state = width < 25 ? 0 : width < 60 ? 1 : width < 90 ? 2 : 3;
+                        expect(piece.value == values[state] &&
+                                   reach_motion_value_at(&steps, now) == values[state],
+                               "native and CPU lookup agree with source thresholds in both "
+                               "directions");
+                    }
+                }
+                expect(pieces[count - 1].end_value == reach_motion_value_at(&steps, 12),
+                       "finite lookup ends at its exact final state");
+            }
+            float low = 0, high = 0;
+            expect(reach_motion_range(&steps, &low, &high) == REACH_OK && low == -48 && high == 0,
+                   "lookup range includes intermediate states even with equal endpoint values");
+            expect(isinf(reach_motion_time_to_value_at(&steps, -12, 10)),
+                   "lookup never reports a crossing through an unvisited intermediate value");
+            double crossing = reach_motion_time_to_value_at(&steps, -24, 10);
+            expect(crossing > 0 && crossing < 2 &&
+                       reach_motion_value_at(&steps, 10 + crossing + 0.0001) == -24,
+                   "lookup crossing identifies the actual first visited state");
+            auto mapped = reach_motion_affine(&steps, -2, 1);
+            expect(reach_motion_value_at(&mapped, 10.7) ==
+                       1 - 2 * reach_motion_value_at(&steps, 10.7),
+                   "affine lookup changes values without moving threshold times");
+            float current = reach_motion_value_at(&steps, 10.7);
+            reach_motion_animate_to_at(&steps, 10, .2, REACH_EASING_EASE_OUT, 10.7);
+            expect(steps.from == current && !steps.has_mapping &&
+                       steps.generation == source.generation + 1,
+                   "retargeting retires lookup from its currently visible discrete value");
+        }
+}
+
+static void test_lookup_motion_preflight_and_mapped_sources(void)
+{
+    reach_motion source = {}, mapped = {}, steps = {};
+    reach_motion_start_at(&source, 0, 100, 2, REACH_EASING_EASE_IN_OUT, 10);
+    expect(reach_motion_hinge(&source, 50, 50, .5f, 2, &mapped) == REACH_OK,
+           "lookup source can use existing piecewise fitting");
+    mapped = reach_motion_clamp(&mapped, 30, 120);
+    const float thresholds[] = {20, 40, 90, 130};
+    const float values[] = {0, 1, 2, 3, 4};
+    expect(reach_motion_lookup(&mapped, thresholds, values, 4, &steps) == REACH_OK,
+           "lookup resolves thresholds through monotone mapping and active bounds");
+    for (int sample = 0; sample <= 200; ++sample)
+    {
+        double now = 10 + sample * .01;
+        float value = reach_motion_value_at(&mapped, now);
+        size_t state = value < 20 ? 0 : value < 40 ? 1 : value < 90 ? 2 : value < 130 ? 3 : 4;
+        expect(reach_motion_value_at(&steps, now) == values[state],
+               "mapped lookup preserves existing clamp and fitting thresholds");
+    }
+    reach_motion previous = steps;
+    const float unordered[] = {40, 20};
+    expect(reach_motion_lookup(&source, unordered, values, 2, &steps) == REACH_INVALID_ARGUMENT &&
+               reach_motion_equal(&previous, &steps),
+           "invalid lookup leaves output intent untouched");
+    reach_motion negative = {};
+    reach_motion_hinge(&source, 50, 50, -1, -1, &negative);
+    expect(reach_motion_lookup(&negative, thresholds, values, 4, &steps) == REACH_INVALID_ARGUMENT,
+           "lookup rejects decreasing source maps instead of approximating them");
+    expect(reach_motion_combine(&previous, 1, &source, 1, 0, &steps) == REACH_INVALID_ARGUMENT,
+           "unsupported continuous and discrete combinations reject rather than interpolate jumps");
+    reach_motion_repeat_at(&source, 0, 100, .2, .4, .4, REACH_EASING_EASE_IN_OUT, 10);
+    expect(reach_motion_lookup(&source, thresholds, values, 4, &steps) == REACH_INVALID_ARGUMENT,
+           "finite lookup cannot silently become a periodic driver");
+    const float one[] = {7};
+    expect(reach_motion_lookup(&mapped, nullptr, one, 0, &steps) == REACH_OK &&
+               reach_motion_value_at(&steps, 11) == 7 && !reach_motion_active_at(&steps, 11),
+           "constant lookup owns no unnecessary motion activity");
+    const float maximum_thresholds[] = {10, 20, 30, 40, 50, 60, 70, 80};
+    const float maximum_values[] = {0, 1, 2, 3, 4, 5, 6, 7, 8};
+    reach_motion_start_at(&source, 0, 100, 2, REACH_EASING_EASE_IN_OUT, 10);
+    expect(reach_motion_lookup(&source, maximum_thresholds, maximum_values, 8, &steps) ==
+                   REACH_OK &&
+               steps.mapping_extra_count == REACH_MOTION_MAX_EXTRA_KNOTS,
+           "lookup uses the existing bounded mapping capacity without descriptor growth");
+    const float midpoint[] = {50};
+    const float binary[] = {0, 1};
+    for (int direction = 0; direction < 2; ++direction)
+    {
+        reach_motion_start_at(&source, direction ? 100 : 0, direction ? 0 : 100, 2,
+                              REACH_EASING_EASE_IN_OUT, 10);
+        expect(reach_motion_lookup(&source, midpoint, binary, 1, &steps) == REACH_OK &&
+                   reach_motion_value_at(&steps, 11) == (direction ? 0 : 1),
+               "an exact lookup crossing selects the following traversal state");
+        reach_motion_segment pieces[REACH_MOTION_MAX_SEGMENTS] = {};
+        expect(reach_motion_compile_at(&steps, 11, pieces) > 0 &&
+                   pieces[0].value == reach_motion_value_at(&steps, 11),
+               "submission at an exact lookup crossing agrees with CPU state");
+    }
+}
+
 int main(void)
 {
+    test_lookup_motion_sampling_compilation_and_retarget();
+    test_lookup_motion_preflight_and_mapped_sources();
     test_composed_periodic_motion_preserves_phase();
     test_composed_motion_capacity_and_identity();
     test_composed_fitting_motion_preserves_constraints();

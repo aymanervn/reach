@@ -1271,3 +1271,47 @@ question. Watchdog-first termination, checked-binary replacement and installed-f
 `reachctl --start` succeeded. Reach PID 19168 and watchdog PID 17156 run from the installed folder;
 Reach/Settings hashes match the final checked Debug builds. The existing installation was reused.
 This startup/lifetime check does not establish displayed caret timing or full product interaction.
+
+
+## Width-dependent retained text sources
+
+The shared text/viewport relationship prepares DirectWrite trim states and selects retained raster
+rows with canonical finite lookup. It preserves ordinary font size, character ellipsis and
+alignment without a second clock. Static fields retain one ordinary source. Active fitting prepares
+needed blocks, retaining prior block identities for retargets. Source owner namespaces survive
+command reordering. The existing 128 MiB nominal aggregate source limit, 16,384-pixel dimensions
+and 451 native-layer bound remain in force. Incremental staging bounds temporary source-command
+expansion as well; it does not build an entire oversized graph before selecting fallback.
+
+Oversized/unsupported title graphs retain ordinary text pixels and report renderer-owned sampling
+through the render port. Both application loops can sample those records without arranging a
+capsule or rebuilding commands. Actual source rasterization and renderer execution remain counted;
+one final sample clears demand. This is an explicit capacity fallback, not a product efficiency
+claim or exemption for normal preview width tracks.
+
+Both complete builds and forty Debug/Release test groups pass. Owned production checks cover 288
+static comparisons on WUC/DC, two production font modes and four DPI values, plus displayed finite
+forward/reverse endpoints, unchanged sources/tree, command reorder, color/font changes, scissoring,
+source-only fallback and resource retirement. Static sources match ordinary reference pixels;
+active atlas output matches an independent translated glyph state within the two-channel bound.
+The earlier prototype isolates fractional filtering from glyph selection: legacy edge differences
+reach 133, while flat interiors/exteriors have zero error. The inspected comparison and failed
+initial matrix remain recorded; no legacy tolerance was silently raised. Complete intermediate
+consumer appearance and controlled product cost/latency remain open.
+
+The command grows 1,024 -> 1,032 bytes; buffer 1,013,800 -> 1,017,768 (+3,968 / 0.39%). Motion and
+retained group storage remain 152 and 2,248 bytes. Two render callbacks add sixteen bytes per port.
+Recipe caches, sampled-source records, internal owner maps, retained source commands and atlas
+pixels add further bounded CPU/GPU storage. Earlier small prototype scenes use approximately
+0.5--1.34 MiB including a 281,600-byte background; current static production fields return to an
+ordinary source. These estimates exclude driver/native object allocation and do not establish total
+memory equivalence. Full Dock/Switcher fitting and the final comparison remain pending.
+
+Evidence under `build/gpu-composition-migration`: `text_width_probe.cpp`,
+`text-width-layout-release.log`, `title_width_native_probe.inc`, `text-width-size.cpp`,
+`probe-title-width-atlas-reference-release.log`, `probe-text-width-final-{debug,release}.log`,
+`probe-text-width-full-{debug,release}.log` and the text-width build/test logs. Final scoped bounded-staging
+checks also pass (`probe-text-width-bounds-{debug,release}.log`): fifty simultaneous title fields use
+446 native layers and 55,942,400 nominal bytes, selecting six sampled sources. Final serial ctest
+runs pass all forty groups in each build. The installed watchdog-first/reachctl restart is verified
+with matching Reach/Settings hashes; the text-width design records its process lifetime evidence.

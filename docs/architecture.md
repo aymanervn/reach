@@ -436,6 +436,14 @@ are rejected without changing the output. The descriptor stores seven additional
 unused storage does not affect retained intent identity. Output limits and affine transforms retain
 the full mapping. `reach_motion_range` includes every interior extremum.
 
+`reach_motion_lookup` projects a finite monotone source into up to eight discrete threshold changes
+without growing the descriptor or introducing another owner. Source mapping/clamp intersections
+resolve into its raw domain; constant native pieces jump through the existing WUC step/DC cubic
+execution. At an exact crossing, traversal selects the following state in either direction. Affine
+output changes retain crossing times. Range and crossing queries inspect only visited states;
+retargeting begins at the current discrete value. Nested lookup, repetition, decreasing source maps
+and ambiguous continuous/discrete composition reject before mutation.
+
 The shared compiler splits at mapping knots, clamp crossings and the easing midpoint into at most
 32 finite pieces or 68 rotated-cycle pieces. Both native backends consume those same cubic segments.
 CPU input/fallback samples use the same descriptor; crossing queries find the first future crossing,
@@ -683,6 +691,26 @@ Unsupported rendering samples the same phase at visible-field deadlines, skips m
 returns to idle between boundaries; native mode never advances the fallback snapshot for blinking.
 The compound drawing path remains necessary for that unsupported renderer. Source/consumer checks
 pass; displayed timing and total product workload/power acceptance remain migration work.
+
+`reach_render_push_width_text` associates one ordinary text command with a dedicated rectangular
+viewport whose right inset owns layout width. Its text envelope covers the complete width range;
+left/top/bottom insets stay zero. Core preflight rejects ambiguous/missing ownership, unsupported
+clips and shape-shadow ancestry. The native planner prepares DirectWrite trim states in retained
+raster blocks and selects rows through canonical finite lookup. Independent alignment translation
+preserves text size. A bounded 32-entry recipe cache reuses the existing font/format/layout caches.
+Static fields use one ordinary source; active fitting prepares visible blocks and reuses prior
+ones. Owner-based internal namespaces preserve surviving source IDs across command reordering.
+Command scissors wrap output before internal alignment/row translation. Retiring a static text
+raster restores DirectComposition's inherited interpolation mode before adding descendants.
+
+The planner enforces the existing source-byte, dimension and native-layer limits while staging each
+field. Unsupported/over-budget text uses an ordinary source sampled from the same width. Generic
+render-port demand includes its required final update. Reach and Settings can sample only that
+source when no other work is dirty, without capsule arrangement or command production. Suspension,
+source removal and font recreation clear sampled-source ownership; finite endpoints return both
+loops to idle. These are shared capabilities; Dock/Switcher consumers, intermediate product pixels
+and total CPU/GPU/power/memory/latency acceptance remain migration work. See
+`docs/gpu-text-width-design.md`.
 
 Dock and Top Bar press feedback emits a separate flat retained group, copying item placement
 for moving icons. Shared UI feedback owns the group descriptor; the icon helper retains its

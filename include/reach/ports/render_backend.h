@@ -26,6 +26,8 @@ extern "C"
         reach_result (*presentation_complete)(reach_render_backend *backend, uint64_t generation,
                                               int32_t *out_complete);
         void (*suspend)(reach_render_backend *backend);
+        int32_t (*content_sampling_required)(const reach_render_backend *backend);
+        reach_result (*sample_content)(reach_render_backend *backend);
     } reach_render_backend_ops;
 
     typedef struct reach_render_backend_port
@@ -33,6 +35,19 @@ extern "C"
         reach_render_backend *backend;
         reach_render_backend_ops ops;
     } reach_render_backend_port;
+
+    static inline int32_t
+    reach_render_backend_content_sampling_active(const reach_render_backend_port *renderer,
+                                                 const reach_render_command_buffer *commands)
+    {
+        return commands != 0 &&
+               (commands->requires_content_sampling ||
+                (renderer != 0 && renderer->ops.content_sampling_required != 0 &&
+                 renderer->ops.content_sampling_required(renderer->backend)) ||
+                (reach_render_command_buffer_motion_active(commands) && renderer != 0 &&
+                 (renderer->ops.retained_supported == 0 ||
+                  !renderer->ops.retained_supported(renderer->backend))));
+    }
 
 #ifdef __cplusplus
 }

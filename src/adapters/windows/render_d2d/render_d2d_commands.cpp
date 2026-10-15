@@ -300,6 +300,13 @@ reach_result reach_d2d_execute_fallback(reach_render_backend *backend,
     for (size_t index = 0; index < commands->count && outcome == REACH_OK; ++index)
     {
         reach_render_command command = commands->commands[index];
+        if (command.text_fit_to_clip)
+        {
+            const reach_render_group *viewport =
+                reach_render_command_buffer_group(commands, command.group_id);
+            command.rect.width = reach_render_group_clip_at(viewport, now_seconds).width;
+            command.text_fit_to_clip = 0;
+        }
         const reach_render_group *shadow =
             has_shadow ? reach_render_command_buffer_group_shadow(commands, command.group_id)
                        : nullptr;

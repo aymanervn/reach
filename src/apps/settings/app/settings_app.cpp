@@ -444,6 +444,8 @@ static reach_result reach_settings_render(reach_settings_app *app)
     }
     result = app->renderer.ops.execute(app->renderer.backend, &app->render_commands);
     reach_result end_result = app->renderer.ops.end_frame(app->renderer.backend);
+    app->motion_fallback_active =
+        reach_render_backend_content_sampling_active(&app->renderer, &app->render_commands);
     return result != REACH_OK ? result : end_result;
 }
 
@@ -3032,10 +3034,18 @@ reach_result reach_settings_app_update(reach_settings_app *app, double delta_sec
     if (reach_settings_app_caret_deadline(app) > 0.0 &&
         reach_settings_model_update_caret(&app->model, reach_motion_now_seconds()))
         app->dirty = 1;
-    int32_t motion_fallback = app->render_commands.requires_content_sampling ||
-                              (reach_render_command_buffer_motion_active(&app->render_commands) &&
-                               (app->renderer.ops.retained_supported == nullptr ||
-                                !app->renderer.ops.retained_supported(app->renderer.backend)));
+    int32_t motion_fallback =
+        reach_render_backend_content_sampling_active(&app->renderer, &app->render_commands);
+    if (!app->dirty && !app->render_commands.requires_content_sampling &&
+        app->renderer.ops.sample_content != nullptr &&
+        app->renderer.ops.content_sampling_required != nullptr &&
+        app->renderer.ops.content_sampling_required(app->renderer.backend))
+    {
+        reach_result result = app->renderer.ops.sample_content(app->renderer.backend);
+        app->motion_fallback_active =
+            reach_render_backend_content_sampling_active(&app->renderer, &app->render_commands);
+        return result;
+    }
     if (motion_fallback || app->motion_fallback_active)
         app->dirty = 1;
     app->motion_fallback_active = motion_fallback;
@@ -3105,10 +3115,8 @@ int32_t reach_settings_app_needs_frame(const reach_settings_app *app)
     int32_t visible = app->window.ops.is_minimized == nullptr ||
                       !app->window.ops.is_minimized(app->window.window);
     int32_t sampled_visual =
-        visible && (app->motion_fallback_active || app->render_commands.requires_content_sampling ||
-                    (reach_render_command_buffer_motion_active(&app->render_commands) &&
-                     (app->renderer.ops.retained_supported == nullptr ||
-                      !app->renderer.ops.retained_supported(app->renderer.backend))));
+        visible && (app->motion_fallback_active || reach_render_backend_content_sampling_active(
+                                                       &app->renderer, &app->render_commands));
     return (caret_deadline > 0.0 && reach_motion_wait_ms(caret_deadline) == 0) || sampled_visual ||
            app->dirty || reach_busy || startup_busy || worker->completed ||
            app->update_worker.progress_state.load() != 0 ||

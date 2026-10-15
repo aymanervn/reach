@@ -276,7 +276,8 @@ static int32_t reach_render_repetition_valid(const reach_render_group *group, in
     for (index = 0; index < sizeof(motions) / sizeof(motions[0]); ++index)
     {
         const reach_motion *motion = motions[index];
-        if (motion->has_mapping != 0 && motion->has_mapping != 1)
+        if (motion->has_mapping != 0 && motion->has_mapping != 1 &&
+            motion->has_mapping != REACH_MOTION_MAPPING_STEPS)
             return 0;
         if (motion->has_mapping || motion->mapping_extra_count != 0)
         {
@@ -290,6 +291,31 @@ static int32_t reach_render_repetition_valid(const reach_render_group *group, in
             return 0;
     }
     return 1;
+}
+
+static int32_t reach_render_width_text_valid(const reach_render_command *command,
+                                             const reach_render_group *viewport)
+{
+    if (command == 0 || viewport == 0 || command->type != REACH_RENDER_COMMAND_TEXT ||
+        !viewport->has_clip || viewport->clip_radius != 0 || viewport->has_tint ||
+        viewport->has_shadow || !reach_render_rect_equal(viewport->clip, command->rect) ||
+        !reach_render_rect_equal(viewport->bounds, command->rect) || !isfinite(command->rect.x) ||
+        !isfinite(command->rect.y) || !isfinite(command->rect.width) ||
+        !isfinite(command->rect.height) || command->rect.width <= 0 || command->rect.height <= 0)
+        return 0;
+    for (size_t side = 0; side < 4; ++side)
+        if (side != REACH_RENDER_CLIP_RIGHT)
+        {
+            float minimum = 0, maximum = 0;
+            if (reach_motion_range(&viewport->clip_insets[side], &minimum, &maximum) != REACH_OK ||
+                minimum != 0 || maximum != 0)
+                return 0;
+        }
+    reach_rect_motion clip = {0};
+    float minimum = 0, maximum = 0;
+    return reach_render_group_clip_motion(viewport, &clip) == REACH_OK &&
+           reach_motion_range(&clip.width, &minimum, &maximum) == REACH_OK &&
+           maximum <= command->rect.width;
 }
 
 reach_result reach_render_command_buffer_validate_groups(const reach_render_command_buffer *buffer)
@@ -331,6 +357,18 @@ reach_result reach_render_command_buffer_validate_groups(const reach_render_comm
     for (index = 0; index < buffer->count; ++index)
     {
         const reach_render_command *command = &buffer->commands[index];
+        if (command->text_fit_to_clip != 0 && command->text_fit_to_clip != 1)
+            return REACH_INVALID_ARGUMENT;
+        if (command->text_fit_to_clip)
+        {
+            const reach_render_group *viewport =
+                reach_render_command_buffer_group(buffer, command->group_id);
+            if (!reach_render_width_text_valid(command, viewport))
+                return REACH_INVALID_ARGUMENT;
+            for (other = 0; other < buffer->count; ++other)
+                if (other != index && buffer->commands[other].group_id == command->group_id)
+                    return REACH_INVALID_ARGUMENT;
+        }
         const reach_render_group *shadow =
             has_shadow ? reach_render_command_buffer_group_shadow(buffer, command->group_id) : 0;
         if (shadow != 0 && (command->group_id == shadow->id ||
@@ -790,6 +828,29 @@ reach_result reach_render_push_textbox(reach_render_command_buffer *buffer,
     textbox.caret_group_id = caret_id;
     textbox.caret_visible = 1;
     return reach_render_command_buffer_push(buffer, &textbox);
+}
+
+reach_result reach_render_push_width_text(reach_render_command_buffer *buffer,
+                                          const reach_render_command *command,
+                                          const reach_render_group *viewport)
+{
+    if (buffer == 0 || buffer->current_group_id != 0 ||
+        !reach_render_width_text_valid(command, viewport) ||
+        reach_render_command_buffer_group_shadow(buffer, viewport->parent_id) != 0)
+        return REACH_INVALID_ARGUMENT;
+    if (buffer->count >= REACH_MAX_RENDER_COMMANDS)
+        return REACH_ERROR;
+    reach_result result = reach_render_command_buffer_begin_group(buffer, viewport);
+    if (result != REACH_OK)
+        return result;
+    reach_render_command text = *command;
+    text.text_fit_to_clip = 1;
+    text.text_ellipsis = 1;
+    result = reach_render_command_buffer_push(buffer, &text);
+    reach_render_command_buffer_end_group(buffer);
+    if (result != REACH_OK)
+        --buffer->group_count;
+    return result;
 }
 
 int32_t reach_render_retained_command_bounds(const reach_render_command *command,

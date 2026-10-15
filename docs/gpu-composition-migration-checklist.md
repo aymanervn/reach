@@ -91,6 +91,15 @@ support expectation is explicitly resolved.
     Cached/fallback coverage matches static viewport coverage at six widths/four DPI scales.
     Installed Reach is restarted through reachctl and verified alive. The descriptor adds 1,800 bytes
     per render buffer (0.18%). Consumer appearance, shadows and width fitting remain open.
+  - [x] Preserve width-dependent text layout through retained source parts.
+    Shared text/viewport ownership, bounded canonical finite lookup and DirectWrite trim-state
+    blocks are implemented on both native backends, with ordinary sampled fallback. Owner-based
+    identities survive reorder; static fields use one source; whole-output scissors and font/color
+    replacement preserve the width epoch. Source/layer bounds select active-only renderer-owned
+    sampling without feature layout/commands in either loop. Pure ownership/clock checks, both
+    builds/all forty test groups, full native regressions and owned source/pixel/lifetime matrices
+    pass. Final bounded-staging and installed watchdog-first/reachctl verification also pass.
+    Consumers, intermediate product appearance and total cost remain open; see the text-width design for evidence/limits.
   - [ ] Resolve compact native shadow appearance and total cost before width consumer integration.
     An owned-window prototype renders the existing interior cutout on both compositors. Three widths
     match within two channel values outside a one-pixel geometry edge; edge differences reach 23.

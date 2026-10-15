@@ -96,6 +96,37 @@ struct reach_d2d_cover_entry
 
 struct reach_d2d_shadow_scene;
 
+struct reach_d2d_text_width_layout
+{
+    std::vector<float> thresholds;
+    std::vector<float> widths;
+};
+
+struct reach_d2d_text_width_entry
+{
+    std::wstring text;
+    float size;
+    float width;
+    float height;
+    int32_t weight;
+    int32_t alignment;
+    int32_t ellipsis;
+    reach_d2d_text_width_layout layout;
+};
+
+struct reach_d2d_sampled_text
+{
+    uint64_t owner;
+    reach_render_command command;
+    reach_motion width;
+};
+
+struct reach_d2d_text_width_owner
+{
+    uint64_t owner;
+    uint64_t prefix;
+};
+
 struct reach_d2d_retained_layer
 {
     uint64_t id = 0;
@@ -174,6 +205,10 @@ struct reach_render_backend
     ComPtr<ID2D1DeviceContext> shadow_fallback_context;
     ID2D1Device *shadow_fallback_parent_device = nullptr;
     uint64_t reported_retained_bytes = 0;
+    bool requires_content_sampling = false;
+    std::vector<reach_d2d_sampled_text> sampled_text;
+    std::vector<reach_d2d_text_width_owner> text_width_owners;
+    uint64_t next_text_width_prefix = UINT64_C(0xc000000000010000);
     ComPtr<ABI::Windows::UI::Composition::IContainerVisual> scene_visual;
     ComPtr<IDCompositionVisual2> dcomp_scene_visual;
     ComPtr<IDCompositionScaleTransform> scene_scale;
@@ -189,6 +224,7 @@ struct reach_render_backend
 
     std::vector<reach_d2d_text_format_entry> text_formats;
     std::vector<reach_d2d_text_layout_entry> text_layouts;
+    std::vector<reach_d2d_text_width_entry> text_width_layouts;
     std::vector<reach_d2d_cover_entry> cover_cache;
     IDWriteFactory *text_factory;
     IWICImagingFactory *wic_factory;
@@ -211,6 +247,11 @@ struct reach_render_backend
 
 ID2D1RenderTarget *reach_d2d_target(reach_render_backend *backend);
 int32_t reach_d2d_retained_supported(const reach_render_backend *backend);
+int32_t reach_d2d_content_sampling_required(const reach_render_backend *backend);
+reach_result reach_d2d_sample_content(reach_render_backend *backend);
+reach_result reach_d2d_text_width_layout_for(reach_render_backend *backend,
+                                             const reach_render_command *command,
+                                             const reach_d2d_text_width_layout **out);
 reach_result reach_d2d_sync_retained(reach_render_backend *backend,
                                      const reach_render_command_buffer *commands);
 void reach_d2d_release_retained(reach_render_backend *backend);
