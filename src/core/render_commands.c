@@ -318,6 +318,17 @@ static int32_t reach_render_width_text_valid(const reach_render_command *command
            maximum <= command->rect.width;
 }
 
+static int32_t reach_render_clip_fill_valid(const reach_render_command *command,
+                                            const reach_render_group *source)
+{
+    return source != 0 && command->type == REACH_RENDER_COMMAND_RECT && command->radius == 0 &&
+           command->stroke_width == 0 && !command->has_clip_rect && !command->has_scissor &&
+           source->has_clip && source->clip_uniform_radius && !source->has_shadow &&
+           !source->x.generation && !source->y.generation && !source->scale.generation &&
+           !source->scale_y.generation && reach_render_rect_equal(command->rect, source->bounds) &&
+           reach_render_rect_equal(source->clip, source->bounds);
+}
+
 reach_result reach_render_command_buffer_validate_groups(const reach_render_command_buffer *buffer)
 {
     size_t index, other, active_count = 0;
@@ -357,6 +368,21 @@ reach_result reach_render_command_buffer_validate_groups(const reach_render_comm
     for (index = 0; index < buffer->count; ++index)
     {
         const reach_render_command *command = &buffer->commands[index];
+        if (command->rect_fit_to_clip != 0 && command->rect_fit_to_clip != 1)
+            return REACH_INVALID_ARGUMENT;
+        if (command->rect_fit_to_clip)
+        {
+            const reach_render_group *source =
+                reach_render_command_buffer_group(buffer, command->group_id);
+            if (!reach_render_clip_fill_valid(command, source))
+                return REACH_INVALID_ARGUMENT;
+            for (other = 0; other < buffer->count; ++other)
+                if (other != index && buffer->commands[other].group_id == source->id)
+                    return REACH_INVALID_ARGUMENT;
+            for (other = 0; other < buffer->group_count; ++other)
+                if (buffer->groups[other].parent_id == source->id)
+                    return REACH_INVALID_ARGUMENT;
+        }
         if (command->text_fit_to_clip != 0 && command->text_fit_to_clip != 1)
             return REACH_INVALID_ARGUMENT;
         if (command->text_fit_to_clip)
@@ -912,6 +938,7 @@ reach_result reach_render_push_rect_motion(reach_render_command_buffer *buffer,
         result = reach_render_command_buffer_begin_group(buffer, &paint);
     reach_render_command fill = {0};
     fill.type = REACH_RENDER_COMMAND_RECT;
+    fill.rect_fit_to_clip = 1;
     fill.rect = source->bounds;
     fill.color = color;
     int32_t scissored = buffer->has_scissor;

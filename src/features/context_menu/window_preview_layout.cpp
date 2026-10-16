@@ -11,29 +11,6 @@ static constexpr float reach_preview_header_gap_dp = 8.0f;
 static constexpr float reach_preview_margin_dp = 16.0f;
 static constexpr double reach_preview_width_seconds = 0.18;
 
-static float reach_context_menu_preview_width(reach_context_menu *menu, float target,
-                                              int32_t constraints_changed)
-{
-    float previous_target =
-        reach_animation_manager_target(&menu->animations, REACH_CONTEXT_MENU_ANIM_WIDTH);
-    if (constraints_changed || previous_target <= 0.0f ||
-        !reach_feature_transition_visible(&menu->popup_transition))
-    {
-        reach_animation_manager_set(&menu->animations, REACH_CONTEXT_MENU_ANIM_WIDTH, target);
-    }
-    else if (fabsf(previous_target - target) >= 0.5f)
-    {
-        reach_animation_manager_animate_to(&menu->animations, REACH_CONTEXT_MENU_ANIM_WIDTH, target,
-                                           reach_preview_width_seconds, REACH_EASING_EASE_IN_OUT);
-    }
-    else if (previous_target != target &&
-             !reach_animation_manager_active(&menu->animations, REACH_CONTEXT_MENU_ANIM_WIDTH))
-    {
-        reach_animation_manager_set(&menu->animations, REACH_CONTEXT_MENU_ANIM_WIDTH, target);
-    }
-    return reach_animation_manager_value(&menu->animations, REACH_CONTEXT_MENU_ANIM_WIDTH);
-}
-
 void reach_context_menu_attach_services(reach_context_menu *menu, reach_window_tracking *windows,
                                         reach_icon_service *icons)
 {
@@ -111,7 +88,11 @@ int32_t reach_context_menu_arrange_previews(reach_context_menu *menu,
         return 0;
     }
     reach_context_menu_state *state = &menu->state;
-    int32_t monitor_changed = !reach_rect_equal(menu->preview_context.monitor, ctx->monitor);
+    if (!state->open && menu->layout_initialized &&
+        reach_feature_transition_visible(&menu->popup_transition))
+        return 0;
+    reach_context_menu_open_context previous_context = menu->preview_context;
+    int32_t monitor_changed = !reach_rect_equal(previous_context.monitor, ctx->monitor);
     menu->preview_context = *ctx;
     menu->preview_context.request = nullptr;
     menu->preview_context.item_commands = nullptr;
@@ -213,91 +194,185 @@ int32_t reach_context_menu_arrange_previews(reach_context_menu *menu,
     start = layout.page_starts[layout.page_index];
     reach_window_preview_range range = reach_window_preview_pack(widths, state->item_count, start,
                                                                  REACH_MENU_MAX_WINDOWS, room, gap);
-    float row_width = fmaxf(range.width, overflow ? header * 5.0f : header);
-    row_width = fminf(room, row_width);
-    float popup_width = row_width + (padding + border) * 2.0f;
-    popup_width = reach_context_menu_preview_width(menu, popup_width,
-                                                   monitor_changed || scale != state->dpi_scale);
-    row_width = fmaxf(0.0f, popup_width - (padding + border) * 2.0f);
-    float fit = reach_window_preview_row_scale(range.width, row_width);
-    float popup_height = height + chrome - margin * 2.0f + (overflow ? header + header_gap : 0.0f);
+    float row_width = fminf(room, fmaxf(range.width, overflow ? header * 5 : header));
+    float target_width = row_width + (padding + border) * 2;
+    float popup_height = height + chrome - margin * 2 + (overflow ? header + header_gap : 0);
+    double now = reach_motion_now_seconds();
+    int32_t cut = !menu->layout_initialized ||
+                  !reach_feature_transition_visible(&menu->popup_transition) || monitor_changed ||
+                  scale != state->dpi_scale || border != menu->previews.border ||
+                  !reach_rect_equal(previous_context.anchor_button, ctx->anchor_button) ||
+                  previous_context.drop_direction != ctx->drop_direction ||
+                  previous_context.bar_edge_y != ctx->bar_edge_y;
+    layout.count = range.end - range.start;
+    layout.overflow = overflow;
+    layout.border = border;
+    layout.header_y = border + padding + (ctx->drop_direction == REACH_POPUP_DROP_DOWN ? notch : 0);
+    int32_t sources_changed = layout.count != menu->previews.count;
+    int32_t membership_changed = sources_changed;
+    int32_t source_geometry_changed = 0;
+    size_t survivors = 0;
+    for (size_t visible = 0; visible < layout.count; ++visible)
+    {
+        size_t index = range.start + visible;
+        auto &card = layout.cards[visible];
+        card.window = state->item_windows[index];
+        card.index = index;
+        card.live = live[index];
+        card.source_width = widths[index];
+        card.source_height = height;
+        card.header_height = header;
+        source_geometry_changed |=
+            card.source_width != menu->previews.cards[visible].source_width ||
+            card.source_height != menu->previews.cards[visible].source_height;
+        sources_changed |= card.window != menu->previews.cards[visible].window;
+        membership_changed |= card.window != menu->previews.cards[visible].window ||
+                              card.live != menu->previews.cards[visible].live;
+        for (size_t old = 0; old < menu->previews.count; ++old)
+            if (menu->previews.cards[old].window == card.window)
+            {
+                ++survivors;
+                card.render_id = menu->previews.cards[old].render_id;
+            }
+        if (card.render_id == 0)
+        {
+            card.render_id = menu->next_card_id;
+            menu->next_card_id += 16;
+        }
+    }
+    int32_t restart =
+        sources_changed || source_geometry_changed || fabsf(menu->width.to - target_width) >= .5f;
+    if (cut)
+    {
+        reach_motion_set(&menu->reflow, 1);
+        reach_motion_set(&menu->width, target_width);
+        menu->layout_cleanup_pending = 0;
+    }
+    else if (state->open && restart)
+    {
+        float current = reach_motion_value_at(&menu->width, now);
+        reach_motion_start_at(&menu->reflow, 0, 1, reach_preview_width_seconds,
+                              REACH_EASING_EASE_IN_OUT, now);
+        menu->width = reach_motion_affine(&menu->reflow, target_width - current, current);
+        menu->layout_cleanup_pending = 1;
+    }
+    else if (state->open && !reach_motion_active_at(&menu->reflow, now) &&
+             menu->width.to != target_width)
+        reach_motion_set(&menu->width, target_width);
     reach_popup_anchor anchor = {};
     anchor.button = ctx->anchor_button;
     anchor.monitor = ctx->monitor;
     anchor.bar_edge_y = ctx->bar_edge_y;
     anchor.direction = ctx->drop_direction;
-    reach_popup_placement placement = reach_popup_place(&anchor, popup_width, popup_height, margin);
-    reach_rect_f32 before = state->bounds;
-    float previous_scale = state->dpi_scale;
-    state->bounds = placement.bounds;
-    state->notch_anchor_x = placement.notch_anchor_x;
-    state->anchored = ctx->anchored;
-    state->drop_direction = ctx->drop_direction;
-    state->dpi_scale = scale;
-    state->visible_start = range.start;
-    state->visible_count = range.end - range.start;
-    state->scroll_offset = 0.0f;
-    state->scroll_max = 0.0f;
-    state->item_height = header + header_gap + height;
-    float y = border + padding + (ctx->drop_direction == REACH_POPUP_DROP_DOWN ? notch : 0.0f);
-    float x = border + padding + (row_width - range.width * fit) * 0.5f;
-    state->item_viewport = {border + padding, y, row_width, state->item_height};
-    layout.count = state->visible_count;
-    layout.overflow = overflow;
-    for (size_t index = 0; index < REACH_MENU_MAX_WINDOWS; ++index)
+    if (reach_popup_width_motion(&anchor, &menu->width, popup_height, margin, scale, &layout.body,
+                                 &layout.notch) != REACH_OK)
+        return 0;
+    float near_x = 0, far_x = 0, minimum = 0, maximum = 0;
+    reach_motion far = {};
+    if (reach_motion_range(&layout.body.x, &near_x, &maximum) != REACH_OK ||
+        reach_motion_combine(&layout.body.x, 1, &layout.body.width, 1, 0, &far) != REACH_OK ||
+        reach_motion_range(&far, &minimum, &far_x) != REACH_OK)
+        return 0;
+    float top = reach_motion_value_at(&layout.body.y, now);
+    layout.envelope = {near_x, top, far_x - near_x, popup_height};
+    if (!cut)
     {
-        state->item_slots[index] = {};
+        far_x = fmaxf(far_x, menu->previews.envelope.x + menu->previews.envelope.width);
+        float bottom =
+            fmaxf(top + popup_height, menu->previews.envelope.y + menu->previews.envelope.height);
+        layout.envelope.x = fminf(near_x, menu->previews.envelope.x);
+        layout.envelope.y = fminf(top, menu->previews.envelope.y);
+        layout.envelope.width = far_x - layout.envelope.x;
+        layout.envelope.height = bottom - layout.envelope.y;
     }
-    int32_t membership_changed = layout.count != menu->previews.count;
-    int32_t changed = !reach_rect_equal(before, state->bounds) || scale != previous_scale ||
-                      layout.overflow != menu->previews.overflow;
+    layout.body.x = reach_motion_affine(&layout.body.x, 1, -layout.envelope.x);
+    layout.body.y = reach_motion_affine(&layout.body.y, 1, -layout.envelope.y);
+    reach_motion fit = {};
+    auto available = reach_motion_affine(&menu->width, 1, -(padding + border) * 2);
+    available = reach_motion_clamp(&available, 0, room);
+    if (range.width > 0)
+    {
+        fit = reach_motion_affine(&available, 1 / range.width, 0);
+        fit = reach_motion_clamp(&fit, 0, 1);
+    }
+    else
+        reach_motion_set(&fit, 1);
+    reach_motion_set(&layout.viewport.x, border + padding);
+    reach_motion_set(&layout.viewport.y, layout.header_y);
+    layout.viewport.width = available;
+    reach_motion_set(&layout.viewport.height, header + header_gap + height);
+    float prefix = 0;
+    auto center = reach_motion_affine(&menu->width, .5f, 0);
     for (size_t visible = 0; visible < layout.count; ++visible)
     {
-        size_t index = range.start + visible;
-        reach_context_menu_preview_card *card = &layout.cards[visible];
-        card->window = state->item_windows[index];
-        card->index = index;
-        card->live = live[index];
-        float width = widths[index] * fit;
-        card->header = {x, y, width, header};
-        float close_size = fminf(header, width);
-        card->close = {x + width - close_size, y, close_size, header};
-        card->preview = {x, y + header + header_gap + height * (1.0f - fit) * 0.5f, width,
-                         height * fit};
-        state->item_slots[index] = {x, y, width, state->item_height};
-        const reach_context_menu_preview_card *previous = &menu->previews.cards[visible];
-        membership_changed |= card->window != previous->window || card->live != previous->live;
-        changed |= card->index != previous->index;
-        x += width + gap * fit;
+        auto &card = layout.cards[visible];
+        if (reach_motion_combine(&center, 1, &fit, prefix - range.width * .5f, 0, &card.motion.x) !=
+            REACH_OK)
+            return 0;
+        card.motion.y = reach_motion_affine(&fit, -height * .5f,
+                                            layout.header_y + header + header_gap + height * .5f);
+        card.motion.width = reach_motion_affine(&fit, card.source_width, 0);
+        card.motion.height = reach_motion_affine(&fit, height, 0);
+        prefix += card.source_width + gap;
     }
+    float footer_y = layout.header_y + header + header_gap + height + header_gap;
     if (overflow)
     {
-        float footer_y = y + state->item_height + header_gap;
-        layout.footer = {border + padding, footer_y, row_width, header};
+        reach_motion_set(&layout.footer.x, border + padding);
+        reach_motion_set(&layout.footer.y, footer_y);
+        layout.footer.width = available;
+        reach_motion_set(&layout.footer.height, header);
         if (range.start > 0)
         {
-            layout.previous = {border + padding, footer_y, header, header};
+            layout.previous = layout.footer;
+            reach_motion_set(&layout.previous.width, header);
         }
         if (range.end < state->item_count)
         {
-            layout.next = {border + padding + row_width - header, footer_y, header, header};
+            layout.next = layout.footer;
+            layout.next.x = reach_motion_affine(&menu->width, 1, -border - padding - header);
+            reach_motion_set(&layout.next.width, header);
         }
     }
-    reach_context_menu_reflow_previews(menu, &layout, before,
-                                       monitor_changed || scale != previous_scale);
+    state->dpi_scale = scale;
+    if (reach_context_menu_reflow_previews(menu, &layout, now, restart,
+                                           cut || (sources_changed && survivors == 0)) != REACH_OK)
+        return 0;
+    int32_t changed = !reach_rect_equal(layout.envelope, menu->previews.envelope) ||
+                      !reach_motion_equal(&layout.body.width, &menu->previews.body.width) ||
+                      !reach_motion_equal(&layout.body.x, &menu->previews.body.x) ||
+                      !reach_motion_equal(&layout.body.y, &menu->previews.body.y) ||
+                      !reach_motion_equal(&layout.body.height, &menu->previews.body.height) ||
+                      !reach_motion_equal(&layout.notch, &menu->previews.notch) ||
+                      layout.overflow != menu->previews.overflow;
     for (size_t index = 0; index < layout.count; ++index)
     {
+        const auto &card = layout.cards[index];
+        const auto &old = menu->previews.cards[index];
         changed |=
-            !reach_rect_equal(layout.cards[index].preview, menu->previews.cards[index].preview);
+            card.index != old.index ||
+            (card.source_width != old.source_width || card.source_height != old.source_height ||
+             card.header_height != old.header_height) ||
+            !reach_motion_equal(&card.motion.x, &old.motion.x) ||
+            !reach_motion_equal(&card.motion.y, &old.motion.y) ||
+            !reach_motion_equal(&card.motion.width, &old.motion.width) ||
+            !reach_motion_equal(&card.motion.height, &old.motion.height);
     }
-    changed |= !reach_rect_equal(layout.previous, menu->previews.previous) ||
-               !reach_rect_equal(layout.next, menu->previews.next);
     if (membership_changed)
     {
         ++menu->preview_generation;
         changed = 1;
     }
     menu->previews = layout;
+    menu->layout_initialized = 1;
+    state->anchored = ctx->anchored;
+    state->drop_direction = ctx->drop_direction;
+    state->notch_anchor_x = ctx->anchor_button.x + ctx->anchor_button.width * .5f;
+    state->visible_start = range.start;
+    state->visible_count = layout.count;
+    state->scroll_offset = state->scroll_max = 0;
+    state->item_height = header + header_gap + height;
+    (void)reach_context_menu_state_ptr(menu);
     menu->request.anchor_button = ctx->anchor_button;
     menu->request.bar_edge_y = ctx->bar_edge_y;
     menu->request.anchored = ctx->anchored;
@@ -314,6 +389,8 @@ void reach_context_menu_open_window_list(reach_context_menu *menu, size_t target
     {
         return;
     }
+    if (!menu->state.open)
+        reach_context_menu_reset_preview_layout(menu);
     menu->state.item_count = 0;
     menu->state.visible_start = 0;
     reach_context_menu_load_windows(menu, ctx->request);
@@ -463,11 +540,12 @@ reach_result reach_context_menu_thumbnail_motion_at(const reach_context_menu *me
         return REACH_INVALID_ARGUMENT;
     const reach_context_menu_preview_card *card = &menu->previews.cards[index];
     *out_window = card->live ? card->window : 0;
-    *out_destination = {};
-    out_destination->x = reach_motion_affine(&card->x, 1, card->preview.x + menu->state.bounds.x);
-    reach_motion_set(&out_destination->y, card->preview.y + menu->state.bounds.y);
-    reach_motion_set(&out_destination->width, card->preview.width);
-    reach_motion_set(&out_destination->height, card->preview.height);
+    *out_destination = card->motion;
+    if (reach_motion_combine(&menu->previews.body.x, 1, &card->motion.x, 1,
+                             menu->previews.envelope.x, &out_destination->x) != REACH_OK ||
+        reach_motion_combine(&menu->previews.body.y, 1, &card->motion.y, 1,
+                             menu->previews.envelope.y, &out_destination->y) != REACH_OK)
+        return REACH_INVALID_ARGUMENT;
     return REACH_OK;
 }
 

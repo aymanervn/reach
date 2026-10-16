@@ -89,6 +89,24 @@ enum
 
 const reach_context_menu_state *reach_context_menu_state_ptr(const reach_context_menu *menu)
 {
+    if (menu != nullptr && menu->state.window_list_open && menu->layout_initialized)
+    {
+        auto *state = &const_cast<reach_context_menu *>(menu)->state;
+        double now = reach_motion_now_seconds();
+        state->bounds = reach_rect_motion_value_at(&menu->previews.body, now);
+        state->bounds.x += menu->previews.envelope.x;
+        state->bounds.y += menu->previews.envelope.y;
+        state->item_viewport =
+            reach_context_menu_preview_bounds_at(menu, &menu->previews.viewport, now);
+        for (size_t index = 0; index < REACH_MENU_MAX_WINDOWS; ++index)
+            state->item_slots[index] = {};
+        for (size_t visible = 0; visible < menu->previews.count; ++visible)
+        {
+            auto card = reach_context_menu_preview_card_at(menu, visible, now);
+            state->item_slots[card.index] = {card.header.x, card.header.y, card.header.width,
+                                             state->item_height};
+        }
+    }
     return menu != nullptr ? &menu->state : nullptr;
 }
 
@@ -107,8 +125,8 @@ void reach_context_menu_force_close(reach_context_menu *menu)
         menu->state.close_hovered_index = REACH_CONTEXT_MENU_NO_ITEM;
         reach_motion_set(&menu->hover, 0.0f);
         reach_motion_set(&menu->close_hover, 0.0f);
-        reach_animation_manager_reset(&menu->animations, REACH_CONTEXT_MENU_ANIM_WIDTH);
         reach_context_menu_stop_preview_reflow(menu);
+        reach_context_menu_reset_preview_layout(menu);
         reach_feature_transition_reset(&menu->popup_transition);
     }
 }
@@ -127,8 +145,9 @@ int32_t reach_context_menu_window_list_holds_pointer(const reach_context_menu *m
         return 1;
     }
     return reach_context_menu_hover_region_contains(
-        menu->state.bounds, menu->request.anchor_button, menu->request.bar_edge_y,
-        menu->state.drop_direction, menu->hover_margin, screen_x, screen_y);
+        reach_context_menu_state_ptr(menu)->bounds, menu->request.anchor_button,
+        menu->request.bar_edge_y, menu->state.drop_direction, menu->hover_margin, screen_x,
+        screen_y);
 }
 
 /* The bounding band of the hold region above, so the pointer can be watched globally while the
@@ -142,7 +161,7 @@ int32_t reach_context_menu_window_list_hover_bounds(const reach_context_menu *me
         return 0;
     }
 
-    const reach_rect_f32 popup = menu->state.bounds;
+    const reach_rect_f32 popup = menu->previews.envelope;
     const reach_rect_f32 slot = menu->request.anchor_button;
     const float margin = menu->hover_margin;
     float left = popup.x < slot.x ? popup.x : slot.x;
@@ -183,9 +202,8 @@ int32_t reach_context_menu_set_open(reach_context_menu *menu, int32_t open)
     menu->state.open = 0;
     if (menu->state.window_list_open)
     {
+        (void)reach_context_menu_state_ptr(menu);
         reach_context_menu_stop_preview_reflow(menu);
-        reach_animation_manager_set(&menu->animations, REACH_CONTEXT_MENU_ANIM_WIDTH,
-                                    menu->state.bounds.width);
     }
     reach_pressable_reset(&menu->pressable, nullptr);
     menu->pressable_identity = 0;
@@ -221,8 +239,7 @@ void reach_context_menu_reset(reach_context_menu *menu)
     }
     reach_motion_set(&menu->hover, 0.0f);
     reach_motion_set(&menu->close_hover, 0.0f);
-    reach_animation_manager_reset(&menu->animations, REACH_CONTEXT_MENU_ANIM_WIDTH);
-    reach_context_menu_stop_preview_reflow(menu);
+    reach_context_menu_reset_preview_layout(menu);
     reach_feature_transition_reset(&menu->popup_transition);
 }
 
@@ -358,8 +375,7 @@ void reach_context_menu_open_power(reach_context_menu *menu,
                                             &state->item_count);
     state->power_open = 1;
     state->window_list_open = 0;
-    reach_animation_manager_reset(&menu->animations, REACH_CONTEXT_MENU_ANIM_WIDTH);
-    reach_context_menu_stop_preview_reflow(menu);
+    reach_context_menu_reset_preview_layout(menu);
     menu->previews = {};
     ++menu->preview_generation;
     reach_context_menu_place(state, ctx, reach_context_menu_power_popup_width * ctx->dpi_scale,
@@ -482,8 +498,7 @@ void reach_context_menu_open_for_item(reach_context_menu *menu, size_t target_in
     }
     state->power_open = 0;
     state->window_list_open = 0;
-    reach_animation_manager_reset(&menu->animations, REACH_CONTEXT_MENU_ANIM_WIDTH);
-    reach_context_menu_stop_preview_reflow(menu);
+    reach_context_menu_reset_preview_layout(menu);
     menu->previews = {};
     ++menu->preview_generation;
     menu->request = ctx->request != nullptr ? *ctx->request : reach_menu_request{};
@@ -568,11 +583,16 @@ static int32_t reach_context_menu_capsule_wants_pointer_move(const void *capsule
     return reach_context_menu_is_open(static_cast<const reach_context_menu *>(capsule));
 }
 
-static int32_t reach_context_menu_point_in_bounds(const reach_context_menu_state *state, int32_t x,
+static int32_t reach_context_menu_point_in_bounds(const reach_context_menu *menu, int32_t x,
                                                   int32_t y)
 {
-    return state != nullptr && x >= 0 && (float)x <= state->bounds.width && y >= 0 &&
-           (float)y <= state->bounds.height;
+    if (menu == nullptr)
+        return 0;
+    reach_rect_f32 bounds = {0, 0, menu->state.bounds.width, menu->state.bounds.height};
+    if (menu->state.window_list_open && menu->layout_initialized)
+        bounds = reach_rect_motion_value_at(&menu->previews.body, reach_motion_now_seconds());
+    return x >= bounds.x && x <= bounds.x + bounds.width && y >= bounds.y &&
+           y <= bounds.y + bounds.height;
 }
 
 static int32_t reach_context_menu_point_in_item_viewport(const reach_context_menu_state *state,
@@ -593,14 +613,16 @@ static uint64_t reach_context_menu_pressable_target(const reach_context_menu *me
     }
     if (button == REACH_POINTER_BUTTON_SECONDARY)
     {
-        return reach_context_menu_point_in_bounds(&menu->state, x, y)
+        return reach_context_menu_point_in_bounds(menu, x, y)
                    ? ((uint64_t)REACH_CONTEXT_MENU_PRESSABLE_BACKGROUND << 32)
                    : REACH_PRESSABLE_TARGET_NONE;
     }
     if (menu->state.window_list_open)
     {
-        reach_rect_f32 previous = menu->previews.previous;
-        reach_rect_f32 next = menu->previews.next;
+        double now = reach_motion_now_seconds();
+        reach_rect_f32 previous =
+            reach_context_menu_preview_bounds_at(menu, &menu->previews.previous, now);
+        reach_rect_f32 next = reach_context_menu_preview_bounds_at(menu, &menu->previews.next, now);
         if (previous.width > 0.0f && reach_context_menu_hit_test_items(&previous, 1, x, y).hit)
         {
             return (uint64_t)REACH_CONTEXT_MENU_PRESSABLE_PREVIOUS << 32;
@@ -629,7 +651,7 @@ static uint64_t reach_context_menu_pressable_target(const reach_context_menu *me
     {
         return ((uint64_t)REACH_CONTEXT_MENU_PRESSABLE_ITEM << 32) | hit.index;
     }
-    return reach_context_menu_point_in_bounds(&menu->state, x, y)
+    return reach_context_menu_point_in_bounds(menu, x, y)
                ? ((uint64_t)REACH_CONTEXT_MENU_PRESSABLE_BACKGROUND << 32)
                : REACH_PRESSABLE_TARGET_NONE;
 }
@@ -678,6 +700,7 @@ static void reach_context_menu_capsule_handle_pointer(void *capsule,
     *out = {};
 
     reach_context_menu *menu = static_cast<reach_context_menu *>(capsule);
+    (void)reach_context_menu_state_ptr(menu);
     if (menu == nullptr || event == nullptr || !menu->state.open ||
         event->coordinate_space != REACH_POINTER_COORDINATE_SURFACE_LOCAL)
     {
@@ -900,19 +923,10 @@ static void reach_context_menu_capsule_tick(void *capsule, double delta_seconds,
     {
         return;
     }
-    if (reach_animation_manager_any_active(&menu->animations))
-    {
-        reach_animation_manager_sample_at(&menu->animations, reach_motion_now_seconds());
-        if (menu->state.open)
-        {
-            out->redraw = 1;
-            out->request_update = 1;
-        }
-    }
-    if (menu->preview_origin_count > 0 && !reach_motion_active(&menu->reflow))
+    if (menu->layout_cleanup_pending && !reach_motion_active(&menu->reflow))
     {
         reach_context_menu_stop_preview_reflow(menu);
-        out->redraw = 1;
+        out->redraw = out->request_update = 1;
     }
     int32_t popup_was_visible = reach_feature_transition_visible(&menu->popup_transition);
     if (reach_feature_transition_tick(&menu->popup_transition, delta_seconds))
@@ -930,9 +944,7 @@ static void reach_context_menu_capsule_tick(void *capsule, double delta_seconds,
 static int32_t reach_context_menu_capsule_needs_frame(const void *capsule)
 {
     const reach_context_menu *menu = static_cast<const reach_context_menu *>(capsule);
-    return menu != nullptr &&
-           (reach_feature_transition_needs_update(&menu->popup_transition) ||
-            (menu->state.open && reach_animation_manager_any_active(&menu->animations)));
+    return menu != nullptr && reach_feature_transition_needs_update(&menu->popup_transition);
 }
 
 static int32_t reach_context_menu_capsule_presentation_visible(const void *capsule)
@@ -958,12 +970,16 @@ static void reach_context_menu_capsule_surface_geometry(const void *capsule,
     const reach_context_menu *menu = static_cast<const reach_context_menu *>(capsule);
     if (menu != nullptr)
     {
-        out->visible_bounds = menu->state.bounds;
-        out->envelope_bounds = menu->state.bounds;
+        out->visible_bounds = menu->state.window_list_open && menu->layout_initialized
+                                  ? menu->previews.envelope
+                                  : menu->state.bounds;
+        out->envelope_bounds = out->visible_bounds;
+        out->has_input_bounds = menu->state.window_list_open && menu->layout_initialized;
+        out->input_bounds = menu->previews.body;
         out->notch_anchor_x = menu->state.notch_anchor_x;
         out->notch_side = reach_popup_notch_side(menu->state.drop_direction);
         reach_feature_transition_presentation(&menu->popup_transition, out);
-        if (menu->preview_origin_count > 0)
+        if (menu->layout_cleanup_pending)
             out->deadline_seconds =
                 fmax(out->deadline_seconds, reach_motion_deadline(&menu->reflow));
     }
@@ -1001,8 +1017,6 @@ reach_result reach_context_menu_create(reach_context_menu **out_menu)
     {
         return REACH_ERROR;
     }
-    reach_animation_manager_init(&menu->animations, menu->animation_tracks,
-                                 REACH_CONTEXT_MENU_ANIM_COUNT);
     reach_feature_transition_init(&menu->popup_transition, REACH_FEATURE_TRANSITION_FROM_BELOW);
     reach_pressable_init(&menu->pressable);
     reach_context_menu_reset(menu);

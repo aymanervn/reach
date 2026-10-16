@@ -1073,8 +1073,24 @@ static void test_rect_motion_source_ownership(void)
     expect_true(reach_render_push_rect_motion(buffer.get(), &source, &rect, 12, {1, 1, 1, 1}) ==
                         REACH_OK &&
                     reach_render_command_buffer_validate_groups(buffer.get()) == REACH_OK &&
-                    buffer->has_scissor && !buffer->commands[0].has_scissor,
+                    buffer->has_scissor && !buffer->commands[0].has_scissor &&
+                    buffer->commands[0].rect_fit_to_clip,
                 "motion fill retains two owned sources and an output scissor");
+    buffer->commands[1] = buffer->commands[0];
+    ++buffer->count;
+    expect_true(reach_render_command_buffer_validate_groups(buffer.get()) == REACH_INVALID_ARGUMENT,
+                "solid clip fill owns exactly one raster command");
+    --buffer->count;
+    reach_render_group child = {};
+    child.id = 30;
+    child.parent_id = 21;
+    child.bounds = {0, 0, 10, 10};
+    expect_true(reach_render_command_buffer_begin_group(buffer.get(), &child) == REACH_OK,
+                "solid clip ownership preflight accepts an ordinary descendant group");
+    reach_render_command_buffer_end_group(buffer.get());
+    expect_true(reach_render_command_buffer_validate_groups(buffer.get()) == REACH_INVALID_ARGUMENT,
+                "solid clip fill cannot also own independently clipped descendants");
+    --buffer->group_count;
     reach_rect_f32 clip = {};
     expect_true(reach_render_command_buffer_group_clip_at(buffer.get(), 21, 10.2, &clip) &&
                     clip.x == 40 && clip.y == 10 && clip.width == 10 && clip.height == 20,

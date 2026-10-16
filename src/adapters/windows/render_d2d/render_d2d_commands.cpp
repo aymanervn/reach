@@ -312,10 +312,23 @@ reach_result reach_d2d_execute_fallback(reach_render_backend *backend,
                        : nullptr;
         uint64_t owner_id = shadow ? shadow->id : command.group_id;
         const reach_render_group *group = reach_render_command_buffer_group(commands, owner_id);
+        bool solid_clip = command.rect_fit_to_clip && !shadow;
+        uint64_t clip_owner_id = owner_id;
+        if (solid_clip)
+        {
+            reach_motion radius_x = {}, radius_y = {};
+            if (group == nullptr ||
+                reach_render_group_clip_radii_motion(group, &radius_x, &radius_y) != REACH_OK)
+                return REACH_INVALID_ARGUMENT;
+            command.rect = reach_render_group_clip_at(group, now_seconds);
+            command.radius = reach_motion_value_at(&radius_x, now_seconds);
+            command.rect_fit_to_clip = 0;
+            clip_owner_id = group->parent_id;
+        }
         target->SetTransform(content * root);
         reach_rect_f32 clip = {};
         bool has_clip = reach_render_command_buffer_group_rectangular_clip_at(
-                            commands, owner_id, now_seconds, &clip) != 0;
+                            commands, clip_owner_id, now_seconds, &clip) != 0;
         if (has_clip)
         {
             target->PushAxisAlignedClip(
@@ -323,7 +336,7 @@ reach_result reach_d2d_execute_fallback(reach_render_backend *backend,
                 D2D1_ANTIALIAS_MODE_ALIASED);
         }
         uint32_t rounded_depth = 0;
-        outcome = reach_d2d_push_group_masks(backend, target, commands, owner_id, now_seconds,
+        outcome = reach_d2d_push_group_masks(backend, target, commands, clip_owner_id, now_seconds,
                                              &rounded_depth);
         if (outcome != REACH_OK)
         {
@@ -369,9 +382,9 @@ reach_result reach_d2d_execute_fallback(reach_render_backend *backend,
             size_t end = index + 1;
             while (end < commands->count && commands->commands[end].group_id == group->id)
                 ++end;
-            outcome =
-                reach_d2d_execute_tinted_group(backend, target, *group, commands->commands + index,
-                                               end - index, opacity, now_seconds, caret_opacity);
+            outcome = reach_d2d_execute_tinted_group(
+                backend, target, *group, solid_clip ? &command : commands->commands + index,
+                end - index, opacity, now_seconds, caret_opacity);
             while (rounded_depth-- > 0)
                 target->PopLayer();
             if (has_clip)

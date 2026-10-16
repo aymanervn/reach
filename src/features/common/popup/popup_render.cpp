@@ -482,42 +482,64 @@ reach_result reach_popup_push_width_background(const reach_popup_background_inpu
     if (result == REACH_INVALID_ARGUMENT)
     {
         reach_render_command_buffer_clear(batch.get());
-        source.bounds.width = ceilf(fmaxf(maximum, input->bounds.width) + pad.left + pad.right);
-        if (input->theme->popup_shadow.blur > 0 && input->theme->popup_shadow.color.a > 0)
+        float notch_minimum = 0, notch_maximum = 0;
+        bool fixed = minimum == maximum &&
+                     reach_motion_range(&center, &notch_minimum, &notch_maximum) == REACH_OK &&
+                     notch_minimum == notch_maximum;
+        if (fixed)
         {
-            source.has_shadow = 1;
-            source.shadow = input->theme->popup_shadow;
-            source.shadow.offset_x *= input->dpi_scale;
-            source.shadow.offset_y *= input->dpi_scale;
-            source.shadow.blur *= input->dpi_scale;
-            result = reach_render_command_buffer_begin_group(batch.get(), &source);
-            reach_render_command_buffer_end_group(batch.get());
+            shape = *input;
+            shape.bounds.width = maximum;
+            shape.notch_center_x = notch_minimum;
+            reach_render_command_buffer_clear(paint.get());
+            result = reach_popup_push_background(&shape, paint.get());
+            source.bounds.width = ceilf(maximum + pad.left + pad.right);
             if (result == REACH_OK)
-                result = reach_popup_motion_shape(batch.get(), source.id, first_group_id + 1,
-                                                  *width, center, input->bounds.height, 0, radius,
-                                                  notch_width, notch_height, input->notch_side,
-                                                  {1, 1, 1, 1}, input->bounds.width);
+                result = reach_render_command_buffer_begin_group(batch.get(), &source);
+            for (size_t index = 0; result == REACH_OK && index < paint->count; ++index)
+                result = reach_render_command_buffer_push(batch.get(), &paint->commands[index]);
+            reach_render_command_buffer_end_group(batch.get());
         }
         else
-            result = REACH_OK;
-        float border = reach_theme_border_thickness(input->theme, input->dpi_scale);
-        reach_color background = input->has_background_color_override
-                                     ? input->background_color_override
-                                     : input->theme->popup_background;
-        background.a = 1;
-        reach_color outer = border > 0 && input->theme->popup_border.a > 0
-                                ? input->theme->popup_border
-                                : background;
-        outer.a = 1;
-        if (result == REACH_OK)
-            result = reach_popup_motion_shape(
-                batch.get(), 0, first_group_id + 4, *width, center, input->bounds.height, 0, radius,
-                notch_width, notch_height, input->notch_side, outer, input->bounds.width);
-        if (result == REACH_OK && border > 0 && input->theme->popup_border.a > 0)
-            result = reach_popup_motion_shape(batch.get(), 0, first_group_id + 7, *width, center,
-                                              input->bounds.height, border, radius, notch_width,
-                                              notch_height, input->notch_side, background,
-                                              input->bounds.width);
+        {
+            source.bounds.width = ceilf(fmaxf(maximum, input->bounds.width) + pad.left + pad.right);
+            if (input->theme->popup_shadow.blur > 0 && input->theme->popup_shadow.color.a > 0)
+            {
+                source.has_shadow = 1;
+                source.shadow = input->theme->popup_shadow;
+                source.shadow.offset_x *= input->dpi_scale;
+                source.shadow.offset_y *= input->dpi_scale;
+                source.shadow.blur *= input->dpi_scale;
+                result = reach_render_command_buffer_begin_group(batch.get(), &source);
+                reach_render_command_buffer_end_group(batch.get());
+                if (result == REACH_OK)
+                    result = reach_popup_motion_shape(
+                        batch.get(), source.id, first_group_id + 1, *width, center,
+                        input->bounds.height, 0, radius, notch_width, notch_height,
+                        input->notch_side, {1, 1, 1, 1}, input->bounds.width);
+            }
+            else
+                result = REACH_OK;
+            float border = reach_theme_border_thickness(input->theme, input->dpi_scale);
+            reach_color background = input->has_background_color_override
+                                         ? input->background_color_override
+                                         : input->theme->popup_background;
+            background.a = 1;
+            reach_color outer = border > 0 && input->theme->popup_border.a > 0
+                                    ? input->theme->popup_border
+                                    : background;
+            outer.a = 1;
+            if (result == REACH_OK)
+                result = reach_popup_motion_shape(batch.get(), 0, first_group_id + 4, *width,
+                                                  center, input->bounds.height, 0, radius,
+                                                  notch_width, notch_height, input->notch_side,
+                                                  outer, input->bounds.width);
+            if (result == REACH_OK && border > 0 && input->theme->popup_border.a > 0)
+                result = reach_popup_motion_shape(batch.get(), 0, first_group_id + 7, *width,
+                                                  center, input->bounds.height, border, radius,
+                                                  notch_width, notch_height, input->notch_side,
+                                                  background, input->bounds.width);
+        }
     }
     if (result != REACH_OK)
         return result;

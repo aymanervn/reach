@@ -1,7 +1,7 @@
 # Retained text during width fitting
 
-Status: shared capability implemented and verified. Dock/Switcher consumers and final product
-appearance/workload acceptance remain pending.
+Status: shared capability and Dock/Switcher consumers implemented. Complete live/product
+appearance and total-cost acceptance remain pending.
 
 Dock card titles and the selected Switcher label are laid out at the fitted card width. Preserving
 only a moving clip cuts glyphs rather than reproducing DirectWrite character trimming. Centered
@@ -182,5 +182,15 @@ canonical card/body geometry. Growing-card producer captures at four DPI scales 
 preserve logical width, size, truncation and alignment on both native renderers. Flat regions match
 the established static renderer exactly; fractional glyph edges have the inspected filtering
 difference recorded in the workload baseline. The scalar width path is removed; one endpoint
-cleanup switches settled titles back to ordinary sources. Dock integration and final displayed
-live/product-cost acceptance remain open.
+cleanup switches settled titles back to ordinary sources. Dock also consumes the contract for
+leading titles and independent close-control fitting. Final displayed live/product-cost acceptance
+remains open.
+
+
+Settled consumer sources preserve physical raster origin under fractional fixed translations;
+independent displayed text comparisons match exactly across both fonts, alignments and four DPI
+scales. Moving unchanged raster content can reuse that origin until the next legitimate settled
+submission. The controlled sixteen-card Dock case reaches the existing byte bound with one sampled
+title source and verifies source-only updates without layout/command/property/tree work. See the
+workload baseline for producer, source-limit and paging evidence; complete live/product acceptance
+remains open.

@@ -274,22 +274,18 @@ its public route callback, preserving the popup transition for the same owner. C
 resolves card placements, hit regions, anchor, DPI and pointer corridor together. An optional
 surface-ops pointer-observation hook lets the generic frame path update the event-driven watch
 after arrangement. Ordinary command and power menus keep their existing row presentation.
-Hover-popup width changes use a private 180ms ease-in-out track in the existing animation manager.
-Owner, source and page changes retarget from the track's current value. Target-width packing stays
-fixed during motion; the shared preview row-fit helper uniformly fits thumbnails and gaps within
-the animated inner width, preserving source proportions and a common preview height. Headers,
-controls, borders and the popup's height are not scaled by that fit. The current placed bounds
-supply drawn chrome, native placements and pointer retention. Closing freezes the width, fresh
-presentation starts at its target width, and monitor/DPI changes cut to the newly constrained
-layout. This remains CPU layout through the existing frame path; no new compositor capability is
-introduced.
-Source changes with surviving visible windows also start a private 180ms reflow progress track.
-Context Menu captures each survivor's current screen X by window identity, then interpolates
-toward the packed row as width motion continues. A new source enters from a small horizontal
-offset. Complete previews stay inside the current viewport; headers, close controls and hit
-regions move with their preview. Interrupted changes capture the displayed positions again,
-while initial presentation, disjoint pages and monitor/DPI changes use the constrained layout
-directly. Closing freezes arranged positions and retires the reflow track. Hovering anywhere
+Dock preview width and membership reflow share one capsule-owned 180ms canonical layout epoch.
+Target packing remains CPU policy; body/notch placement, proportional equal-height cards and gaps,
+header fills, borders, close controls and independent width-text viewports retain that intent.
+Survivors capture their screen X at the exact retarget timestamp; the shared same-epoch constraints
+keep complete cards in the moving viewport. New sources enter from the existing small offset.
+Stable per-window token blocks identify sources independently of visible order. A stable session
+envelope holds retained body placement; native destinations and input snapshots sample the same
+body/card rectangles. Pointer observation covers the envelope and owner corridor while retention
+uses the sampled body. Closing freezes width and reflow, hide/reset retires ownership, and fresh
+presentation or changed monitor/DPI constraints cuts stale layout intent. One deadline cleans up
+layout; the scalar width manager, periodic width tick/frame demand and sampled render rectangles
+are removed. Source extents and header heights remain endpoint layout data. Hovering anywhere
 on a card highlights its fixed header pill and square thumbnail border with the shared
 `context_menu_hover_background` theme color. The dark theme uses its darker structure shade.
 The title has 8dp left padding; the close control renders at 80% of its hit-region dimensions
@@ -613,8 +609,8 @@ cover the full motion range; same-envelope retargets reuse source pixels and sce
 The helper reserves sixteen consecutive group IDs, including an optional final scissor wrapper
 around the complete output and shadow. Combined parent ownership, IDs and capacity are validated
 before an atomic append. DirectComposition rounded clip containers use soft border mode; ordinary
-rectangular clips restore inherited mode. Dock/Switcher integration and product appearance/cost
-acceptance remain migration work. See `docs/gpu-resize-reveal-design.md` and
+rectangular clips restore inherited mode. Dock/Switcher consume these capabilities; complete
+product appearance/cost acceptance remains migration work. See `docs/gpu-resize-reveal-design.md` and
 `docs/gpu-compact-shadow-design.md`.
 
 Explicit render groups can tint their rasterized alpha coverage with four normalized RGBA motion
@@ -708,18 +704,29 @@ field. Unsupported/over-budget text uses an ordinary source sampled from the sam
 render-port demand includes its required final update. Reach and Settings can sample only that
 source when no other work is dirty, without capsule arrangement or command production. Suspension,
 source removal and font recreation clear sampled-source ownership; finite endpoints return both
-loops to idle. Switcher consumes these sources for centered labels during fitting. Dock integration,
-complete intermediate product verification and total CPU/GPU/power/memory/latency acceptance remain
-migration work. See
-`docs/gpu-text-width-design.md`.
+loops to idle. Switcher consumes these sources for centered labels and Dock for leading titles
+during fitting. Complete intermediate product verification and total CPU/GPU/power/memory/latency
+acceptance remain migration work. See `docs/gpu-text-width-design.md`.
+
+Native raster planning preserves physical pixel phase for fitted text and isolated vector icons
+under fixed unit-scale ancestry. Moving unchanged content can reuse its existing raster origin;
+settled descriptors realign it at the next legitimate submission. Explicit solid-clip fill owners
+can bake fixed rounded geometry into their source; arbitrary viewport clips retain unchanged source
+pixels. CPU fallback draws the same sampled fill directly
+and retains ancestor clipping/tint. Moving geometry retains native clips.
+This preserves settled corner/control coverage without changing canonical intent or adding frames.
+WUC axis-scaled raster pieces select hard quad edges, preserving the alpha already in their source
+and avoiding seams between chrome pieces; source retirement restores inherited edge mode.
 
 `reach_render_push_rect_motion` publishes one translation owner and one rounded clipped paint
 source. Width/height insets preserve circular corners and permit collapsed endpoints without
-scaling borders or content. Stable source envelopes bound allocation; collision, parent and range
-checks reject before append. A stationary outer clip preserves an inherited output scissor.
+scaling borders or content. Its explicit solid-clip command owns one raster with no descendants;
+the marker uses existing command padding. Stable source envelopes bound allocation; collision,
+parent and range checks reject before append. A stationary outer clip preserves an inherited output scissor.
 `reach_ui_motion_background_render` composes these fills with an optional shape-shadow caster and
 opaque outer/inner border semantics. Popup width chrome reuses the same primitive for compact
-body fills; notches retain their independent rigid geometry.
+body fills; notches retain their independent rigid geometry. Settled compact chrome and constant
+common backgrounds use ordinary cached sources; animated ranges retain the shape graph.
 
 Dock and Top Bar press feedback emits a separate flat retained group, copying item placement
 for moving icons. Shared UI feedback owns the group descriptor; the icon helper retains its
@@ -742,8 +749,9 @@ uses canonical retained opacity, and the square border uses the shared RGBA tint
 window identity and use shared pixel-aligned source bounds. The border drawing helper makes its
 painted alpha opaque, so the visible interpolation is affine. Enter/leave and identity semantics are
 preserved; ordinary menu rows keep immediate feedback. The header hover scalar track/accessor and
-its frame demand are removed; width/reflow remain separate scalar consumers. A contained single
-rectangle in the tint fallback draws directly with its effective color, preserving fractional-position
+its frame demand are removed. Width and reflow share canonical retained geometry, as described
+above. A contained single rectangle in the tint fallback draws directly with its effective color,
+preserving fractional-position
 edge antialiasing and avoiding an unnecessary intermediate coverage bitmap.
 
 Top Bar tray and Dock icon groups use stable item identities. Pointer events publish direct
@@ -1091,8 +1099,8 @@ session envelope. Empty body parents translate retained rounded fills, fixed-thi
 proportional fallback icons and independently fitted label viewports. Card source tokens survive
 visible-source reorder; monitor/DPI changes cut stale layout intent. Input bounds and native
 destinations sample the body at event time. Width retargeting preserves continuity, continues during
-the existing close fade and retires once at its endpoint or on hide. Context Menu body layout
-remains on its pending CPU path. Settled DWM content
+the existing close fade and retires once at its endpoint or on hide. Context Menu publishes its
+shared width/reflow epoch through the same body/input/native destination contract. Settled DWM content
 updates independently. Stage keeps its capsule-owned exact placement and synchronized close semantics.
 
 Each surface runtime caches its last arrangement inputs, canonical geometry and native projection
@@ -1109,14 +1117,13 @@ Native overlay items may also publish a canonical destination rectangle. The run
 four properties at the same timestamp as root presentation, then applies the existing client-space
 projection. Destination motion participates in active-only native demand and the terminal sample.
 
-Dock preview card reflow owns canonical progress and derives a clamped horizontal offset per stable
-window identity. A retained parent moves each card's header, border, close controls and fallback
-icon; separate cached sources preserve painter order and independent feedback. Native rectangles
-and event-time item/close hit tests sample that same offset. Retargeting starts from the survivor's
-current position; close freezes it, and constraints/reopening retire old origins. One deadline
-cleans up a completed reflow. Its scalar track, frame advancement and sampled layout-position writes
-are removed. Popup width and the associated card-size/title-fit layout remain on their existing CPU
-path pending the wider resize migration.
+Dock width and reflow share canonical progress and derive constrained card rectangles by stable
+window identity. Retained parents move the independent sources; thumbnails preserve aspect and
+equal heights, while title widths, close widths and proportional glyph/icon sizes follow fitting.
+Native rectangles and event-time item/close hit tests sample the same geometry. The fixed-geometry
+preview-border path reuses the existing pixel-aligned bordered-shape recipe; active geometry uses
+the published clips. Complete-card paging and source-loss handling retain the native overlay seam.
+
 Retained render groups also publish four animated clip insets. Both Windows backends retain their
 clip objects and submit changed edges without regenerating unchanged content; unsupported targets
 sample the same descriptor. Battery, Quick Settings and tray popup press feedback publish
