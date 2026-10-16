@@ -354,14 +354,18 @@ static int32_t reach_render_width_text_valid(const reach_render_command *command
            maximum <= command->rect.width;
 }
 
-static int32_t reach_render_clip_fill_valid(const reach_render_command *command,
-                                            const reach_render_group *source)
+static int32_t reach_render_fitted_rect_valid(const reach_render_command *command,
+                                              const reach_render_group *source)
 {
-    return source != 0 && command->type == REACH_RENDER_COMMAND_RECT && command->radius == 0 &&
-           command->stroke_width == 0 && !command->has_clip_rect && !command->has_scissor &&
-           source->has_clip && source->clip_uniform_radius && !source->has_shadow &&
-           !source->x.generation && !source->y.generation && !source->scale.generation &&
-           !source->scale_y.generation && reach_render_rect_equal(command->rect, source->bounds) &&
+    return source != 0 &&
+           (command->type == REACH_RENDER_COMMAND_RECT ||
+            (command->type == REACH_RENDER_COMMAND_ICON && command->icon_id != 0 &&
+             command->icon_fade_start == 0)) &&
+           command->radius == 0 && command->stroke_width == 0 && !command->has_clip_rect &&
+           !command->has_scissor && source->has_clip && source->clip_uniform_radius &&
+           !source->has_shadow && !source->x.generation && !source->y.generation &&
+           !source->scale.generation && !source->scale_y.generation &&
+           reach_render_rect_equal(command->rect, source->bounds) &&
            reach_render_rect_equal(source->clip, source->bounds);
 }
 
@@ -411,7 +415,7 @@ reach_result reach_render_command_buffer_validate_groups(const reach_render_comm
         {
             const reach_render_group *source =
                 reach_render_command_buffer_group(buffer, command->group_id);
-            if (!reach_render_clip_fill_valid(command, source))
+            if (!reach_render_fitted_rect_valid(command, source))
                 return REACH_INVALID_ARGUMENT;
             for (other = 0; other < buffer->count; ++other)
                 if (other != index && buffer->commands[other].group_id == source->id)
@@ -918,10 +922,10 @@ reach_result reach_render_push_width_text(reach_render_command_buffer *buffer,
     return result;
 }
 
-reach_result reach_render_push_rect_motion(reach_render_command_buffer *buffer,
-                                           const reach_render_group *source,
-                                           const reach_rect_motion *bounds, float radius,
-                                           reach_color color)
+static reach_result reach_render_push_fitted_rect(reach_render_command_buffer *buffer,
+                                                  const reach_render_group *source,
+                                                  const reach_rect_motion *bounds, float radius,
+                                                  const reach_render_command *command)
 {
     if (buffer == 0 || source == 0 || bounds == 0 || buffer->current_group_id != 0 ||
         source->id == 0 || source->id >= UINT64_C(0x8000000000000000) - 1 || source->has_clip ||
@@ -975,11 +979,9 @@ reach_result reach_render_push_rect_motion(reach_render_command_buffer *buffer,
     reach_render_command_buffer_end_group(buffer);
     if (result == REACH_OK)
         result = reach_render_command_buffer_begin_group(buffer, &paint);
-    reach_render_command fill = {0};
-    fill.type = REACH_RENDER_COMMAND_RECT;
+    reach_render_command fill = *command;
     fill.rect_fit_to_clip = 1;
     fill.rect = source->bounds;
-    fill.color = color;
     int32_t scissored = buffer->has_scissor;
     buffer->has_scissor = 0;
     if (result == REACH_OK)
@@ -989,6 +991,55 @@ reach_result reach_render_push_rect_motion(reach_render_command_buffer *buffer,
     if (result != REACH_OK)
         buffer->group_count = first_group;
     return result;
+}
+
+reach_result reach_render_push_rect_motion(reach_render_command_buffer *buffer,
+                                           const reach_render_group *source,
+                                           const reach_rect_motion *bounds, float radius,
+                                           reach_color color)
+{
+    reach_render_command command = {0};
+    command.type = REACH_RENDER_COMMAND_RECT;
+    command.color = color;
+    return reach_render_push_fitted_rect(buffer, source, bounds, radius, &command);
+}
+
+reach_result reach_render_push_image_motion(reach_render_command_buffer *buffer,
+                                            const reach_render_group *source,
+                                            const reach_rect_motion *bounds, float radius,
+                                            const reach_render_command *image)
+{
+    if (buffer == 0 || source == 0 ||
+        reach_render_command_buffer_group_shadow(buffer, source->parent_id) != 0 || image == 0 ||
+        image->type != REACH_RENDER_COMMAND_ICON || image->icon_id == 0 || image->radius != 0 ||
+        image->icon_fade_start != 0 || image->has_clip_rect || image->has_scissor ||
+        image->rect_fit_to_clip || image->text_fit_to_clip || image->stroke_width != 0 ||
+        image->caret_group_id != 0 ||
+        (image->corner_mask != 0 && image->corner_mask != REACH_RENDER_CORNER_ALL))
+        return REACH_INVALID_ARGUMENT;
+    if (bounds == 0)
+        return REACH_INVALID_ARGUMENT;
+    reach_rect_motion aligned = *bounds;
+    reach_motion *axes[] = {&aligned.x, &aligned.y, &aligned.width, &aligned.height};
+    for (size_t index = 0; index < 4; ++index)
+    {
+        float minimum = 0, maximum = 0;
+        if (reach_motion_range(axes[index], &minimum, &maximum) != REACH_OK)
+            return REACH_INVALID_ARGUMENT;
+        if (minimum == maximum)
+        {
+            float value = floorf(minimum + .5f);
+            if (index >= 2 && minimum > 0)
+                value = fmaxf(1, value);
+            reach_motion_set(axes[index], value);
+        }
+    }
+    if (!isfinite(source->bounds.x) || !isfinite(source->bounds.y))
+        return REACH_INVALID_ARGUMENT;
+    reach_render_group raster = *source;
+    raster.bounds.x = floorf(raster.bounds.x);
+    raster.bounds.y = floorf(raster.bounds.y);
+    return reach_render_push_fitted_rect(buffer, &raster, &aligned, radius, image);
 }
 
 int32_t reach_render_retained_command_bounds(const reach_render_command *command,

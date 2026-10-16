@@ -398,6 +398,12 @@ support expectation is explicitly resolved.
 
 - [ ] Implement the selected generic resize/reveal capabilities end to end, preserving anchors,
   notches, corners, shadows, monitor constraints and input alignment.
+  - [x] Add shared retained image crop/stretch fitting for resize consumers.
+    Actual bitmap dimensions drive cached native source geometry; fixed axes/endpoints preserve
+    bitmap rounding. Unsupported clocks and resource budgets use existing active-only render-port
+    sampling, retiring at endpoint/hide. Both builds/all forty tests and native/fallback, fractional
+    origin, zero-axis, replacement and memory matrices pass. Full native regressions pass on both
+    backends/configurations. Clipboard integration and total product acceptance remain open.
 - [ ] Migrate Launcher results, Quick Settings sections, Clipboard sizing and Settings expandable rows,
   including eligible smooth viewport scrolling identified in the ledger.
   - [x] Migrate Quick Settings section reveals, following content and label/chevron crossfades.

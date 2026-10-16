@@ -121,7 +121,15 @@ struct reach_d2d_sampled_text
     reach_motion width;
 };
 
-struct reach_d2d_text_width_owner
+struct reach_d2d_sampled_image
+{
+    uint64_t owner;
+    reach_render_command command;
+    reach_rect_motion bounds;
+    float radius;
+};
+
+struct reach_d2d_fit_owner
 {
     uint64_t owner;
     uint64_t prefix;
@@ -207,7 +215,10 @@ struct reach_render_backend
     uint64_t reported_retained_bytes = 0;
     bool requires_content_sampling = false;
     std::vector<reach_d2d_sampled_text> sampled_text;
-    std::vector<reach_d2d_text_width_owner> text_width_owners;
+    std::vector<reach_d2d_sampled_image> sampled_images;
+    std::vector<reach_d2d_fit_owner> image_fit_owners;
+    uint64_t next_image_fit_prefix = UINT64_C(0xd000000000010000);
+    std::vector<reach_d2d_fit_owner> text_width_owners;
     uint64_t next_text_width_prefix = UINT64_C(0xc000000000010000);
     ComPtr<ABI::Windows::UI::Composition::IContainerVisual> scene_visual;
     ComPtr<IDCompositionVisual2> dcomp_scene_visual;
@@ -292,6 +303,8 @@ reach_result reach_d2d_end_frame(reach_render_backend *backend);
 reach_result reach_d2d_synchronize(reach_render_backend *backend);
 
 void reach_d2d_clear_icon_cache(reach_render_backend *backend);
+reach_result reach_d2d_image_size(reach_render_backend *backend, uint64_t id,
+                                  D2D1_SIZE_F *out_size);
 reach_result reach_d2d_draw_icon(reach_render_backend *backend,
                                  const reach_render_command *command);
 reach_result reach_d2d_draw_blurred_image(reach_render_backend *backend,

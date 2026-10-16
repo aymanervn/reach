@@ -726,6 +726,18 @@ source. Width/height insets preserve circular corners and permit collapsed endpo
 scaling borders or content. Its explicit solid-clip command owns one raster with no descendants;
 the marker uses existing command padding. Stable source envelopes bound allocation; collision,
 parent and range checks reject before append. A stationary outer clip preserves an inherited output scissor.
+
+`reach_render_push_image_motion` shares the fitted-rectangle ownership and stationary scissor path.
+Its rounded viewport fits an ordinary cached bitmap through native scale/translation using the
+bitmap's actual dimensions; crop-to-fill preserves a centered crop, while ordinary image fitting
+uses independent axes. Constant image axes retain bitmap snapping. Fixed endpoints reuse ordinary
+raster drawing, and collapsed images draw nothing. Unsupported independent crop clocks, tinted
+sources or over-budget expansions use renderer-owned source sampling through the existing render
+port until the finite descriptors settle. Image and text expansions share the existing 128MiB and
+layer budgets. Source changes invalidate their bitmap, while hide/retirement removes fit ownership
+and sampling. No fields are added to the render command/group/buffer for this capability.
+Clipboard width integration remains migration work.
+
 `reach_ui_motion_background_render` composes these fills with an optional shape-shadow caster and
 opaque outer/inner border semantics. Constant paint axes keep the existing pixel-aligned border
 recipe while animated axes retain continuous geometry; the shadow caster keeps its original shape.
