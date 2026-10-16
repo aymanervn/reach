@@ -90,7 +90,7 @@ migrated, rather than only changing the track representation.
 | `bluetooth_row_tracks[]` | `settings_bluetooth.cpp`, Bluetooth layout/render | Expand/collapse | Migrate: same section capability. |
 | `bluetooth_radio_toggle` | `settings_bluetooth.cpp`, shared retained toggle | Radio target changes | Implemented: same retained primitive; scalar radio track, sampled commands and frame demand removed. Final product acceptance pending. |
 | `startup_toggles[]` | `settings_startup_apps.cpp`, shared retained toggle | Enable/disable target changes | Implemented: list refresh resets intent, entry changes retarget the live curve; scalar manager/tick/frame APIs removed. Full-capacity page command ownership verified. Final product acceptance pending. |
-| `power_tracks[]` | `settings_power_sleep.cpp`, `settings_render.cpp` | Custom timer entry/reconfiguration | Migrate: preserve picker/edit reveal with retained content. |
+| `power_tracks[]` | `settings_power_sleep.cpp`, `settings_render.cpp` | Option selection/custom timer entry; 220ms ease-out color crossfade | Migrate: independent option border/background/label and custom-field text colors. Source inspection confirms no row sizing/reveal in this track; custom textbox placeholder, suffix, selection and caret retain independent paint. |
 | `power_wait_toggles[]` | `settings_power_sleep.cpp`, shared retained toggle and label tint | Wait option target changes | Implemented: track, knob and label alpha share canonical intent; scalar wait tracks and frame demand removed. Picker/edit reveal remains separate. Final product acceptance pending. |
 | `display_fps_toggle` | `settings_monitors_scaling.cpp`, shared retained toggle | Refresh preference changes | Implemented: retained track/knob; scalar track and frame demand removed, refresh policy unchanged. Final product acceptance pending. |
 | `display_font_toggle` | `settings_monitors_scaling.cpp`, shared retained toggle | Font preference changes | Implemented: retained track/knob; scalar track and frame demand removed, actual font changes still invalidate content. Final product acceptance pending. |
@@ -240,3 +240,13 @@ where needed. This preserves painter order and alignment without nested render g
 and overflow glyphs use shared RGBA tint; ordinary controls and icon tint use retained opacity.
 Legacy overlay alpha replaces theme alpha, preserved explicitly in the retained command. Remaining
 width/slot/hover scalar tracks are independently pending and do not advance migrated press feedback.
+
+
+## Review markers for the current continuation
+
+**Review needed:** all broad live/product acceptance entries remain open in
+[gpu-composition-review.md](gpu-composition-review.md). The user resumed source work while keeping
+Reach stopped after an intentional return to Explorer. Do not restart/reinstall to obtain those
+checks. R3 covers Clipboard width and its measured edge/memory costs; R4 covers semantic Battery/
+Bluetooth policy; R1/R2/R5/R6 cover the other implemented primitives/consumers and environment/
+lifecycle behavior; R7/R8 cover complete performance and final ledger/code acceptance.
