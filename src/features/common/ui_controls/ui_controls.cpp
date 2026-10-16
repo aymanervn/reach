@@ -199,25 +199,45 @@ reach_result reach_ui_motion_background_render(reach_render_command_buffer *comm
         if (result == REACH_OK)
             result = reach_render_push_rect_motion(commands, &source, bounds, radius, {1, 1, 1, 1});
     }
+    reach_rect_motion paint = *bounds;
+    auto aligned = reach_render_pixel_aligned_rect(reach_rect_motion_value_at(bounds, 0));
+    auto align_axis = [](reach_motion &position, reach_motion &extent, float near, float size)
+    {
+        float near_minimum = 0, near_maximum = 0, size_minimum = 0, size_maximum = 0;
+        if (reach_motion_range(&position, &near_minimum, &near_maximum) == REACH_OK &&
+            reach_motion_range(&extent, &size_minimum, &size_maximum) == REACH_OK &&
+            near_minimum == near_maximum && size_minimum == size_maximum)
+        {
+            reach_motion_set(&position, near);
+            reach_motion_set(&extent, size);
+        }
+    };
+    align_axis(paint.x, paint.width, aligned.x, aligned.width);
+    align_axis(paint.y, paint.height, aligned.y, aligned.height);
+    float paint_width = 0, paint_height = 0;
+    (void)reach_motion_range(&paint.width, &minimum, &paint_width);
+    (void)reach_motion_range(&paint.height, &minimum, &paint_height);
+    source.bounds.width = fmaxf(1, ceilf(paint_width));
+    source.bounds.height = fmaxf(1, ceilf(paint_height));
     bool bordered = border > 0 && outline.a > 0;
     background.a = outline.a = 1;
     source.id = first_id + 3;
     source.parent_id = parent_id;
     if (result == REACH_OK)
-        result = reach_render_push_rect_motion(commands, &source, bounds, radius,
+        result = reach_render_push_rect_motion(commands, &source, &paint, radius,
                                                bordered ? outline : background);
-    if (result == REACH_OK && bordered && width > border * 2 && height > border * 2)
+    if (result == REACH_OK && bordered && paint_width > border * 2 && paint_height > border * 2)
     {
-        reach_rect_motion inner = *bounds;
+        reach_rect_motion inner = paint;
         inner.x = reach_motion_affine(&inner.x, 1, border);
         inner.y = reach_motion_affine(&inner.y, 1, border);
         inner.width = reach_motion_affine(&inner.width, 1, -border * 2);
-        inner.width = reach_motion_clamp(&inner.width, 0, width - border * 2);
+        inner.width = reach_motion_clamp(&inner.width, 0, paint_width - border * 2);
         inner.height = reach_motion_affine(&inner.height, 1, -border * 2);
-        inner.height = reach_motion_clamp(&inner.height, 0, height - border * 2);
+        inner.height = reach_motion_clamp(&inner.height, 0, paint_height - border * 2);
         source.id = first_id + 5;
-        source.bounds.width = ceilf(width - border * 2);
-        source.bounds.height = ceilf(height - border * 2);
+        source.bounds.width = ceilf(paint_width - border * 2);
+        source.bounds.height = ceilf(paint_height - border * 2);
         result = reach_render_push_rect_motion(commands, &source, &inner, fmaxf(0, radius - border),
                                                background);
     }

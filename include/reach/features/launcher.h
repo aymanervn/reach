@@ -75,7 +75,7 @@ extern "C"
         int32_t caret_visible;
         int32_t selection_start;
         int32_t selection_end;
-        float results_expansion;
+        reach_motion results_expansion;
     } reach_launcher_render_input;
 
     struct reach_launcher_state

@@ -188,6 +188,18 @@ reach_host_execute_registered_surface(reach_host *host, reach_feature_runtime *d
             reach_host_stamp_surface_content(host, desc->definition->id, commands);
         }
         commands->presentation.bounds = commands->content_rect;
+        commands->presentation_center_x =
+            geometry->presentation.center_x.generation
+                ? reach_motion_affine(&geometry->presentation.center_x,
+                                      commands->content_transform.scale_x,
+                                      commands->content_transform.offset_x)
+                : reach_motion{};
+        commands->presentation_center_y =
+            geometry->presentation.center_y.generation
+                ? reach_motion_affine(&geometry->presentation.center_y,
+                                      commands->content_transform.scale_y,
+                                      commands->content_transform.offset_y)
+                : reach_motion{};
     }
     desc->surface->fallback_animation_active =
         reach_render_backend_content_sampling_active(&desc->surface->renderer, commands);
@@ -423,8 +435,18 @@ reach_window_thumbnail_placement reach_host_native_overlay_placement(
     {
         const reach_render_group *group = &geometry->presentation.group;
         reach_point_f32 scale = reach_render_group_scale_at(group, now_seconds);
-        float center_x = ctx->content_rect.x + ctx->content_rect.width * 0.5f;
-        float center_y = ctx->content_rect.y + ctx->content_rect.height * 0.5f;
+        float center_x =
+            geometry->presentation.center_x.generation
+                ? reach_motion_value_at(&geometry->presentation.center_x, now_seconds) *
+                          transform.scale_x +
+                      transform.offset_x
+                : ctx->content_rect.x + ctx->content_rect.width * .5f;
+        float center_y =
+            geometry->presentation.center_y.generation
+                ? reach_motion_value_at(&geometry->presentation.center_y, now_seconds) *
+                          transform.scale_y +
+                      transform.offset_y
+                : ctx->content_rect.y + ctx->content_rect.height * .5f;
         rect->x = center_x + (rect->x - center_x) * scale.x +
                   reach_motion_value_at(&group->x, now_seconds);
         rect->y = center_y + (rect->y - center_y) * scale.y +
@@ -445,11 +467,15 @@ static int32_t reach_host_native_presentation_active(const reach_feature_surface
     if (!geometry->presentation.retained)
         return 0;
     const reach_render_group *group = &geometry->presentation.group;
+    auto scale = reach_render_group_scale_at(group, now_seconds);
     return reach_motion_active_at(&group->x, now_seconds) ||
            reach_motion_active_at(&group->y, now_seconds) ||
            reach_motion_active_at(&group->scale, now_seconds) ||
            reach_motion_active_at(&group->scale_y, now_seconds) ||
-           reach_motion_active_at(&group->opacity, now_seconds);
+           reach_motion_active_at(&group->opacity, now_seconds) ||
+           (scale.x != 1 &&
+            reach_motion_active_at(&geometry->presentation.center_x, now_seconds)) ||
+           (scale.y != 1 && reach_motion_active_at(&geometry->presentation.center_y, now_seconds));
 }
 
 static reach_result reach_host_sync_native_overlay(reach_host *host, reach_feature_runtime *desc,
@@ -616,6 +642,8 @@ static int32_t reach_host_surface_geometry_equal(const reach_feature_surface_geo
            reach_rect_equal(a->presentation.translation_bounds,
                             b->presentation.translation_bounds) &&
            a->presentation.retained == b->presentation.retained &&
+           reach_motion_equal(&a->presentation.center_x, &b->presentation.center_x) &&
+           reach_motion_equal(&a->presentation.center_y, &b->presentation.center_y) &&
            reach_render_group_equal(&a->presentation.group, &b->presentation.group);
 }
 
@@ -830,6 +858,14 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
             input.y = geometry.presentation.group.y;
             input.scale = geometry.presentation.group.scale;
             input.scale_y = geometry.presentation.group.scale_y;
+            if (geometry.presentation.center_x.generation)
+                input.center_x = reach_motion_affine(&geometry.presentation.center_x,
+                                                     surface_ctx.render_transform.scale_x,
+                                                     surface_ctx.render_transform.offset_x);
+            if (geometry.presentation.center_y.generation)
+                input.center_y = reach_motion_affine(&geometry.presentation.center_y,
+                                                     surface_ctx.render_transform.scale_y,
+                                                     surface_ctx.render_transform.offset_y);
             input.has_motion_bounds = geometry.has_input_bounds;
             if (geometry.has_input_bounds)
             {

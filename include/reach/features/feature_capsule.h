@@ -134,6 +134,8 @@ extern "C"
             reach_rect_f32 translation_bounds;
             int32_t retained;
             reach_render_group group;
+            reach_motion center_x;
+            reach_motion center_y;
         } presentation;
     } reach_feature_surface_geometry;
 

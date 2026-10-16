@@ -24,6 +24,9 @@ reach_launcher_hit_result reach_launcher_hit_test(const reach_launcher_model *mo
         return hit;
     }
 
+    if (!reach_launcher_rect_contains(layout->search_results, x, y))
+        return hit;
+
     if (reach_launcher_rect_contains(layout->search_result_scrollbar_thumb, x, y))
     {
         hit.type = REACH_LAUNCHER_HIT_SCROLLBAR_THUMB;

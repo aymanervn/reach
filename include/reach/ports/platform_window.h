@@ -52,6 +52,8 @@ extern "C"
         reach_motion y;
         reach_motion scale;
         reach_motion scale_y;
+        reach_motion center_x;
+        reach_motion center_y;
         int32_t has_motion_bounds;
         reach_rect_motion motion_bounds;
     } reach_platform_window_input_presentation;

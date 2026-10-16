@@ -213,6 +213,8 @@ struct reach_render_backend
     ComPtr<IDCompositionVisual2> dcomp_scene_visual;
     ComPtr<IDCompositionScaleTransform> scene_scale;
     reach_render_group scene_presentation;
+    reach_motion scene_center_x;
+    reach_motion scene_center_y;
     int32_t has_scene_presentation;
     ComPtr<ABI::Windows::UI::Composition::ICompositionScopedBatch> presentation_batch;
     EventRegistrationToken presentation_token = {};

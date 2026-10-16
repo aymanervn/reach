@@ -784,6 +784,47 @@ static HRESULT sync_clip(reach_render_backend *backend, reach_d2d_retained_layer
     return hr;
 }
 
+static HRESULT presentation_center(reach_render_backend *backend, const reach_render_group &group,
+                                   const reach_motion &x, const reach_motion &y)
+{
+    reach_workload_add(REACH_WORKLOAD_PROPERTY_SUBMISSIONS, 1);
+    float center_x = scalar_value(backend, x, group.bounds.x + group.bounds.width * .5f);
+    float center_y = scalar_value(backend, y, group.bounds.y + group.bounds.height * .5f);
+    if (backend->root_visual != nullptr)
+    {
+        ComPtr<IVisual> visual;
+        HRESULT hr = backend->root_visual.As(&visual);
+        if (SUCCEEDED(hr))
+            hr = visual->put_CenterPoint({center_x, center_y, 0});
+        if (SUCCEEDED(hr))
+            hr = wuc_motion(backend, backend->root_visual.Get(), L"CenterPoint.X", x);
+        if (SUCCEEDED(hr))
+            hr = wuc_motion(backend, backend->root_visual.Get(), L"CenterPoint.Y", y);
+        return hr;
+    }
+    HRESULT hr = backend->scene_scale->SetCenterX(center_x);
+    if (SUCCEEDED(hr))
+        hr = backend->scene_scale->SetCenterY(center_y);
+    ComPtr<IDCompositionAnimation> animation;
+    if (SUCCEEDED(hr))
+    {
+        HRESULT motion_hr = dcomp_motion(backend, x, &animation);
+        if (FAILED(motion_hr))
+            return motion_hr;
+        if (motion_hr == S_OK)
+            hr = backend->scene_scale->SetCenterX(animation.Get());
+    }
+    if (SUCCEEDED(hr))
+    {
+        HRESULT motion_hr = dcomp_motion(backend, y, &animation);
+        if (FAILED(motion_hr))
+            return motion_hr;
+        if (motion_hr == S_OK)
+            hr = backend->scene_scale->SetCenterY(animation.Get());
+    }
+    return hr;
+}
+
 static HRESULT wuc_properties(reach_render_backend *backend, IInspectable *inspectable,
                               const reach_render_group &group, float base_x, float base_y,
                               unsigned mask = 31)
@@ -1474,8 +1515,9 @@ void reach_d2d_release_retained(reach_render_backend *backend)
         ComPtr<ABI::Windows::UI::Composition::ICompositionObject> root;
         if (SUCCEEDED(backend->root_visual.As(&root)))
         {
-            const wchar_t *properties[] = {L"Offset.X", L"Offset.Y", L"Opacity", L"Scale.X",
-                                           L"Scale.Y"};
+            const wchar_t *properties[] = {L"Offset.X",     L"Offset.Y", L"Opacity",
+                                           L"Scale.X",      L"Scale.Y",  L"CenterPoint.X",
+                                           L"CenterPoint.Y"};
             for (const wchar_t *property_name : properties)
             {
                 HSTRING property = nullptr;
@@ -1559,11 +1601,16 @@ reach_result reach_d2d_presentation_complete(reach_render_backend *backend, uint
     if (backend->presentation_result != REACH_OK)
         return backend->presentation_result;
     double now_seconds = reach_motion_now_seconds();
+    bool transparent =
+        backend->scene_presentation.opacity.generation &&
+        reach_motion_value_at(&backend->scene_presentation.opacity, now_seconds) <= 0;
     if (reach_motion_active_at(&backend->scene_presentation.opacity, now_seconds) ||
         reach_motion_active_at(&backend->scene_presentation.x, now_seconds) ||
         reach_motion_active_at(&backend->scene_presentation.y, now_seconds) ||
         reach_motion_active_at(&backend->scene_presentation.scale, now_seconds) ||
-        reach_motion_active_at(&backend->scene_presentation.scale_y, now_seconds))
+        reach_motion_active_at(&backend->scene_presentation.scale_y, now_seconds) ||
+        (!transparent && (reach_motion_active_at(&backend->scene_center_x, now_seconds) ||
+                          reach_motion_active_at(&backend->scene_center_y, now_seconds))))
         return REACH_OK;
     if (backend->reconciled_presentation_generation == generation)
     {
@@ -1612,6 +1659,14 @@ reach_result reach_d2d_presentation_complete(reach_render_backend *backend, uint
     settled.x.duration_seconds = settled.y.duration_seconds = 0.0;
     settled.opacity.duration_seconds = settled.scale.duration_seconds = 0.0;
     settled.scale_y.duration_seconds = 0.0;
+    auto center_x = backend->scene_center_x, center_y = backend->scene_center_y;
+    if (center_x.duration_seconds > 0 || center_y.duration_seconds > 0)
+    {
+        center_x.duration_seconds = center_y.duration_seconds = 0;
+        HRESULT center_hr = presentation_center(backend, settled, center_x, center_y);
+        if (FAILED(center_hr))
+            return reach_d2d_fail_presentation(backend, L"presentation endpoint center", center_hr);
+    }
     if (backend->compositor != nullptr)
     {
         HRESULT hr = wuc_properties(backend, backend->root_visual.Get(), settled, 0.0f, 0.0f);
@@ -2235,11 +2290,16 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
     }
     reach_render_group presentation =
         commands->has_presentation ? commands->presentation : reach_render_group{};
-    if (SUCCEEDED(hr) && (!backend->has_scene_presentation ||
-                          !reach_render_group_equal(&presentation, &backend->scene_presentation)))
+    reach_motion center_x = commands->presentation_center_x;
+    reach_motion center_y = commands->presentation_center_y;
+    bool center_changed = !backend->has_scene_presentation ||
+                          !reach_motion_equal(&center_x, &backend->scene_center_x) ||
+                          !reach_motion_equal(&center_y, &backend->scene_center_y);
+    if (SUCCEEDED(hr) &&
+        (center_changed || !reach_render_group_equal(&presentation, &backend->scene_presentation)))
     {
         bool animation_changed =
-            !backend->has_scene_presentation ||
+            center_changed || !backend->has_scene_presentation ||
             !reach_motion_equal(&presentation.opacity, &backend->scene_presentation.opacity) ||
             !reach_motion_equal(&presentation.x, &backend->scene_presentation.x) ||
             !reach_motion_equal(&presentation.y, &backend->scene_presentation.y) ||
@@ -2289,36 +2349,24 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
                 }
             }
         }
-        float center_x = presentation.bounds.x + presentation.bounds.width * 0.5f;
-        float center_y = presentation.bounds.y + presentation.bounds.height * 0.5f;
-        if (backend->root_visual != nullptr)
+        if (SUCCEEDED(hr))
+            hr = presentation_center(backend, presentation, center_x, center_y);
+        if (SUCCEEDED(hr))
         {
-            ComPtr<IVisual> root;
-            hr = backend->root_visual.As(&root);
-            if (SUCCEEDED(hr))
-                hr = root->put_CenterPoint({center_x, center_y, 0.0f});
-            if (SUCCEEDED(hr))
-                hr = wuc_properties(backend, backend->root_visual.Get(), presentation, 0.0f, 0.0f,
-                                    animation_changed
-                                        ? 31
-                                        : property_mask(presentation, backend->scene_presentation,
-                                                        0.0f, 0.0f,
-                                                        backend->has_scene_presentation != 0));
-        }
-        else
-        {
-            hr = backend->scene_scale->SetCenterX(center_x);
-            if (SUCCEEDED(hr))
-                hr = backend->scene_scale->SetCenterY(center_y);
-            if (SUCCEEDED(hr))
-                hr = dcomp_properties(backend, backend->dcomp_visual, backend->scene_scale.Get(),
-                                      presentation, 0.0f, 0.0f,
-                                      property_mask(presentation, backend->scene_presentation, 0.0f,
-                                                    0.0f, backend->has_scene_presentation != 0));
+            unsigned mask = animation_changed
+                                ? 31
+                                : property_mask(presentation, backend->scene_presentation, 0, 0,
+                                                backend->has_scene_presentation != 0);
+            hr = backend->root_visual != nullptr
+                     ? wuc_properties(backend, backend->root_visual.Get(), presentation, 0, 0, mask)
+                     : dcomp_properties(backend, backend->dcomp_visual, backend->scene_scale.Get(),
+                                        presentation, 0, 0, mask);
         }
         if (SUCCEEDED(hr))
         {
             backend->scene_presentation = presentation;
+            backend->scene_center_x = center_x;
+            backend->scene_center_y = center_y;
             backend->has_scene_presentation = 1;
         }
         if (animation_changed && backend->presentation_batch != nullptr)

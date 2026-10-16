@@ -74,8 +74,14 @@ reach_pointer_event reach_host_surface_pointer_event(const reach_feature_runtime
     {
         const reach_render_group *group = &geometry.presentation.group;
         reach_point_f32 scale = reach_render_group_scale_at(group, now_seconds);
-        float center_x = geometry.visible_bounds.x + geometry.visible_bounds.width * 0.5f;
-        float center_y = geometry.visible_bounds.y + geometry.visible_bounds.height * 0.5f;
+        float center_x = geometry.visible_bounds.x +
+                         (geometry.presentation.center_x.generation
+                              ? reach_motion_value_at(&geometry.presentation.center_x, now_seconds)
+                              : geometry.visible_bounds.width * .5f);
+        float center_y = geometry.visible_bounds.y +
+                         (geometry.presentation.center_y.generation
+                              ? reach_motion_value_at(&geometry.presentation.center_y, now_seconds)
+                              : geometry.visible_bounds.height * .5f);
         if (scale.x > 0.0f && scale.y > 0.0f)
         {
             pointer.x =

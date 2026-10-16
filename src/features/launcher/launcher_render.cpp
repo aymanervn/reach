@@ -5,6 +5,9 @@
 #include "reach/core/typography.h"
 #include "reach/features/common/scrollbar_render.h"
 #include "reach/features/common/section_reveal.h"
+#include "reach/features/common/ui_controls.h"
+
+#include <math.h>
 
 static uint64_t reach_launcher_fallback_icon(reach_search_result_kind kind)
 {
@@ -72,25 +75,13 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
     float row_path_size = reach_launcher_scale(input, REACH_TEXT_SIZE_SMALL);
     int32_t error_row_visible = reach_launcher_error_row_visible(model);
     int32_t results_attached = model->result_count > 0 || error_row_visible ? 1 : 0;
-    float outer_height = layout->search_box.height;
-    if (results_attached)
-    {
-        float expanded_height =
-            (layout->search_results.y - layout->bounds.y) + layout->search_results.height;
-        outer_height += (expanded_height - outer_height) * input->results_expansion;
-    }
+    auto bounds = reach_launcher_body_motion(layout, &input->results_expansion);
     float border_thickness = reach_theme_border_thickness(theme, input->dpi_scale);
-
+    reach_result result = reach_ui_motion_background_render(
+        out_commands, &bounds, launcher_radius, border_thickness, theme->launcher_search_background,
+        theme->launcher_border, &theme->popup_shadow, input->dpi_scale,
+        UINT64_C(0x2900000000040000), 0);
     reach_render_command command = {};
-    command.type = REACH_RENDER_COMMAND_RECT;
-    command.rect.x = 0.0f;
-    command.rect.y = 0.0f;
-    command.rect.width = layout->bounds.width;
-    command.rect.height = outer_height;
-    command.radius = launcher_radius;
-    reach_result result = reach_render_push_bordered_background(
-        out_commands, &command, theme->launcher_search_background, theme->launcher_border,
-        border_thickness, &theme->popup_shadow, input->dpi_scale);
     if (result != REACH_OK)
     {
         return result;
@@ -137,28 +128,60 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
         reach_render_command_buffer_push(out_commands, &command);
     }
 
-    if (results_attached && input->results_expansion > 0.001f)
+    if (results_attached)
     {
         reach_rect_f32 results_clip = {};
         results_clip.x = 0.0f;
         results_clip.y = layout->search_results.y - layout->bounds.y;
         results_clip.width = layout->bounds.width;
-        results_clip.height = outer_height - results_clip.y;
-        if (results_clip.height < 0.0f)
+        results_clip.height = fmaxf(0, layout->bounds.height - results_clip.y);
+        reach_render_group viewport = {};
+        viewport.id = UINT64_C(0x2900000000040010);
+        viewport.bounds = results_clip;
+        viewport.bounds.height = fmaxf(1, viewport.bounds.height);
+        viewport.clip = results_clip;
+        viewport.has_clip = 1;
+        viewport.clip_insets[REACH_RENDER_CLIP_BOTTOM] =
+            reach_motion_affine(&bounds.height, -1, layout->bounds.height);
+        result = reach_render_command_buffer_begin_group(out_commands, &viewport);
+        reach_render_command_buffer_end_group(out_commands);
+        if (result != REACH_OK)
+            return result;
+        reach_render_group content = {};
+        content.id = viewport.id + 1;
+        content.parent_id = viewport.id;
+        content.bounds = viewport.bounds;
+        content.bounds.x = floorf(content.bounds.x);
+        content.bounds.y = floorf(content.bounds.y);
+        content.bounds.width = ceilf(viewport.bounds.x + viewport.bounds.width) - content.bounds.x;
+        content.bounds.height =
+            ceilf(viewport.bounds.y + viewport.bounds.height) - content.bounds.y;
+        auto opacity = reach_section_reveal_opacity(&input->results_expansion);
+        float slide = reach_launcher_scale(input, reach_launcher_results_offset_dp);
+        content.y = reach_motion_affine(&opacity, -slide, slide);
+        result = reach_render_command_buffer_begin_group(out_commands, &content);
+        reach_render_command_buffer_end_group(out_commands);
+        if (result != REACH_OK)
+            return result;
+        reach_motion stationary = {};
+        auto retain = [&](size_t first, uint64_t id)
         {
-            results_clip.height = 0.0f;
-        }
-        reach_render_command_buffer_set_scissor(out_commands, results_clip);
-        size_t first_result_command = out_commands->count;
+            return reach_render_retain_commands(out_commands, first, id, content.id, &opacity,
+                                                &stationary);
+        };
         size_t visible_count = reach_launcher_visible_result_count(model);
         float row_height = reach_launcher_scale(input, 56.0f);
 
         if (layout->search_result_scrollbar_track.height > 0.0f)
         {
+            size_t first = out_commands->count;
             reach_scrollbar_build_render_commands(layout->search_result_scrollbar_track,
                                                   layout->search_result_scrollbar_thumb,
                                                   layout->bounds, theme->launcher_scrollbar_track,
                                                   theme->launcher_scrollbar_thumb, out_commands);
+            result = retain(first, UINT64_C(0x2900000000060000));
+            if (result != REACH_OK)
+                return result;
         }
 
         size_t start = reach_launcher_model_result_scroll_offset(model);
@@ -180,6 +203,8 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
                           row_height * (float)visible_index;
             float row_width = layout->search_result_items.width;
             int32_t selected = index == model->selected_result_index;
+            uint64_t row_id = UINT64_C(0x2900000000050000) + index * 8;
+            size_t first = out_commands->count;
 
             if (selected)
             {
@@ -192,7 +217,11 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
                 command.color = theme->launcher_row_selected_background;
                 command.radius = row_selected_radius;
                 reach_render_command_buffer_push(out_commands, &command);
+                result = retain(first, row_id);
+                if (result != REACH_OK)
+                    return result;
             }
+            first = out_commands->count;
 
             float icon_size = row_icon_size;
             float icon_x = row_x + row_icon_x;
@@ -263,10 +292,14 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
             command.text_ellipsis = 1;
             reach_copy_utf16(command.text, 260, model->results[index].subtitle);
             reach_render_command_buffer_push(out_commands, &command);
+            result = retain(first, row_id + 1);
+            if (result != REACH_OK)
+                return result;
         }
 
         if (error_row_visible)
         {
+            size_t first = out_commands->count;
             float row_x = layout->search_result_items.x - layout->bounds.x;
             float row_y = layout->search_result_items.y - layout->bounds.y;
             float row_width = layout->search_result_items.width;
@@ -298,11 +331,10 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
             reach_copy_utf16(command.text, 260,
                              (const uint16_t *)L"Could not connect to retriever. Is it installed?");
             reach_render_command_buffer_push(out_commands, &command);
+            result = retain(first, UINT64_C(0x2900000000060010));
+            if (result != REACH_OK)
+                return result;
         }
-
-        reach_section_reveal_apply(out_commands, first_result_command, input->results_expansion,
-                                   reach_launcher_scale(input, 4.0f));
-        reach_render_command_buffer_clear_scissor(out_commands);
     }
 
     return REACH_OK;
@@ -353,7 +385,7 @@ reach_result reach_launcher_append_render_commands(reach_launcher *launcher,
     input.caret_opacity = reach_launcher_caret_opacity(launcher);
     reach_text_edit_selection_range(&state->launcher_text_edit, &input.selection_start,
                                     &input.selection_end);
-    input.results_expansion = reach_launcher_results_expansion(launcher);
+    input.results_expansion = reach_launcher_results_motion(launcher);
 
     return reach_launcher_build_render_commands(&input, out_commands);
 }

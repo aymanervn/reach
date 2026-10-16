@@ -1260,8 +1260,37 @@ static void test_popup_width_background_preflight(void)
     expect_true(!shadow, "covered width range avoids an unnecessary live shadow filter");
 }
 
+static void test_presentation_center_uses_canonical_motion(void)
+{
+    auto buffer = std::make_unique<reach_render_command_buffer>();
+    reach_render_command_buffer_clear(buffer.get());
+    buffer->has_presentation = 1;
+    buffer->presentation.bounds = {10, 20, 100, 200};
+    auto center = reach_render_presentation_center_at(buffer.get(), 10);
+    expect_true(center.x == 60 && center.y == 120,
+                "unspecified presentation center follows the static content bounds");
+    reach_motion_start_at(&buffer->presentation_center_y, 40, 200, .2, REACH_EASING_EASE_IN_OUT,
+                          10);
+    center = reach_render_presentation_center_at(buffer.get(), 10.1);
+    expect_true(center.x == 60 && fabsf(center.y - 120) < .001f &&
+                    reach_render_command_buffer_validate_groups(buffer.get()) == REACH_OK,
+                "one canonical center axis retains the other axis default");
+    buffer->has_presentation = 0;
+    expect_true(reach_render_command_buffer_validate_groups(buffer.get()) == REACH_INVALID_ARGUMENT,
+                "a center motion requires its root presentation owner");
+    buffer->has_presentation = 1;
+    buffer->presentation_center_y.repeating = 1;
+    expect_true(reach_render_command_buffer_validate_groups(buffer.get()) == REACH_INVALID_ARGUMENT,
+                "root center repetition cannot prevent finite presentation completion");
+    reach_render_command_buffer_clear(buffer.get());
+    expect_true(!buffer->presentation_center_y.generation &&
+                    !reach_render_command_buffer_motion_active(buffer.get()),
+                "clearing the render buffer retires root center ownership");
+}
+
 int main(void)
 {
+    test_presentation_center_uses_canonical_motion();
     test_rect_motion_source_ownership();
     test_width_text_source_ownership();
     test_popup_width_background_preflight();

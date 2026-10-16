@@ -100,6 +100,12 @@ support expectation is explicitly resolved.
     builds/all forty test groups, full native regressions and owned source/pixel/lifetime matrices
     pass. Final bounded-staging and installed watchdog-first/reachctl verification also pass.
     Consumers, intermediate product appearance and total cost remain open; see the text-width design for evidence/limits.
+  - [x] Support canonical animated root scale centers on both native backends.
+    Two optional root descriptors preserve moving pivots without per-group storage growth. Generic
+    rendering, CPU fallback, native preview projection, host inverse input and native hit testing
+    share the center; finite completion and suspension preserve lifetime. Both builds/all forty
+    tests, owned motion/input/lifetime/source probes, full native regressions and installed
+    validation pass. Launcher consumes the capability; broader product acceptance stays open.
   - [ ] Resolve compact native shadow appearance and total cost before width consumer integration.
     An owned-window prototype renders the existing interior cutout on both compositors. Three widths
     match within two channel values outside a one-pixel geometry edge; edge differences reach 23.
@@ -406,6 +412,14 @@ support expectation is explicitly resolved.
     monitors and four DPI values are covered; source chrome readback differs by at most one channel
     value. Native collapse/reversal reuses sources with zero raster passes. Animated custom compact
     geometry, displayed compositor pixels and total product acceptance remain in the broader gates.
+  - [x] Migrate Launcher result-height/reveal and overlapping opening-scale integration.
+    Canonical height, stationary clipping, per-paint fade/slide and one endpoint cleanup replace
+    the scalar manager and periodic result work. Generic root center motion preserves the changing
+    zoom pivot in both renderers, fallback, native input and preview projection. Both builds/all
+    forty tests and focused native/fallback/error/settled/source matrices pass. Shared pixel-aligned
+    constant axes preserve border coverage; intermediate glyph/curve sampling differences are
+    scoped and inspected. Full native/fallback regressions and installed watchdog-first/reachctl
+    validation pass. Source-memory cost is measured and remains part of total product acceptance.
 - [ ] Migrate Top Bar control widths and Dock insertion, removal, reorder and capacity fitting;
   verify existing compositor consumers as well as newly migrated paths.
 - [ ] Migrate Dock popup width/reflow and Switcher width fitting using the selected preview design;

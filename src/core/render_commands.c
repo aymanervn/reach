@@ -175,12 +175,30 @@ reach_result reach_render_group_clip_radii_motion(const reach_render_group *grou
     return REACH_OK;
 }
 
+reach_point_f32 reach_render_presentation_center_at(const reach_render_command_buffer *buffer,
+                                                    double now_seconds)
+{
+    reach_point_f32 point = {0};
+    if (buffer != 0)
+    {
+        point.x = buffer->presentation_center_x.generation
+                      ? reach_motion_value_at(&buffer->presentation_center_x, now_seconds)
+                      : buffer->presentation.bounds.x + buffer->presentation.bounds.width * .5f;
+        point.y = buffer->presentation_center_y.generation
+                      ? reach_motion_value_at(&buffer->presentation_center_y, now_seconds)
+                      : buffer->presentation.bounds.y + buffer->presentation.bounds.height * .5f;
+    }
+    return point;
+}
+
 int32_t reach_render_command_buffer_motion_active(const reach_render_command_buffer *buffer)
 {
     size_t index;
     if (buffer == 0)
         return 0;
-    if (buffer->has_presentation && reach_render_group_motion_active(&buffer->presentation))
+    if (buffer->has_presentation && (reach_render_group_motion_active(&buffer->presentation) ||
+                                     reach_motion_active(&buffer->presentation_center_x) ||
+                                     reach_motion_active(&buffer->presentation_center_y)))
         return 1;
     for (index = 0; index < buffer->group_count; ++index)
         if (reach_render_group_motion_active(&buffer->groups[index]))
@@ -293,6 +311,24 @@ static int32_t reach_render_repetition_valid(const reach_render_group *group, in
     return 1;
 }
 
+static int32_t reach_render_presentation_center_valid(const reach_render_command_buffer *buffer)
+{
+    const reach_motion *motions[] = {&buffer->presentation_center_x,
+                                     &buffer->presentation_center_y};
+    for (size_t index = 0; index < 2; ++index)
+    {
+        const reach_motion *motion = motions[index];
+        if (motion->generation == 0)
+            continue;
+        float minimum = 0, maximum = 0;
+        if (!buffer->has_presentation || motion->repeating || !isfinite(motion->started_seconds) ||
+            !isfinite(motion->duration_seconds) || motion->duration_seconds < 0 ||
+            reach_motion_range(motion, &minimum, &maximum) != REACH_OK)
+            return 0;
+    }
+    return 1;
+}
+
 static int32_t reach_render_width_text_valid(const reach_render_command *command,
                                              const reach_render_group *viewport)
 {
@@ -339,6 +375,7 @@ reach_result reach_render_command_buffer_validate_groups(const reach_render_comm
     int32_t has_shadow = 0;
     if (buffer == 0 || buffer->group_count > REACH_MAX_RENDER_GROUPS ||
         buffer->count > REACH_MAX_RENDER_COMMANDS ||
+        !reach_render_presentation_center_valid(buffer) ||
         (buffer->has_presentation && (buffer->presentation.parent_id != 0 ||
                                       !reach_render_repetition_valid(&buffer->presentation, 1))))
         return REACH_INVALID_ARGUMENT;
@@ -597,6 +634,8 @@ void reach_render_command_buffer_clear(reach_render_command_buffer *buffer)
         buffer->current_group_id = 0;
         buffer->has_presentation = 0;
         buffer->requires_content_sampling = 0;
+        buffer->presentation_center_x = (reach_motion){0};
+        buffer->presentation_center_y = (reach_motion){0};
         buffer->has_scissor = 0;
         buffer->content_rect = empty;
         buffer->content_transform = (reach_transform_f32){1.0f, 1.0f, 0.0f, 0.0f};
@@ -714,7 +753,7 @@ reach_result reach_render_push_shadow(reach_render_command_buffer *buffer,
     return reach_render_command_buffer_push(buffer, &command);
 }
 
-static reach_rect_f32 reach_render_pixel_aligned_rect(reach_rect_f32 rect)
+reach_rect_f32 reach_render_pixel_aligned_rect(reach_rect_f32 rect)
 {
     float right = roundf(rect.x + rect.width);
     float bottom = roundf(rect.y + rect.height);

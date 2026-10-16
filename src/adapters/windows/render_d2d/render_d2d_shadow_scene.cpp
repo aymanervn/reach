@@ -381,6 +381,7 @@ reach_result reach_d2d_draw_group_shadow(reach_render_backend *backend,
     {
         auto source_commands = std::make_unique<reach_render_command_buffer>(*commands);
         source_commands->has_presentation = 0;
+        source_commands->presentation_center_x = source_commands->presentation_center_y = {};
         source_commands->content_transform = {1, 1, -group.bounds.x, -group.bounds.y};
         source_commands->count = (uint32_t)count;
         for (size_t index = 0; index < count; ++index)

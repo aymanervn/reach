@@ -225,6 +225,8 @@ extern "C"
         uint64_t current_group_id;
         int32_t has_presentation;
         reach_render_group presentation;
+        reach_motion presentation_center_x;
+        reach_motion presentation_center_y;
         int32_t requires_content_sampling;
     } reach_render_command_buffer;
 
@@ -241,6 +243,8 @@ extern "C"
 
     void reach_render_command_buffer_clear(reach_render_command_buffer *buffer);
     int32_t reach_render_command_buffer_motion_active(const reach_render_command_buffer *buffer);
+    reach_point_f32 reach_render_presentation_center_at(const reach_render_command_buffer *buffer,
+                                                        double now_seconds);
     reach_result
     reach_render_command_buffer_validate_groups(const reach_render_command_buffer *buffer);
     const reach_render_group *
@@ -303,6 +307,7 @@ extern "C"
     reach_result reach_render_push_shadow(reach_render_command_buffer *buffer,
                                           const reach_render_command *shape,
                                           const reach_shadow *shadow, float dpi_scale);
+    reach_rect_f32 reach_render_pixel_aligned_rect(reach_rect_f32 rect);
     size_t reach_render_bordered_background_shapes(const reach_render_command *shape,
                                                    reach_color background_color,
                                                    reach_color border_color, float border_thickness,

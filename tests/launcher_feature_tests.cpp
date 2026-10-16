@@ -184,7 +184,8 @@ int main()
     const reach_feature_capsule_ops *capsule_ops = reach_launcher_capsule_ops();
     reach_feature_surface_geometry geometry = {};
     capsule_ops->surface_geometry(capsule, &geometry);
-    failed += expect_close(geometry.visible_bounds.height, expansion_layout.search_box.height);
+    failed += expect_close(reach_motion_value(&geometry.input_bounds.height),
+                           expansion_layout.search_box.height);
     failed += expect_close(geometry.envelope_bounds.x, expansion_layout.bounds.x);
     failed += expect_close(geometry.envelope_bounds.y, expansion_layout.bounds.y);
     failed +=
@@ -199,8 +200,9 @@ int main()
     reach_test_motion_clock_advance(0.08);
     capsule_ops->tick(capsule, 0.08, &tick);
     capsule_ops->surface_geometry(capsule, &geometry);
-    failed += expect(geometry.visible_bounds.height > expansion_layout.search_box.height &&
-                     geometry.visible_bounds.height < expansion_layout.bounds.height);
+    failed += expect(
+        reach_motion_value(&geometry.input_bounds.height) > expansion_layout.search_box.height &&
+        reach_motion_value(&geometry.input_bounds.height) < expansion_layout.bounds.height);
     double middle = geometry.presentation.group.opacity.started_seconds + 0.08;
     float opacity = reach_motion_value_at(&geometry.presentation.group.opacity, middle);
     float offset = reach_motion_value_at(&geometry.presentation.group.y, middle);
@@ -208,7 +210,7 @@ int main()
     failed += expect(opacity > 0.0f && opacity < 1.0f);
     failed += expect(offset > 0.0f && offset < 8.0f);
     failed += expect(scale > 1.0f && scale < 1.08f);
-    failed += expect(tick.redraw == 1);
+    failed += expect(tick.redraw == 0);
     tick = {};
     reach_test_motion_clock_advance(0.16);
     capsule_ops->tick(capsule, 0.16, &tick);
