@@ -2,6 +2,9 @@
 #include "test_utf16.h"
 
 #include <stdio.h>
+#include <chrono>
+#include <thread>
+#include "reach/support/motion.h"
 
 static int failures;
 
@@ -138,13 +141,26 @@ static void test_pending_expires(void)
     reach_feature_tick_result tick = {};
     ops->tick(battery, 0.5, &tick);
     expect_true(reach_battery_saver_pending(battery), "pending holds inside the grace window");
-    expect_true(tick.request_update, "a pending request keeps asking for updates");
+    expect_true(!tick.request_update && !ops->needs_frame(battery),
+                "a pending request waits without periodic updates");
+    reach_feature_surface_geometry geometry = {};
+    ops->surface_geometry(battery, &geometry);
+    expect_true(geometry.deadline_seconds > reach_motion_now_seconds(),
+                "a pending request publishes an absolute wake deadline");
+    tick = {};
+    ops->tick(battery, 10.0, &tick);
+    expect_true(reach_battery_saver_pending(battery) && !tick.request_update,
+                "frame delta does not advance semantic timeouts");
+    std::this_thread::sleep_for(
+        std::chrono::milliseconds(reach_motion_wait_ms(geometry.deadline_seconds) + 1));
 
     tick = {};
-    ops->tick(battery, 2.0, &tick);
+    ops->tick(battery, 0, &tick);
     expect_true(!reach_battery_saver_pending(battery),
                 "pending expires when the system never agrees");
     expect_true(tick.redraw, "expiring the request asks for a redraw");
+    ops->surface_geometry(battery, &geometry);
+    expect_true(geometry.deadline_seconds == 0, "expiry retires the pending wake deadline");
     expect_true(reach_battery_model_saver_effective(&reach_battery_state_ptr(battery)->model) == 0,
                 "the model falls back to the system state after expiry");
 

@@ -152,7 +152,7 @@ extern "C"
         uint32_t bluetooth_icon_id;
         int32_t network_connected;
         int32_t bluetooth_enabled;
-        double bluetooth_absent_seconds;
+        double bluetooth_absence_deadline;
         int32_t volume_valid;
         int32_t volume_muted;
         uint16_t volume_text[8];

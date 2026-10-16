@@ -394,6 +394,13 @@ support expectation is explicitly resolved.
     submissions/repaints per phase but do not prove total product cost or displayed timing; those
     remain in the broader acceptance gates.
 
+- [x] Remove periodic frame demand from Battery pending and Top Bar Bluetooth grace policies.
+  Preserve their two-second lifetimes using generic absolute deadline wakes. Keep service
+  acknowledgement/recovery and reset cancellation, merge Battery's timeout with popup completion,
+  and reconcile expiry once. Both builds/all forty tests and owned scheduling/lifetime probes pass;
+  pending waits request zero frames or recurring updates. Other semantic scheduling remains audited
+  separately in the ledger and broad product acceptance remains open.
+
 ## 5. Reveal, resize and layout motion
 
 - [ ] Implement the selected generic resize/reveal capabilities end to end, preserving anchors,

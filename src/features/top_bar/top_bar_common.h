@@ -62,7 +62,6 @@ struct reach_top_bar
 reach_top_bar_state *reach_top_bar_state_mut(reach_top_bar *top_bar);
 reach_top_bar_now_playing *reach_top_bar_now_playing_subfeature(reach_top_bar *top_bar);
 reach_icon_service *reach_top_bar_icons(reach_top_bar *top_bar);
-int32_t reach_top_bar_bluetooth_absence_pending(const reach_top_bar *top_bar);
 reach_pressable_feedback_style reach_top_bar_pressable_feedback(reach_top_bar *top_bar);
 void reach_top_bar_reconcile_tray_order(reach_top_bar *top_bar);
 void reach_top_bar_sync_tray_items(reach_top_bar *top_bar);

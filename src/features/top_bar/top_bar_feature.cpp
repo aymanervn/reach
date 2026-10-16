@@ -262,51 +262,38 @@ static uint32_t reach_top_bar_network_icon_id(const reach_network_state *network
     return REACH_VECTOR_ICON_WIFI_HIGH;
 }
 
-static int32_t reach_top_bar_bluetooth_holding(const reach_top_bar_state *state)
-{
-    return state->bluetooth_icon_id != REACH_VECTOR_ICON_NONE &&
-           state->bluetooth_absent_seconds > 0.0 &&
-           state->bluetooth_absent_seconds <
-               reach_top_bar_metrics_values.bluetooth_absence_grace_seconds;
-}
-
 // Enabling the radio makes it briefly unenumerable, so a bare availability read would blink the
 // glyph out and back on every enable. Hold the last known glyph until absence outlasts the grace.
 static void reach_top_bar_resolve_bluetooth(reach_top_bar_state *state,
                                             const reach_system_status_system_snapshot *snapshot,
-                                            double delta_seconds, uint32_t *out_icon_id,
+                                            double now_seconds, uint32_t *out_icon_id,
                                             int32_t *out_enabled)
 {
     if (snapshot->bluetooth_valid && snapshot->bluetooth.available)
     {
-        state->bluetooth_absent_seconds = 0.0;
+        state->bluetooth_absence_deadline = 0.0;
         *out_enabled = snapshot->bluetooth.enabled ? 1 : 0;
         *out_icon_id =
             *out_enabled ? REACH_VECTOR_ICON_BLUETOOTH_ON : REACH_VECTOR_ICON_BLUETOOTH_OFF;
         return;
     }
 
-    const double grace = reach_top_bar_metrics_values.bluetooth_absence_grace_seconds;
-    state->bluetooth_absent_seconds += delta_seconds;
-    if (state->bluetooth_absent_seconds > grace)
+    if (state->bluetooth_icon_id != REACH_VECTOR_ICON_NONE)
     {
-        state->bluetooth_absent_seconds = grace;
+        if (state->bluetooth_absence_deadline <= 0)
+            state->bluetooth_absence_deadline =
+                now_seconds + reach_top_bar_metrics_values.bluetooth_absence_grace_seconds;
+        if (now_seconds < state->bluetooth_absence_deadline)
+        {
+            *out_icon_id = state->bluetooth_icon_id;
+            *out_enabled = state->bluetooth_enabled;
+            return;
+        }
     }
-
-    if (reach_top_bar_bluetooth_holding(state))
-    {
-        *out_icon_id = state->bluetooth_icon_id;
-        *out_enabled = state->bluetooth_enabled;
-        return;
-    }
+    state->bluetooth_absence_deadline = 0;
 
     *out_icon_id = REACH_VECTOR_ICON_NONE;
     *out_enabled = 0;
-}
-
-int32_t reach_top_bar_bluetooth_absence_pending(const reach_top_bar *top_bar)
-{
-    return top_bar != nullptr && reach_top_bar_bluetooth_holding(&top_bar->state);
 }
 
 static void reach_top_bar_format_volume(uint16_t *dst, size_t dst_count, float level)
@@ -326,7 +313,7 @@ static void reach_top_bar_format_volume(uint16_t *dst, size_t dst_count, float l
     reach_copy_ascii_to_utf16(dst, dst_count, text);
 }
 
-static int32_t reach_top_bar_update_system_status(reach_top_bar *top_bar, double delta_seconds)
+static int32_t reach_top_bar_update_system_status(reach_top_bar *top_bar, double now_seconds)
 {
     reach_top_bar_state *state = &top_bar->state;
     reach_system_status_system_snapshot snapshot = {};
@@ -344,7 +331,7 @@ static int32_t reach_top_bar_update_system_status(reach_top_bar *top_bar, double
         reach_top_bar_network_icon_id(&snapshot.network, snapshot.network_valid);
     uint32_t bluetooth_icon = REACH_VECTOR_ICON_NONE;
     int32_t bluetooth_enabled = 0;
-    reach_top_bar_resolve_bluetooth(state, &snapshot, delta_seconds, &bluetooth_icon,
+    reach_top_bar_resolve_bluetooth(state, &snapshot, now_seconds, &bluetooth_icon,
                                     &bluetooth_enabled);
     int32_t network_connected = snapshot.network_valid && snapshot.network.connected;
 
@@ -1241,7 +1228,7 @@ static void reach_top_bar_capsule_reset(void *capsule)
     }
     top_bar->state.power_hovered = 0;
     reach_motion_set(&top_bar->power_hover, 0.0f);
-    top_bar->state.bluetooth_absent_seconds = 0.0;
+    top_bar->state.bluetooth_absence_deadline = 0.0;
 }
 
 static void reach_top_bar_capsule_on_game_mode(void *capsule, int32_t enabled)
@@ -1264,6 +1251,7 @@ static void reach_top_bar_capsule_on_game_mode(void *capsule, int32_t enabled)
 static void reach_top_bar_capsule_tick(void *capsule, double delta_seconds,
                                        reach_feature_tick_result *out)
 {
+    (void)delta_seconds;
     if (out != nullptr)
     {
         *out = {};
@@ -1288,7 +1276,8 @@ static void reach_top_bar_capsule_tick(void *capsule, double delta_seconds,
         out->relayout = 1;
     }
 
-    if (reach_top_bar_update_system_status(top_bar, delta_seconds) && out != nullptr)
+    double now_seconds = reach_motion_now_seconds();
+    if (reach_top_bar_update_system_status(top_bar, now_seconds) && out != nullptr)
     {
         out->redraw = 1;
         out->relayout = 1;
@@ -1308,7 +1297,7 @@ static void reach_top_bar_capsule_tick(void *capsule, double delta_seconds,
     reach_animation_manager *manager = &top_bar->manager;
 
     int32_t width_was_active = reach_top_bar_width_animation_active(top_bar);
-    reach_animation_manager_sample_at(manager, reach_motion_now_seconds());
+    reach_animation_manager_sample_at(manager, now_seconds);
 
     int32_t redraw = 0;
 
@@ -1344,8 +1333,7 @@ static int32_t reach_top_bar_capsule_needs_frame(const void *capsule)
         return 0;
     }
     return reach_animation_manager_active(&top_bar->manager, REACH_TOP_BAR_ANIM_Y) ||
-           reach_top_bar_width_animation_active(top_bar) ||
-           reach_top_bar_bluetooth_absence_pending(top_bar);
+           reach_top_bar_width_animation_active(top_bar);
 }
 
 static int32_t reach_top_bar_capsule_pointer_sequence_active(const void *capsule)
@@ -1379,6 +1367,7 @@ static void reach_top_bar_capsule_surface_geometry(const void *capsule,
     {
         int32_t static_mode = top_bar->state.mode == REACH_CONFIG_TOP_BAR_MODE_STATIC;
         out->visible_bounds = top_bar->state.layout.bounds;
+        out->deadline_seconds = top_bar->state.bluetooth_absence_deadline;
         out->manage_monitor_work_area = 1;
         out->reserve_monitor_work_area = static_mode;
         out->work_area_clearance = top_bar->state.layout.app_clearance;

@@ -1290,6 +1290,12 @@ saver pending reconciliation through a neutral route bound to Top Bar in `interf
 Power-change requests and service-ready wakeups remain active in game mode while CPU/network
 sampling is disabled. A failed power read retains the last successful value, and a delayed system
 worker publication cannot overwrite a newer power snapshot.
+Battery's two-second pending timeout and Top Bar's two-second Bluetooth absence grace are semantic
+absolute deadlines. Capsules publish their next wake through generic surface geometry; Battery
+merges its timeout with popup completion. Awaiting policy outcomes causes no periodic frame or
+update request. Status acknowledgement/recovery and reset cancel stale deadlines, and expiry
+reconciles the visible state once. The Bluetooth grace starts at the first observed absence and
+repeated absent snapshots do not extend it. Neither timer advances from frame deltas.
 
 The pure `reach_frame_rate_resolve` policy uses the main display's refresh rate when adaptive
 animations are enabled, with a 60 Hz override while battery saver is on. Adaptive off or an invalid

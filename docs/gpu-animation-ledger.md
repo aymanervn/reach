@@ -155,10 +155,13 @@ artwork and controls is caching, not an additional temporal effect.
 
 These do not become GPU algorithms, but their scheduling must not hide redundant visual work:
 
-- Battery saver pending timeout (`saver_pending_seconds`) requests frames while awaiting change;
-  replace elapsed-frame accumulation with a deadline/event wake where appropriate.
-- Top Bar Bluetooth absence grace (`bluetooth_absent_seconds`) is status policy; preserve the grace
-  via event/deadline work, not an animation redraw loop.
+- Battery saver pending timeout (`saver_pending_deadline`) now publishes one two-second absolute
+  deadline through generic surface geometry, merged with popup completion. Awaiting confirmation
+  causes no periodic update/frame request. Acknowledgement and reset cancel it; expiry reconciles once.
+- Top Bar Bluetooth absence grace (`bluetooth_absence_deadline`) preserves the two-second glyph hold
+  through one semantic wake. Repeated absent snapshots retain the original deadline; recovery and
+  reset cancel it. No grace-only frames or frame-delta accumulation remain. Both builds/all forty
+  tests and owned before/after scheduling, expiry, recovery and cancellation checks pass.
 - Settings worker completion, progress, service notifications, caret deadlines, active scalar
   effects and smooth scrolling wake the loop. Stationary scrollbar drag flags no longer request
   frames; pointer capture and move/release events retain ownership. Worker/status scheduling

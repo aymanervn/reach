@@ -79,7 +79,7 @@ void reach_battery_reset(reach_battery *battery)
     }
     reach_battery_reset_pressable(battery);
     battery->state = {};
-    battery->saver_pending_seconds = 0.0;
+    battery->saver_pending_deadline = 0.0;
     reach_feature_transition_reset(&battery->popup_transition);
 }
 
@@ -213,7 +213,8 @@ void reach_battery_set_saver_pending(reach_battery *battery, int32_t pending,
                       battery->state.model.saver_pending_enabled != next_enabled;
     battery->state.model.saver_pending = next_pending;
     battery->state.model.saver_pending_enabled = next_enabled;
-    battery->saver_pending_seconds = 0.0;
+    battery->saver_pending_deadline =
+        next_pending ? reach_motion_now_seconds() + REACH_BATTERY_SAVER_PENDING_TIMEOUT_SECONDS : 0;
     if (changed && battery->routes.saver_pending_changed != nullptr)
     {
         battery->routes.saver_pending_changed(battery->routes.user, next_pending, next_enabled);
@@ -352,27 +353,18 @@ static void reach_battery_capsule_tick(void *capsule, double delta_seconds,
         out->request_update = 1;
     }
 
-    if (battery->state.model.saver_pending)
+    if (battery->state.model.saver_pending && battery->saver_pending_deadline > 0 &&
+        reach_motion_now_seconds() >= battery->saver_pending_deadline)
     {
-        battery->saver_pending_seconds += delta_seconds;
-        if (battery->saver_pending_seconds >= REACH_BATTERY_SAVER_PENDING_TIMEOUT_SECONDS)
-        {
-            reach_battery_set_saver_pending(battery, 0, 0);
-            out->redraw = 1;
-        }
-        else
-        {
-            out->request_update = 1;
-        }
+        reach_battery_set_saver_pending(battery, 0, 0);
+        out->redraw = 1;
     }
 }
 
 static int32_t reach_battery_capsule_needs_frame(const void *capsule)
 {
     const reach_battery *battery = static_cast<const reach_battery *>(capsule);
-    return battery != nullptr &&
-           (reach_feature_transition_needs_update(&battery->popup_transition) ||
-            (battery->state.open && battery->state.model.saver_pending));
+    return battery != nullptr && reach_feature_transition_needs_update(&battery->popup_transition);
 }
 
 static int32_t reach_battery_capsule_presentation_visible(const void *capsule)
@@ -526,6 +518,9 @@ static void reach_battery_capsule_surface_geometry(const void *capsule,
     out->notch_anchor_x = battery->state.notch_anchor_x;
     out->notch_side = reach_popup_notch_side(battery->state.drop_direction);
     reach_feature_transition_presentation(&battery->popup_transition, out);
+    if (battery->saver_pending_deadline > 0 &&
+        (out->deadline_seconds <= 0 || battery->saver_pending_deadline < out->deadline_seconds))
+        out->deadline_seconds = battery->saver_pending_deadline;
 }
 
 const reach_feature_capsule_ops *reach_battery_capsule_ops(void)
