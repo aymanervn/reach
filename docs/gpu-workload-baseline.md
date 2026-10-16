@@ -1648,3 +1648,71 @@ and outside error zero. Capture origins are normalized to a physical-pixel basis
 requested destination, preserving bitmap snapping in native and CPU paths. Architecture, formatting
 and whitespace checks pass. No tracked UI tests were added, and no installed Reach restart was needed
 for an as-yet-unconsumed shared primitive.
+
+
+## 2026-10-16: Clipboard retained item width
+
+The consumer removes its item-width scalar track and sampled layout-width API. One canonical 160ms
+ease-out owns normal 19dp gutter changes, current-width input geometry and one cleanup deadline.
+Height and smooth scrolling remain open. Private owned diagnostics exercise real capsule relayout,
+exact-time reversal, close hit testing, no width-only frame/relayout, one endpoint cleanup, forced
+hide, source retirement and the extremely narrow horizontally clipped image/SVG fallback. Normal
+width submissions need no renderer sampling; the narrow fallback ends on the same finite deadline.
+
+The owned producer compares both compositors at 100/125/150/200%, both themes and five progress
+positions, with partially visible mixed text/image items and two image-aspect regimes. A separate
+maximum-membership wide-glyph fixture preserves native horizontal clipping and the ordinary CPU
+fallback's existing unclipped ink. This pre-existing backend difference is not repaired by the
+migration. Settled comparisons remain strict; moving rounded borders and glyph clip edges are
+measured separately from unaffected pixels. The temporary fixtures are input-transparent and
+capture only their own windows and generated image source.
+
+The capsule grows from 16,040 to 16,048 bytes; render command/group/buffer sizes remain unchanged
+at 1,032 / 2,248 / 1,018,072 bytes. A controlled four-text-item scene without a blue capture backdrop
+retains 2,139,744 nominal surface bytes in the former renderer, 2,188,864 settled after migration,
+and 5,216,416 while expanded (16/28/96 producer groups and 21/29/145 native layers). A five-item
+width capsule uses 5,222,432 bytes while active and returns to 2,188,864 at cleanup. These are
+surface counters, not all bitmap-cache/driver allocations. The finite extra source memory remains
+part of the required whole-product CPU/GPU/power/memory/latency acceptance.
+
+Initial Debug command construction is about 0.06ms settled and 0.27ms expanded; first expanded
+submission is about 10ms and an identical warm submission about 1.4-1.7ms in the owned scene.
+Warm unchanged width submissions alter no raster, property or tree counters; exact-time reversal
+rerasterizes no surviving sources. These isolated timings are not repeated product acceptance.
+
+
+`build-clipboard-width-final-{debug,release}.log` and
+`test-clipboard-width-final-{debug,release}.log` pass both builds and all forty tests after the final
+fallback behavior change. `probe-clipboard-width-final-{debug,release}.log` and
+`probe-clipboard-width-final-wide-{debug,release}.log` each report zero failures, totaling 320
+displayed poses. Ordinary native intermediate raw differences reach 143 at filtered edges, with
+3x3 channel-neighborhood error at most nine. Wide-glyph clipping reaches 50 on one moving right-edge
+column; away from a 1.5px band around those text-width cuts, neighborhood error is at most twelve.
+Settled native poses differ by at most three channel values. Complete CPU endpoints match exactly;
+intermediate CPU differences reach 28 only in the 1.5px rounded-border sampling band and are zero
+outside it in the final fixtures. The ignored side-by-side `clipboard-width-wide-edge-detail.png`
+inspects the right-edge coverage rather than widening a global image tolerance. The separate
+120,120-case-per-build capacity proof retains exact custom slice selection.
+
+Release construction is about 0.02-0.05ms settled and 0.09-0.12ms expanded; first expanded submission
+is about 7ms and an identical warm submission about 0.4-0.6ms in this scene. Architecture, formatting,
+whitespace and obsolete-width-symbol checks pass. No tracked UI tests were introduced.
+
+
+`probe-clipboard-width-full-{debug,release}.log` each passes five complete native runs per backend
+plus HWND fallback with zero failures. The isolated `probe-width-contract-{debug,release}.log`
+rechecks physical fitted-text alignment at four DPI values/two fonts and both alignments, stable
+source reordering/color/font replacement, and the new vertical-ink mode's oversized/capacity
+fallback. Both compositors retain 446 layers and 60,848,864 nominal bytes in the fifty-source stress
+scene, sampling six text sources within the existing bounds; source-only work ends at the canonical
+endpoint and clearing retires every owner. These checks pass in both configurations.
+
+
+Installed validation stopped watchdog PID 576 and awaited exit, then stopped Reach PID 15328 and
+awaited exit. Checked Debug binaries/PDBs were copied into the existing build folder; startup used
+only that folder's `reachctl --start`. Watchdog PID 8412 and Reach PID 10304 are alive from
+`C:\Dev\reach\build`, created 2026-10-16 18:39:17/18 Casablanca (+00:00), verified afterward.
+Installed Reach SHA256 is `DC78C5E3F3EB6219708AED44E31B8C0C5D23C8C31DD0B50BBB821C9C04E02EAB`;
+Settings is `A8797B094507C29DD461C4D1CDE299957816C790528EFB713510E20BC0733F5D`.
+No reinstall or direct Reach/watchdog launch was used. This verifies installation/lifetime, while
+full live interaction and total product acceptance remain open.

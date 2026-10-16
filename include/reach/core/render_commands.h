@@ -167,6 +167,12 @@ extern "C"
         REACH_TEXT_ALIGNMENT_TRAILING = 2
     } reach_text_alignment;
 
+    typedef enum reach_render_text_fit
+    {
+        REACH_RENDER_TEXT_FIT_CLIPPED = 1,
+        REACH_RENDER_TEXT_FIT_VERTICAL_OVERFLOW = 2
+    } reach_render_text_fit;
+
     typedef struct reach_render_command
     {
         reach_render_command_type type;

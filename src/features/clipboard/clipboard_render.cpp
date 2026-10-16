@@ -5,6 +5,9 @@
 #include "clipboard_metrics.h"
 #include "reach/features/common/ui_controls.h"
 
+#include <math.h>
+#include <limits>
+
 static float reach_clipboard_max_float(float a, float b)
 {
     return a > b ? a : b;
@@ -309,17 +312,15 @@ static void reach_clipboard_copy_preview_slice(reach_render_command *command,
     command->text[output] = 0;
 }
 
-static void
-reach_clipboard_push_preview_text_lines(reach_render_command_buffer *commands,
-                                        const reach_clipboard_item *item, reach_rect_f32 text_rect,
-                                        reach_rect_f32 clip_rect,
-                                        decltype(((reach_render_command *)nullptr)->color) color,
-                                        float text_size, int32_t text_alignment)
+static size_t reach_clipboard_preview_commands(
+    const reach_clipboard_item *item, reach_rect_f32 text_rect, reach_rect_f32 clip_rect,
+    decltype(((reach_render_command *)nullptr)->color) color, float text_size,
+    int32_t text_alignment, reach_render_command out[REACH_CLIPBOARD_PREVIEW_LINE_LIMIT])
 {
-    if (commands == nullptr || item == nullptr || text_rect.width <= 0.0f ||
-        text_rect.height <= 0.0f || !reach_clipboard_preview_has_visible_text(item))
+    if (item == nullptr || text_rect.width <= 0.0f || text_rect.height <= 0.0f ||
+        !reach_clipboard_preview_has_visible_text(item))
     {
-        return;
+        return 0;
     }
 
     const float line_height =
@@ -362,13 +363,14 @@ reach_clipboard_push_preview_text_lines(reach_render_command_buffer *commands,
 
     if (actual_line_count == 0)
     {
-        return;
+        return 0;
     }
 
     const float used_text_height = line_height * (float)actual_line_count;
     const float start_y =
         text_rect.y + reach_clipboard_max_float(0.0f, text_rect.height - used_text_height) * 0.5f;
 
+    size_t written = 0;
     for (size_t line_index = 0; line_index < actual_line_count; ++line_index)
     {
         reach_render_command command = {};
@@ -391,9 +393,93 @@ reach_clipboard_push_preview_text_lines(reach_render_command_buffer *commands,
 
         if (reach_clipboard_clip_rect(&command.rect, clip_rect))
         {
-            reach_render_command_buffer_push(commands, &command);
+            out[written++] = command;
         }
     }
+    return written;
+}
+
+static reach_result reach_clipboard_push_width_preview(
+    reach_render_command_buffer *commands, uint64_t first_id, const reach_clipboard_item *item,
+    reach_rect_f32 text_rect, reach_rect_f32 clip_rect, reach_color color, float text_size,
+    int32_t text_alignment, const reach_motion &width, const reach_motion &x, float width_span)
+{
+    if (text_rect.width <= 0 || text_rect.height <= 0 ||
+        !reach_clipboard_preview_has_visible_text(item))
+        return REACH_OK;
+    auto available = reach_motion_clamp(&width, 0, text_rect.width);
+    float minimum = fmaxf(0, text_rect.width - width_span), maximum = text_rect.width;
+    size_t first = reach_clipboard_preview_line_capacity(minimum, text_size);
+    size_t last = reach_clipboard_preview_line_capacity(maximum, text_size);
+    if (last - first >= 4)
+        return REACH_ERROR;
+    reach_render_group position = {};
+    position.id = first_id;
+    position.bounds = text_rect;
+    position.x = reach_motion_affine(&x, 1, -text_rect.x);
+    reach_result result = reach_render_command_buffer_begin_group(commands, &position);
+    reach_render_command_buffer_end_group(commands);
+    if (result != REACH_OK)
+        return result;
+    float glyph = fmaxf(1, text_size * REACH_CLIPBOARD_PREVIEW_GLYPH_ADVANCE_RATIO);
+    auto threshold_for = [&](size_t capacity)
+    {
+        float threshold = (float)capacity * glyph;
+        while (reach_clipboard_preview_line_capacity(threshold, text_size) < capacity)
+            threshold = nextafterf(threshold, std::numeric_limits<float>::infinity());
+        while (reach_clipboard_preview_line_capacity(
+                   nextafterf(threshold, -std::numeric_limits<float>::infinity()), text_size) >=
+               capacity)
+            threshold = nextafterf(threshold, -std::numeric_limits<float>::infinity());
+        return threshold;
+    };
+    for (size_t capacity = first; capacity <= last; ++capacity)
+    {
+        reach_rect_f32 sample = text_rect;
+        sample.width = fminf(maximum, fmaxf(minimum, ((float)capacity + .5f) * glyph));
+        reach_render_command lines[REACH_CLIPBOARD_PREVIEW_LINE_LIMIT] = {};
+        size_t count = reach_clipboard_preview_commands(item, sample, clip_rect, color, text_size,
+                                                        text_alignment, lines);
+        if (count == 0)
+            continue;
+        float thresholds[2] = {}, values[3] = {};
+        size_t boundaries = 0;
+        if (capacity > 1)
+        {
+            thresholds[boundaries++] = threshold_for(capacity);
+            values[1] = 1;
+        }
+        else
+            values[0] = 1;
+        thresholds[boundaries++] = threshold_for(capacity + 1);
+        reach_render_group variant = {};
+        variant.id = first_id + 1 + (capacity - first) * 16;
+        variant.parent_id = position.id;
+        variant.bounds = text_rect;
+        result = reach_motion_lookup(&available, thresholds, values, boundaries, &variant.opacity);
+        if (result == REACH_OK)
+            result = reach_render_command_buffer_begin_group(commands, &variant);
+        reach_render_command_buffer_end_group(commands);
+        if (result != REACH_OK)
+            return result;
+        for (size_t index = 0; index < count; ++index)
+        {
+            auto &line = lines[index];
+            line.rect.width = text_rect.width;
+            reach_render_group viewport = {};
+            viewport.id = variant.id + index + 1;
+            viewport.parent_id = variant.id;
+            viewport.bounds = viewport.clip = line.rect;
+            viewport.has_clip = 1;
+            viewport.clip_insets[REACH_RENDER_CLIP_RIGHT] =
+                reach_motion_affine(&available, -1, line.rect.width);
+            line.text_fit_to_clip = REACH_RENDER_TEXT_FIT_VERTICAL_OVERFLOW;
+            result = reach_render_push_width_text(commands, &line, &viewport);
+            if (result != REACH_OK)
+                return result;
+        }
+    }
+    return REACH_OK;
 }
 
 static float reach_clipboard_thumbnail_width_for_item(const reach_clipboard_item *item,
@@ -436,8 +522,42 @@ reach_result reach_clipboard_build_render_commands(const reach_clipboard_render_
     const reach_clipboard_metrics metrics = reach_clipboard_metrics_for_scale(input->dpi_scale);
     const reach_theme *theme = input->theme;
     const reach_clipboard_model *model = input->model;
-    const reach_clipboard_layout *layout = input->layout;
+    reach_clipboard_layout source_layout = *input->layout;
+    const reach_clipboard_layout *layout = &source_layout;
     const float border_thickness = reach_theme_border_thickness(theme, input->dpi_scale);
+    const float width_span = metrics.scrollbar_gutter + metrics.item_scrollbar_gap;
+    bool retained_width = input->item_width != nullptr && input->item_width->duration_seconds > 0;
+    reach_motion item_width = {};
+    reach_motion_set(&item_width, layout->item_width);
+    if (input->item_width != nullptr && input->item_width->generation != 0)
+        item_width = *input->item_width;
+    item_width = reach_motion_clamp(&item_width, 0, fmaxf(0, layout->viewport.width));
+    if (retained_width)
+    {
+        float minimum = 0, maximum = 0;
+        if (reach_motion_range(&item_width, &minimum, &maximum) != REACH_OK)
+            return REACH_INVALID_ARGUMENT;
+        if (minimum < metrics.close_button_size + metrics.close_button_margin * 2 +
+                          border_thickness * 2 ||
+            minimum < fmaxf(0, layout->viewport.width - width_span) - .01f ||
+            maximum > layout->viewport.width + .01f)
+        {
+            reach_clipboard_layout_set_item_width(
+                &source_layout, model->count, reach_motion_value(&item_width), border_thickness);
+            auto sampled = *input;
+            sampled.layout = &source_layout;
+            sampled.item_width = nullptr;
+            reach_result result = reach_clipboard_build_render_commands(&sampled, commands);
+            if (result == REACH_OK)
+                commands->requires_content_sampling = reach_motion_active(&item_width);
+            return result;
+        }
+        reach_clipboard_layout_set_item_width(&source_layout, model->count, layout->viewport.width,
+                                              border_thickness);
+    }
+    else if (item_width.generation != 0)
+        reach_clipboard_layout_set_item_width(&source_layout, model->count,
+                                              reach_motion_value(&item_width), border_thickness);
     reach_render_command_buffer_clear(commands);
 
     reach_render_command command = {};
@@ -572,12 +692,26 @@ reach_result reach_clipboard_build_render_commands(const reach_clipboard_render_
             hover = reach_motion_clamp(&input->hover_motions[index], 0, 1);
         uint64_t feedback_id = input->hover_group_ids != nullptr
                                    ? input->hover_group_ids[index]
-                                   : UINT64_C(0x7000000000000000) + index * 16;
-        result = reach_ui_bordered_color_feedback_render(
-            commands, feedback_id, local_visible_item,
-            reach_clipboard_scale_value(theme->radius_small, input->dpi_scale), border_thickness,
-            theme->clipboard_item_background, theme->clipboard_item_hover_background,
-            theme->clipboard_item_hover_border, &hover);
+                                   : UINT64_C(0x7000000000000000) + index * 128;
+        if (retained_width)
+        {
+            reach_rect_motion visible = {};
+            reach_motion_set(&visible.x, local_visible_item.x);
+            reach_motion_set(&visible.y, local_visible_item.y);
+            visible.width = item_width;
+            reach_motion_set(&visible.height, local_visible_item.height);
+            result = reach_ui_bordered_motion_color_feedback_render(
+                commands, feedback_id + 16, &visible,
+                reach_clipboard_scale_value(theme->radius_small, input->dpi_scale),
+                border_thickness, theme->clipboard_item_background,
+                theme->clipboard_item_hover_background, theme->clipboard_item_hover_border, &hover);
+        }
+        else
+            result = reach_ui_bordered_color_feedback_render(
+                commands, feedback_id, local_visible_item,
+                reach_clipboard_scale_value(theme->radius_small, input->dpi_scale),
+                border_thickness, theme->clipboard_item_background,
+                theme->clipboard_item_hover_background, theme->clipboard_item_hover_border, &hover);
         if (result != REACH_OK)
             return result;
 
@@ -586,6 +720,19 @@ reach_result reach_clipboard_build_render_commands(const reach_clipboard_render_
         const reach_rect_f32 close_rect =
             reach_clipboard_local(layout->close_buttons[index], layout->bounds);
 
+        reach_render_group close_placement = {};
+        close_placement.parent_id = retained_width ? feedback_id + 8 : 0;
+        if (retained_width)
+        {
+            reach_render_group position = {};
+            position.id = close_placement.parent_id;
+            position.bounds = close_rect;
+            position.x = reach_motion_affine(&item_width, 1, -layout->item_width);
+            result = reach_render_command_buffer_begin_group(commands, &position);
+            reach_render_command_buffer_end_group(commands);
+            if (result != REACH_OK)
+                return result;
+        }
         command = {};
         command.type = REACH_RENDER_COMMAND_RECT;
         command.rect = close_rect;
@@ -599,8 +746,9 @@ reach_result reach_clipboard_build_render_commands(const reach_clipboard_render_
             reach_rect_f32 source = {};
             if (!reach_render_retained_command_bounds(&command, &source))
                 return REACH_ERROR;
-            result =
-                reach_ui_feedback_begin(commands, feedback_id + 4, source, &close_opacity, nullptr);
+            close_placement.bounds = source;
+            result = reach_ui_feedback_begin(commands, feedback_id + 4, source, &close_opacity,
+                                             retained_width ? &close_placement : nullptr);
             if (result != REACH_OK)
                 return result;
             result = reach_render_command_buffer_push(commands, &command);
@@ -626,8 +774,9 @@ reach_result reach_clipboard_build_render_commands(const reach_clipboard_render_
             reach_rect_f32 source = {};
             if (!reach_render_retained_command_bounds(&command, &source))
                 return REACH_ERROR;
-            result =
-                reach_ui_feedback_begin(commands, feedback_id + 5, source, &glyph_opacity, nullptr);
+            close_placement.bounds = source;
+            result = reach_ui_feedback_begin(commands, feedback_id + 5, source, &glyph_opacity,
+                                             retained_width ? &close_placement : nullptr);
             if (result != REACH_OK)
                 return result;
             result = reach_render_command_buffer_push(commands, &command);
@@ -639,6 +788,48 @@ reach_result reach_clipboard_build_render_commands(const reach_clipboard_render_
         const float padding = metrics.thumbnail_padding;
         const float reserved_right = close_size + close_margin * 2.0f;
         const float text_right = local_item_content.x + local_item_content.width - reserved_right;
+        auto push_text = [&](float x, reach_color color, const reach_motion *thumbnail)
+        {
+            reach_rect_f32 text_rect = {
+                x, local_item_content.y + padding, reach_clipboard_max_float(0, text_right - x),
+                reach_clipboard_max_float(0, local_item_content.height - padding * 2)};
+            if (!retained_width)
+            {
+                reach_render_command lines[REACH_CLIPBOARD_PREVIEW_LINE_LIMIT] = {};
+                size_t count = reach_clipboard_preview_commands(
+                    item_data, text_rect, local_visible_item, color, metrics.items_font_size,
+                    input->text_alignment_leading, lines);
+                for (size_t index = 0; index < count; ++index)
+                {
+                    auto &line = lines[index];
+                    line.text_fit_to_clip = REACH_RENDER_TEXT_FIT_VERTICAL_OVERFLOW;
+                    reach_render_group viewport = {};
+                    viewport.id = feedback_id + 32 + index;
+                    viewport.bounds = viewport.clip = line.rect;
+                    viewport.has_clip = 1;
+                    auto result = reach_render_push_width_text(commands, &line, &viewport);
+                    if (result != REACH_OK)
+                        return result;
+                }
+                return REACH_OK;
+            }
+            auto text_width = reach_motion_affine(&item_width, 1,
+                                                  -border_thickness * 2 - reserved_right - padding);
+            reach_motion text_x = {};
+            reach_motion_set(&text_x, local_item_content.x + padding);
+            if (thumbnail != nullptr)
+            {
+                if (reach_motion_combine(&text_width, 1, thumbnail, -1, -metrics.thumbnail_text_gap,
+                                         &text_width) != REACH_OK)
+                    return REACH_INVALID_ARGUMENT;
+                text_x = reach_motion_affine(
+                    thumbnail, 1, local_item_content.x + padding + metrics.thumbnail_text_gap);
+            }
+            return reach_clipboard_push_width_preview(
+                commands, feedback_id + 32, item_data, text_rect, local_visible_item, color,
+                metrics.items_font_size, input->text_alignment_leading, text_width, text_x,
+                width_span);
+        };
         if (item_data->kind == REACH_CLIPBOARD_ITEM_IMAGE && item_data->thumbnail_id != 0)
         {
             const float thumbnail_height =
@@ -661,38 +852,64 @@ reach_result reach_clipboard_build_render_commands(const reach_clipboard_render_
             command.icon_crop_to_fill = 1;
             command.color.a = 1.0f;
             command.radius = reach_clipboard_scale_value(theme->radius_small, input->dpi_scale);
+            reach_motion thumbnail_motion =
+                reach_motion_affine(&item_width, metrics.thumbnail_max_width_ratio,
+                                    -border_thickness * 2 * metrics.thumbnail_max_width_ratio);
+            float aspect = item_data->image_width > 0 && item_data->image_height > 0
+                               ? (float)item_data->image_width / item_data->image_height
+                               : 1;
+            float cap = fmaxf(1, thumbnail_height * aspect);
+            thumbnail_motion = reach_motion_clamp(&thumbnail_motion, 1, cap);
             if (reach_clipboard_clip_rect(&command.rect, local_visible_item))
             {
-                reach_render_command_buffer_push(commands, &command);
+                reach_rect_motion image_bounds = {};
+                reach_motion_set(&image_bounds.x, command.rect.x);
+                reach_motion_set(&image_bounds.y, command.rect.y);
+                image_bounds.width = thumbnail_motion;
+                if (!retained_width)
+                    reach_motion_set(&image_bounds.width, command.rect.width);
+                reach_motion_set(&image_bounds.height, command.rect.height);
+                reach_render_group source = {};
+                source.id = feedback_id + 10;
+                source.bounds = {0, 0, ceilf(retained_width ? thumbnail_width : command.rect.width),
+                                 ceilf(command.rect.height)};
+                float radius = command.radius;
+                command.radius = 0;
+                result = reach_render_push_image_motion(commands, &source, &image_bounds, radius,
+                                                        &command);
+                if (result != REACH_OK)
+                    return result;
             }
 
             const float text_x = thumbnail_x + thumbnail_width + metrics.thumbnail_text_gap;
-            reach_clipboard_push_preview_text_lines(
-                commands, item_data,
-                {text_x, local_item_content.y + padding,
-                 reach_clipboard_max_float(0.0f, text_right - text_x),
-                 reach_clipboard_max_float(0.0f, local_item_content.height - padding * 2.0f)},
-                local_visible_item, theme->clipboard_secondary_text, metrics.items_font_size,
-                input->text_alignment_leading);
+            result = push_text(text_x, theme->clipboard_secondary_text, &thumbnail_motion);
         }
         else
         {
             const float text_x = local_item_content.x + padding;
-            reach_clipboard_push_preview_text_lines(
-                commands, item_data,
-                {text_x, local_item_content.y + padding,
-                 reach_clipboard_max_float(0.0f, text_right - text_x),
-                 reach_clipboard_max_float(0.0f, local_item_content.height - padding * 2.0f)},
-                local_visible_item, theme->clipboard_primary_text, metrics.items_font_size,
-                input->text_alignment_leading);
+            result = push_text(text_x, theme->clipboard_primary_text, nullptr);
         }
+        if (result != REACH_OK)
+            return result;
     }
 
     if (reach_clipboard_layout_has_scrollbar(layout))
     {
+        if (retained_width)
+        {
+            reach_render_group position = {};
+            position.id = UINT64_C(0x7100000000000000);
+            position.bounds = reach_clipboard_local(layout->scrollbar.track, layout->bounds);
+            position.x = reach_motion_affine(&item_width, 1, -layout->item_width);
+            result = reach_render_command_buffer_begin_group(commands, &position);
+            if (result != REACH_OK)
+                return result;
+        }
         reach_scrollbar_build_render_commands(layout->scrollbar.track, layout->scrollbar.thumb,
                                               layout->bounds, theme->clipboard_scrollbar_track,
                                               theme->clipboard_scrollbar_thumb, commands);
+        if (retained_width)
+            reach_render_command_buffer_end_group(commands);
     }
 
     return REACH_OK;
@@ -712,6 +929,8 @@ reach_result reach_clipboard_append_render_commands(reach_clipboard_feature *cli
     input.theme = theme;
     input.model = &state->model;
     input.layout = &state->layout;
+    auto item_width = reach_clipboard_feature_item_width(clipboard);
+    input.item_width = &item_width;
     input.hover_motions = reach_clipboard_feature_hover_motions(clipboard);
     input.hover_group_ids = reach_clipboard_feature_hover_group_ids(clipboard);
     input.dpi_scale = dpi_scale;

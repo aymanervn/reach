@@ -403,9 +403,18 @@ support expectation is explicitly resolved.
     bitmap rounding. Unsupported clocks and resource budgets use existing active-only render-port
     sampling, retiring at endpoint/hide. Both builds/all forty tests and native/fallback, fractional
     origin, zero-axis, replacement and memory matrices pass. Full native regressions pass on both
-    backends/configurations. Clipboard integration and total product acceptance remain open.
+    backends/configurations. Clipboard width consumes it; height, scrolling and total product acceptance remain open.
 - [ ] Migrate Launcher results, Quick Settings sections, Clipboard sizing and Settings expandable rows,
   including eligible smooth viewport scrolling identified in the ledger.
+  - [x] Migrate Clipboard item width through retained item/text/image/control fitting.
+    One canonical 160ms ease-out, endpoint layout and event-time input replace the width scalar
+    track, accessor and periodic width frame/layout work. Stable source domains preserve custom
+    preview variants, visible-fragment border policy and exact-time reversal. One deadline retires
+    expanded sources; extremely narrow clipped-glyph geometry uses generic finite content sampling.
+    Both builds/all forty tests and normal/maximum-membership native/fallback matrices pass across
+    four DPI values and both themes. Moving edge-filter differences and temporary source-memory
+    cost are measured in the baseline. Full native/fallback regressions and installed watchdog-first/
+    reachctl startup pass. Height, smooth scroll and full product acceptance remain open.
   - [x] Migrate Quick Settings section reveals, following content and label/chevron crossfades.
     Remove both section scalar tracks and sampled render values. Retained parents share curves;
     individual paint sources preserve overlap and stable control identity. Event-time input includes

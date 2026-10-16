@@ -1457,6 +1457,33 @@ static reach_render_command reach_d2d_sampled_image_command(const reach_d2d_samp
     return command;
 }
 
+static reach_result reach_d2d_sampled_text_command(reach_render_backend *backend,
+                                                   const reach_render_command &source,
+                                                   const reach_motion &width, double now_seconds,
+                                                   reach_render_command *out)
+{
+    *out = source;
+    out->text_fit_to_clip = 0;
+    out->rect.width = reach_motion_value_at(&width, now_seconds);
+    if (source.text_fit_to_clip != REACH_RENDER_TEXT_FIT_VERTICAL_OVERFLOW)
+        return REACH_OK;
+    reach_rect_f32 fit = {};
+    if (reach_d2d_text_fit_bounds(backend, out, &fit) != REACH_OK)
+        return REACH_ERROR;
+    reach_rect_f32 clip = {fit.x, fit.y, out->rect.x + out->rect.width - fit.x, fit.height};
+    if (out->has_scissor)
+    {
+        float left = fmaxf(clip.x, out->scissor_rect.x);
+        float top = fmaxf(clip.y, out->scissor_rect.y);
+        float right = fminf(clip.x + clip.width, out->scissor_rect.x + out->scissor_rect.width);
+        float bottom = fminf(clip.y + clip.height, out->scissor_rect.y + out->scissor_rect.height);
+        clip = {left, top, fmaxf(0, right - left), fmaxf(0, bottom - top)};
+    }
+    out->has_scissor = 1;
+    out->scissor_rect = clip;
+    return REACH_OK;
+}
+
 reach_result reach_d2d_sample_content(reach_render_backend *backend)
 {
     if (backend == nullptr || !reach_d2d_retained_supported(backend))
@@ -1476,9 +1503,10 @@ reach_result reach_d2d_sample_content(reach_render_backend *backend)
                                   { return value.id == source.owner; });
         if (layer == backend->retained_layers.end())
             return REACH_ERROR;
-        reach_render_command command = source.command;
-        command.text_fit_to_clip = 0;
-        command.rect.width = reach_motion_value_at(&source.width, motion_sample_time(backend));
+        reach_render_command command = {};
+        if (reach_d2d_sampled_text_command(backend, source.command, source.width,
+                                           motion_sample_time(backend), &command) != REACH_OK)
+            return REACH_ERROR;
         localize(command, layer->group.bounds);
         if (layer->commands.size() != 1 || layer->commands[0].rect.width != command.rect.width)
         {
@@ -1860,18 +1888,28 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
         return std::find_if(plans.begin(), plans.end(),
                             [&](const retained_plan &plan) { return plan.group.id == id; });
     };
-    auto sample_text = [&](const text_fit &fit)
+    auto sample_text = [&](const text_fit &fit) -> reach_result
     {
         auto base = plan_for(fit.owner);
-        base->owned.assign(1, fit.command);
-        base->owned[0].text_fit_to_clip = 0;
-        base->owned[0].rect.width = reach_motion_value_at(&fit.width, motion_sample_time(backend));
+        reach_render_command command = {};
+        if (reach_d2d_sampled_text_command(backend, fit.command, fit.width,
+                                           motion_sample_time(backend), &command) != REACH_OK)
+            return REACH_ERROR;
+        base->owned.assign(1, command);
         base->commands = base->owned.data();
         base->count = 1;
+        if (fit.command.text_fit_to_clip == REACH_RENDER_TEXT_FIT_VERTICAL_OVERFLOW)
+        {
+            base->group.has_clip = 0;
+            auto envelope = fit.command;
+            if (reach_d2d_text_fit_bounds(backend, &envelope, &base->group.bounds) != REACH_OK)
+                return REACH_ERROR;
+        }
         preserve_raster_bounds(*base);
         backend->requires_content_sampling =
             backend->requires_content_sampling ||
             reach_motion_active_at(&fit.width, motion_sample_time(backend));
+        return REACH_OK;
     };
     auto sample_image = [&](const image_fit &fit)
     {
@@ -1907,10 +1945,10 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
                 bytes += (double)ceilf(plan.group.bounds.width) * ceilf(plan.group.bounds.height);
         return bytes;
     };
-    auto limit_fit_sources = [&]()
+    auto limit_fit_sources = [&]() -> reach_result
     {
         if (fitted_text.empty() && fitted_images.empty())
-            return;
+            return REACH_OK;
         while (planned_bytes() > REACH_D2D_MAX_SURFACE_BYTES ||
                plans.size() > REACH_MAX_RENDER_GROUPS * 2 + 1)
         {
@@ -1943,10 +1981,12 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
             }
             else
             {
-                sample_text(*text);
+                if (sample_text(*text) != REACH_OK)
+                    return REACH_ERROR;
                 text->expanded = false;
             }
         }
+        return REACH_OK;
     };
     for (size_t index = 0; index < commands->count;)
     {
@@ -2137,7 +2177,12 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
                 parts.push_back(std::move(scissor));
                 parent = fit.prefix;
             }
-            float row_height = ceilf(first.rect.height) + 2;
+            reach_rect_f32 paint_bounds = first.rect;
+            bool overflow = first.text_fit_to_clip == REACH_RENDER_TEXT_FIT_VERTICAL_OVERFLOW;
+            if (overflow)
+                valid =
+                    valid && reach_d2d_text_fit_bounds(backend, &first, &paint_bounds) == REACH_OK;
+            float row_height = ceilf(paint_bounds.height) + 2;
             float alignment = first.text_alignment == REACH_TEXT_ALIGNMENT_CENTER     ? .5f
                               : first.text_alignment == REACH_TEXT_ALIGNMENT_TRAILING ? 1
                                                                                       : 0;
@@ -2159,10 +2204,10 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
                 retained_plan part = {};
                 part.group.id = fit.prefix | (uint64_t)(begin / 7 + 1);
                 part.group.parent_id = parent;
-                part.group.bounds = first.rect;
+                part.group.bounds = paint_bounds;
                 part.group.bounds.height = (float)(end - begin) * row_height;
                 part.group.has_clip = 1;
-                part.group.clip = first.rect;
+                part.group.clip = paint_bounds;
                 part.group.x =
                     reach_motion_affine(&fit.width, alignment, -alignment * first.rect.width);
                 valid = reach_motion_lookup(&fit.width, thresholds, values, count, &part.group.y) ==
@@ -2190,8 +2235,9 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
                     text.rect.x += alignment * (first.rect.width - text.rect.width);
                     text.rect.y += (float)(at - begin) * row_height;
                     text.has_scissor = 1;
-                    text.scissor_rect = {first.rect.x, text.rect.y, first.rect.width,
-                                         first.rect.height};
+                    text.scissor_rect = {paint_bounds.x,
+                                         paint_bounds.y + (float)(at - begin) * row_height,
+                                         paint_bounds.width, paint_bounds.height};
                     part.owned.push_back(text);
                 }
                 part.commands = part.owned.data();
@@ -2203,12 +2249,19 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
                 auto base = plan_for(group.id);
                 base->commands = nullptr;
                 base->count = 0;
+                if (overflow)
+                {
+                    base->group.clip.width += base->group.clip.x - paint_bounds.x;
+                    base->group.clip.x = paint_bounds.x;
+                    base->group.clip.y = paint_bounds.y;
+                    base->group.clip.height = paint_bounds.height;
+                }
                 for (auto &part : parts)
                     plans.push_back(std::move(part));
                 fit.expanded = true;
             }
-            else
-                sample_text(fit);
+            else if (sample_text(fit) != REACH_OK)
+                return REACH_ERROR;
             fitted_text.push_back(std::move(fit));
         }
         if (first.caret_group_id != 0 && group.bounds.width > 0 && group.bounds.height > 0)
@@ -2253,7 +2306,8 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
             }
         }
         index = end;
-        limit_fit_sources();
+        if (limit_fit_sources() != REACH_OK)
+            return REACH_ERROR;
     }
     for (const auto &fit : fitted_text)
         if (!fit.expanded && reach_motion_active_at(&fit.width, motion_sample_time(backend)))

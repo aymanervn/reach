@@ -44,19 +44,20 @@ void reach_clipboard_pointer_down(reach_clipboard_feature *clipboard, int32_t x,
     }
 
     reach_clipboard_state *state = reach_clipboard_feature_state_mut(clipboard);
+    auto layout = reach_clipboard_feature_input_layout(clipboard, reach_motion_now_seconds());
 
     if (!state->model.open)
     {
         return;
     }
 
-    reach_clipboard_hit_result hit = reach_clipboard_hit_test(&state->model, &state->layout, x, y);
+    reach_clipboard_hit_result hit = reach_clipboard_hit_test(&state->model, &layout, x, y);
 
     if (hit.type == REACH_CLIPBOARD_HIT_SCROLLBAR_THUMB ||
         hit.type == REACH_CLIPBOARD_HIT_SCROLLBAR_TRACK)
     {
         reach_scrollbar_begin_drag(&state->model.scrollbar, &state->scrollbar_drag,
-                                   &state->layout.scrollbar, (float)y,
+                                   &layout.scrollbar, (float)y,
                                    hit.type == REACH_CLIPBOARD_HIT_SCROLLBAR_THUMB);
         out->handled = 1;
         out->capture_pointer = 1;
@@ -88,13 +89,14 @@ void reach_clipboard_pointer_up(reach_clipboard_feature *clipboard, int32_t x, i
     }
 
     reach_clipboard_state *state = reach_clipboard_feature_state_mut(clipboard);
+    auto layout = reach_clipboard_feature_input_layout(clipboard, reach_motion_now_seconds());
 
     if (!state->model.open)
     {
         return;
     }
 
-    reach_clipboard_hit_result hit = reach_clipboard_hit_test(&state->model, &state->layout, x, y);
+    reach_clipboard_hit_result hit = reach_clipboard_hit_test(&state->model, &layout, x, y);
     uint64_t press_identity = state->press_identity;
     int32_t was_tracking = reach_pressable_tracking(&state->pressable);
     reach_pressable_result result = {};
@@ -168,14 +170,15 @@ void reach_clipboard_scrollbar_drag_move(reach_clipboard_feature *clipboard, int
     }
 
     reach_clipboard_state *state = reach_clipboard_feature_state_mut(clipboard);
+    auto layout = reach_clipboard_feature_input_layout(clipboard, reach_motion_now_seconds());
 
     if (!state->scrollbar_drag.active)
     {
         return;
     }
 
-    reach_scrollbar_update_drag(&state->model.scrollbar, &state->scrollbar_drag,
-                                &state->layout.scrollbar, (float)y);
+    reach_scrollbar_update_drag(&state->model.scrollbar, &state->scrollbar_drag, &layout.scrollbar,
+                                (float)y);
     state->model.hovered_index = REACH_CLIPBOARD_MAX_ITEMS;
     out->handled = 1;
     out->redraw = 1;
@@ -191,13 +194,14 @@ void reach_clipboard_pointer_move(reach_clipboard_feature *clipboard, int32_t x,
     }
 
     reach_clipboard_state *state = reach_clipboard_feature_state_mut(clipboard);
+    auto layout = reach_clipboard_feature_input_layout(clipboard, reach_motion_now_seconds());
 
     if (!state->model.open)
     {
         return;
     }
 
-    reach_clipboard_hit_result hit = reach_clipboard_hit_test(&state->model, &state->layout, x, y);
+    reach_clipboard_hit_result hit = reach_clipboard_hit_test(&state->model, &layout, x, y);
     if (reach_pressable_tracking(&state->pressable))
     {
         reach_pressable_result result = {};
@@ -228,12 +232,11 @@ void reach_clipboard_wheel(reach_clipboard_feature *clipboard, int32_t x, int32_
     }
 
     reach_clipboard_state *state = reach_clipboard_feature_state_mut(clipboard);
+    auto layout = reach_clipboard_feature_input_layout(clipboard, reach_motion_now_seconds());
 
     if (!state->model.open || wheel_delta == 0 ||
-        !((float)x >= state->layout.viewport.x &&
-          (float)x <= state->layout.viewport.x + state->layout.viewport.width &&
-          (float)y >= state->layout.viewport.y &&
-          (float)y <= state->layout.viewport.y + state->layout.viewport.height))
+        !((float)x >= layout.viewport.x && (float)x <= layout.viewport.x + layout.viewport.width &&
+          (float)y >= layout.viewport.y && (float)y <= layout.viewport.y + layout.viewport.height))
     {
         return;
     }

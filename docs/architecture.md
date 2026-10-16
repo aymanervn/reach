@@ -736,7 +736,23 @@ sources or over-budget expansions use renderer-owned source sampling through the
 port until the finite descriptors settle. Image and text expansions share the existing 128MiB and
 layer budgets. Source changes invalidate their bitmap, while hide/retirement removes fit ownership
 and sampling. No fields are added to the render command/group/buffer for this capability.
-Clipboard width integration remains migration work.
+Clipboard item width now owns one canonical 160ms ease-out motion and one cleanup deadline.
+Endpoint layout stays authoritative; pointer operations sample a separate current-width snapshot.
+Normal scrollbar-gutter changes retain fixed-radius item borders, independent hover paint, close
+controls, image crops, custom preview line variants and scrollbar placement. Stable item source
+identities reserve 128 IDs each. The renderer retains at most five visible items and four bounded
+line-capacity variants per item; no width-only capsule frame or layout tick advances the effect.
+Monitor/DPI constraints and hidden initialization cut the width. Extremely narrow, horizontally
+clipped close glyphs use generic active-only content sampling until the same canonical deadline.
+Height and smooth scrolling remain CPU consumers pending their own migration.
+
+Width-text callers own their ellipsis policy. Dock and Switcher explicitly request DWrite ellipsis;
+Clipboard preserves its custom line splitting and literal dots. The vertical-overflow fit mode
+expands native source bounds using DWrite glyph overhang while retaining horizontal width clipping.
+It preserves the ordinary CPU text fallback's unclipped glyph ink instead of applying the metadata
+viewport there. Sampled native sources bake horizontal clipping into their raster; active sources
+retain bounded vertical ink and animate the width clip. This keeps consumer layout height separate
+from the glyph paint extent without adding another animation owner.
 
 `reach_ui_motion_background_render` composes these fills with an optional shape-shadow caster and
 opaque outer/inner border semantics. Constant paint axes keep the existing pixel-aligned border

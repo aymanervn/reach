@@ -424,7 +424,8 @@ reach_result reach_render_command_buffer_validate_groups(const reach_render_comm
                 if (buffer->groups[other].parent_id == source->id)
                     return REACH_INVALID_ARGUMENT;
         }
-        if (command->text_fit_to_clip != 0 && command->text_fit_to_clip != 1)
+        if (command->text_fit_to_clip < 0 ||
+            command->text_fit_to_clip > REACH_RENDER_TEXT_FIT_VERTICAL_OVERFLOW)
             return REACH_INVALID_ARGUMENT;
         if (command->text_fit_to_clip)
         {
@@ -913,8 +914,9 @@ reach_result reach_render_push_width_text(reach_render_command_buffer *buffer,
     if (result != REACH_OK)
         return result;
     reach_render_command text = *command;
-    text.text_fit_to_clip = 1;
-    text.text_ellipsis = 1;
+    text.text_fit_to_clip = command->text_fit_to_clip == REACH_RENDER_TEXT_FIT_VERTICAL_OVERFLOW
+                                ? REACH_RENDER_TEXT_FIT_VERTICAL_OVERFLOW
+                                : REACH_RENDER_TEXT_FIT_CLIPPED;
     result = reach_render_command_buffer_push(buffer, &text);
     reach_render_command_buffer_end_group(buffer);
     if (result != REACH_OK)

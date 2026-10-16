@@ -165,6 +165,7 @@ reach_result reach_switcher_append_render_commands(reach_switcher *switcher,
             command.color = theme->switcher_label_text;
             command.text_weight = REACH_TEXT_WEIGHT_DEMIBOLD;
             command.text_alignment = REACH_TEXT_ALIGNMENT_CENTER;
+            command.text_ellipsis = 1;
             command.text_size = REACH_TEXT_SIZE_MEDIUM * scale;
             reach_switcher_label_for_window(command.text, 260, window);
             result = reach_render_push_width_text(out_commands, &command, &viewport);

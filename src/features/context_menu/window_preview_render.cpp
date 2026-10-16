@@ -44,6 +44,7 @@ static reach_result reach_preview_text(reach_render_command_buffer *out, uint64_
     command.text_size = size;
     command.text_weight = REACH_TEXT_WEIGHT_NORMAL;
     command.text_alignment = alignment;
+    command.text_ellipsis = 1;
     reach_copy_utf16(command.text, REACH_MENU_TEXT_CAPACITY, text);
     return reach_render_push_width_text(out, &command, &viewport);
 }

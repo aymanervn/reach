@@ -391,6 +391,28 @@ static HRESULT reach_d2d_command_text_layout(reach_render_backend *backend,
         command->text_ellipsis, out_layout);
 }
 
+reach_result reach_d2d_text_fit_bounds(reach_render_backend *backend,
+                                       const reach_render_command *command,
+                                       reach_rect_f32 *out_bounds)
+{
+    if (backend == nullptr || command == nullptr || out_bounds == nullptr)
+        return REACH_INVALID_ARGUMENT;
+    ComPtr<IDWriteTextLayout> layout;
+    DWRITE_OVERHANG_METRICS ink = {};
+    HRESULT hr = reach_d2d_command_text_layout(backend, command, &layout);
+    if (SUCCEEDED(hr))
+        hr = layout->GetOverhangMetrics(&ink);
+    if (FAILED(hr))
+        return REACH_ERROR;
+    reach_rect_f32 bounds = {floorf(command->rect.x) - 1,
+                             floorf(command->rect.y - fmaxf(0, ink.top) - 1), 0, 0};
+    bounds.width = ceilf(command->rect.x + command->rect.width) + 1 - bounds.x;
+    bounds.height =
+        ceilf(command->rect.y + command->rect.height + fmaxf(0, ink.bottom) + 1) - bounds.y;
+    *out_bounds = bounds;
+    return REACH_OK;
+}
+
 reach_result reach_d2d_text_width_layout_for(reach_render_backend *backend,
                                              const reach_render_command *command,
                                              const reach_d2d_text_width_layout **out)
