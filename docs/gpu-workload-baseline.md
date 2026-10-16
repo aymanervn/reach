@@ -1608,3 +1608,43 @@ that folder. Watchdog PID 576 and Reach PID 15328 were verified alive at the bui
 `0C16D4F4299195E21682301E22CFF445147A053BCC7F0BD6BD36181CAE0836DA`; Settings SHA256 is
 `FE7A26DF33806152D9704648B4D8B9B1C302B93A5BB2AF20F44EF5DCA330FB62`. No reinstall or direct
 Reach/watchdog launch was used.
+
+
+## 2026-10-16: Shared retained image fitting
+
+The Clipboard width prerequisite now has a shared image-fitting contract. Its adapter uses actual
+bitmap dimensions, retains full source pixels once, and changes centered crop or stretch geometry
+through existing native group properties. Core command/group/buffer storage is unchanged. A small
+extension of the existing pure fitted-source ownership test covers image ownership, constant-axis
+snapping, inherited scissor, atomic unsupported-fade rejection and shape-shadow ancestry rejection.
+Clipboard's scalar sizing and scrolling are not migrated by this capability milestone.
+
+The ignored `image_fit_probe.inc` uses only its own generated bitmap and input-transparent window.
+`probe-image-fit-budget-{debug,release}.log` record 160 displayed source comparisons per configuration:
+four DPI values, crop/stretch, five widths and moving/fixed sources on both compositors. Fixed source
+pixels differ by at most one channel value; complete CPU fallback pixels match ordinary drawing
+exactly. Intermediate raw channel differences reach 94 at a half-pixel edge, while each channel stays
+within one value of the 3x3 reference-neighborhood range. Surrounding pixels match exactly. The
+125% center-crop pair is inspected in ignored `image-fit-inspection.png`; the continuous edge and
+centered crop preserve the picture, with the former rounded-width edge differing within one pixel.
+This spatial sampling check is scoped evidence and does not establish whole-product acceptance.
+
+Unchanged active submissions change no raster, property or tree counters. Reversal reuses its image
+source. A changed bitmap/aspect invalidates exactly one raster. Independent crop clocks use renderer
+sampling without capsule layout and stop at their deadline. A nine-source 2048x2048 stress case falls
+back for two sources and retains 120,440,512 nominal surface bytes on each backend, below 128MiB;
+all sources, fit ownership and pending sampling retire on clear while the clock is active. These
+surface counters do not include every bitmap-cache or driver allocation. Full product memory,
+latency, power and CPU/GPU acceptance remain open.
+
+Both final builds and all forty tests pass (`build-image-fit-origin-{debug,release}.log`,
+`test-image-fit-origin-{debug,release}.log`). `probe-image-fit-full-final-{debug,release}.log` each
+passes five complete native runs per backend plus HWND fallback with zero failures after the
+collapsed-image/atomic-parent changes. Final source-origin normalization is isolated to the new image
+helper; `probe-image-fit-origin-{debug,release}.log` repeats the complete image matrix using fractional
+capture origins and the existing HWND fallback checks. All 164 displayed comparisons per build pass,
+including both collapsed axes. Settled error remains at most one, moving neighborhood error one,
+and outside error zero. Capture origins are normalized to a physical-pixel basis without moving the
+requested destination, preserving bitmap snapping in native and CPU paths. Architecture, formatting
+and whitespace checks pass. No tracked UI tests were added, and no installed Reach restart was needed
+for an as-yet-unconsumed shared primitive.

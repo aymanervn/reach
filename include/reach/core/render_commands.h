@@ -241,6 +241,11 @@ extern "C"
                                                const reach_rect_motion *bounds, float radius,
                                                reach_color color);
 
+    reach_result reach_render_push_image_motion(reach_render_command_buffer *buffer,
+                                                const reach_render_group *source,
+                                                const reach_rect_motion *bounds, float radius,
+                                                const reach_render_command *image);
+
     void reach_render_command_buffer_clear(reach_render_command_buffer *buffer);
     int32_t reach_render_command_buffer_motion_active(const reach_render_command_buffer *buffer);
     reach_point_f32 reach_render_presentation_center_at(const reach_render_command_buffer *buffer,

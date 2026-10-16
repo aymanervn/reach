@@ -1111,6 +1111,51 @@ static void test_rect_motion_source_ownership(void)
                         REACH_INVALID_ARGUMENT &&
                     buffer->count == 0 && buffer->group_count == 0,
                 "motion fill cannot exceed its source envelope");
+    reach_motion_set(&rect.width, 80.25f);
+    reach_motion_set(&rect.height, 40.25f);
+    reach_motion_set(&rect.x, 13.25f);
+    reach_render_command image = {};
+    image.type = REACH_RENDER_COMMAND_ICON;
+    image.icon_id = 100;
+    image.color.a = 1;
+    image.icon_crop_to_fill = 1;
+    expect_true(reach_render_push_image_motion(buffer.get(), &source, &rect, 12, &image) ==
+                        REACH_OK &&
+                    reach_render_command_buffer_validate_groups(buffer.get()) == REACH_OK &&
+                    buffer->commands[0].type == REACH_RENDER_COMMAND_ICON &&
+                    buffer->commands[0].rect_fit_to_clip && !buffer->commands[0].has_scissor,
+                "fitted image retains exclusive ownership and the inherited output clip");
+    expect_true(reach_render_group_clip_at(&buffer->groups[1], 10).width == 80 &&
+                    reach_motion_value_at(&buffer->groups[0].x, 10) == 13,
+                "fitted image preserves ordinary bitmap snapping for constant axes");
+    reach_render_command_buffer_clear(buffer.get());
+    source.bounds.x = -.5f;
+    source.bounds.y = .25f;
+    expect_true(
+        reach_render_push_image_motion(buffer.get(), &source, &rect, 12, &image) == REACH_OK &&
+            buffer->groups[1].bounds.x == -1 && buffer->groups[1].bounds.y == 0 &&
+            reach_motion_value_at(&buffer->groups[0].x, 10) + buffer->groups[1].bounds.x == 13,
+        "fractional image capture origin keeps bitmap snapping at the requested placement");
+    reach_render_command_buffer_clear(buffer.get());
+    image.icon_fade_start = .5f;
+    expect_true(reach_render_push_image_motion(buffer.get(), &source, &rect, 12, &image) ==
+                        REACH_INVALID_ARGUMENT &&
+                    buffer->count == 0 && buffer->group_count == 0,
+                "fitted image rejects destination-dependent fade before append");
+    image.icon_fade_start = 0;
+    reach_render_group shadow = {};
+    shadow.id = 10;
+    shadow.bounds = source.bounds;
+    shadow.has_shadow = 1;
+    shadow.shadow = {0, 0, 4, {0, 0, 0, 1}};
+    expect_true(reach_render_command_buffer_begin_group(buffer.get(), &shadow) == REACH_OK,
+                "fitted image shadow-parent rejection fixture");
+    reach_render_command_buffer_end_group(buffer.get());
+    source.parent_id = shadow.id;
+    expect_true(reach_render_push_image_motion(buffer.get(), &source, &rect, 12, &image) ==
+                        REACH_INVALID_ARGUMENT &&
+                    buffer->count == 0 && buffer->group_count == 1,
+                "fitted image rejects unsupported shape-shadow ancestry before append");
 }
 
 static void test_width_text_source_ownership(void)

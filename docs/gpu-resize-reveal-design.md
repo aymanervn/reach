@@ -274,3 +274,36 @@ reversal, source reuse, transparent completion and suspension; generic publicati
 checks use the same center. Complete producer, settled text, intermediate appearance, CPU fallback,
 error/source and full regression checks pass in Debug and Release. The original fixed-height pivot alternative remains rejected. This implementation does
 not close broad workload, power, memory, latency or live product acceptance.
+
+
+## Retained image fitting implementation
+
+`reach_render_push_image_motion` extends shared fitted-rectangle ownership to ordinary image commands.
+The two producer owners separate placement from a rounded viewport. Windows raster planning reads
+the cached bitmap's actual size and retains one unscaled bitmap source. Crop-to-fill derives the
+larger of width/source-width and height/source-height and centers the scaled source in the viewport;
+stretching uses independent axes. This preserves crop content rather than stretching a previously
+cropped picture. Clipboard thumbnails are bounded to 256px on their longest side, but original item
+metadata can have a slightly different aspect ratio because thumbnail dimensions are rounded. The
+adapter's bitmap size is therefore authoritative for cropping.
+
+Constant axes use the established bitmap rounding recipe; fractional capture origins normalize to
+a pixel basis without moving the requested destination. Animated dimensions remain continuous;
+fixed endpoints use ordinary image drawing, and zero extents draw nothing. Image fitting reuses the
+existing marker, motion compiler, group properties and render-port source sampling. Independent
+crop clocks that cannot combine exactly, tinted image sources, excessive source dimensions and
+aggregate source budgets fall back to active-only renderer sampling. Shape-shadow ancestry and
+destination-dependent fades reject before append; the image helper retains an inherited stationary
+scissor. Image and text expansion share the existing 128MiB/449-layer resource limits, with source
+ownership retired on hide or removal. This capability does not complete Clipboard sizing, custom
+preview wrapping, virtualization or smooth scrolling. Those consumer paths remain open.
+
+
+Clipboard wrapping prerequisite: ignored `clipboard_wrap_motion_probe.cpp` checks 120,120 source
+comparisons per build in Debug and Release at four DPI values, including plain text and four thumbnail aspect regimes. At every
+sample, canonical finite lookup selects the existing character capacity. A maximum of four cached
+variants preserves line membership, literal dots, newline/space handling and clipped vertical
+centering exactly. This validates a bounded frontend recipe for the normal 19dp gutter transition;
+it does not implement producer ownership, input sampling, constraints or lifecycle cleanup. The
+shared width-text helper currently forces DWrite ellipsis; consumer integration must preserve the
+Clipboard per-line flag and explicitly retain ellipsis at the existing Dock/Switcher call sites.

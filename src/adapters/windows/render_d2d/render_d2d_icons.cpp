@@ -568,6 +568,18 @@ static void reach_d2d_draw_bitmap_with_fade(reach_render_backend *backend,
     }
 }
 
+reach_result reach_d2d_image_size(reach_render_backend *backend, uint64_t id, D2D1_SIZE_F *out_size)
+{
+    if (backend == nullptr || out_size == nullptr)
+        return REACH_INVALID_ARGUMENT;
+    ID2D1Bitmap *bitmap = nullptr;
+    reach_result result = reach_d2d_get_icon_bitmap(backend, id, &bitmap);
+    if (result != REACH_OK || bitmap == nullptr)
+        return result == REACH_OK ? REACH_ERROR : result;
+    *out_size = bitmap->GetSize();
+    return REACH_OK;
+}
+
 reach_result reach_d2d_draw_icon(reach_render_backend *backend, const reach_render_command *command)
 {
     REACH_ASSERT(backend != nullptr);
