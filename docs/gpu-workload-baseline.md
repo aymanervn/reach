@@ -1716,3 +1716,44 @@ Installed Reach SHA256 is `DC78C5E3F3EB6219708AED44E31B8C0C5D23C8C31DD0B50BBB821
 Settings is `A8797B094507C29DD461C4D1CDE299957816C790528EFB713510E20BC0733F5D`.
 No reinstall or direct Reach/watchdog launch was used. This verifies installation/lifetime, while
 full live interaction and total product acceptance remain open.
+
+
+## 2026-10-16: Semantic Battery/Bluetooth deadline scheduling
+
+Battery's saver request and Top Bar's Bluetooth absence hold retain their two-second policy
+lifetimes through absolute `reach_motion_now_seconds` deadlines published by existing generic
+surface geometry. These are CPU semantic timers; the renderer owns no new effect. Frame-delta
+accumulation and wait-only frame/update demand are removed. Battery merges the pending timeout with
+popup completion, acknowledgement and reset cancel it, and expiry reconciles once. Bluetooth grace
+starts on the first observed absence, including a zero-delta status event; repeated absence does
+not extend it, and recovery/reset cancel stale work. No timer, polling loop or composition branch
+was introduced.
+
+The ignored `semantic_deadline_probe.cpp` owns its capsules and a generated service snapshot; it
+performs no OS power/radio actions and shows no windows. Before migration, 100 simulated waiting
+updates requested 100 Battery frames and updates and 100 Bluetooth-grace frames, with no semantic
+wake deadline (`probe-semantic-deadline-before-debug.log`). Final Debug and Release probes request
+zero frames/updates and publish future wakes. A large frame delta does not expire either timer;
+after real deadline passage, one reconciliation clears both wakes and further ticks remain idle.
+Service acknowledgement, zero-delta absence, repeated absence, recovery and reset pass with zero
+failures (`probe-semantic-deadline-after-{debug,release}.log`). This is scoped scheduling evidence,
+not a whole-product power/CPU measurement.
+
+Both builds and all forty tests pass (`build-semantic-deadline-{debug,release}.log`,
+`test-semantic-deadline-{debug,release}.log`). The existing Battery timeout test now verifies the
+absolute wake and lack of recurring requests, then waits for its published deadline instead of
+simulating policy time by animation-frame deltas. No new UI test was added. Renderer code and
+visual command production are unchanged by this milestone; the preceding full native regressions
+remain applicable to the retained primitives. Final architecture/format/whitespace and obsolete
+semantic-counter searches pass.
+
+
+Installed/live follow-up for this semantic milestone is pending. At 2026-10-16 22:04 Casablanca,
+read-only enumeration finds no Reach/watchdog/service process, the current-user shell registration
+is `explorer.exe`, and no Reach scheduled tasks are registered. The allowed installed-folder
+`reachctl --start` therefore reports that Reach is not installed. The stop sequence found no Reach
+or watchdog process to terminate; checked binaries were copied into the existing build folder.
+No reinstall, shell-registration write or direct Reach/watchdog launch was attempted. Earlier
+18:39 width-milestone startup verification remains historical evidence, not a claim about the
+current session. Source/build/owned-policy verification is complete; current installation state
+must be resolved before live product acceptance can pass.

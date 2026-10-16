@@ -12,7 +12,7 @@ struct reach_battery
     reach_battery_state state;
     reach_system_status *status;
     reach_battery_routes routes;
-    double saver_pending_seconds;
+    double saver_pending_deadline;
     reach_motion press_feedback;
     reach_feature_transition popup_transition;
     reach_pressable pressable;
