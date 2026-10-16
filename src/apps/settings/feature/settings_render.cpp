@@ -312,29 +312,31 @@ static void render_power_page(const reach_settings_render_input *input,
                                           &toggle_style, id, motion);
         }
 
-        float t = reach_animation_manager_value(&model->power_animations, timer);
         size_t selected = model->power_selected[timer];
         size_t previous = model->power_previous[timer];
         reach_ui_selection_item_style pill_style = reach_settings_pill_style(input, accent);
         for (size_t option = 0; option < REACH_SETTINGS_POWER_OPTION_COUNT; ++option)
         {
-            float selection = 0.0f;
+            reach_motion selection = {};
+            reach_motion_set(&selection, 0);
             if (option == selected)
             {
-                selection = t;
+                selection = model->power_selection[timer];
             }
             else if (option == previous)
             {
-                selection = 1.0f - t;
+                selection = reach_motion_affine(&model->power_selection[timer], -1, 1);
             }
+            uint64_t id =
+                reach_settings_control_group_id(REACH_SETTINGS_HIT_POWER_OPTION,
+                                                timer * REACH_SETTINGS_POWER_OPTION_COUNT + option);
             if (option == REACH_SETTINGS_POWER_CUSTOM_OPTION)
             {
                 const reach_rect_f32 slot = layout->power_options[timer][option];
                 reach_ui_selection_item_style custom_style = pill_style;
-                custom_style.background =
-                    reach_theme_color_mix(input->theme->settings_input_background,
-                                          input->theme->settings_pill_background, selection);
-                reach_ui_selection_item_backdrop_render(commands, slot, &custom_style, selection);
+                (void)reach_ui_selection_item_motion_backdrop_render(
+                    commands, slot, &custom_style, &input->theme->settings_input_background, id,
+                    &selection);
                 const reach_rect_f32 hours =
                     layout->power_custom_fields[timer][REACH_SETTINGS_POWER_FIELD_HOURS];
                 const reach_rect_f32 minutes =
@@ -374,20 +376,23 @@ static void render_power_page(const reach_settings_render_input *input,
                         state.selection_end = 0;
                     }
                     state.text_color = input->theme->settings_secondary_text;
+                    state.text_color_motion = &selection;
+                    state.text_color_to = accent;
+                    state.text_color_id = id + 2 + field;
                     state.placeholder_color = reach_settings_color_with_alpha(
                         input->theme->settings_secondary_text, 0.55f);
                     state.selection_color = reach_settings_color_with_alpha(accent, 0.30f);
                     state.suffix_color = reach_settings_color_with_alpha(
                         input->theme->settings_secondary_text, 0.65f);
                     reach_ui_textbox_render(commands, layout->power_custom_fields[timer][field],
-                                            &custom_style, selection, &state);
+                                            &custom_style, 0, &state);
                 }
             }
             else
             {
-                reach_ui_selection_item_render(commands, layout->power_options[timer][option],
-                                               reach_settings_power_option_label(timer, option),
-                                               &pill_style, selection);
+                (void)reach_ui_selection_item_motion_render(
+                    commands, layout->power_options[timer][option],
+                    reach_settings_power_option_label(timer, option), &pill_style, id, &selection);
             }
         }
     }

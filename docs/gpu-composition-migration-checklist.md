@@ -313,6 +313,18 @@ scoped test results; live/product acceptance remains unchecked.
     coverage within two channel values. Displayed pixels, source memory comparison and total product
     workload acceptance remain in the broader gates.
 
+  - [x] Migrate Settings Power option/custom-field colors through shared retained paint.
+    Implementation replaces the scalar manager, sampled Power values and periodic frame predicate
+    with canonical 220ms intent, shared selection-item tint, independent textbox ink and one visible
+    cleanup deadline. Existing reset-on-selection, placeholder/suffix/highlight/caret and ordinary
+    settled paint are preserved. Debug/Release builds/all forty tests and real-loop scheduler checks
+    pass. Complete Debug/Release former-producer matrices cover 960 poses across both backends,
+    four DPI values, two themes/fonts and three transitions; CPU error is at most one, native glyph contrast
+    at most 17 with other/flat pixels within three. The fractional source-phase defect is fixed.
+    Five full native runs per backend plus HWND fallback pass in both configurations. No deployment
+    or Reach restart was performed.
+    **Review needed:** live editing/focus, glyph contrast and source/driver memory/cost; see R9.
+
   - [x] Migrate Settings Reach-theme and Top Bar style selectors through shared retained selection.
     Canonical position drives cached pill translation and fixed label tint. Shared bounded peak
     mapping preserves the middle label's brightening/dimming during outer-choice jumps; outer

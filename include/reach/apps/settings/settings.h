@@ -237,8 +237,7 @@ extern "C"
         int32_t power_focused_timer;
         int32_t power_focused_field;
         reach_blink power_caret;
-        reach_animation_track power_tracks[REACH_SETTINGS_POWER_TIMER_COUNT];
-        reach_animation_manager power_animations;
+        reach_motion power_selection[REACH_SETTINGS_POWER_TIMER_COUNT];
         reach_motion power_wait_toggles[REACH_SETTINGS_POWER_TIMER_COUNT];
         uint16_t account_display_name[REACH_SETTINGS_ACCOUNT_NAME_CAPACITY];
         uint16_t account_user_name[REACH_SETTINGS_ACCOUNT_NAME_CAPACITY];
@@ -558,9 +557,9 @@ extern "C"
     int32_t reach_settings_model_power_minutes(const reach_settings_model *model, size_t timer);
     void reach_settings_model_select_power_option(reach_settings_model *model, size_t timer,
                                                   size_t option);
-    int32_t reach_settings_model_sample_power_animations_at(reach_settings_model *model,
-                                                            double now_seconds);
-    int32_t reach_settings_model_power_animations_active(const reach_settings_model *model);
+    int32_t reach_settings_model_finish_visual_motion_at(reach_settings_model *model,
+                                                         double now_seconds);
+    double reach_settings_model_visual_deadline(const reach_settings_model *model);
     void reach_settings_model_power_focus_custom(reach_settings_model *model, size_t timer,
                                                  size_t field);
     void reach_settings_model_power_blur(reach_settings_model *model);

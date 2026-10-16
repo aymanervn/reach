@@ -1,6 +1,7 @@
 # GPU composition migration review register
 
-Updated 2026-10-16 at `910b9c0`. These acceptance items remain open. This register complements the
+Updated 2026-10-16 with the Power selection-color milestone. These acceptance items remain
+open. This register complements the
 [delivery checklist](gpu-composition-migration-checklist.md) and
 [workload evidence](gpu-workload-baseline.md); it does not replace remaining implementation.
 
@@ -20,8 +21,9 @@ pending until a later authorized running session is available.
 | R6 | Environment and lifecycle matrix | Scoped 100/125/150/200%, two themes, fonts, lifetime/recreation and bounded-source fixtures | Product checks across mixed DPI, monitor constraints/resolutions, normal/high refresh and battery saver; capture, focus, game mode, hidden retirement and callback cancellation. Record each unavailable configuration explicitly. |
 | R7 | Total efficiency and regression acceptance | Opt-in counters, read-only collector, isolated scene timings and nominal retained-source bytes | Comparable repeated Reach + Settings + DWM CPU/GPU, latency, energy/power and memory measurements; variation/regression thresholds, observer overhead and independent GPU-memory evidence. No passing whole-product claim yet. |
 | R8 | Final code/ledger acceptance | Focused commits, architecture checks, obsolete-path searches and recorded CPU responsibilities for migrated consumers | Finish every remaining consumer and timer/native disposition; remove superseded execution paths; review current architecture/ledger against the finished source. Do not close the goal with pending implementation or acceptance evidence. |
+| R9 | Power option/custom-field colors and shared textbox ink | Both builds/all 40 tests; independent caret/color, bounded-source fallback and endpoint scheduling fixtures; complete former-producer pixel comparisons recorded in the baseline | Review intermediate glyph contrast from tinted coverage, custom edits/selection/suffix/placeholder/caret overlap, rapid reselection and focus. Confirm live theme/font/DPI changes and the measured source-memory/driver cost. Keep live and total-cost acceptance open; no Reach/Settings deployment was performed. |
 
 The remaining implementation includes Clipboard height/smooth scrolling, Settings Wi-Fi/Bluetooth
-row expansion and eligible scrolling, Power option/custom-field color animation, Top Bar control
+row expansion and eligible scrolling, Top Bar control
 widths, Dock membership/capacity fitting, Stage choreography and native bar movement separation.
 Each implementation milestone adds its own validation and updates the relevant review entry.

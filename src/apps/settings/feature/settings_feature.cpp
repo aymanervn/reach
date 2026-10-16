@@ -68,8 +68,8 @@ void reach_settings_model_init(reach_settings_model *model)
     reach_text_edit_init(&model->wifi_key_edit, REACH_WIFI_KEY_MAXIMUM_LENGTH);
     reach_text_edit_init(&model->wifi_add_key_edit, REACH_WIFI_KEY_MAXIMUM_LENGTH);
     reach_text_edit_init(&model->wifi_add_name_edit, REACH_WIFI_SSID_CAPACITY - 1);
-    reach_animation_manager_init(&model->power_animations, model->power_tracks,
-                                 REACH_SETTINGS_POWER_TIMER_COUNT);
+    for (auto &selection : model->power_selection)
+        reach_motion_set(&selection, 0);
     model->power_focused_timer = -1;
     model->account_focused_field = -1;
     model->hovered_button = REACH_SETTINGS_HIT_NONE;

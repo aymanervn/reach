@@ -424,6 +424,168 @@ void reach_ui_selection_item_render(reach_render_command_buffer *commands, reach
                        reach_theme_color_mix(style->text, style->accent, selection));
 }
 
+static reach_result reach_ui_selection_background_motion(const reach_motion &selection, float from,
+                                                         float to, float accent, reach_motion *out)
+{
+    if (from == to)
+    {
+        *out = reach_motion_affine(&selection, .22f * (accent - from), from);
+        return REACH_OK;
+    }
+    float values[9] = {};
+    for (size_t index = 0; index < 9; ++index)
+    {
+        float progress = (float)index * .125f;
+        float background = from + (to - from) * progress;
+        values[index] = background + (accent - background) * .22f * progress;
+    }
+    float previous = (values[1] - values[0]) * 8;
+    reach_motion mapped = reach_motion_affine(&selection, previous, values[0]);
+    for (size_t index = 1; index < 8; ++index)
+    {
+        float next = (values[index + 1] - values[index]) * 8;
+        reach_motion bend = {};
+        if (reach_motion_hinge(&selection, (float)index * .125f, 0, 0, next - previous, &bend) !=
+                REACH_OK ||
+            reach_motion_combine(&mapped, 1, &bend, 1, 0, &mapped) != REACH_OK)
+            return REACH_INVALID_ARGUMENT;
+        previous = next;
+    }
+    *out = mapped;
+    return REACH_OK;
+}
+
+reach_result reach_ui_selection_item_motion_backdrop_render(
+    reach_render_command_buffer *commands, reach_rect_f32 bounds,
+    const reach_ui_selection_item_style *style, const reach_color *background_from, uint64_t id,
+    const reach_motion *selection)
+{
+    if (commands == nullptr || style == nullptr || selection == nullptr || id == 0 ||
+        id > UINT64_C(0x7ffffffffffffffd))
+        return REACH_INVALID_ARGUMENT;
+    if (bounds.width <= 0 || bounds.height <= 0)
+        return REACH_OK;
+    auto progress = reach_motion_clamp(selection, 0, 1);
+    reach_color from = background_from != nullptr ? *background_from : style->background;
+    float minimum = 0, maximum = 0;
+    if (reach_motion_range(&progress, &minimum, &maximum) != REACH_OK)
+        return REACH_INVALID_ARGUMENT;
+    auto sampled = [&]()
+    {
+        float value = reach_motion_value(&progress);
+        auto current = *style;
+        current.background = reach_theme_color_mix(from, style->background, value);
+        reach_ui_selection_item_backdrop_render(commands, bounds, &current, value);
+        commands->requires_content_sampling =
+            commands->requires_content_sampling || reach_motion_active(&progress);
+        return REACH_OK;
+    };
+    if (minimum == maximum || style->border_width <= 0 || from.a != 1 || style->background.a != 1 ||
+        style->accent.a != 1)
+        return sampled();
+    reach_render_group ink = {};
+    ink.has_tint = 1;
+    float start[] = {from.r, from.g, from.b};
+    float finish[] = {style->background.r, style->background.g, style->background.b};
+    float accent[] = {style->accent.r, style->accent.g, style->accent.b};
+    for (size_t channel = 0; channel < 3; ++channel)
+        if (reach_ui_selection_background_motion(progress, start[channel], finish[channel],
+                                                 accent[channel], &ink.tint[channel]) != REACH_OK)
+            return sampled();
+    reach_motion_set(&ink.tint[REACH_RENDER_COLOR_ALPHA], 1);
+    reach_render_command shape = {};
+    shape.type = REACH_RENDER_COMMAND_RECT;
+    shape.rect = bounds;
+    shape.radius = bounds.height * .5f;
+    reach_render_command shapes[2] = {};
+    size_t count = reach_render_bordered_background_shapes(&shape, {1, 1, 1, 1}, {1, 1, 1, 1},
+                                                           style->border_width, shapes);
+    if (commands->group_count + count > REACH_MAX_RENDER_GROUPS ||
+        commands->count + count > REACH_MAX_RENDER_COMMANDS)
+        return sampled();
+    uint64_t parent = commands->current_group_id;
+    for (size_t index = 0; index < count; ++index)
+    {
+        auto group = ink;
+        group.id = id + index;
+        group.parent_id = parent;
+        if (!reach_render_retained_command_bounds(&shapes[index], &group.bounds))
+            return REACH_INVALID_ARGUMENT;
+        if (index == 0)
+        {
+            group.tint_rgb_target = style->accent;
+            auto mix = reach_motion_affine(&progress, .85f, 0);
+            group.tint_rgb_mix = reach_motion_clamp(&mix, 0, 1);
+        }
+        commands->current_group_id = 0;
+        reach_result result = reach_render_command_buffer_begin_group(commands, &group);
+        if (result == REACH_OK)
+            result = reach_render_command_buffer_push(commands, &shapes[index]);
+        reach_render_command_buffer_end_group(commands);
+        commands->current_group_id = parent;
+        if (result != REACH_OK)
+            return result;
+    }
+    return REACH_OK;
+}
+
+reach_result reach_ui_selection_item_motion_render(reach_render_command_buffer *commands,
+                                                   reach_rect_f32 bounds, const uint16_t *label,
+                                                   const reach_ui_selection_item_style *style,
+                                                   uint64_t id, const reach_motion *selection)
+{
+    reach_result result = reach_ui_selection_item_motion_backdrop_render(commands, bounds, style,
+                                                                         nullptr, id, selection);
+    if (result != REACH_OK || bounds.width <= 0 || bounds.height <= 0)
+        return result;
+    float minimum = 0, maximum = 0;
+    if (reach_motion_range(selection, &minimum, &maximum) != REACH_OK)
+        return REACH_INVALID_ARGUMENT;
+    if (minimum == maximum || commands->group_count == REACH_MAX_RENDER_GROUPS)
+    {
+        reach_ui_push_text(
+            commands, bounds, label, style->text_size, style->text_weight,
+            REACH_TEXT_ALIGNMENT_CENTER,
+            reach_theme_color_mix(style->text, style->accent, reach_motion_value(selection)));
+        commands->requires_content_sampling =
+            commands->requires_content_sampling || reach_motion_active(selection);
+        return REACH_OK;
+    }
+    uint64_t parent = commands->current_group_id;
+    auto progress = reach_motion_clamp(selection, 0, 1);
+    auto command = reach_ui_text_command(bounds, label, style->text_size, style->text_weight,
+                                         REACH_TEXT_ALIGNMENT_CENTER, {1, 1, 1, 1});
+    reach_rect_f32 source = {};
+    if (!reach_render_retained_command_bounds(&command, &source))
+        return REACH_INVALID_ARGUMENT;
+    size_t length = 0;
+    while (length + 1 < sizeof(command.text) / sizeof(command.text[0]) && command.text[length] != 0)
+        ++length;
+    float padding = ceilf(style->text_size * (float)length);
+    float vertical_padding = ceilf(style->text_size);
+    source.x -= padding;
+    source.y -= vertical_padding;
+    source.width += padding * 2;
+    source.height += vertical_padding * 2;
+    if (source.width > 16384 || source.height > 16384)
+    {
+        command.color =
+            reach_theme_color_mix(style->text, style->accent, reach_motion_value(&progress));
+        commands->requires_content_sampling =
+            commands->requires_content_sampling || reach_motion_active(&progress);
+        return reach_render_command_buffer_push(commands, &command);
+    }
+    auto ink = reach_ui_color_group(id + 2, source, style->text, style->accent, &progress);
+    ink.parent_id = parent;
+    commands->current_group_id = 0;
+    result = reach_render_command_buffer_begin_group(commands, &ink);
+    if (result == REACH_OK)
+        result = reach_render_command_buffer_push(commands, &command);
+    reach_render_command_buffer_end_group(commands);
+    commands->current_group_id = parent;
+    return result;
+}
+
 reach_rect_f32 reach_ui_segmented_control_item_bounds(reach_rect_f32 bounds, size_t item_count,
                                                       size_t index)
 {
@@ -674,6 +836,22 @@ void reach_ui_textbox_render(reach_render_command_buffer *commands, reach_rect_f
                           (state->caret_viewport.width <= 0 || overlaps(state->caret_viewport)) &&
                           (!commands->has_scissor || overlaps(commands->scissor_rect));
     reach_motion opacity = reach_blink_opacity(state->caret);
+    reach_render_group ink = {};
+    const reach_render_group *ink_owner = nullptr;
+    if (state->text_color_motion != nullptr)
+    {
+        float minimum = 0, maximum = 0;
+        if (reach_motion_range(state->text_color_motion, &minimum, &maximum) == REACH_OK &&
+            minimum == maximum)
+            command.text_color =
+                reach_theme_color_mix(state->text_color, state->text_color_to, minimum);
+        else
+            ink_owner = &ink;
+        ink.id = state->text_color_id;
+        ink.bounds = box;
+        reach_ui_color_feedback_apply(&ink, state->text_color, state->text_color_to,
+                                      state->text_color_motion);
+    }
     (void)reach_render_push_textbox(commands, &command, state->caret_id,
-                                    retained_caret ? &opacity : nullptr);
+                                    retained_caret ? &opacity : nullptr, ink_owner);
 }

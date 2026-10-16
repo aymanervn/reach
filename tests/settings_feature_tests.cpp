@@ -239,21 +239,36 @@ static void test_power_timers(void)
     expect_true(reach_settings_model_power_minutes(model.get(), REACH_SETTINGS_POWER_TIMER_SLEEP) ==
                     45,
                 "raw config value is preserved");
-    expect_true(!reach_settings_model_power_animations_active(model.get()),
+    expect_true(!reach_motion_active(&model->power_selection[REACH_SETTINGS_POWER_TIMER_SLEEP]),
                 "seeding from config does not animate");
 
+    model->selected_page = REACH_SETTINGS_PAGE_POWER_SLEEP;
     reach_settings_model_select_power_option(model.get(), REACH_SETTINGS_POWER_TIMER_LOCK, 2);
     expect_true(reach_settings_model_power_minutes(model.get(), REACH_SETTINGS_POWER_TIMER_LOCK) ==
                     5,
                 "selecting an option applies its minutes");
-    expect_true(reach_settings_model_power_animations_active(model.get()),
+    expect_true(reach_motion_active(&model->power_selection[REACH_SETTINGS_POWER_TIMER_LOCK]),
                 "selecting an option starts the cross-fade animation");
-    expect_true(reach_settings_model_sample_power_animations_at(
+    const auto &selection = model->power_selection[REACH_SETTINGS_POWER_TIMER_LOCK];
+    expect_true(reach_settings_model_visual_deadline(model.get()) ==
+                        reach_motion_deadline(&selection) &&
+                    !reach_settings_model_finish_visual_motion_at(model.get(),
+                                                                  selection.started_seconds + .1),
+                "in-flight selection publishes one cleanup wake without sampled updates");
+    model->selected_page = REACH_SETTINGS_PAGE_DISPLAY;
+    expect_true(reach_settings_model_visual_deadline(model.get()) == 0,
+                "hidden power content publishes no visual cleanup wake");
+    model->selected_page = REACH_SETTINGS_PAGE_POWER_SLEEP;
+    expect_true(reach_settings_model_finish_visual_motion_at(
                     model.get(), reach_motion_deadline(
-                                     &model->power_tracks[REACH_SETTINGS_POWER_TIMER_LOCK].motion)),
+                                     &model->power_selection[REACH_SETTINGS_POWER_TIMER_LOCK])),
                 "endpoint sampling reports the final animation update");
-    expect_true(!reach_settings_model_power_animations_active(model.get()),
+    expect_true(!reach_motion_active(&model->power_selection[REACH_SETTINGS_POWER_TIMER_LOCK]),
                 "animation completes after its duration");
+    expect_true(reach_settings_model_visual_deadline(model.get()) == 0 &&
+                    !reach_settings_model_finish_visual_motion_at(model.get(),
+                                                                  reach_motion_now_seconds() + 1),
+                "completed selection does not repeat cleanup work");
 }
 static void test_power_apply_tracking(void)
 {
@@ -364,7 +379,7 @@ static void test_power_wait_apps_toggle(void)
         "toggling turns the flag off");
     const reach_motion *toggle = &model->power_wait_toggles[REACH_SETTINGS_POWER_TIMER_SLEEP];
     expect_true(reach_motion_active(toggle), "toggling animates the switch");
-    expect_true(!reach_settings_model_power_animations_active(model.get()),
+    expect_true(!reach_motion_active(&model->power_selection[REACH_SETTINGS_POWER_TIMER_SLEEP]),
                 "toggle motion does not require scalar frames");
     expect_true(reach_motion_value_at(toggle, reach_motion_deadline(toggle)) == 0.0f,
                 "toggle animation completes after its duration");

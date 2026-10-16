@@ -1757,3 +1757,70 @@ No reinstall, shell-registration write or direct Reach/watchdog launch was attem
 18:39 width-milestone startup verification remains historical evidence, not a claim about the
 current session. Source/build/owned-policy verification is complete; current installation state
 must be resolved before live product acceptance can pass.
+
+## 2026-10-16: Settings Power selection colors and independent textbox ink
+
+Power's five option transitions now publish canonical 220ms ease-out intent. Previous/selected
+policy still resets each new transition. Retained opaque border/background coverage and label ink
+use shared UI selection helpers; custom textbox ink shares the same intent while placeholder,
+suffix, selection highlight and caret opacity keep their own paint. The old scalar manager,
+per-update sampled Power values and periodic application frame predicate are removed. One earliest
+visible endpoint folds the finite source graph back into ordinary paint; hidden Power pages and
+minimized Settings windows publish no Power cleanup wake. This is color animation, not row reveal.
+
+The custom background's existing nested mixes contain a quadratic in selection. Nine sampled
+values compile into eight segments through the existing canonical hinge/combine operations; no
+new timeline or motion descriptor is introduced. Ignored Debug/Release color-mapping probes check
+960,096 extreme-color/direction/sample combinations each. Worst approximation is 0.219172 of one
+8-bit channel, with at most eight compiled segments and no failures. Unsupported nonopaque paint,
+geometry or UI capacity uses ordinary drawing sampled from that same finite intent.
+
+An optional exclusively owned `text_color_group_id` separates textbox glyph coverage from editor
+background/selection/placeholder paint. The caret inherits color and its independent opacity;
+empty/unpainted parts allocate no raster. CPU fallback samples only textbox text color. Both native
+backends share the planner and reuse source pixels across color retargets. The shared 128 MiB/layer
+budget can replace duplicate painted editor/ink sources with renderer-owned active-only source
+sampling, keeping native caret opacity and avoiding feature layout/command production. The owned
+12-editor budget scene retains 20 layers and 128,000,000 nominal bytes while sampling four sources;
+source-only sampling stops at the canonical endpoint and hide clears all records. Final independent
+textbox probes pass Debug/Release (`probe-textbox-ink-final-{debug,release}.log`): 320 total displayed
+poses across four DPI values/two fonts, filled/empty fields, selection/placeholder/caret and ancestor
+clip/opacity. CPU reference output is exact. Native differences peak at 8 (WUC) and 12 (DC), confined
+to glyph ink; other and locally flat pixels retain the three-channel limit. Independent color/caret
+motion, zero initial text alpha, unchanged reuse, retarget, font replacement, suspension, retirement
+and resource fallback are covered. Glyph contrast still requires product review.
+
+The complete Power producer is compared with an ignored copy of the former producer, driven by the
+same canonical sample time. The matrix includes all five rows, preset-to-preset, preset-to-custom
+and custom-to-preset transitions, focused custom selection/caret, five poses, four DPI values, both
+themes and both fonts. The final Debug/Release matrices (`probe-power-selection-aligned-debug.log`,
+`probe-power-selection-final-release.log`) cover 960 displayed comparisons across both backends:
+CPU error at most one channel, native at most 17
+inside glyph ink, and other/locally flat pixels within three. Settled constant paint stays within
+three. The measured 17-channel pose is separately captured for visual inspection. These are native
+comparisons against native former output and separate CPU comparisons against CPU former output;
+pre-existing ancestor-opacity differences between backends are not misclassified as migration error.
+
+The first full-producer matrix exposed fractional source padding at 125% DPI, causing a 103-channel
+glyph shift. Integral physical-pixel padding fixes the local DWrite phase while preserving unclipped
+label overflow. Failing exploratory logs are excluded from final evidence. Remaining small glyph
+contrast differences from tinted coverage are explicitly marked R9; they are not declared identical
+or accepted solely because an isolated fixture passes.
+
+At 100% DPI the five-row 1100x1500 scene uses 14,575,408 former/settled nominal source bytes and
+15,667,336 during preset color motion. The largest tested active scene at 200% uses 18,085,440 versus
+15,328,080 former bytes. Active layer count peaks at 83; the ordinary 100% scene uses 38. Values include
+the full scene backdrop and measure nominal surfaces, not actual driver allocation. Source-only
+waiting performs zero application render/raster/property submissions; unchanged intent and same-source
+reversal reuse pixels and the visual tree. Cleanup removes finite bindings and hide retires sources.
+The shared command grows from 1032 to 1040 bytes; group stays 2248 and fixed buffer grows by 3968 to
+1,022,040 bytes. Shared UI textbox state is 176 bytes.
+
+Debug/Release real Settings scheduler probes report zero requests across 100 active checks and one
+220ms endpoint wait; hidden/minimized, final cleanup, repeated cleanup and unsupported-renderer
+endpoint behavior pass. Both product builds/all forty test groups pass after the physical-alignment
+fix. No tracked UI tests were added. Five full native runs per backend plus HWND fallback pass
+in each configuration (`probe-power-selection-full-{debug,release}.log`, zero failures). Final
+architecture, formatting, whitespace and obsolete Power-API searches pass. No Reach restart, deployment, reinstall, shell/task
+repair or OS power action was performed; live editing/focus/DPI acceptance and total product CPU/GPU,
+power, latency and memory cost remain open in review R9 and the broader acceptance gates.

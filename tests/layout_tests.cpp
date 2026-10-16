@@ -971,7 +971,7 @@ static void test_textbox_caret_reference_ownership(void)
     textbox.rect = {10, 10, 100, 30};
     reach_motion opacity = {};
     reach_motion_repeat_at(&opacity, 1, 0, 0, 0.55, 0.45, REACH_EASING_EASE_IN_OUT, 10);
-    expect_true(reach_render_push_textbox(&buffer, &textbox, 100, &opacity) == REACH_OK &&
+    expect_true(reach_render_push_textbox(&buffer, &textbox, 100, &opacity, nullptr) == REACH_OK &&
                     buffer.current_group_id == 0 &&
                     reach_render_command_buffer_validate_groups(&buffer) == REACH_OK,
                 "textbox part references one retained opacity owner without opening a paint group");
@@ -997,6 +997,37 @@ static void test_textbox_caret_reference_ownership(void)
     expect_true(reach_render_command_buffer_push(&buffer, &sibling) == REACH_OK &&
                     reach_render_command_buffer_validate_groups(&buffer) == REACH_INVALID_ARGUMENT,
                 "a caret body stays a single source so splitting preserves painter order");
+    reach_render_command_buffer_clear(&buffer);
+    reach_render_group color = {};
+    color.id = 300;
+    color.bounds = textbox.rect;
+    color.has_tint = 1;
+    for (size_t channel = 0; channel < 4; ++channel)
+        reach_motion_set(&color.tint[channel], 1);
+    expect_true(reach_render_push_textbox(&buffer, &textbox, 100, &opacity, &color) == REACH_OK &&
+                    reach_render_command_buffer_validate_groups(&buffer) == REACH_OK &&
+                    buffer.commands[0].text_color_group_id == color.id,
+                "textbox ink and caret retain independent exclusive property owners");
+    buffer.commands[0].text_color_group_id = 301;
+    expect_true(reach_render_command_buffer_validate_groups(&buffer) == REACH_INVALID_ARGUMENT,
+                "missing textbox ink ownership is rejected");
+    buffer.commands[0].text_color_group_id = 100;
+    expect_true(reach_render_command_buffer_validate_groups(&buffer) == REACH_INVALID_ARGUMENT,
+                "textbox ink cannot alias caret ownership");
+    reach_render_command_buffer_clear(&buffer);
+    color.id = 100;
+    expect_true(reach_render_push_textbox(&buffer, &textbox, 100, &opacity, &color) ==
+                        REACH_INVALID_ARGUMENT &&
+                    buffer.count == 0 && buffer.group_count == 0,
+                "conflicting textbox property ownership fails before append");
+    color.id = 300;
+    reach_render_command_buffer_clear(&buffer);
+    expect_true(reach_render_command_buffer_begin_group(&buffer, &body) == REACH_OK &&
+                    reach_render_push_textbox(&buffer, &textbox, 100, &opacity, &color) ==
+                        REACH_OK &&
+                    buffer.current_group_id == body.id &&
+                    reach_render_command_buffer_validate_groups(&buffer) == REACH_OK,
+                "textbox property ownership preserves an existing placement parent");
 }
 
 static void test_shadow_source_ownership(void)

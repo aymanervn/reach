@@ -299,6 +299,13 @@ reach_result reach_d2d_execute_fallback(reach_render_backend *backend,
     for (size_t index = 0; index < commands->count && outcome == REACH_OK; ++index)
     {
         reach_render_command command = commands->commands[index];
+        if (command.text_color_group_id != 0)
+        {
+            const reach_render_group *color =
+                reach_render_command_buffer_group(commands, command.text_color_group_id);
+            command.text_color = reach_render_group_tint_at(color, now_seconds);
+            command.text_color_group_id = 0;
+        }
         bool overflow_text = command.text_fit_to_clip == REACH_RENDER_TEXT_FIT_VERTICAL_OVERFLOW;
         if (command.text_fit_to_clip)
         {

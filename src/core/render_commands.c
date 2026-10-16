@@ -369,6 +369,13 @@ static int32_t reach_render_fitted_rect_valid(const reach_render_command *comman
            reach_render_rect_equal(source->clip, source->bounds);
 }
 
+static int32_t reach_render_textbox_color_owner_valid(const reach_render_group *group)
+{
+    return group != 0 && group->has_tint && group->parent_id == 0 && !group->has_clip &&
+           !group->has_shadow && !group->x.generation && !group->y.generation &&
+           !group->scale.generation && !group->scale_y.generation && !group->opacity.generation;
+}
+
 reach_result reach_render_command_buffer_validate_groups(const reach_render_command_buffer *buffer)
 {
     size_t index, other, active_count = 0;
@@ -446,6 +453,24 @@ reach_result reach_render_command_buffer_validate_groups(const reach_render_comm
                              command->type != REACH_RENDER_COMMAND_NOTCHED_ROUNDED_RECT &&
                              command->type != REACH_RENDER_COMMAND_CLIPPED_ROUNDED_RECT)))
             return REACH_INVALID_ARGUMENT;
+        if (command->text_color_group_id != 0)
+        {
+            const reach_render_group *color =
+                reach_render_command_buffer_group(buffer, command->text_color_group_id);
+            const reach_render_group *body =
+                reach_render_command_buffer_group(buffer, command->group_id);
+            if (command->type != REACH_RENDER_COMMAND_TEXTBOX ||
+                !reach_render_textbox_color_owner_valid(color) ||
+                command->caret_group_id == color->id || (body != 0 && body->has_tint))
+                return REACH_INVALID_ARGUMENT;
+            for (other = 0; other < buffer->count; ++other)
+                if (buffer->commands[other].group_id == color->id ||
+                    buffer->commands[other].caret_group_id == color->id ||
+                    (other != index && (buffer->commands[other].text_color_group_id == color->id ||
+                                        (command->group_id != 0 &&
+                                         buffer->commands[other].group_id == command->group_id))))
+                    return REACH_INVALID_ARGUMENT;
+        }
         if (command->caret_group_id == 0)
             continue;
         const reach_render_group *caret =
@@ -876,28 +901,55 @@ reach_result reach_render_command_buffer_push(reach_render_command_buffer *buffe
 
 reach_result reach_render_push_textbox(reach_render_command_buffer *buffer,
                                        const reach_render_command *command, uint64_t caret_id,
-                                       const reach_motion *caret_opacity)
+                                       const reach_motion *caret_opacity,
+                                       const reach_render_group *text_color)
 {
-    if (buffer == 0 || command == 0 || command->type != REACH_RENDER_COMMAND_TEXTBOX)
+    if (buffer == 0 || command == 0 || command->type != REACH_RENDER_COMMAND_TEXTBOX ||
+        command->caret_group_id != 0 || command->text_color_group_id != 0)
         return REACH_INVALID_ARGUMENT;
-    if (caret_opacity == 0 || caret_id == 0)
-        return reach_render_command_buffer_push(buffer, command);
-    if (buffer->count >= REACH_MAX_RENDER_COMMANDS)
+    int32_t has_caret = caret_id != 0 && caret_opacity != 0;
+    if (text_color != 0 && (!reach_render_textbox_color_owner_valid(text_color) ||
+                            (has_caret && caret_id == text_color->id)))
+        return REACH_INVALID_ARGUMENT;
+    if (buffer->count >= REACH_MAX_RENDER_COMMANDS ||
+        buffer->group_count + (size_t)has_caret + (text_color != 0) > REACH_MAX_RENDER_GROUPS)
         return REACH_ERROR;
     reach_render_group caret = {0};
     caret.id = caret_id;
     caret.bounds = command->rect;
-    caret.opacity = *caret_opacity;
+    if (has_caret)
+        caret.opacity = *caret_opacity;
     uint64_t parent = buffer->current_group_id;
     buffer->current_group_id = 0;
-    reach_result result = reach_render_command_buffer_begin_group(buffer, &caret);
+    int32_t valid =
+        (!has_caret || reach_render_command_buffer_check_group(buffer, &caret) == REACH_OK) &&
+        (text_color == 0 ||
+         reach_render_command_buffer_check_group(buffer, text_color) == REACH_OK);
     buffer->current_group_id = parent;
-    if (result != REACH_OK)
-        return result;
+    if (!valid)
+        return REACH_INVALID_ARGUMENT;
+    size_t first_group = buffer->group_count;
+    buffer->current_group_id = 0;
+    reach_result result = REACH_OK;
+    if (text_color != 0)
+        result = reach_render_command_buffer_begin_group(buffer, text_color);
+    reach_render_command_buffer_end_group(buffer);
+    if (result == REACH_OK && has_caret)
+        result = reach_render_command_buffer_begin_group(buffer, &caret);
+    buffer->current_group_id = parent;
     reach_render_command textbox = *command;
-    textbox.caret_group_id = caret_id;
-    textbox.caret_visible = 1;
-    return reach_render_command_buffer_push(buffer, &textbox);
+    if (has_caret)
+    {
+        textbox.caret_group_id = caret_id;
+        textbox.caret_visible = 1;
+    }
+    if (text_color != 0)
+        textbox.text_color_group_id = text_color->id;
+    if (result == REACH_OK)
+        result = reach_render_command_buffer_push(buffer, &textbox);
+    if (result != REACH_OK)
+        buffer->group_count = first_group;
+    return result;
 }
 
 reach_result reach_render_push_width_text(reach_render_command_buffer *buffer,
@@ -1016,7 +1068,7 @@ reach_result reach_render_push_image_motion(reach_render_command_buffer *buffer,
         image->type != REACH_RENDER_COMMAND_ICON || image->icon_id == 0 || image->radius != 0 ||
         image->icon_fade_start != 0 || image->has_clip_rect || image->has_scissor ||
         image->rect_fit_to_clip || image->text_fit_to_clip || image->stroke_width != 0 ||
-        image->caret_group_id != 0 ||
+        image->caret_group_id != 0 || image->text_color_group_id != 0 ||
         (image->corner_mask != 0 && image->corner_mask != REACH_RENDER_CORNER_ALL))
         return REACH_INVALID_ARGUMENT;
     if (bounds == 0)
