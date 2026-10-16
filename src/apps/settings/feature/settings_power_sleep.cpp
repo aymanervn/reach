@@ -162,7 +162,7 @@ void reach_settings_model_set_power_minutes(reach_settings_model *model, size_t 
     }
     model->power_selected[timer] = selected;
     model->power_previous[timer] = selected;
-    reach_animation_manager_set(&model->power_animations, timer, 1.0f);
+    reach_motion_set(&model->power_selection[timer], 1);
 }
 
 int32_t reach_settings_model_power_minutes(const reach_settings_model *model, size_t timer)
@@ -201,29 +201,34 @@ void reach_settings_model_select_power_option(reach_settings_model *model, size_
     {
         model->power_minutes[timer] = reach_settings_power_presets[timer][option];
     }
-    reach_animation_manager_start(&model->power_animations, timer, 0.0f, 1.0f, 0.22,
-                                  REACH_EASING_EASE_OUT);
+    reach_motion_start(&model->power_selection[timer], 0.0f, 1.0f, 0.22, REACH_EASING_EASE_OUT);
 }
 
-int32_t reach_settings_model_sample_power_animations_at(reach_settings_model *model,
-                                                        double now_seconds)
+int32_t reach_settings_model_finish_visual_motion_at(reach_settings_model *model,
+                                                     double now_seconds)
 {
     if (model == nullptr)
-    {
         return 0;
-    }
-    int32_t active = 0;
-    if (reach_animation_manager_any_active(&model->power_animations))
-    {
-        reach_animation_manager_sample_at(&model->power_animations, now_seconds);
-        active = 1;
-    }
-    return active;
+    int32_t changed = 0;
+    for (auto &selection : model->power_selection)
+        if (selection.duration_seconds > 0 && now_seconds >= reach_motion_deadline(&selection))
+        {
+            reach_motion_set(&selection, selection.to);
+            changed = 1;
+        }
+    return changed && model->selected_page == REACH_SETTINGS_PAGE_POWER_SLEEP;
 }
 
-int32_t reach_settings_model_power_animations_active(const reach_settings_model *model)
+double reach_settings_model_visual_deadline(const reach_settings_model *model)
 {
-    return model != nullptr && reach_animation_manager_any_active(&model->power_animations);
+    if (model == nullptr || model->selected_page != REACH_SETTINGS_PAGE_POWER_SLEEP)
+        return 0;
+    double deadline = 0;
+    for (const auto &selection : model->power_selection)
+        if (selection.duration_seconds > 0 &&
+            (deadline <= 0 || reach_motion_deadline(&selection) < deadline))
+            deadline = reach_motion_deadline(&selection);
+    return deadline;
 }
 
 void reach_settings_model_power_focus_custom(reach_settings_model *model, size_t timer,
@@ -287,8 +292,7 @@ static void reach_settings_power_apply_edit_minutes(reach_settings_model *model)
     {
         model->power_previous[timer] = model->power_selected[timer];
         model->power_selected[timer] = REACH_SETTINGS_POWER_CUSTOM_OPTION;
-        reach_animation_manager_start(&model->power_animations, timer, 0.0f, 1.0f, 0.22,
-                                      REACH_EASING_EASE_OUT);
+        reach_motion_start(&model->power_selection[timer], 0.0f, 1.0f, 0.22, REACH_EASING_EASE_OUT);
     }
 }
 

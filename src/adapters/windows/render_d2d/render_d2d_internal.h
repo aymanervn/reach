@@ -121,6 +121,13 @@ struct reach_d2d_sampled_text
     reach_motion width;
 };
 
+struct reach_d2d_sampled_textbox
+{
+    uint64_t owner;
+    reach_render_command command;
+    reach_render_group color;
+};
+
 struct reach_d2d_sampled_image
 {
     uint64_t owner;
@@ -215,6 +222,7 @@ struct reach_render_backend
     uint64_t reported_retained_bytes = 0;
     bool requires_content_sampling = false;
     std::vector<reach_d2d_sampled_text> sampled_text;
+    std::vector<reach_d2d_sampled_textbox> sampled_textboxes;
     std::vector<reach_d2d_sampled_image> sampled_images;
     std::vector<reach_d2d_fit_owner> image_fit_owners;
     uint64_t next_image_fit_prefix = UINT64_C(0xd000000000010000);

@@ -67,6 +67,9 @@ extern "C"
         int32_t selection_start;
         int32_t selection_end;
         reach_color text_color;
+        const reach_motion *text_color_motion;
+        reach_color text_color_to;
+        uint64_t text_color_id;
         reach_color placeholder_color;
         reach_color selection_color;
         reach_color suffix_color;
@@ -85,6 +88,15 @@ extern "C"
                                         reach_rect_f32 bounds, const uint16_t *label,
                                         const reach_ui_selection_item_style *style,
                                         float selection);
+
+    reach_result reach_ui_selection_item_motion_backdrop_render(
+        reach_render_command_buffer *commands, reach_rect_f32 bounds,
+        const reach_ui_selection_item_style *style, const reach_color *background_from, uint64_t id,
+        const reach_motion *selection);
+    reach_result reach_ui_selection_item_motion_render(reach_render_command_buffer *commands,
+                                                       reach_rect_f32 bounds, const uint16_t *label,
+                                                       const reach_ui_selection_item_style *style,
+                                                       uint64_t id, const reach_motion *selection);
 
     reach_rect_f32 reach_ui_segmented_control_item_bounds(reach_rect_f32 bounds, size_t item_count,
                                                           size_t index);

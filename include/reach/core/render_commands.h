@@ -211,6 +211,7 @@ extern "C"
         reach_color placeholder_color;
         reach_color selection_color;
         uint64_t caret_group_id;
+        uint64_t text_color_group_id;
         int32_t caret_index;
         int32_t caret_visible;
         int32_t selection_start;
@@ -238,7 +239,8 @@ extern "C"
 
     reach_result reach_render_push_textbox(reach_render_command_buffer *buffer,
                                            const reach_render_command *command, uint64_t caret_id,
-                                           const reach_motion *caret_opacity);
+                                           const reach_motion *caret_opacity,
+                                           const reach_render_group *text_color);
     reach_result reach_render_push_width_text(reach_render_command_buffer *buffer,
                                               const reach_render_command *command,
                                               const reach_render_group *viewport);

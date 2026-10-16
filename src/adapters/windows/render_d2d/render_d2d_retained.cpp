@@ -1484,11 +1484,35 @@ static reach_result reach_d2d_sampled_text_command(reach_render_backend *backend
     return REACH_OK;
 }
 
+static bool reach_d2d_textbox_color_active(const reach_render_group &color, double now_seconds)
+{
+    for (const auto &channel : color.tint)
+        if (reach_motion_active_at(&channel, now_seconds))
+            return true;
+    return reach_motion_active_at(&color.tint_rgb_mix, now_seconds) != 0;
+}
+
+static reach_render_command
+reach_d2d_sampled_textbox_command(const reach_d2d_sampled_textbox &source, double now_seconds)
+{
+    auto command = source.command;
+    command.text_color_group_id = 0;
+    command.text_color = reach_render_group_tint_at(&source.color, now_seconds);
+    if (command.caret_group_id != 0)
+    {
+        command.caret_group_id = 0;
+        command.caret_visible = 0;
+        command.caret_index = 0;
+    }
+    return command;
+}
+
 reach_result reach_d2d_sample_content(reach_render_backend *backend)
 {
     if (backend == nullptr || !reach_d2d_retained_supported(backend))
         return REACH_INVALID_ARGUMENT;
-    if (backend->sampled_text.empty() && backend->sampled_images.empty())
+    if (backend->sampled_text.empty() && backend->sampled_images.empty() &&
+        backend->sampled_textboxes.empty())
     {
         backend->requires_content_sampling = false;
         return REACH_OK;
@@ -1515,6 +1539,25 @@ reach_result reach_d2d_sample_content(reach_render_backend *backend)
                 return REACH_ERROR;
         }
         active = active || reach_motion_active_at(&source.width, motion_sample_time(backend));
+    }
+    for (const auto &source : backend->sampled_textboxes)
+    {
+        auto layer = std::find_if(backend->retained_layers.begin(), backend->retained_layers.end(),
+                                  [&](const reach_d2d_retained_layer &value)
+                                  { return value.id == source.owner; });
+        if (layer == backend->retained_layers.end())
+            return REACH_ERROR;
+        auto command = reach_d2d_sampled_textbox_command(source, motion_sample_time(backend));
+        localize(command, layer->group.bounds);
+        if (layer->commands.size() != 1 ||
+            memcmp(&layer->commands[0], &command, sizeof(command)) != 0)
+        {
+            std::vector<reach_render_command> commands = {command};
+            if (FAILED(draw_layer(backend, *layer, commands, layer->width, layer->height)))
+                return REACH_ERROR;
+        }
+        active =
+            active || reach_d2d_textbox_color_active(source.color, motion_sample_time(backend));
     }
     for (const auto &source : backend->sampled_images)
     {
@@ -1543,6 +1586,7 @@ reach_result reach_d2d_sample_content(reach_render_backend *backend)
         if (!active)
         {
             backend->sampled_text.clear();
+            backend->sampled_textboxes.clear();
             backend->sampled_images.clear();
         }
     }
@@ -1553,6 +1597,7 @@ void reach_d2d_clear_retained_layers(reach_render_backend *backend)
 {
     backend->requires_content_sampling = false;
     backend->sampled_text.clear();
+    backend->sampled_textboxes.clear();
     backend->sampled_images.clear();
     backend->text_width_owners.clear();
     backend->image_fit_owners.clear();
@@ -1785,6 +1830,7 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
     motion_sample_scope sample(backend);
     backend->requires_content_sampling = false;
     backend->sampled_text.clear();
+    backend->sampled_textboxes.clear();
     backend->sampled_images.clear();
     if (reach_render_command_buffer_validate_groups(commands) != REACH_OK)
         return REACH_INVALID_ARGUMENT;
@@ -1876,6 +1922,14 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
         bool expanded;
     };
     std::vector<text_fit> fitted_text;
+    struct textbox_fit
+    {
+        reach_d2d_sampled_textbox source;
+        uint64_t ink_owner;
+        bool body_painted;
+        bool expanded;
+    };
+    std::vector<textbox_fit> fitted_textboxes;
     struct image_fit
     {
         reach_d2d_sampled_image source;
@@ -1947,7 +2001,7 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
     };
     auto limit_fit_sources = [&]() -> reach_result
     {
-        if (fitted_text.empty() && fitted_images.empty())
+        if (fitted_text.empty() && fitted_images.empty() && fitted_textboxes.empty())
             return REACH_OK;
         while (planned_bytes() > REACH_D2D_MAX_SURFACE_BYTES ||
                plans.size() > REACH_MAX_RENDER_GROUPS * 2 + 1)
@@ -1967,6 +2021,40 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
                     largest_bytes = fit_bytes(at->prefix);
                     image = at;
                 }
+            auto textbox = fitted_textboxes.end();
+            for (auto at = fitted_textboxes.begin(); at != fitted_textboxes.end(); ++at)
+                if (at->expanded && at->body_painted)
+                {
+                    auto ink = plan_for(at->ink_owner);
+                    if (ink == plans.end())
+                        return REACH_ERROR;
+                    double bytes =
+                        (double)ceilf(ink->group.bounds.width) * ceilf(ink->group.bounds.height);
+                    if (bytes > largest_bytes)
+                    {
+                        largest_bytes = bytes;
+                        textbox = at;
+                    }
+                }
+            if (textbox != fitted_textboxes.end())
+            {
+                plans.erase(std::remove_if(plans.begin(), plans.end(),
+                                           [&](const retained_plan &plan)
+                                           { return plan.group.id == textbox->ink_owner; }),
+                            plans.end());
+                auto base = plan_for(textbox->source.owner);
+                base->owned.assign(1, reach_d2d_sampled_textbox_command(
+                                          textbox->source, motion_sample_time(backend)));
+                base->commands = base->owned.data();
+                base->count = 1;
+                preserve_raster_bounds(*base);
+                textbox->expanded = false;
+                backend->requires_content_sampling =
+                    backend->requires_content_sampling ||
+                    reach_d2d_textbox_color_active(textbox->source.color,
+                                                   motion_sample_time(backend));
+                continue;
+            }
             if (text == fitted_text.end() && image == fitted_images.end())
                 break;
             uint64_t prefix = image != fitted_images.end() ? image->prefix : text->prefix;
@@ -2264,18 +2352,57 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
                 return REACH_ERROR;
             fitted_text.push_back(std::move(fit));
         }
-        if (first.caret_group_id != 0 && group.bounds.width > 0 && group.bounds.height > 0)
+        if ((first.caret_group_id != 0 || first.text_color_group_id != 0) &&
+            group.bounds.width > 0 && group.bounds.height > 0)
         {
             auto base = plan_for(group.id);
             base->owned.assign(1, first);
             base->owned[0].caret_visible = 0;
             base->owned[0].caret_index = 0;
             base->owned[0].caret_group_id = 0;
-            base->commands = base->owned.data();
-            base->count = 1;
+            base->owned[0].text_color_group_id = 0;
+            const reach_render_group *text_color =
+                reach_render_command_buffer_group(commands, first.text_color_group_id);
+            std::vector<retained_plan> text_parts;
+            if (text_color != nullptr)
+            {
+                base->owned[0].text_color = {};
+                bool placeholder = first.text[0] == 0 && first.placeholder[0] != 0 &&
+                                   first.placeholder_color.a > 0;
+                bool selection = first.text[0] != 0 && first.selection_color.a > 0 &&
+                                 first.selection_start != first.selection_end;
+                if (first.color.a <= 0 && !placeholder && !selection)
+                {
+                    base->owned.clear();
+                    base->commands = nullptr;
+                    base->count = 0;
+                }
+                retained_plan ink = {};
+                ink.group = *text_color;
+                ink.group.parent_id = group.id;
+                ink.group.bounds = group.bounds;
+                ink.owned.assign(1, first);
+                ink.owned[0].color = {};
+                ink.owned[0].text_color = {1, 1, 1, 1};
+                ink.owned[0].placeholder_color = {};
+                ink.owned[0].selection_color = {};
+                ink.owned[0].caret_group_id = 0;
+                ink.owned[0].text_color_group_id = 0;
+                if (first.caret_group_id != 0)
+                    ink.owned[0].caret_visible = 0;
+                ink.commands = ink.owned.data();
+                ink.count = 1;
+                if (first.text[0] != 0 || (first.caret_group_id == 0 && first.caret_visible != 0))
+                    text_parts.push_back(std::move(ink));
+            }
+            base->commands = base->owned.empty() ? nullptr : base->owned.data();
+            base->count = base->owned.size();
             reach_render_command line = {};
-            if (reach_d2d_textbox_caret_line(backend, &first, &line) != REACH_OK)
+            if (first.caret_group_id != 0 &&
+                reach_d2d_textbox_caret_line(backend, &first, &line) != REACH_OK)
                 return REACH_ERROR;
+            if (text_color != nullptr)
+                line.color = {1, 1, 1, 1};
             if (line.type != REACH_RENDER_COMMAND_NONE && line.rect.height > 0 && line.color.a > 0)
             {
                 line.has_scissor = first.has_scissor;
@@ -2294,6 +2421,15 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
                     retained_plan caret = {};
                     caret.group =
                         *reach_render_command_buffer_group(commands, first.caret_group_id);
+                    if (text_color != nullptr)
+                    {
+                        caret.group.has_tint = 1;
+                        for (size_t channel = 0; channel < 4; ++channel)
+                            caret.group.tint[channel] = text_color->tint[channel];
+                        caret.group.tint_rgb_target = text_color->tint_rgb_target;
+                        caret.group.tint_rgb_mix = text_color->tint_rgb_mix;
+                        line.color = {1, 1, 1, 1};
+                    }
                     caret.group.parent_id = group.id;
                     caret.group.bounds = ink;
                     caret.group.has_clip = 1;
@@ -2301,14 +2437,24 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
                     caret.owned.push_back(line);
                     caret.commands = caret.owned.data();
                     caret.count = 1;
-                    plans.push_back(std::move(caret));
+                    text_parts.push_back(std::move(caret));
                 }
             }
+            if (text_color != nullptr &&
+                (first.text[0] != 0 || (first.caret_group_id == 0 && first.caret_visible != 0)))
+                fitted_textboxes.push_back(
+                    {{group.id, first, *text_color}, text_color->id, base->count != 0, true});
+            for (auto &part : text_parts)
+                plans.push_back(std::move(part));
         }
         index = end;
         if (limit_fit_sources() != REACH_OK)
             return REACH_ERROR;
     }
+    for (const auto &fit : fitted_textboxes)
+        if (!fit.expanded &&
+            reach_d2d_textbox_color_active(fit.source.color, motion_sample_time(backend)))
+            backend->sampled_textboxes.push_back(fit.source);
     for (const auto &fit : fitted_text)
         if (!fit.expanded && reach_motion_active_at(&fit.width, motion_sample_time(backend)))
             backend->sampled_text.push_back({fit.owner, fit.command, fit.width});

@@ -3027,7 +3027,7 @@ reach_result reach_settings_app_update(reach_settings_app *app, double delta_sec
     {
         app->dirty = 1;
     }
-    if (reach_settings_model_sample_power_animations_at(&app->model, animation_now))
+    if (reach_settings_model_finish_visual_motion_at(&app->model, animation_now))
     {
         app->dirty = 1;
     }
@@ -3117,7 +3117,9 @@ int32_t reach_settings_app_needs_frame(const reach_settings_app *app)
     int32_t sampled_visual =
         visible && (app->motion_fallback_active || reach_render_backend_content_sampling_active(
                                                        &app->renderer, &app->render_commands));
-    return (caret_deadline > 0.0 && reach_motion_wait_ms(caret_deadline) == 0) || sampled_visual ||
+    double visual_deadline = visible ? reach_settings_model_visual_deadline(&app->model) : 0;
+    return (visual_deadline > 0 && reach_motion_wait_ms(visual_deadline) == 0) ||
+           (caret_deadline > 0.0 && reach_motion_wait_ms(caret_deadline) == 0) || sampled_visual ||
            app->dirty || reach_busy || startup_busy || worker->completed ||
            app->update_worker.progress_state.load() != 0 ||
            app->model.update_scrollbar.offset != app->model.update_scrollbar.target ||
@@ -3125,7 +3127,6 @@ int32_t reach_settings_app_needs_frame(const reach_settings_app *app)
            app->model.installed_apps_scrollbar.offset !=
                app->model.installed_apps_scrollbar.target ||
            app->model.display_scrollbar.offset != app->model.display_scrollbar.target ||
-           reach_settings_model_power_animations_active(&app->model) ||
            app->async_notify.load() != 0 || app->system_controls_change_flags.load() != 0 ||
            app->model.wifi_scrollbar.offset != app->model.wifi_scrollbar.target ||
            app->model.bluetooth_scrollbar.offset != app->model.bluetooth_scrollbar.target ||
@@ -3174,6 +3175,15 @@ uint32_t reach_settings_app_idle_wait_ms(const reach_settings_app *app)
         uint32_t caret_wait = reach_motion_wait_ms(caret_deadline);
         if (caret_wait < wait_ms)
             wait_ms = caret_wait;
+    }
+    int32_t visible = app->window.ops.is_minimized == nullptr ||
+                      !app->window.ops.is_minimized(app->window.window);
+    double visual_deadline = visible ? reach_settings_model_visual_deadline(&app->model) : 0;
+    if (visual_deadline > 0)
+    {
+        uint32_t visual_wait = reach_motion_wait_ms(visual_deadline);
+        if (visual_wait < wait_ms)
+            wait_ms = visual_wait;
     }
     return wait_ms;
 }

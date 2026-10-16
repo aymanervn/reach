@@ -90,8 +90,8 @@ migrated, rather than only changing the track representation.
 | `bluetooth_row_tracks[]` | `settings_bluetooth.cpp`, Bluetooth layout/render | Expand/collapse | Migrate: same section capability. |
 | `bluetooth_radio_toggle` | `settings_bluetooth.cpp`, shared retained toggle | Radio target changes | Implemented: same retained primitive; scalar radio track, sampled commands and frame demand removed. Final product acceptance pending. |
 | `startup_toggles[]` | `settings_startup_apps.cpp`, shared retained toggle | Enable/disable target changes | Implemented: list refresh resets intent, entry changes retarget the live curve; scalar manager/tick/frame APIs removed. Full-capacity page command ownership verified. Final product acceptance pending. |
-| `power_tracks[]` | `settings_power_sleep.cpp`, `settings_render.cpp` | Option selection/custom timer entry; 220ms ease-out color crossfade | Migrate: independent option border/background/label and custom-field text colors. Source inspection confirms no row sizing/reveal in this track; custom textbox placeholder, suffix, selection and caret retain independent paint. |
-| `power_wait_toggles[]` | `settings_power_sleep.cpp`, shared retained toggle and label tint | Wait option target changes | Implemented: track, knob and label alpha share canonical intent; scalar wait tracks and frame demand removed. Picker/edit reveal remains separate. Final product acceptance pending. |
+| `power_selection[]` | `settings_power_sleep.cpp`, shared retained selection-item/textbox ink | Option selection/custom timer entry; canonical 220ms ease-out color crossfade and visible endpoint cleanup | Implemented: independent border/background/label and custom-field ink; placeholder, suffix, selection and caret remain independent. Scalar Power manager, sampled updates and periodic frame predicate removed. Review needed: intermediate glyph contrast, live editing/focus and total source/driver cost (R9). This track owns no row sizing/reveal. |
+| `power_wait_toggles[]` | `settings_power_sleep.cpp`, shared retained toggle and label tint | Wait option target changes | Implemented: track, knob and label alpha share canonical intent; scalar wait tracks and frame demand removed. Independent option/custom-field colors use the shared retained selection and textbox-ink paths. Final product acceptance pending. |
 | `display_fps_toggle` | `settings_monitors_scaling.cpp`, shared retained toggle | Refresh preference changes | Implemented: retained track/knob; scalar track and frame demand removed, refresh policy unchanged. Final product acceptance pending. |
 | `display_font_toggle` | `settings_monitors_scaling.cpp`, shared retained toggle | Font preference changes | Implemented: retained track/knob; scalar track and frame demand removed, actual font changes still invalidate content. Final product acceptance pending. |
 | Reach theme selection | Canonical `display_theme_selection`; shared retained segmented control | Theme selection | Implemented: cached pill translation and affine label tint; scalar manager/sample/frame demand removed without changing theme policy. Both builds/tests, scoped native/fallback pixels and full native suites pass; displayed pixels and total acceptance pending. |
@@ -179,7 +179,8 @@ These do not become GPU algorithms, but their scheduling must not hide redundant
 Finite scalar tracks now share `reach_motion` timing, easing and generation with retained effects.
 The delta tick and unused scalar crossing API are removed across every production caller. Retargeting
 uses input time rather than the last rendered value; one sample retires pending endpoint activity.
-Settings samples its five remaining scalar families at one update timestamp. Manager intent can be
+Settings samples its two remaining scalar families (Wi-Fi/Bluetooth row expansion) at one update
+timestamp; Power selection uses canonical retained color intent and an endpoint cleanup deadline. Manager intent can be
 published unchanged to retained groups. Existing scalar consumers still need their visual/frame
 migration, and direct loader/scroll/native choreography timing remains separately pending.
 

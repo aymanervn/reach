@@ -455,6 +455,17 @@ The two scalar managers, sampling functions and application frame predicates are
 Windows system/application theme choices reuse the same primitive with constant intent. Shared
 Settings control ids preserve the four-subsource allocation used by toggles and selectors.
 
+Settings Power option colors own five canonical 220ms ease-out descriptors and one earliest visible
+cleanup deadline. Selection retains its previous reset-on-selection policy. Shared selection-item
+rendering retains opaque outer/inner coverage and separately tinted label ink. Custom backgrounds
+reuse bounded canonical piecewise mapping for the existing nested color mixes; custom textbox ink
+uses the same selection descriptor without tinting suffixes, placeholders or highlights. Label
+source envelopes preserve unclipped overflow and physical pixel alignment. Endpoint cleanup folds
+constant sources back into ordinary paint; hidden pages and minimized windows publish no Power
+cleanup wake. The scalar Power manager, sampled values and periodic frame predicate are removed.
+Unsupported paint geometry/capacity falls back to sampling the same canonical descriptor only while
+active. Product appearance and total-cost acceptance remain in the migration review register.
+
 Finite and periodic properties share `reach_motion`. Periodic intent adds forward/backward travel
 with independent endpoint holds and an absolute epoch. CPU sampling, affine mapping and bounded
 compilation preserve phase; the compiler rotates one complete cycle to the submission time.
@@ -518,7 +529,14 @@ references a dedicated opacity descriptor; the adapter resolves a small stroke s
 same cached DWrite layout and parents it to the editor, preserving its raster limits and ancestor
 transforms/clips. Caret boundaries change native opacity without application frames or repaint.
 The body is an ungrouped editor or a single-command, tint-free group; the referenced caret owner
-cannot paint other content. Validation rejects ambiguous ownership before renderer dereference.
+cannot paint other content. An optional `text_color_group_id` references an exclusively owned,
+root metadata descriptor for textbox ink color. The adapter separates backdrop/selection/placeholder,
+glyph coverage and caret; only glyph/caret parts receive the color, while caret opacity remains
+independent. Unpainted editor parts allocate no source. The CPU fallback samples the same RGBA
+intent. If duplicate painted textbox parts exceed the shared source budget, renderer-owned sampling
+repaints only the necessary editor source until its canonical endpoint, preserving the native caret.
+Helpers preflight property ownership before append; validation rejects aliases, painted metadata
+and ambiguous bodies before renderer dereference.
 Explicit groups otherwise retain feature-declared ownership. Surfaces
 are bounded to 128 MiB per renderer and 16,384 pixels per dimension. Retired groups are removed
 before replacements are allocated. Processed cover artwork uses a 24-entry, 16 MiB cache, while

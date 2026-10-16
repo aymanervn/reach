@@ -110,7 +110,8 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
         reach_copy_utf16(command.text, 260, model->query);
         reach_copy_utf16(command.placeholder, 128, (const uint16_t *)L"Search for anything");
         result = reach_render_push_textbox(out_commands, &command, UINT64_C(0x2900000000030000),
-                                           input->caret_retained ? &input->caret_opacity : nullptr);
+                                           input->caret_retained ? &input->caret_opacity : nullptr,
+                                           nullptr);
         if (result != REACH_OK)
             return result;
     }
