@@ -295,8 +295,7 @@ crop clocks that cannot combine exactly, tinted image sources, excessive source 
 aggregate source budgets fall back to active-only renderer sampling. Shape-shadow ancestry and
 destination-dependent fades reject before append; the image helper retains an inherited stationary
 scissor. Image and text expansion share the existing 128MiB/449-layer resource limits, with source
-ownership retired on hide or removal. This capability does not complete Clipboard sizing, custom
-preview wrapping, virtualization or smooth scrolling. Those consumer paths remain open.
+ownership retired on hide or removal. The Clipboard width consumer now uses this capability. Height and smooth scrolling remain open.
 
 
 Clipboard wrapping prerequisite: ignored `clipboard_wrap_motion_probe.cpp` checks 120,120 source
@@ -304,6 +303,25 @@ comparisons per build in Debug and Release at four DPI values, including plain t
 sample, canonical finite lookup selects the existing character capacity. A maximum of four cached
 variants preserves line membership, literal dots, newline/space handling and clipped vertical
 centering exactly. This validates a bounded frontend recipe for the normal 19dp gutter transition;
-it does not implement producer ownership, input sampling, constraints or lifecycle cleanup. The
-shared width-text helper currently forces DWrite ellipsis; consumer integration must preserve the
-Clipboard per-line flag and explicitly retain ellipsis at the existing Dock/Switcher call sites.
+the consumer implementation below completes producer ownership, input sampling, constraints and
+lifecycle cleanup. Width-text now preserves the Clipboard per-line flag, and the existing Dock/
+Switcher call sites explicitly retain their DWrite ellipsis policy.
+
+
+## Clipboard width consumer
+
+One canonical 160ms ease-out replaces the item-width scalar track. The endpoint layout owns item
+and scrollbar geometry; event-time input copies sample the current width without changing source
+layout. Normal 19dp gutter motion publishes retained rounded bordered fragments, independent hover
+color/opacity, close-control X, fitted bitmap crop, text X/width/capacity and scrollbar X. Existing
+visible-intersection border policy remains intact. Full-width source envelopes and item-keyed IDs
+allow exact-time reversal without rerasterizing surviving sources. Monitor width, DPI, border,
+nonpositive initialization and hidden relayout cut width; one deadline removes expanded sources.
+No normal width-only capsule frame or relayout advances time.
+
+Custom preview variants retain newline/space policy, literal dots and vertical centering. Native
+text sources include DWrite vertical glyph overhang without replacing that policy. The existing
+CPU/native horizontal-ink difference is preserved and recorded in repo analysis. Extremely narrow
+geometry can squash a horizontally clipped SVG close glyph; it uses the existing generic content-
+sampling flag only while the canonical width is active. There is no separate fallback timeline.
+Height, smooth scroll, live interaction and complete product efficiency remain separate gates.

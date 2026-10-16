@@ -3,6 +3,7 @@
 #include "reach/support/util.h"
 
 #include <math.h>
+#include <initializer_list>
 
 static void reach_ui_push_rect(reach_render_command_buffer *commands, reach_rect_f32 rect,
                                float radius, reach_color color)
@@ -302,6 +303,51 @@ reach_result reach_ui_bordered_color_feedback_render(reach_render_command_buffer
         commands->current_group_id = parent_id;
         if (result != REACH_OK)
             return result;
+    }
+    return REACH_OK;
+}
+
+reach_result reach_ui_bordered_motion_color_feedback_render(
+    reach_render_command_buffer *commands, uint64_t first_id, const reach_rect_motion *bounds,
+    float radius, float border, reach_color from, reach_color to, reach_color outline,
+    const reach_motion *progress)
+{
+    if (commands == nullptr || bounds == nullptr || progress == nullptr)
+        return REACH_INVALID_ARGUMENT;
+    bool fixed = true;
+    for (const reach_motion *motion : {&bounds->x, &bounds->y, &bounds->width, &bounds->height})
+    {
+        float minimum = 0, maximum = 0;
+        if (reach_motion_range(motion, &minimum, &maximum) != REACH_OK)
+            return REACH_INVALID_ARGUMENT;
+        fixed = fixed && minimum == maximum;
+    }
+    if (fixed)
+        return reach_ui_bordered_color_feedback_render(commands, first_id,
+                                                       reach_rect_motion_value_at(bounds, 0),
+                                                       radius, border, from, to, outline, progress);
+    uint64_t parent = commands->current_group_id;
+    commands->current_group_id = 0;
+    size_t begin = commands->group_count;
+    reach_result result = reach_ui_motion_background_render(
+        commands, bounds, radius, border, {1, 1, 1, 1}, {1, 1, 1, 1}, nullptr, 1, first_id, parent);
+    commands->current_group_id = parent;
+    if (result != REACH_OK)
+        return result;
+    from.a = to.a = 1;
+    auto hover = reach_motion_clamp(progress, 0, 1);
+    for (size_t index = begin; index < commands->group_count; ++index)
+    {
+        auto &group = commands->groups[index];
+        if (group.id != first_id + 4 && group.id != first_id + 6)
+            continue;
+        reach_ui_color_feedback_apply(&group, from, to, &hover);
+        if (group.id == first_id + 4 && border > 0)
+        {
+            group.tint_rgb_target = outline;
+            auto weight = reach_motion_affine(&hover, outline.a, 0);
+            group.tint_rgb_mix = reach_motion_clamp(&weight, 0, 1);
+        }
     }
     return REACH_OK;
 }

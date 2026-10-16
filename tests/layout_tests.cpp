@@ -1176,8 +1176,8 @@ static void test_width_text_source_ownership(void)
     viewport.clip_insets[REACH_RENDER_CLIP_RIGHT] = reach_motion_affine(&width, -1, 200);
     expect_true(reach_render_push_width_text(buffer.get(), &text, &viewport) == REACH_OK &&
                     reach_render_command_buffer_validate_groups(buffer.get()) == REACH_OK &&
-                    buffer->commands[0].text_fit_to_clip && buffer->commands[0].text_ellipsis,
-                "width text publishes one owned text source with a canonical viewport");
+                    buffer->commands[0].text_fit_to_clip && !buffer->commands[0].text_ellipsis,
+                "width text preserves source trimming with one canonical viewport");
     expect_true(reach_render_push_width_text(buffer.get(), &text, &viewport) ==
                         REACH_INVALID_ARGUMENT &&
                     buffer->count == 1 && buffer->group_count == 1,
@@ -1217,6 +1217,16 @@ static void test_width_text_source_ownership(void)
                         REACH_INVALID_ARGUMENT &&
                     buffer->count == 0 && buffer->group_count == 1,
                 "width text rejects shape-shadow ancestry before appending raster content");
+    reach_render_command_buffer_clear(buffer.get());
+    viewport.parent_id = 0;
+    text.text_fit_to_clip = REACH_RENDER_TEXT_FIT_VERTICAL_OVERFLOW;
+    text.text_ellipsis = 1;
+    expect_true(reach_render_push_width_text(buffer.get(), &text, &viewport) == REACH_OK &&
+                    reach_render_command_buffer_validate_groups(buffer.get()) == REACH_OK &&
+                    buffer->commands[0].text_fit_to_clip ==
+                        REACH_RENDER_TEXT_FIT_VERTICAL_OVERFLOW &&
+                    buffer->commands[0].text_ellipsis,
+                "width text retains explicit ink-overflow and source trimming intent");
 }
 
 static void test_popup_width_background_preflight(void)

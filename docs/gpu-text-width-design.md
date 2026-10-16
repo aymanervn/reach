@@ -194,3 +194,20 @@ submission. The controlled sixteen-card Dock case reaches the existing byte boun
 title source and verifies source-only updates without layout/command/property/tree work. See the
 workload baseline for producer, source-limit and paging evidence; complete live/product acceptance
 remains open.
+
+
+## Clipboard custom preview integration
+
+The shared append preserves the caller's ellipsis flag. Dock and Switcher explicitly retain their
+existing DWrite trimming; Clipboard selects custom wrapped-line sources and literal dots through
+canonical discrete opacity. Its vertical-overflow fit mode keeps glyph ink beyond a shortened
+layout rectangle by querying DWrite overhang metrics. Active atlas rows, fixed sources and sampled
+native sources include that vertical paint extent. Native horizontal clipping stays tied to the
+available width, with a one-pixel left raster margin preserving glyph-edge coverage. CPU fallback
+keeps ordinary DrawTextLayout ink behavior and skips only the metadata viewport, retaining explicit
+ancestor clipping. Ordinary non-fitted text behavior is unchanged.
+
+Clipboard uses a stable full-width source domain for the normal 19dp gutter range, so a retarget
+reuses surviving line sources. Capacity thresholds reproduce the original floating-point division;
+custom splitting, whitespace/newlines, vertical centering and per-line ellipsis remain feature
+policy. The adapter still owns shaping, source planning, clipping and source-only budget fallback.

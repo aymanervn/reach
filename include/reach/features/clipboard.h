@@ -54,6 +54,7 @@ extern "C"
         const reach_clipboard_model *model;
         const reach_clipboard_layout *layout;
         const reach_motion *hover_motions;
+        const reach_motion *item_width;
         const uint64_t *hover_group_ids;
         float dpi_scale;
         int32_t text_alignment_leading;
@@ -69,9 +70,6 @@ extern "C"
                                                           reach_rect_f32 monitor_bounds,
                                                           reach_rect_f32 launcher_bounds,
                                                           float dpi_scale, float border_thickness);
-    reach_clipboard_layout reach_clipboard_compute_layout_animated(
-        reach_clipboard_model *model, reach_rect_f32 monitor_bounds, reach_rect_f32 launcher_bounds,
-        float dpi_scale, float border_thickness, float animated_height, float animated_item_width);
     reach_result reach_clipboard_build_render_commands(const reach_clipboard_render_input *input,
                                                        reach_render_command_buffer *commands);
 

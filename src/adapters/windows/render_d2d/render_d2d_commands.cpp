@@ -299,6 +299,7 @@ reach_result reach_d2d_execute_fallback(reach_render_backend *backend,
     for (size_t index = 0; index < commands->count && outcome == REACH_OK; ++index)
     {
         reach_render_command command = commands->commands[index];
+        bool overflow_text = command.text_fit_to_clip == REACH_RENDER_TEXT_FIT_VERTICAL_OVERFLOW;
         if (command.text_fit_to_clip)
         {
             const reach_render_group *viewport =
@@ -312,7 +313,7 @@ reach_result reach_d2d_execute_fallback(reach_render_backend *backend,
         uint64_t owner_id = shadow ? shadow->id : command.group_id;
         const reach_render_group *group = reach_render_command_buffer_group(commands, owner_id);
         bool fitted_clip = command.rect_fit_to_clip && !shadow;
-        uint64_t clip_owner_id = owner_id;
+        uint64_t clip_owner_id = overflow_text && group != nullptr ? group->parent_id : owner_id;
         if (fitted_clip)
         {
             if (group == nullptr)
