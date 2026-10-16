@@ -151,6 +151,34 @@ reach_result reach_ui_motion_background_render(reach_render_command_buffer *comm
         parent_id = clip.id;
         commands->has_scissor = 0;
     }
+    bool fixed = left == right && top == bottom;
+    float width_minimum = 0, height_minimum = 0, ignored = 0;
+    fixed = fixed && reach_motion_range(&bounds->width, &width_minimum, &ignored) == REACH_OK &&
+            reach_motion_range(&bounds->height, &height_minimum, &ignored) == REACH_OK &&
+            width_minimum == width && height_minimum == height;
+    if (result == REACH_OK && fixed)
+    {
+        reach_render_group background_source = {};
+        background_source.id = first_id;
+        background_source.parent_id = parent_id;
+        background_source.bounds = capture;
+        result = reach_render_command_buffer_begin_group(commands, &background_source);
+        reach_render_command shape = {};
+        shape.type = REACH_RENDER_COMMAND_RECT;
+        shape.rect = reach_rect_motion_value_at(bounds, 0);
+        shape.radius = radius;
+        if (result == REACH_OK)
+            result = reach_render_push_bordered_background(commands, &shape, background, outline,
+                                                           border, shadow, dpi_scale);
+        reach_render_command_buffer_end_group(commands);
+        commands->has_scissor = scissored;
+        if (result != REACH_OK)
+        {
+            commands->group_count = first_group;
+            commands->count = first_command;
+        }
+        return result;
+    }
     reach_render_group source = {};
     source.bounds = {0, 0, ceilf(width), ceilf(height)};
     if (result == REACH_OK && casts)

@@ -170,6 +170,7 @@ extern "C"
     typedef struct reach_render_command
     {
         reach_render_command_type type;
+        int32_t rect_fit_to_clip;
         uint64_t group_id;
         reach_rect_f32 rect;
         reach_rect_f32 clip_rect;

@@ -1368,3 +1368,121 @@ PID 17284 and waiting, then stopping Reach PID 12588 and waiting. Startup uses o
 `BD52E6A121096CD59E8A8C3BAA369A1AF6476A843CB8451D7A25B70CADDA394F`.
 This closes the scoped implementation milestone; displayed live native alignment and aggregate
 CPU/GPU/power/memory/latency acceptance remain open.
+
+
+## Dock width/card/title fitting — 2026-10-15
+
+Dock's Context Menu preview capsule now derives width, survivor reflow, monitor-clamped body/notch,
+proportional card geometry, title widths and close/icon geometry from one canonical layout epoch.
+A stable session envelope replaces width-driven HWND/content layout. Native destination rectangles
+and event-time input/hold snapshots share the same descriptors. Visible-source tokens survive
+reorder; changed source extents retarget, monitor/DPI constraints cut, and close freezes the entire
+layout. One cleanup deadline retires it. The scalar width manager/tick/frame demand and sampled
+render rectangles are removed; ordinary menus keep their existing path.
+
+The full producer exposed three appearance issues before acceptance. Settled fitted text and vector
+sources now preserve physical raster origin under fixed unit-scale ancestors; moving unchanged
+sources can retain that origin and realign at a legitimate endpoint submission. Static childless
+solid clipped fills bake their rounded source coverage while moving geometry keeps native clips.
+WUC stretch pieces now select hard quad edges so the existing source alpha joins without visible
+seams. The preview border also reuses the established pixel-aligned bordered-shape recipe when
+geometry is fixed. The first fractional-DPI border mismatch reached 131 because the replacement
+had omitted that rounding policy; the corrected source preserves it. No tolerance was raised to
+accept that defect. Rounded-fill baking preserves parent clips when descendants are present.
+
+`probe-dock-static-title-alignment-debug.log` compares static fitted titles under fractional parent
+translations with independent physical-position text. Both renderers, two font modes, four DPI
+scales and two alignments produce 32 displayed comparisons with zero channel error.
+`probe-dock-width-static-matrix-final-debug.log` compares the complete Dock producer against the
+established renderer: four DPI scales, both themes and five hover states, forty cases per backend.
+Flat interiors/exteriors and title regions retain the existing strict limits; remaining inspected
+corner/glyph antialias edges remain within the established 64-channel shape bound. Its owned
+windows and explicit backdrop ensure the comparison contains actual product pixels.
+
+The former private cached-source consumer approximation omitted the production clipping/content
+transform and physical-raster preparation. It is replaced in full native runs by the complete
+owned-window producer comparison, retaining the independent static renderer and strict flat/title
+checks. The shared offscreen source helper remains available for its other primitive diagnostics.
+This upgrades the evidence to actual WUC/DC presentation rather than treating the approximation's
+unmodeled edge filtering as a product oracle.
+
+`probe-dock-width-motion-compact-debug.log` verifies 48 actual producer cases across both renderers,
+four DPI scales, both notch directions and left/center/right anchors. The initial source has 0.1
+aspect, explicitly exercising compact shape-shadow chrome before growth. Five points in the epoch
+verify equal preview heights, source aspect, complete moving-body containment and native/card
+geometry. Exact event timestamps verify interruption continuity. Repeated native frames change no
+rasters/properties/tree and capsule ticks dirty no content. Endpoints deliver one cleanup; closing
+and force-hide freeze/cancel layout, and empty scenes retire rasters, sampled text and owner maps.
+
+The qualified sixteen-source case in `probe-dock-width-limits-qualified-debug.log` starts compact
+and grows to wide cards under controlled 16,000px monitor constraints. It uses 186 command groups,
+270 native layers, 133,218,740 nominal source bytes and one sampled title source, staying below the
+existing 224-group, 449-layer and 128 MiB source bounds. Source-only title sampling changes no
+layout/commands/native properties/tree. A constrained monitor/DPI cut and complete-card paging
+expose every source; the last page renders exactly one enabled previous arrow. Cleanup preserves
+uninitialized disabled navigation fields, and force hide cancels an active layout generation.
+The first maximum fixture had untitled identity-less snapshots, which the tracking service correctly
+excluded; qualifying those controlled snapshots fixes the fixture without changing product policy.
+
+Both builds and all forty test groups pass. Focused Release static/motion/maximum runs also pass.
+Full native regressions and installed validation pass; final shared title/popup cross-checks are
+recorded below.
+These are controlled producer/resource fixtures, not proof of displayed live DWM alignment, real
+mixed-monitor behavior, aggregate CPU/GPU/power/latency or independent GPU-memory acceptance.
+
+
+The capsule descriptor grows from 24,880 to 34,952 bytes (+10,072); its layout grows from 3,792 to
+13,872 bytes and each stored card from 224 to 656 bytes. The additional space owns canonical
+rectangles rather than full command buffers. Event-time placements are separate small snapshots.
+Render-buffer and render-port ABI sizes do not change in this consumer milestone. Independent
+physical GPU-memory and aggregate process-memory acceptance remains in the final measurements.
+
+
+The solid fill relationship is explicit through `rect_fit_to_clip`, emitted by the motion-fill
+helper and checked as one dedicated raster owner with no independent descendants. It occupies the
+previous four-byte padding after the command type: command/group/buffer sizes remain
+1,032/2,248/1,017,768 bytes. Native fixed-fill preparation is restricted to that relationship;
+arbitrary viewport clips preserve their unchanged-source animation contract. A broader rounded
+reversal check caught the overly general first optimization, and the explicit ownership restores
+its zero-raster result without relaxing the check. CPU fallback samples the same fill geometry
+directly while retaining ancestor clipping and tint. The complete static fallback matrix in
+`probe-solid-clip-dock-fallback-debug.log` passes all eighty comparisons with zero flat/title error
+and at most two channel values overall. Generic rounded reversal and combined popup repeat/finite/
+scissor capture also pass in `probe-solid-clip-generic-popup-debug.log`.
+
+The HWND session envelope stays stable, while settled/frozen compact chrome may reduce its source
+capture to the current width. Active retargets retain the larger source envelope; endpoint/close
+events can release its unnecessary shadow area without adding periodic work.
+
+
+Settled compact popup and common motion backgrounds now use the canonical ordinary cached source
+instead of retaining a shape-shadow graph whose geometry is constant. Active compact width ranges
+still use the graph, and transition completion changes ownership only on the existing cleanup event.
+This reduces static source/layer cost and preserves the original static chrome pixels.
+
+The final compact fallback check isolates popup chrome from deliberately tiny card content. Both
+shared-device and WARP/readback shadow execution match the ordinary chrome reference within
+seventeen channel values at the curved edge. The first diagnostic incorrectly compared clipped
+zero-width retained titles with the old title overflow and forced its ordinary shadow reference
+into a device-less mode; those are diagnostic errors, not accepted shadow regressions. Ordinary
+complete-card static title/fill comparisons remain separate and keep their original strict limits.
+`probe-static-chrome-motion-final-debug.log` passes all forty-eight motion cases and the compact
+fallback checks with zero failures. No temporary renderer instrumentation remains.
+
+
+Dock milestone acceptance update, 2026-10-16: `probe-dock-final-full-{debug,release}.log` each passes
+five complete native runs per backend plus the HWND fallback checks with zero failures. The final
+`probe-dock-final-{static,fallback,motion,limit,switcher}-{debug,release}.log` suites all pass. Dock
+static scenes cover both themes/four DPI scales; motion covers four DPI scales, two directions and
+three anchors. Maximum membership retains the existing byte/layer bounds and releases all owners.
+Both forty-test suites, architecture, formatting and whitespace checks pass. The final Debug text
+and combined rounded/popup repeat/finite/scissor checks pass. The matching Release text/popup batch also passes with zero failures. These shared cross-checks
+retain the original strict source-reuse, ownership and clipping limits.
+
+Deployment stopped watchdog PID 7480 and awaited its exit, then stopped Reach PID 1044 and awaited
+its exit. Checked Debug Reach/Settings binaries and PDBs were copied into the existing `build`
+folder; only that folder's `reachctl --start` was used. Read-only verification found watchdog PID
+1444 and Reach PID 14304 alive from `C:\Dev\reach\build`, both created 2026-10-16 at 11:24:12 local.
+Reach SHA256 is `9B39AB44A921F4631201805AD4BA76CB11E091D04296CA6FC26975AC3D1DF653`;
+Settings SHA256 is `4CB97FB5B7921339A251DF733A4161CAF7CE0CC21D4EAD60C98E896F1AC9155B`.
+Live source alignment, native refresh variation and total product cost remain open parent gates.

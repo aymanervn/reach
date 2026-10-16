@@ -418,6 +418,14 @@ support expectation is explicitly resolved.
     flat colors match exactly; antialias/glyph differences are bounded and inspected. Full renderer
     regressions and installed validation pass. Live preview alignment and total product
     acceptance remain in the parent/broader gates.
+  - [x] Complete Dock popup width/card/title fitting through the shared layout and native path.
+    Width, reflow, body/notch and fitted cards now share one canonical epoch and stable envelope.
+    Scalar width ownership, periodic width work and sampled render rectangles are removed.
+    Both builds/all forty tests and focused native source/static pixel/motion/resource matrices
+    pass, including maximum membership, paging, exact event-time reversal and close freeze.
+    Five full native runs per backend plus fallback pass in both builds; final complete Dock and
+    Switcher matrices pass. The installed watchdog-first/reachctl restart is verified alive.
+    Live DWM alignment and total product acceptance remain in the parent/broader gates.
   - [x] Migrate Dock preview horizontal reflow through retained motion and shared native destinations.
     Stable window parents translate cached card sources; headers, borders, close controls, fallback
     icons, DWM rectangles and event-time hit testing share canonical offsets. Remove the scalar

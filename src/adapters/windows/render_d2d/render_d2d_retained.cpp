@@ -1192,6 +1192,55 @@ static bool text_snap_transform(const reach_render_group &group)
            !group.x.repeating;
 }
 
+static bool raster_group_fixed(const reach_render_group &group)
+{
+    auto fixed = [](const reach_motion &motion, float expected, bool match)
+    {
+        float minimum = 0, maximum = 0;
+        return reach_motion_range(&motion, &minimum, &maximum) == REACH_OK && minimum == maximum &&
+               (!match || minimum == expected);
+    };
+    return fixed(group.x, 0, false) && fixed(group.y, 0, false) &&
+           (!group.scale.generation || fixed(group.scale, 1, true)) &&
+           (!group.scale_y.generation || fixed(group.scale_y, 1, true));
+}
+
+static bool raster_translation_fixed(const reach_render_command_buffer *commands,
+                                     const reach_render_group &source)
+{
+    if (commands->content_transform.scale_x != 1 || commands->content_transform.scale_y != 1)
+        return false;
+    const reach_render_group *group = &source;
+    size_t depth = 0;
+    while (group != nullptr && depth++ <= commands->group_count)
+    {
+        if (!raster_group_fixed(*group))
+            return false;
+        group = reach_render_command_buffer_group(commands, group->parent_id);
+    }
+    return group == nullptr;
+}
+
+static reach_rect_f32 raster_source_bounds(const reach_render_command_buffer *commands,
+                                           const reach_render_group &source)
+{
+    if (!raster_translation_fixed(commands, source))
+        return source.bounds;
+    auto transform = reach_render_command_buffer_group_transform_at(commands, source.id, 0);
+    float x = transform.offset_x + commands->content_transform.offset_x;
+    float y = transform.offset_y + commands->content_transform.offset_y;
+    reach_rect_f32 bounds = source.bounds;
+    float left = floorf(bounds.x + x), top = floorf(bounds.y + y);
+    bounds.width = ceilf(bounds.x + x + bounds.width) - left;
+    bounds.height = ceilf(bounds.y + y + bounds.height) - top;
+    bounds.x = left - x;
+    bounds.y = top - y;
+    if (bounds.width > REACH_D2D_MAX_SURFACE_DIMENSION ||
+        bounds.height > REACH_D2D_MAX_SURFACE_DIMENSION)
+        return source.bounds;
+    return bounds;
+}
+
 static HRESULT sync_layer(reach_render_backend *backend, reach_d2d_retained_layer &layer,
                           const reach_render_group &group, const reach_render_command *commands,
                           size_t count, reach_point_f32 parent_origin, bool allow_text_snap)
@@ -1217,6 +1266,8 @@ static HRESULT sync_layer(reach_render_backend *backend, reach_d2d_retained_laye
     for (auto &command : local)
         localize(command, group.bounds);
     bool initialized = layer.initialized;
+    bool previous_hard_border =
+        initialized && !layer.commands.empty() && layer.group.scale_y.generation != 0;
     bool content_changed =
         width != layer.width || height != layer.height || local.size() != layer.commands.size() ||
         (!local.empty() && memcmp(local.data(), layer.commands.data(),
@@ -1245,6 +1296,19 @@ static HRESULT sync_layer(reach_render_backend *backend, reach_d2d_retained_laye
         layer.text_phase_valid =
             count == 1 && local[0].type == REACH_RENDER_COMMAND_TEXT &&
             reach_d2d_text_raster_phase(backend, &local[0], &layer.text_raster_phase_y);
+    }
+    bool hard_border = count != 0 && group.scale_y.generation != 0;
+    if (SUCCEEDED(hr) && backend->compositor != nullptr && (hard_border || previous_hard_border) &&
+        (!initialized || hard_border != previous_hard_border))
+    {
+        ComPtr<IVisual> visual;
+        hr = layer.visual.As(&visual);
+        if (SUCCEEDED(hr))
+        {
+            reach_workload_add(REACH_WORKLOAD_PROPERTY_SUBMISSIONS, 1);
+            hr = visual->put_BorderMode(hard_border ? CompositionBorderMode_Hard
+                                                    : CompositionBorderMode_Inherit);
+        }
     }
     bool text_pixel_aligned = allow_text_snap && layer.text_phase_valid;
     float text_phase_y = text_pixel_aligned ? layer.text_raster_phase_y : 0.0f;
@@ -1664,6 +1728,24 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
         std::vector<reach_render_command> owned;
     };
     std::vector<retained_plan> plans;
+    auto preserve_raster_bounds = [&](retained_plan &plan)
+    {
+        auto bounds = raster_source_bounds(commands, plan.group);
+        if (!raster_translation_fixed(commands, plan.group) && plan.count == 1)
+        {
+            auto previous = std::find_if(
+                backend->retained_layers.begin(), backend->retained_layers.end(),
+                [&](const reach_d2d_retained_layer &layer) { return layer.id == plan.group.id; });
+            if (previous != backend->retained_layers.end() && previous->commands.size() == 1)
+            {
+                auto command = plan.commands[0];
+                localize(command, previous->group.bounds);
+                if (memcmp(&command, &previous->commands[0], sizeof(command)) == 0)
+                    bounds = previous->group.bounds;
+            }
+        }
+        plan.group.bounds = bounds;
+    };
     struct text_fit
     {
         uint64_t owner;
@@ -1686,6 +1768,7 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
         base->owned[0].rect.width = reach_motion_value_at(&fit.width, motion_sample_time(backend));
         base->commands = base->owned.data();
         base->count = 1;
+        preserve_raster_bounds(*base);
         backend->requires_content_sampling =
             backend->requires_content_sampling ||
             reach_motion_active_at(&fit.width, motion_sample_time(backend));
@@ -1775,6 +1858,47 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
                 existing->group = group;
                 existing->commands = commands->commands + index;
                 existing->count = end - index;
+            }
+        }
+        if (first.type == REACH_RENDER_COMMAND_VECTOR_ICON && end == index + 1)
+        {
+            auto base = plan_for(group.id);
+            if (base != plans.end())
+                preserve_raster_bounds(*base);
+        }
+        if (first.rect_fit_to_clip && end == index + 1 && first.radius == 0 && !first.has_scissor &&
+            group.has_clip && !group.has_shadow &&
+            (group.clip_uniform_radius || group.clip_radius == 0) &&
+            reach_motion_value_at(&group.x, 0) == 0 && reach_motion_value_at(&group.y, 0) == 0 &&
+            raster_group_fixed(group) &&
+            std::none_of(commands->groups, commands->groups + commands->group_count,
+                         [&](const reach_render_group &child)
+                         { return child.parent_id == group.id; }))
+        {
+            reach_rect_motion clip_motion = {};
+            bool fixed = reach_render_group_clip_motion(&group, &clip_motion) == REACH_OK;
+            for (const reach_motion *motion :
+                 {&clip_motion.x, &clip_motion.y, &clip_motion.width, &clip_motion.height})
+            {
+                float minimum = 0, maximum = 0;
+                fixed = fixed && reach_motion_range(motion, &minimum, &maximum) == REACH_OK &&
+                        minimum == maximum;
+            }
+            auto clip = reach_rect_motion_value_at(&clip_motion, 0);
+            if (fixed && clip.width > 0 && clip.height > 0 && first.rect.x <= clip.x &&
+                first.rect.y <= clip.y && first.rect.x + first.rect.width >= clip.x + clip.width &&
+                first.rect.y + first.rect.height >= clip.y + clip.height)
+            {
+                auto base = plan_for(group.id);
+                base->owned.assign(1, first);
+                base->owned[0].rect_fit_to_clip = 0;
+                base->owned[0].rect = clip;
+                base->owned[0].radius =
+                    fminf(group.clip_radius, fminf(clip.width, clip.height) * .5f);
+                base->commands = base->owned.data();
+                base->group.has_clip = 0;
+                base->group.bounds = clip;
+                preserve_raster_bounds(*base);
             }
         }
         if (first.text_fit_to_clip)
