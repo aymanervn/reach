@@ -21,6 +21,17 @@ compositor paths still require audit and measurement. Remove each consumer's sup
 the same migration change. Unavailable acceptance evidence stays pending until obtained or its
 support expectation is explicitly resolved.
 
+## Review status — 2026-10-16
+
+The user resumed implementation with Reach kept stopped. Do not start/restart Reach, reinstall,
+change shell registration or restore its scheduled tasks during this continuation. Isolated owned
+diagnostics and builds may continue. The user's intentional return to Explorer is preserved.
+
+**Review needed** marks missing acceptance evidence. It does not close an implementation gate or
+turn unimplemented work into review-only work. The [review register](gpu-composition-review.md)
+names the evidence required and the current limits. Completed implementation subitems retain their
+scoped test results; live/product acceptance remains unchecked.
+
 ## 1. Inventory and baseline
 
 - [x] Inventory every animation in Reach and Settings, including manager tracks, retained motion,
@@ -395,6 +406,7 @@ support expectation is explicitly resolved.
     remain in the broader acceptance gates.
 
 - [x] Remove periodic frame demand from Battery pending and Top Bar Bluetooth grace policies.
+  **Review needed:** real service acknowledgement/radio-enumeration behavior (R4); isolated policy checks pass.
   Preserve their two-second lifetimes using generic absolute deadline wakes. Keep service
   acknowledgement/recovery and reset cancellation, merge Battery's timeout with popup completion,
   and reconcile expiry once. Both builds/all forty tests and owned scheduling/lifetime probes pass;
@@ -414,6 +426,7 @@ support expectation is explicitly resolved.
 - [ ] Migrate Launcher results, Quick Settings sections, Clipboard sizing and Settings expandable rows,
   including eligible smooth viewport scrolling identified in the ledger.
   - [x] Migrate Clipboard item width through retained item/text/image/control fitting.
+    **Review needed:** live input/focus/capture and visual edge/memory acceptance; see R3/R5 below in the review register.
     One canonical 160ms ease-out, endpoint layout and event-time input replace the width scalar
     track, accessor and periodic width frame/layout work. Stable source domains preserve custom
     preview variants, visible-fragment border policy and exact-time reversal. One deadline retires
@@ -490,11 +503,11 @@ support expectation is explicitly resolved.
 
 ## 7. Behavior and resource verification
 
-- [ ] Verify appearance, easing, retargeting, capture, hit regions, focus, activation and game mode,
+- [ ] **Review needed:** Verify appearance, easing, retargeting, capture, hit regions, focus, activation and game mode,
   including source changes during motion and overlapping preview surfaces.
-- [ ] Verify theme/font changes, 100/125/150/200% and mixed DPI, constrained monitors, multiple screen
+- [ ] **Review needed:** Verify theme/font changes, 100/125/150/200% and mixed DPI, constrained monitors, multiple screen
   resolutions, normal/high refresh and battery saver; record unavailable configurations.
-- [ ] Verify resource reuse, bounded memory, hidden-surface retirement, callback cancellation, source
+- [ ] **Review needed:** Verify resource reuse, bounded memory, hidden-surface retirement, callback cancellation, source
   churn and supported backend recreation on both backends and required fallbacks.
 - [ ] Pass isolated Reach/Settings builds, focused non-UI tests, full ctest, architecture, formatting
   and whitespace checks, plus bounded native/live visual verification.
@@ -507,13 +520,13 @@ support expectation is explicitly resolved.
 
 ## 8. Final acceptance
 
-- [ ] Publish comparable repeated performance measurements; show no meaningful regression in total
+- [ ] **Review needed:** Publish comparable repeated performance measurements; show no meaningful regression in total
   CPU/GPU cost, latency, power or memory and justify complexity against measured/shared benefit.
-- [ ] Confirm eligible compositor motion causes no periodic application layout, rasterization or
+- [ ] **Review needed:** Confirm eligible compositor motion causes no periodic application layout, rasterization or
   presents solely to advance time; justified CPU/native work is active-only and ends when idle.
 - [ ] Resolve every ledger entry; remove obsolete APIs, tracks, timers, sampled render state and
   duplicate execution paths, with no unexplained hybrid or pending capability experiment.
-- [ ] Update architecture and migration records with implemented ownership, evidence and justified
+- [ ] **Review needed:** Update architecture and migration records with implemented ownership, evidence and justified
   CPU responsibilities; close the goal only when all required acceptance evidence is resolved.
 
 Use reviewable commits following the plan's dependencies. Purely drawn-content consumers may
