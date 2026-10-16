@@ -724,7 +724,9 @@ scaling borders or content. Its explicit solid-clip command owns one raster with
 the marker uses existing command padding. Stable source envelopes bound allocation; collision,
 parent and range checks reject before append. A stationary outer clip preserves an inherited output scissor.
 `reach_ui_motion_background_render` composes these fills with an optional shape-shadow caster and
-opaque outer/inner border semantics. Popup width chrome reuses the same primitive for compact
+opaque outer/inner border semantics. Constant paint axes keep the existing pixel-aligned border
+recipe while animated axes retain continuous geometry; the shadow caster keeps its original shape.
+Popup width chrome reuses the same primitive for compact
 body fills; notches retain their independent rigid geometry. Settled compact chrome and constant
 common backgrounds use ordinary cached sources; animated ranges retain the shape graph.
 
@@ -764,8 +766,18 @@ Shared popup transitions, Launcher presentation, and System HUD publish a retain
 presentation and an absolute lifecycle deadline. The generic runtime applies the presentation to
 the complete scene, including backdrop, chrome, and shadows, inside a stable native envelope.
 Both host hit testing and native input regions sample the same motion on pointer events.
+Optional canonical root scale-center motions preserve a moving physical pivot inside that stable
+envelope. Capsules publish center coordinates in content space; generic frame stamping transforms
+them into renderer and native input coordinates. Host inverse input, Windows nonclient hit testing,
+CPU drawing and native preview projection sample the same center. Both compositor drivers bind the
+existing scalar compiler to native center properties. The two descriptors live once per command
+buffer, rather than in every group; ordinary presentations keep the content-bounds center.
+
 Windows Composition uses scoped-batch completion keyed to the current presentation generation.
-Completion waits for all canonical root motions; changing any root motion retires old completion
+Completion waits for canonical root motions, including scale-center movement while visible.
+A fully transparent root can retire a remaining center after its other root motions finish, so an
+invisible pivot cannot extend close latency. Suspension stops both center bindings.
+Changing any root motion retires old completion
 ownership and aggregates the current remaining curves. A hidden or occluded target can defer its
 animation callback: after the canonical deadline, the adapter submits final properties once, awaits
 `RequestCommitAsync` through a weak-lifetime callback, then synchronizes before close delivery.
@@ -781,6 +793,14 @@ requires no animation frames and another action restarts the complete lifetime. 
 blinking uses native retained opacity when supported and deadlines in fallback. Renderers without
 composition sample the same finite group contract
 in a duration-limited CPU fallback; repeating marquee motion remains static there.
+
+Launcher owns canonical result-expansion intent and one endpoint cleanup deadline. Compact shared
+backgrounds preserve its collapsed pill; a stationary viewport and translated per-paint sources
+retain result content and preserve overlap alpha. Stable row namespaces isolate selection and
+scroll changes. Event-time input uses the same clipped body and slide; unrevealed content cannot
+activate. Its root scale center follows half the animated body height, preserving overlapping
+opening and results motion. The scalar manager, periodic result frame demand and baked reveal
+geometry are removed. The shared sampled fallback consumes the same command descriptors.
 
 Text-dependent layout consumes `reach_text_measure_port`. The DirectWrite renderer supplies the
 implementation with the same font family, size, and weight used for drawing; features retain only

@@ -285,9 +285,8 @@ reach_result reach_d2d_execute_fallback(reach_render_backend *backend,
     {
         const reach_render_group &group = commands->presentation;
         reach_point_f32 scale = reach_render_group_scale_at(&group, now_seconds);
-        root = D2D1::Matrix3x2F::Scale(scale.x, scale.y,
-                                       D2D1::Point2F(group.bounds.x + group.bounds.width * 0.5f,
-                                                     group.bounds.y + group.bounds.height * 0.5f)) *
+        reach_point_f32 center = reach_render_presentation_center_at(commands, now_seconds);
+        root = D2D1::Matrix3x2F::Scale(scale.x, scale.y, D2D1::Point2F(center.x, center.y)) *
                D2D1::Matrix3x2F::Translation(reach_motion_value_at(&group.x, now_seconds),
                                              reach_motion_value_at(&group.y, now_seconds));
         root_opacity =

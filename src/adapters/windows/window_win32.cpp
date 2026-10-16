@@ -214,8 +214,12 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
                                     : scale_x;
                 if (scale_x <= 0.0f || scale_y <= 0.0f)
                     return HTTRANSPARENT;
-                float center_x = presentation->bounds.x + presentation->bounds.width * 0.5f;
-                float center_y = presentation->bounds.y + presentation->bounds.height * 0.5f;
+                float center_x = presentation->center_x.generation
+                                     ? reach_motion_value_at(&presentation->center_x, now_seconds)
+                                     : presentation->bounds.x + presentation->bounds.width * .5f;
+                float center_y = presentation->center_y.generation
+                                     ? reach_motion_value_at(&presentation->center_y, now_seconds)
+                                     : presentation->bounds.y + presentation->bounds.height * .5f;
                 point_x = center_x + (point_x - center_x -
                                       reach_motion_value_at(&presentation->x, now_seconds)) /
                                          scale_x;

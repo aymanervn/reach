@@ -1,8 +1,8 @@
 # GPU resize and reveal
 
-Status: fixed-cap and focal chrome, bounded curves, viewport/content hierarchy and animated group insets implemented; complete feature consumers and the
-remaining compact-shape/notched-width capabilities are pending. This does not close the migration
-capability or final performance gates.
+Status: fixed-cap/focal chrome, bounded curves, viewport/content hierarchy, compact shapes/shadows
+and retained width text are implemented. Quick Settings, Dock, Switcher and Launcher consume shared
+capabilities; remaining consumers and broad product/workload acceptance are pending.
 
 ## Implemented mechanism
 
@@ -231,14 +231,14 @@ static sizes. Collapse/reversal submits five intent/deadline frames with zero ra
 compositors; fallback draws the same descriptors. These checks do not establish displayed compositor
 pixels or full product cost. The broader resize/reveal and product acceptance gates stay open.
 
-## Launcher integration requirements
+## Launcher integration constraints
 
 The current Launcher starts at `layout.search_box.height` with a corner radius of half that height
 (`launcher_render.cpp`). The collapsed body is exactly a pill; its corner/shadow caps do not leave
 an independent stretch band. The existing fixed-cap helper requires a positive center and enough
 space to isolate shadow/corner pixels, so applying it directly would distort or reject the opening
-geometry. Resolve compact rounded chrome with shadow on both supported backends before claiming
-an end-to-end Launcher resize migration. Preserve border thickness and source proportions.
+geometry. The shared compact rounded chrome/shadow path addresses that constraint; the integration
+preserves border thickness and source proportions.
 
 Launcher also publishes a root opening scale while its visible body height follows results
 expansion (`launcher_state.cpp`). Its current root scale center therefore changes with body height.
@@ -247,4 +247,30 @@ motions, through a supported animated pivot or another verified compositional co
 it to the full target height would change appearance and event projection. Geometry, native input
 and root inverse sampling must share that solution. The result fade/slide, row clipping, scrolling,
 error rows, caret deadlines and source changes remain part of the complete consumer migration.
-These are confirmed requirements, not a selected new renderer mechanism or completed consumer.
+These are confirmed requirements. The implemented mechanism and its verification are recorded below.
+
+
+## Launcher implementation - 2026-10-16
+
+The consumer now owns canonical result expansion. Compact shared chrome, a stationary result
+viewport and per-paint opacity sources preserve the original height, fade, slide and overlapping
+colors without scaling text, icons or borders. One cleanup deadline retires the animated graph;
+ordinary events own result membership, selection, stepped scrolling and constraints. Event-time
+input samples body height and slide and excludes unrevealed rows.
+
+Optional root center X/Y motions extend generic presentation metadata, native input and preview
+projection. They use the existing finite clock/compiler on both native backends; no fields are
+added to every render group. Windows Composition exposes an animatable
+[Visual.CenterPoint](https://learn.microsoft.com/en-us/uwp/api/windows.ui.composition.visual.centerpoint),
+and DirectComposition accepts an animation for
+[ScaleTransform.CenterY](https://learn.microsoft.com/en-us/windows/win32/api/dcomp/nf-dcomp-idcompositionscaletransform-setcentery%28idcompositionanimation%29).
+Absent axes keep the existing content-bounds center. Launcher derives Y from half its current body
+height, preserving the approved overlapping-motion requirement. Visible center motion participates
+in root completion; after opacity is fully zero, an otherwise completed close can retire its
+invisible center. This preserves close latency. Suspension stops the native bindings.
+
+Both builds and all forty test groups pass. Owned marker captures prove real native center motion,
+reversal, source reuse, transparent completion and suspension; generic publication and Windows hit
+checks use the same center. Complete producer, settled text, intermediate appearance, CPU fallback,
+error/source and full regression checks pass in Debug and Release. The original fixed-height pivot alternative remains rejected. This implementation does
+not close broad workload, power, memory, latency or live product acceptance.

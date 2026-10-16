@@ -1486,3 +1486,89 @@ folder; only that folder's `reachctl --start` was used. Read-only verification f
 Reach SHA256 is `9B39AB44A921F4631201805AD4BA76CB11E091D04296CA6FC26975AC3D1DF653`;
 Settings SHA256 is `4CB97FB5B7921339A251DF733A4161CAF7CE0CC21D4EAD60C98E896F1AC9155B`.
 Live source alignment, native refresh variation and total product cost remain open parent gates.
+
+
+## Launcher retained results and root pivot - 2026-10-16
+
+Implementation removes Launcher's result scalar manager, cached expansion value, periodic tick
+redraw and frame demand. One canonical owner drives compact background height, result clipping,
+per-paint reveal opacity and a 4dp slide. Separate paint sources preserve overlap alpha; flattening
+the full result scene under one opacity was rejected after the independent reference showed changed
+colors. Stable row namespaces keep unrelated rows independent of selection and scrolling.
+Event-time hit geometry follows the current body and slide and excludes unrevealed content. One
+endpoint cleanup reduces the source graph and returns the capsule to idle. The existing search
+completion generation/open checks still reject stale or hidden results; service policy is unchanged.
+
+Optional root center X/Y descriptors preserve the existing physical zoom pivot while body height
+changes. Generic frame stamping, host inverse input, native nonclient hit testing, CPU fallback and
+native preview projection share those coordinates. Both drivers bind the ordinary scalar compiler
+to center properties. Visible centers participate in root completion; once opacity is fully zero,
+an otherwise finished close retires an invisible center without extending activation latency.
+Suspension stops the bindings. Source/group command sizes remain 1,032/2,248 bytes. The buffer grows
+by 304 bytes to 1,018,072 bytes (about 0.03%); the descriptors are stored once, not in every group.
+
+`probe-root-center-lifetime-debug.log` verifies displayed marker positions, event-time reversal,
+zero source/property/tree changes between events, transparent close completion and suspension on
+both native backends. The later focused center runs also exercise generic native input publication,
+moving-center Windows hit testing, host inverse input and native preview forward projection.
+The pure ownership check rejects ownerless/repeating centers and verifies default-axis inheritance
+and clearing. Existing Launcher expectations now sample the canonical input bounds rather than the
+old per-frame visible-bounds snapshot; no tracked UI test was added.
+
+`probe-launcher-verified-{matrix,fallback,error}-debug.log` passes real producer/deadline/input/source
+checks and complete pose comparisons across both themes, four DPI scales and both compositors;
+ordinary CPU fallback and the search-error row use the same intent. Matching focused Release runs,
+settled comparisons, root-center lifetime and Switcher/popup shared regressions also pass.
+Both builds and all forty test groups pass. Complete native regressions and installed verification
+also pass, as recorded below. These scoped scenes do not establish full product acceptance.
+
+Appearance evidence separates fixed source pixels from expected fractional movement. Settled
+sources match the previous renderer within two channel values, with zero flat-color error. During
+motion, flat pixels retain the strict three-channel-value limit. The general non-text edge cap stays
+64; a separately calculated 1.5-pixel band around the rounded outer/inner contours covers the
+half-pixel difference from the old integer height rounding. Observed high-contrast perimeter error
+reaches 65. Constant axes now reuse the canonical pixel-aligned rectangle recipe, fixing the wider
+corner discrepancy. At one 200% DPI reveal pose, cached glyph sampling can choose an adjacent
+physical baseline: the measured fractional phase plus slide lies almost exactly at a half-pixel
+boundary. Inspected glyph edge differences reach 128 there; the scoped intermediate text bound is
+150, matching the earlier retained-text acceptance class. Text metrics, font size and painter order
+are unchanged; settled text keeps its strict two-value gate. The first undifferentiated 64-value
+image cap exposed these two causes; it was replaced by the spatial/settled checks above, not treated
+as a passing whole-image comparison. Images and raw readbacks remain in the ignored diagnostic
+folder (`launcher-second-inspection.png`, `launcher-corner-inspection.png`).
+
+Source-memory comparison excludes the blue diagnostic backdrop: its presence changes the old
+ungrouped source union and otherwise biases the comparison. The five-visible-row, twelve-candidate
+scene at 100% DPI uses 5,010,304 estimated bytes during the actual reveal and 2,321,344 bytes after
+cleanup, versus 1,792,068 for the settled previous renderer. At 200% DPI the constrained two-row
+scene uses 7,201,824 bytes during reveal and 3,272,672 after cleanup, versus 2,576,368 previously.
+The 125% DPI active case reaches 7,859,268 bytes. All remain inside the existing byte/layer limits,
+and hiding releases every source. The extra per-paint sources and compact shadow graph have a
+measured storage cost; fewer application frames alone do not accept it. Independent GPU-memory,
+whole-process memory, total CPU/GPU, power and latency comparisons remain final acceptance work.
+
+One endpoint diagnostic originally mixed GetTickCount granularity with the canonical QPC clock and
+could check a few milliseconds early. It now waits against the actual motion deadline; production
+scheduling was unchanged. Final pure build/architecture/format/whitespace checks are recorded with
+the complete regression and deployment evidence when that milestone finishes.
+
+
+Launcher final regression update: `probe-launcher-full-corrected-{debug,release}.log` each passes
+five complete native runs per backend plus HWND fallback checks with zero failures. The initial
+full Debug run caught five copies of one default-root endpoint regression: the new center helper
+was resetting a center even when no center animation existed. Endpoint reconciliation now skips
+absent/constant center updates; the original one-property-submission bound is unchanged.
+`probe-launcher-root-endpoint-{debug,release}.log` and
+`probe-launcher-root-center-corrected-{debug,release}.log` pass both ordinary and explicit-center
+completion/lifetime paths. The complete forty-test suites pass in both configurations after that
+fix (`test-launcher-endpoint-{debug,release}.log`), along with architecture, formatting and whitespace.
+
+
+Installed Launcher milestone validation stopped watchdog PID 1444 and awaited exit, then stopped
+Reach PID 14304 and awaited exit. Checked Debug Reach/Settings binaries and PDBs were copied into
+the existing `C:\Dev\reach\build`; startup used only that folder's `reachctl --start`.
+Read-only lifetime verification found watchdog PID 12248 and Reach PID 15588 alive at those paths,
+both created 2026-10-16 at 12:29:39 in the client Casablanca timezone. Installed Reach SHA256 is
+`4156071E961A4AC6AB0FFC6F7BD9F6DDF8611C59FB11D4860405FA09F30236C8`; Settings SHA256 is
+`55DBB7ACA3FF1E535E54D7E91F1BEBE2D64E019CAE01139E471419E327EE5891`. No reinstall or direct host/
+watchdog launch was used. Final live product, total cost and memory acceptance remain parent gates.
