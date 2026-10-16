@@ -1572,3 +1572,39 @@ both created 2026-10-16 at 12:29:39 in the client Casablanca timezone. Installed
 `4156071E961A4AC6AB0FFC6F7BD9F6DDF8611C59FB11D4860405FA09F30236C8`; Settings SHA256 is
 `55DBB7ACA3FF1E535E54D7E91F1BEBE2D64E019CAE01139E471419E327EE5891`. No reinstall or direct host/
 watchdog launch was used. Final live product, total cost and memory acceptance remain parent gates.
+
+
+## 2026-10-16: Stationary scrollbar drag scheduling
+
+Clipboard's capsule and Settings' application loop previously treated a held scrollbar as periodic
+frame demand. The pointer paths already update offsets directly, set dirty/relayout on movement,
+and release capture on up/cancellation. Remove only those stationary flags from the frame predicates;
+actual size/smooth-scroll motion, completion/progress notifications and renderer fallback keep their
+existing scheduling. Settings installed-app dragging was already event-driven; all five drag families
+are checked for consistency. No geometry, rendering command, easing, scroll timing or input policy
+changes are included in this milestone.
+
+Ignored `stationary_drag_probe.cpp` includes the actual Settings application implementation and
+calls the actual Clipboard capsule pointer path. Its before variant compiles pre-change HEAD source
+snapshots for both frame predicates. `probe-stationary-drag-{before,after}-{debug,release}.log` all
+pass with zero failures. Both stationary cases return true at 300/300 scheduling opportunities before
+and 0/300 after. These are deterministic predicate counts, not measured desktop wakes or CPU/GPU
+performance. Move events still change offsets immediately and request repaint; capture/subscription,
+release and Clipboard cancellation remain intact. All five Settings drag flags, six Settings smooth
+scroll targets, progress/completion/service/fallback wake causes and Clipboard active scrolling/size
+animation are checked. No temporary test window or user desktop capture was needed.
+
+`build-stationary-drag-{debug,release}.log` and `test-stationary-drag-{debug,release}.log` record successful
+Reach/Settings builds and all forty tests in both configurations. Architecture, formatting and
+whitespace checks pass. No tracked UI tests were added. Clipboard/Settings retained sizing and
+scrolling and overall live/performance acceptance remain open.
+
+
+Installed validation for the idle-drag milestone stopped watchdog PID 12248 and awaited exit,
+then stopped Reach PID 15588 and awaited exit. Checked Debug Reach/Settings binaries and PDBs were
+copied into the existing build folder; startup used only `C:\Dev\reach\build\reachctl --start` from
+that folder. Watchdog PID 576 and Reach PID 15328 were verified alive at the build paths, created
+2026-10-16 12:44:37 Casablanca (+00:00). Installed Reach SHA256 is
+`0C16D4F4299195E21682301E22CFF445147A053BCC7F0BD6BD36181CAE0836DA`; Settings SHA256 is
+`FE7A26DF33806152D9704648B4D8B9B1C302B93A5BB2AF20F44EF5DCA330FB62`. No reinstall or direct
+Reach/watchdog launch was used.

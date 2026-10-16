@@ -634,7 +634,10 @@ Shared bordered feedback consumes `reach_render_bordered_background_shapes`, the
 opaque outer/inner geometry used by ordinary bordered backgrounds. The RGB blend preserves the
 previous nested hover border colors without overlapping translucent rounded layers. Close background
 and glyph coverage use separate retained opacity. Hover tracks, sampled render values, tick redraw
-and hover-only frame demand are removed; sizing and scrolling remain separate CPU consumers.
+and hover-only frame demand are removed; sizing and scrolling remain separate CPU consumers. Stationary
+Clipboard and Settings scrollbar drags retain event-driven pointer capture and movement without
+requesting periodic frames; actual sizing/scrolling and renderer fallback work retain their own
+active scheduling.
 
 
 Optional process-wide workload diagnostics count application wakes/updates, scalar/loader/scroll

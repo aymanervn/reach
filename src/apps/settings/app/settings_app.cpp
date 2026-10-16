@@ -3125,12 +3125,10 @@ int32_t reach_settings_app_needs_frame(const reach_settings_app *app)
            app->model.installed_apps_scrollbar.offset !=
                app->model.installed_apps_scrollbar.target ||
            app->model.display_scrollbar.offset != app->model.display_scrollbar.target ||
-           app->update_scrollbar_drag.active || app->startup_scrollbar_drag.active ||
            reach_settings_model_power_animations_active(&app->model) ||
            app->async_notify.load() != 0 || app->system_controls_change_flags.load() != 0 ||
            app->model.wifi_scrollbar.offset != app->model.wifi_scrollbar.target ||
            app->model.bluetooth_scrollbar.offset != app->model.bluetooth_scrollbar.target ||
-           app->wifi_scrollbar_drag.active || app->bluetooth_scrollbar_drag.active ||
            reach_settings_model_wifi_animations_active(&app->model) ||
            reach_settings_model_bluetooth_animations_active(&app->model);
 }

@@ -166,6 +166,12 @@ support expectation is explicitly resolved.
     visual trees, including explicit initialized/reset zero intent. Both builds, all 40 tests and
     five full native runs per backend plus fallback pass in Debug/Release. This does not migrate
     the remaining visual consumers or settle loader/scroll/native choreography timing and product acceptance.
+  - [x] Remove stationary scrollbar-drag frame demand in Clipboard and Settings.
+    Pointer events preserve capture, immediate geometry, repaint and release/cancellation. Actual
+    sizing/scrolling, worker completion, service notifications and renderer fallback still wake.
+    Both builds/all forty tests, architecture/format/whitespace and owned before/after scheduling
+    diagnostics pass. Each stationary case changes from 300/300 frame requests to 0/300; this is a
+    scheduling check, not a live workload or full scrolling-migration acceptance result.
   - [x] Add shared bounded affine motion and native piecewise compilation for section reveals.
     Preserve delayed fade/early saturation, negative affine mapping, event-time retarget and owner
     deadlines. Both native renderers, fallback, root endpoints/envelopes and fixed-cap normalization

@@ -159,11 +159,14 @@ These do not become GPU algorithms, but their scheduling must not hide redundant
   replace elapsed-frame accumulation with a deadline/event wake where appropriate.
 - Top Bar Bluetooth absence grace (`bluetooth_absent_seconds`) is status policy; preserve the grace
   via event/deadline work, not an animation redraw loop.
-- Settings worker pending/in-flight states, scanning statuses, focused edits and scrollbar drag
-  flags are included in `reach_settings_app_needs_frame`. Service completion should wake the loop;
-  unchanged waiting/drag state alone should not require content or animation frames.
-- Clipboard `scrollbar_drag.active` requests frames even when stationary. Pointer events already
-  update direct geometry; frame demand must depend on actual motion/content needs.
+- Settings worker completion, progress, service notifications, caret deadlines, active scalar
+  effects and smooth scrolling wake the loop. Stationary scrollbar drag flags no longer request
+  frames; pointer capture and move/release events retain ownership. Worker/status scheduling
+  remains subject to the final audit.
+- Clipboard stationary scrollbar drags no longer request frames. Pointer events retain capture
+  and update direct geometry; existing height/width and smooth-scroll work still requests updates.
+  Before/after owned scheduling diagnostics pass in both builds; retained sizing/scroll migration
+  and total product acceptance remain open.
 - Pending Dock unpins, popup-hook reassertion, clock updates, input-language settle and monitor
   retries are semantic/runtime work. Audit deadline/event scheduling without migrating policy to
   the GPU or introducing polling. Existing system-stats sampling is the separately approved exception.
