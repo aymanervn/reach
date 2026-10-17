@@ -223,6 +223,15 @@ uses one timestamp for root inverse presentation and rectangle sampling. It also
 motion into native client space; Win32 hit testing samples it without a window-update timer.
 Nonretained publication uses a valid static input region and clears obsolete motion when absent.
 
+For disjoint moving regions, the optional capsule `input_regions_at` provider returns surface-local
+rectangles at an explicit monotonic time. Generic host classification and Windows nonclient hit
+testing invoke it only while handling input, using the same timestamp as root inverse presentation.
+The native port carries the provider, borrowed opaque capsule and source-to-client transform;
+it does not add per-region motion storage or a window-update timer. Empty results preserve
+click-through behavior, counts are bounded by the existing input-region capacity, and hide/reset
+clears native ownership. The provider overrides a single animated bound when present. Top Bar
+split-width integration and live gap/input acceptance remain separate pending consumer work.
+
 Focused native diagnostics cover positive scroll, collapse/reversal, both exclusive panels, source
 changes during collapse, reopening, compact monitors, environment changes, host event conversion,
 client input publication/reset and Win32 hit testing across four DPI values. Chrome source readback

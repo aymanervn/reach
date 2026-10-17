@@ -201,6 +201,12 @@ scoped test results; live/product acceptance remains unchecked.
     compact shadows, title trimming and total product workload acceptance remain open.
 - [ ] Separate content/layout invalidation, compositor submission, native placement and input updates
   in both application loops; pure compositor motion must not request periodic application frames.
+  - [x] Support event-time disjoint input regions without periodic native-region updates.
+    An optional const capsule provider shares one timestamp with root inverse projection in generic
+    host input and Win32 nonclient hit testing. Client transforms, two regions and their gap,
+    changing extents without publication, empty results, bounded counts and reset cancellation
+    pass in owned hidden-window Debug/Release probes. Both builds/all forty tests, architecture,
+    formatting and whitespace pass. Top Bar width integration and live/product acceptance remain open.
   - [x] Separate native preview root-presentation sampling from retained content frames.
     Shared runtime demand schedules active DWM projection and one endpoint sample, then returns to
     idle. Unchanged surface contexts skip capsule arrangement, command production, window placement

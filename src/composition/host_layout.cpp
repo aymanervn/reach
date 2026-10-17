@@ -56,6 +56,8 @@ static void reach_host_layout_apply_visibility(const reach_host_layout_target *t
         if (!visible)
         {
             surface->activated = 0;
+            if (surface->window.ops.set_input_presentation != nullptr)
+                (void)surface->window.ops.set_input_presentation(surface->window.window, nullptr);
             if (surface->renderer.ops.suspend != nullptr)
                 surface->renderer.ops.suspend(surface->renderer.backend);
             if (surface->window.ops.hide != nullptr)

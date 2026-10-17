@@ -178,6 +178,8 @@ extern "C"
                                        reach_feature_tick_result *out);
         void (*set_close_handoff_pending)(void *capsule, int32_t pending,
                                           reach_feature_tick_result *out);
+        size_t (*input_regions_at)(const void *capsule, double now_seconds,
+                                   reach_rect_f32 *out_regions, size_t max_regions);
     } reach_feature_capsule_ops;
 
 #ifdef __cplusplus

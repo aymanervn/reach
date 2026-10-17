@@ -698,6 +698,10 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
     if (!visible)
     {
         desc->surface->fallback_animation_active = 0;
+        desc->frame_context_valid = 0;
+        if (desc->surface->window.ops.set_input_presentation != nullptr)
+            (void)desc->surface->window.ops.set_input_presentation(desc->surface->window.window,
+                                                                   nullptr);
         reach_host_set_surface_visible(host, desc->definition->id, 0);
         reach_feature_surface_geometry hidden_geometry = {};
         desc->definition->capsule_ops->surface_geometry(desc->capsule, &hidden_geometry);
@@ -867,6 +871,12 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
                                                      surface_ctx.render_transform.scale_y,
                                                      surface_ctx.render_transform.offset_y);
             input.has_motion_bounds = geometry.has_input_bounds;
+            input.input_regions_at = desc->definition->capsule_ops->input_regions_at;
+            input.input_regions_user = desc->capsule;
+            input.input_regions_transform =
+                surface_ctx.content_transform_active
+                    ? surface_ctx.render_transform
+                    : reach_transform_f32{1, 1, shadow_pad.left, shadow_pad.top};
             if (geometry.has_input_bounds)
             {
                 reach_transform_f32 transform =
@@ -885,6 +895,12 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
     {
         reach_platform_window_input_presentation input = {};
         input.has_motion_bounds = geometry.has_input_bounds;
+        input.input_regions_at = desc->definition->capsule_ops->input_regions_at;
+        input.input_regions_user = desc->capsule;
+        input.input_regions_transform =
+            surface_ctx.content_transform_active
+                ? surface_ctx.render_transform
+                : reach_transform_f32{1, 1, shadow_pad.left, shadow_pad.top};
         if (geometry.has_input_bounds)
         {
             reach_transform_f32 transform =
@@ -899,7 +915,8 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
                                                                   &region, 1);
         }
         (void)desc->surface->window.ops.set_input_presentation(
-            desc->surface->window.window, geometry.has_input_bounds ? &input : nullptr);
+            desc->surface->window.window,
+            geometry.has_input_bounds || input.input_regions_at != nullptr ? &input : nullptr);
     }
     surface_ctx.render_bounds = bounds;
 
