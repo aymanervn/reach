@@ -1,15 +1,18 @@
 # GPU composition migration review register
 
-Updated 2026-10-16 with the Power selection-color milestone. These acceptance items remain
+Updated 2026-10-17 for the resumed full migration. These acceptance items remain
 open. This register complements the
 [delivery checklist](gpu-composition-migration-checklist.md) and
 [workload evidence](gpu-workload-baseline.md); it does not replace remaining implementation.
 
-The user intentionally restored Explorer and removed Reach's installation, then authorized
-continued implementation without restarting Reach. Keep that setup. No installed Reach launch,
-restart, reinstallation, shell/task repair or OS power/radio change is part of this continuation.
-Builds, pure tests and owned input-transparent diagnostics may continue. Live checks below stay
-pending until a later authorized running session is available.
+The user intentionally restored Explorer; preserve that setup. Restarts are authorized throughout
+this goal: enumerate fresh processes, stop the watchdog and wait, stop Reach and wait, then start
+only through `C:\Dev\reach\build\reachctl --start` with that folder as the working directory.
+Do not reinstall, launch Reach/watchdog directly, repair shell/task registration or change OS
+power/radio settings. If registration prevents startup, record that limitation and continue
+independent work. Builds, pure tests and owned input-transparent diagnostics remain authorized.
+Live checks require actual evidence from the applicable running binaries; authorization alone
+does not satisfy them.
 
 | ID | Item needing review | Evidence available | Evidence still required |
 | --- | --- | --- | --- |

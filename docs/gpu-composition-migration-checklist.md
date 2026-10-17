@@ -21,11 +21,13 @@ compositor paths still require audit and measurement. Remove each consumer's sup
 the same migration change. Unavailable acceptance evidence stays pending until obtained or its
 support expectation is explicitly resolved.
 
-## Review status — 2026-10-16
+## Review status — 2026-10-17
 
-The user resumed implementation with Reach kept stopped. Do not start/restart Reach, reinstall,
-change shell registration or restore its scheduled tasks during this continuation. Isolated owned
-diagnostics and builds may continue. The user's intentional return to Explorer is preserved.
+The user resumed the full migration with coordinated parallel implementation and authorized
+Reach restarts throughout this goal under the protocol below. Preserve the intentional return to
+Explorer: do not reinstall, repair shell registration or restore scheduled tasks. If the existing
+folder's reachctl cannot start Reach because registration is absent, record the limitation and
+continue independent work. Builds and owned input-transparent diagnostics remain authorized.
 
 **Review needed** marks missing acceptance evidence. It does not close an implementation gate or
 turn unimplemented work into review-only work. The [review register](gpu-composition-review.md)
@@ -545,17 +547,12 @@ Use reviewable commits following the plan's dependencies. Purely drawn-content c
 advance after their shared contract is settled; native-preview consumers depend on the capability
 decision. No checklist item authorizes unrelated cleanup or visible behavior changes.
 
-Validation must not terminate a running Reach instance without explicit authorization in the
-current instruction; each authorization permits one termination.
-
 Current GPU goal exception: the user explicitly authorizes restarts throughout this goal.
-The user reaffirmed this exception on 2026-10-13 and explicitly said no further restart permission
-questions are needed during the active goal. This exception does not authorize direct host launches.
+The user reaffirmed this exception on 2026-10-17, superseding the ordinary AGENTS.md one-termination
+restriction and earlier stop-only continuation notes. No further restart confirmation is needed.
 Always stop `reachWatchdog.exe` first and wait for its exit, then stop Reach and wait for its exit.
-Use `reachctl --install` from `C:\Dev\reach\build` for the first setup, with the user's administrator
-approval, then `reachctl --start` from that same folder. Every subsequent start/restart also uses
-`reachctl --start` from the installed folder. Never launch `reach.exe` or the watchdog directly;
-`reachctl` owns the installed session transition and watchdog startup. Reuse the installation;
-do not reinstall during ordinary restarts. Verify actual process lifetime before treating startup
-as successful. The user explicitly corrected direct-launch validation because it conflicts with
-Explorer and disrupts their desktop.
+Enumerate fresh processes for each restart. Reuse `C:\Dev\reach\build` and start only through that
+folder's `reachctl --start`, with that folder as the working directory. Never reinstall or launch
+Reach/watchdog directly, and never repair shell/task registration. Verify actual process lifetime,
+executable paths and deployed binary hashes before treating startup as successful. A missing
+registration is a live-validation limitation, not permission to bypass these constraints.
