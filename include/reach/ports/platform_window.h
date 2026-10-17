@@ -56,6 +56,10 @@ extern "C"
         reach_motion center_y;
         int32_t has_motion_bounds;
         reach_rect_motion motion_bounds;
+        size_t (*input_regions_at)(const void *user, double now_seconds,
+                                   reach_rect_f32 *out_regions, size_t max_regions);
+        const void *input_regions_user;
+        reach_transform_f32 input_regions_transform;
     } reach_platform_window_input_presentation;
 
     typedef struct reach_platform_window_ops

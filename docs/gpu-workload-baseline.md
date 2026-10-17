@@ -2,6 +2,29 @@
 
 Status: counters verified; full product performance baseline and acceptance pending.
 
+## 2026-10-17: Event-time disjoint input regions
+
+The generic capsule/runtime/native-window contract can sample multiple input rectangles on an
+input event. The provider receives the same monotonic timestamp used for root inverse projection;
+the native port also applies the published surface-to-client transform. It carries one callback
+and borrowed opaque owner, rather than an array of animated rectangles. Hide clears native
+ownership, and existing teardown destroys windows before capsules. No animation wake, timer or
+periodic window update is added.
+
+The ignored `input_regions_provider_probe.cpp` exercises the actual host input projection and
+Windows adapter using its own hidden window. Debug and optimized Release runs pass transformed
+two-region/gap hit tests, extent changes with no new publication, empty provider results,
+capacity bounding and reset cancellation. Evidence is in
+`input_regions_provider_probe-{debug,release}.log`. These are input-policy/native checks, not
+live Top Bar acceptance or visual/performance measurements.
+
+Both integrated product builds and all forty tests pass at this checkpoint
+(`build-resume-shared-debug.log`, `build-image-material-tests-debug.log`,
+`build-resume-integrated-release.log`, `ctest-resume-integrated-{debug,release}.log`).
+Architecture, formatting and whitespace checks pass. The broader tree includes unfinished
+Clipboard height, Settings row and Top Bar width work; this capability does not validate or
+complete those consumers. No deployment, Reach restart or shell/task change was performed.
+
 ## Settings retained segmented selection
 
 Reach theme and Top Bar style now publish canonical position motion. Cached pill coverage translates

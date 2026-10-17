@@ -98,7 +98,29 @@ reach_pointer_event reach_host_surface_pointer_event(const reach_feature_runtime
                 ? REACH_POINTER_SURFACE_INSIDE
                 : REACH_POINTER_SURFACE_OUTSIDE;
     }
-    if (geometry.has_input_bounds)
+    if (desc->definition->capsule_ops != nullptr &&
+        desc->definition->capsule_ops->input_regions_at != nullptr)
+    {
+        reach_rect_f32 regions[REACH_PLATFORM_WINDOW_MAX_INPUT_REGIONS] = {};
+        size_t count = desc->definition->capsule_ops->input_regions_at(
+            desc->capsule, now_seconds, regions, REACH_PLATFORM_WINDOW_MAX_INPUT_REGIONS);
+        if (count > REACH_PLATFORM_WINDOW_MAX_INPUT_REGIONS)
+            count = REACH_PLATFORM_WINDOW_MAX_INPUT_REGIONS;
+        pointer.surface_relation = REACH_POINTER_SURFACE_OUTSIDE;
+        for (size_t index = 0; index < count; ++index)
+        {
+            reach_rect_f32 region = regions[index];
+            region.x += geometry.visible_bounds.x;
+            region.y += geometry.visible_bounds.y;
+            if (region.width > 0 && region.height > 0 &&
+                reach_rect_contains(region, pointer.x, pointer.y))
+            {
+                pointer.surface_relation = REACH_POINTER_SURFACE_INSIDE;
+                break;
+            }
+        }
+    }
+    else if (geometry.has_input_bounds)
     {
         reach_rect_f32 input = reach_rect_motion_value_at(&geometry.input_bounds, now_seconds);
         input.x += geometry.visible_bounds.x;

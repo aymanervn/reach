@@ -1212,6 +1212,13 @@ composition projects them into native client space and classifies events, and Wi
 for hit testing after the root inverse transform. Pure retained height motion requests no periodic
 application frames. Compact static chrome preserves the existing drawing path; animated geometry
 below fixed-cap limits remains part of the migration's pending capability work.
+Capsules with several moving input rectangles can publish `input_regions_at`. Generic host input
+and the native window presentation carry this const provider and its opaque capsule ownership.
+Both sample the provider at the same timestamp as their root inverse projection; native input
+maps the returned surface-local rectangles into client coordinates. Gaps remain transparent as
+the rectangles move, without periodic input-region publication. Hidden surfaces clear the native
+provider, and window teardown precedes capsule destruction. Single animated bounds and ordinary
+static input regions remain supported. The Top Bar width consumer is still being migrated.
 Broader resize, color feedback and native-layout migrations remain pending in
 the [GPU migration checklist](gpu-composition-migration-checklist.md).
 Layout definitions can also reserve a top or bottom edge. A consumer that opts into reserved

@@ -195,7 +195,8 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
         {
             return HTTRANSPARENT;
         }
-        if (window != nullptr && window->input_regions_active)
+        if (window != nullptr && (window->input_regions_active ||
+                                  window->input_presentation.input_regions_at != nullptr))
         {
             POINT point = {GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
             ScreenToClient(hwnd, &point);
@@ -226,6 +227,28 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
                 point_y = center_y + (point_y - center_y -
                                       reach_motion_value_at(&presentation->y, now_seconds)) /
                                          scale_y;
+            }
+            if (presentation->input_regions_at != nullptr)
+            {
+                reach_rect_f32 regions[REACH_PLATFORM_WINDOW_MAX_INPUT_REGIONS] = {};
+                size_t count = presentation->input_regions_at(
+                    presentation->input_regions_user, now_seconds, regions,
+                    REACH_PLATFORM_WINDOW_MAX_INPUT_REGIONS);
+                if (count > REACH_PLATFORM_WINDOW_MAX_INPUT_REGIONS)
+                    count = REACH_PLATFORM_WINDOW_MAX_INPUT_REGIONS;
+                const auto &transform = presentation->input_regions_transform;
+                for (size_t index = 0; index < count; ++index)
+                {
+                    reach_rect_f32 region = regions[index];
+                    region.x = region.x * transform.scale_x + transform.offset_x;
+                    region.y = region.y * transform.scale_y + transform.offset_y;
+                    region.width *= transform.scale_x;
+                    region.height *= transform.scale_y;
+                    if (region.width > 0 && region.height > 0 &&
+                        reach_platform_window_rect_contains(region, point_x, point_y))
+                        return HTCLIENT;
+                }
+                return HTTRANSPARENT;
             }
             if (presentation->has_motion_bounds)
             {
