@@ -246,8 +246,9 @@ width/slot/hover scalar tracks are independently pending and do not advance migr
 ## Review markers for the current continuation
 
 **Review needed:** all broad live/product acceptance entries remain open in
-[gpu-composition-review.md](gpu-composition-review.md). The user resumed source work while keeping
-Reach stopped after an intentional return to Explorer. Do not restart/reinstall to obtain those
-checks. R3 covers Clipboard width and its measured edge/memory costs; R4 covers semantic Battery/
+[gpu-composition-review.md](gpu-composition-review.md). On 2026-10-17 the user resumed the full goal
+and authorized restarts under the checklist's watchdog-first, existing-folder reachctl protocol.
+Preserve Explorer and do not reinstall or repair shell/task registration. Startup limitations
+leave the affected live checks pending. R3 covers Clipboard width and its measured edge/memory costs; R4 covers semantic Battery/
 Bluetooth policy; R1/R2/R5/R6 cover the other implemented primitives/consumers and environment/
 lifecycle behavior; R7/R8 cover complete performance and final ledger/code acceptance.

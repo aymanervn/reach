@@ -274,9 +274,11 @@ Exercise 100/125/150/200% DPI, offset/mixed-DPI/constrained monitors, 720p/1080p
 available, normal/high refresh and battery saver. Use at least five comparable runs for key
 performance cases, including cold/warm setup and sustained effects, to distinguish baseline noise.
 
-Never terminate a running Reach instance without explicit authorization in the current instruction;
-each authorization permits one termination. Installed/running binaries are not implicitly replaced
-for validation. Isolated diagnostics do not establish live acceptance of new binaries.
+The current goal's 2026-10-17 restart exception supersedes the ordinary one-termination rule.
+Follow the checklist's watchdog-first protocol and reuse `C:\Dev\reach\build\reachctl --start`
+from that folder. Preserve Explorer; never reinstall, launch Reach/watchdog directly or repair
+shell/task registration. Missing registration leaves live validation pending while independent
+work continues. Isolated diagnostics do not establish live acceptance of new binaries.
 
 Final acceptance requires:
 
