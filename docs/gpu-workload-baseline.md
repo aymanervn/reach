@@ -2,6 +2,40 @@
 
 Status: counters verified; full product performance baseline and acceptance pending.
 
+## 2026-10-18: Canonical scroll response prerequisite
+
+The shared `reach_scrollbar_motion_retarget` samples the current canonical offset at the input
+instant, then publishes a finite normalized exponential-out descriptor. It replaces no consumer by
+itself. The response uses rate `-60*log(.7)` and a 0.560734650-second lifetime; jumps within 0.1px
+settle immediately. Retargets preserve visible position, invalid input preserves the old descriptor,
+and an exhausted native segment budget returns `REACH_NOT_IMPLEMENTED` while leaving a finite
+canonical curve available to ordinary sampling. Remaining scroll consumers and their old frame
+paths are still implementation work until their own milestones are validated and committed.
+
+The canonical compiler adds adaptive cubic Hermite pieces with an analytical fourth-derivative error
+bound, existing map/clamp crossing boundaries, monotone native control points and a 32-segment cap.
+No motion descriptor, render group or fixed command-buffer field grows. Existing easing policies
+retain their implementations. CPU exponential interpolation uses double intermediate subtraction
+so extreme finite endpoints do not overflow before fallback.
+
+Coordinator rerun of the private dense proof checks 1,260 curves and 5,887,882 native polynomial
+poses (directions, distances, three durations, late publication, affine, clamp and hinge mappings).
+Peak is 29 segments; maximum sample error is 0.061897513px. Stored junction values/times agree;
+polynomial endpoint drift is at most 0.000398034px. Tests also cover invalid targets, exact endpoint
+retirement, reversal and native capacity fallback. Debug/Release full builds and all forty test
+groups pass (`build-current-integrated-{debug,release}.log`,
+`ctest-current-integrated-{debug,release}.log`). The checked tree includes uncommitted consumers;
+these tests establish shared compatibility, not their native/visual/product acceptance.
+
+At 60Hz a 72px step differs from the former Euler response by at most 0.000442px. The old response
+was frame-dependent: relative to that old loop, the new absolute-time curve differs by up to 6.4798px
+at 30Hz, 1.6777px at 90Hz, 2.4591px at 120Hz, 2.8333px at 144Hz and 3.5553px at 240Hz for that step.
+The finite normalization bias is below 0.1px for a 16k-pixel jump; larger jumps need their own scale
+and native-budget disposition. This is a measured 60Hz calibration, not proof of identical behavior
+at every prior cadence. Timing review R10, actual consumer/input/source-turnover checks and repeated
+total Reach + Settings + DWM cost remain open. No deployment or restart was performed for this
+prerequisite.
+
 ## 2026-10-17: Event-time disjoint input regions
 
 The generic capsule/runtime/native-window contract can sample multiple input rectangles on an

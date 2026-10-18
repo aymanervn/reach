@@ -179,6 +179,12 @@ scoped test results; live/product acceptance remains unchecked.
     visual trees, including explicit initialized/reset zero intent. Both builds, all 40 tests and
     five full native runs per backend plus fallback pass in Debug/Release. This does not migrate
     the remaining visual consumers or settle loader/scroll/native choreography timing and product acceptance.
+  - [x] Add a finite absolute-time scrolling response and bounded native exponential compilation.
+    The shared policy matches the former 60Hz decay, preserves event-time reversal, and ends at one
+    exact deadline. Debug/Release builds and all 40 test groups pass; independent dense compilation
+    checks cover 5,887,882 poses with at most 29/32 segments and 0.061898px error. The former Euler
+    response varied with refresh cadence, so other refresh rates require timing review R10.
+    This prerequisite does not complete Clipboard/Settings scrolling consumers or product acceptance.
   - [x] Remove stationary scrollbar-drag frame demand in Clipboard and Settings.
     Pointer events preserve capture, immediate geometry, repaint and release/cancellation. Actual
     sizing/scrolling, worker completion, service notifications and renderer fallback still wake.
