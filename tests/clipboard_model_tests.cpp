@@ -221,6 +221,43 @@ static void test_scrollbar_edges()
     expect_true(stepped.target == 150.0f, "stepped scrollbar quantizes target");
 }
 
+static void test_scrollbar_motion_policy()
+{
+    reach_motion motion = {};
+    reach_motion_set(&motion, 20);
+    expect_true(reach_scrollbar_motion_retarget(&motion, 92, 10) == REACH_OK && motion.from == 20 &&
+                    motion.to == 92 && motion.started_seconds == 10,
+                "scroll retarget publishes one canonical absolute-time owner");
+    for (int frame = 0; frame <= 30; ++frame)
+    {
+        double elapsed = (double)frame / 60;
+        float expected = 92 - 72 * (float)pow(.7, frame);
+        expect_true(fabsf(reach_motion_value_at(&motion, 10 + elapsed) - expected) < .001f,
+                    "canonical scroll matches the former sixty-hertz response");
+    }
+    float interrupted = reach_motion_value_at(&motion, 10.08);
+    uint64_t generation = motion.generation;
+    expect_true(reach_scrollbar_motion_retarget(&motion, 0, 10.08) == REACH_OK &&
+                    motion.from == interrupted && motion.generation == generation + 1,
+                "scroll reversal begins at its exact event-time visible position");
+    double deadline = reach_motion_deadline(&motion);
+    expect_true(deadline > 10.08 && reach_motion_value_at(&motion, deadline) == 0 &&
+                    !reach_motion_active_at(&motion, deadline),
+                "canonical scroll has one finite exact endpoint");
+    reach_motion_set(&motion, 7);
+    expect_true(reach_scrollbar_motion_retarget(&motion, 7.05f, 12) == REACH_OK &&
+                    !reach_motion_active_at(&motion, 12) && motion.to == 7.05f,
+                "sub-tenth-pixel scroll retires without a visible timer");
+    auto previous = motion;
+    expect_true(reach_scrollbar_motion_retarget(&motion, NAN, 12) == REACH_INVALID_ARGUMENT &&
+                    reach_motion_equal(&previous, &motion),
+                "invalid scroll target preserves canonical ownership");
+    expect_true(reach_scrollbar_motion_retarget(&motion, 1e30f, 12) == REACH_NOT_IMPLEMENTED &&
+                    isfinite(reach_motion_value_at(&motion, 12.2)) &&
+                    reach_motion_value_at(&motion, reach_motion_deadline(&motion)) == 1e30f,
+                "native capacity fallback keeps finite canonical scroll and exact completion");
+}
+
 static void test_layout_wraps_runtime_border_around_stable_content(void)
 {
     reach_clipboard_model model = {};
@@ -250,6 +287,7 @@ int main()
     test_remove();
     test_preview();
     test_scrollbar_edges();
+    test_scrollbar_motion_policy();
     test_layout_wraps_runtime_border_around_stable_content();
     test_capsule_owns_capture_and_resource_retirement();
     return failures == 0 ? 0 : 1;

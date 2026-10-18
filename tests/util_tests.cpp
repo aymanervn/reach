@@ -173,6 +173,60 @@ static void test_motion_compilation_matches_cpu_sampling(void)
            "static and absent motion submit no native curve");
 }
 
+static void test_exponential_motion_compilation_and_projection(void)
+{
+    for (float distance : {72.f, 4000.f, 16384.f, 65536.f})
+        for (int reverse : {0, 1})
+        {
+            reach_motion motion = {};
+            reach_motion_start_at(&motion, reverse ? distance : 0, reverse ? 0 : distance, .56,
+                                  REACH_EASING_EXPONENTIAL_OUT, 10);
+            reach_motion curves[] = {motion, reach_motion_clamp(&motion, 100, 300),
+                                     reach_motion_affine(&motion, -.5f, 100)};
+            for (const auto &curve : curves)
+                for (double elapsed : {0., .05, .2, .5})
+                {
+                    reach_motion_segment pieces[REACH_MOTION_MAX_SEGMENTS] = {};
+                    size_t count = reach_motion_compile_at(&curve, 10 + elapsed, pieces);
+                    expect(count > 0 && count <= REACH_MOTION_MAX_SEGMENTS,
+                           "exponential projection stays within native segment capacity");
+                    for (size_t index = 0; index < count; ++index)
+                    {
+                        const auto &piece = pieces[index];
+                        double dt = piece.end - piece.start;
+                        expect(index == 0 || piece.start == pieces[index - 1].end,
+                               "exponential native segments have no gaps");
+                        expect(index == 0 || piece.value == pieces[index - 1].end_value,
+                               "exponential native pieces retain exact junction values");
+                        for (int sample = 0; sample <= 100; ++sample)
+                        {
+                            double at = dt * sample / 100;
+                            double value = piece.value + piece.linear * at +
+                                           piece.quadratic * at * at + piece.cubic * at * at * at;
+                            float expected =
+                                reach_motion_value_at(&curve, 10 + elapsed + piece.start + at);
+                            expect(fabs(value - expected) <= .075,
+                                   "exponential native cubic error remains below a tenth pixel");
+                        }
+                    }
+                    expect(count == 0 ||
+                               pieces[count - 1].end_value == reach_motion_value_at(&curve, 10.56),
+                           "exponential final keyframe is the exact canonical endpoint");
+                }
+            double crossing = reach_motion_time_to_value_at(&motion, distance * .5f, 10);
+            expect(crossing > 0 && crossing < .56 &&
+                       fabsf(reach_motion_value_at(&motion, 10 + crossing) - distance * .5f) < .01f,
+                   "exponential source turnover crossing uses canonical event time");
+        }
+    reach_motion oversized = {};
+    reach_motion_start_at(&oversized, -3e38f, 3e38f, .56, REACH_EASING_EXPONENTIAL_OUT, 10);
+    reach_motion_segment pieces[REACH_MOTION_MAX_SEGMENTS] = {};
+    expect(reach_motion_compile_at(&oversized, 10, pieces) == 0 &&
+               isfinite(reach_motion_value_at(&oversized, 10.2)) &&
+               !reach_motion_active_at(&oversized, 10.56),
+           "unrepresentable native curves preserve finite canonical fallback and deadline");
+}
+
 static void test_peak_motion_compilation_and_crossings(void)
 {
     for (int easing = REACH_EASING_EASE_IN; easing <= REACH_EASING_EASE_IN_OUT; ++easing)
@@ -677,6 +731,7 @@ int main(void)
     test_motion_crossing_preserves_endpoint_deadlines();
     test_bounded_motion_preserves_reveal_and_retarget();
     test_motion_compilation_matches_cpu_sampling();
+    test_exponential_motion_compilation_and_projection();
     const uint16_t empty[] = {0};
     const uint16_t alpha[] = {'A', 'l', 'p', 'h', 'a', 0};
     const uint16_t alpha_copy[] = {'A', 'l', 'p', 'h', 'a', 0};

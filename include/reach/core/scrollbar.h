@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "reach/core/geometry.h"
+#include "reach/support/motion.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -44,6 +45,8 @@ extern "C"
     void reach_scrollbar_set_target(reach_scrollbar_model *model, float target);
     void reach_scrollbar_scroll(reach_scrollbar_model *model, float delta);
     int32_t reach_scrollbar_update(reach_scrollbar_model *model, double delta_seconds);
+    reach_result reach_scrollbar_motion_retarget(reach_motion *motion, float target,
+                                                 double now_seconds);
     reach_scrollbar_layout reach_scrollbar_compute_layout(const reach_scrollbar_model *model,
                                                           reach_rect_f32 track,
                                                           float viewport_extent,

@@ -28,6 +28,8 @@ float reach_easing_apply(float value, reach_easing easing)
         float inverse = 1.0f - t;
         return 1.0f - inverse * inverse * inverse;
     }
+    case REACH_EASING_EXPONENTIAL_OUT:
+        return (float)(-std::expm1(-12.0 * t) / -std::expm1(-12.0));
     case REACH_EASING_EASE_IN_OUT:
     default:
         return t < 0.5f

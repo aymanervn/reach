@@ -10,7 +10,8 @@ extern "C"
     {
         REACH_EASING_EASE_IN = 0,
         REACH_EASING_EASE_OUT = 1,
-        REACH_EASING_EASE_IN_OUT = 2
+        REACH_EASING_EASE_IN_OUT = 2,
+        REACH_EASING_EXPONENTIAL_OUT = 3
     } reach_easing;
 
     float reach_easing_apply(float value, reach_easing easing);

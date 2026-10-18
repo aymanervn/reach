@@ -714,6 +714,8 @@ static double reach_motion_crossing_progress(double progress, reach_easing easin
         return cbrt(progress);
     if (easing == REACH_EASING_EASE_OUT)
         return 1.0 - cbrt(1.0 - progress);
+    if (easing == REACH_EASING_EXPONENTIAL_OUT)
+        return -log1p(-progress * -expm1(-12.0)) / 12.0;
     return progress < 0.5 ? cbrt(progress / 4.0) : 1.0 - cbrt((1.0 - progress) / 4.0);
 }
 
@@ -734,7 +736,7 @@ size_t reach_motion_compile_at(const reach_motion *motion, double now_seconds,
     size_t boundary_count = 2;
     double split = duration * 0.5;
     if (motion->easing != REACH_EASING_EASE_IN && motion->easing != REACH_EASING_EASE_OUT &&
-        split > elapsed)
+        motion->easing != REACH_EASING_EXPONENTIAL_OUT && split > elapsed)
         boundaries[boundary_count++] = split;
     double span = (double)motion->to - motion->from;
     auto add_boundary = [&](double value)
@@ -766,6 +768,71 @@ size_t reach_motion_compile_at(const reach_motion *motion, double now_seconds,
         boundaries[position] = value;
     }
     size_t count = 0;
+    if (motion->easing == REACH_EASING_EXPONENTIAL_OUT)
+    {
+        double normalization = -expm1(-12.0);
+        for (size_t index = 1; index < boundary_count; ++index)
+        {
+            double at = boundaries[index - 1], end = boundaries[index];
+            while (at < end)
+            {
+                double middle = (at + end) * .5 / duration;
+                double multiplier = 1, offset = 0;
+                double middle_value = motion->from + span * -expm1(-12 * middle) / normalization;
+                reach_motion_line(*motion, middle_value, multiplier, offset);
+                middle_value = middle_value * multiplier + offset;
+                bool constant = motion->has_mapping == REACH_MOTION_MAPPING_STEPS ||
+                                (motion->has_limits && (middle_value <= motion->minimum ||
+                                                        middle_value >= motion->maximum));
+                double fourth = constant
+                                    ? 0
+                                    : fabs(multiplier * span) * 20736 * exp(-12 * at / duration) /
+                                          (normalization * pow(duration, 4));
+                double next =
+                    constant ? end
+                             : fmin(end, at + fmin(duration / 6, fourth > 0 ? pow(24 / fourth, .25)
+                                                                            : duration / 6));
+                if (count >= REACH_MOTION_MAX_SEGMENTS || next <= at || !isfinite(next))
+                    return 0;
+                reach_motion_segment segment = {};
+                segment.start = at - elapsed;
+                segment.end = next - elapsed;
+                float first =
+                    (float)(motion->from + span * -expm1(-12 * at / duration) / normalization);
+                float last = next == duration
+                                 ? motion->to
+                                 : (float)(motion->from +
+                                           span * -expm1(-12 * next / duration) / normalization);
+                segment.value = reach_motion_limit(motion, first);
+                segment.end_value = reach_motion_limit(motion, last);
+                if (constant)
+                {
+                    if (motion->has_mapping == REACH_MOTION_MAPPING_STEPS)
+                        segment.value = (float)middle_value;
+                }
+                else
+                {
+                    double dt = next - at;
+                    double first_derivative = multiplier * span * 12 * exp(-12 * at / duration) /
+                                              (normalization * duration);
+                    double last_derivative = multiplier * span * 12 * exp(-12 * next / duration) /
+                                             (normalization * duration);
+                    double slope = ((double)segment.end_value - segment.value) / dt;
+                    segment.linear = (float)first_derivative;
+                    segment.quadratic =
+                        (float)((3 * slope - 2 * first_derivative - last_derivative) / dt);
+                    segment.cubic =
+                        (float)((first_derivative + last_derivative - 2 * slope) / (dt * dt));
+                }
+                segments[count++] = segment;
+                at = next;
+            }
+        }
+        if (motion->has_mapping == REACH_MOTION_MAPPING_STEPS)
+            for (size_t index = 0; index + 1 < count; ++index)
+                segments[index].end_value = segments[index + 1].value;
+        return count;
+    }
     for (size_t index = 1; index < boundary_count; ++index)
     {
         double at = boundaries[index - 1];
@@ -998,6 +1065,11 @@ float reach_motion_value_at(const reach_motion *motion, double now_seconds)
     if (now_seconds <= motion->started_seconds)
         return reach_motion_limit(motion, motion->from);
     float progress = (float)((now_seconds - motion->started_seconds) / motion->duration_seconds);
+    if (motion->easing == REACH_EASING_EXPONENTIAL_OUT)
+        return reach_motion_limit(
+            motion,
+            (float)((double)motion->from + ((double)motion->to - motion->from) *
+                                               reach_easing_apply(progress, motion->easing)));
     return reach_motion_limit(motion,
                               motion->from + (motion->to - motion->from) *
                                                  reach_easing_apply(progress, motion->easing));

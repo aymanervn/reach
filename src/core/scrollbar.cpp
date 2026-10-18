@@ -85,6 +85,25 @@ int32_t reach_scrollbar_update(reach_scrollbar_model *model, double delta_second
     return 1;
 }
 
+reach_result reach_scrollbar_motion_retarget(reach_motion *motion, float target, double now_seconds)
+{
+    if (motion == nullptr || !isfinite(target) || !isfinite(now_seconds))
+        return REACH_INVALID_ARGUMENT;
+    float current = reach_motion_value_at(motion, now_seconds);
+    if (!isfinite(current))
+        return REACH_INVALID_ARGUMENT;
+    if (fabsf(target - current) <= .1f)
+    {
+        reach_motion_set(motion, target);
+        return REACH_OK;
+    }
+    reach_motion_start_at(motion, current, target, 12 / (-60 * log(.7)),
+                          REACH_EASING_EXPONENTIAL_OUT, now_seconds);
+    reach_motion_segment segments[REACH_MOTION_MAX_SEGMENTS] = {};
+    return reach_motion_compile_at(motion, now_seconds, segments) > 0 ? REACH_OK
+                                                                      : REACH_NOT_IMPLEMENTED;
+}
+
 reach_scrollbar_layout reach_scrollbar_compute_layout(const reach_scrollbar_model *model,
                                                       reach_rect_f32 track, float viewport_extent,
                                                       float content_extent,
