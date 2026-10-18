@@ -1183,7 +1183,11 @@ context. Unchanged presented surfaces skip capsule arrangement, command producti
 submission while another surface or native motion keeps the host awake. Native overlay generation
 changes reconcile relationships without requiring a content frame. Environment, anchor, canonical
 intent, window identity or renderer-capability changes invalidate the cache; ordinary dirty flags and
-CPU/fallback frame demand retain their existing behavior. HWND bounds changes may require arrangement
+CPU/fallback frame demand retain their existing behavior. Each surface remembers whether its own
+commands require feature sampling, independently of the shared command buffer and renderer-only
+source sampling. Mixed fallback work rebuilds feature commands until their finite requirement ends;
+renderer-only sampling reuses arrangement and command sources. Hide/reset clears this ownership.
+HWND bounds changes may require arrangement
 without forcing content redraw by themselves. Hide clears the cache, relationships and native-motion
 demand. Synchronized presentation continues through the existing full path. This separates native
 sampling from retained content work without feature-specific composition branches; broader layout,

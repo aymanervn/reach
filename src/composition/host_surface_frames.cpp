@@ -168,6 +168,7 @@ reach_host_execute_registered_surface(reach_host *host, reach_feature_runtime *d
     {
         return result;
     }
+    desc->surface->commands_require_content_sampling = commands->requires_content_sampling;
     const reach_feature_definition *definition = desc->definition;
     if (geometry->presentation.retained)
     {
@@ -698,6 +699,7 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
     if (!visible)
     {
         desc->surface->fallback_animation_active = 0;
+        desc->surface->commands_require_content_sampling = 0;
         desc->frame_context_valid = 0;
         if (desc->surface->window.ops.set_input_presentation != nullptr)
             (void)desc->surface->window.ops.set_input_presentation(desc->surface->window.window,
@@ -767,7 +769,9 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
         render_context_changed ||
         !reach_rect_equal(surface_ctx.last_bounds, desc->layout_context.last_bounds);
     const auto &renderer = desc->surface->renderer;
-    int32_t renderer_sampling = !capsule_needs_frame && renderer.ops.sample_content != nullptr &&
+    int32_t renderer_sampling = !capsule_needs_frame &&
+                                !desc->surface->commands_require_content_sampling &&
+                                renderer.ops.sample_content != nullptr &&
                                 renderer.ops.content_sampling_required != nullptr &&
                                 renderer.ops.content_sampling_required(renderer.backend);
     if ((!needs_frame || renderer_sampling) && !host->dirty.layout && !host->dirty.render &&
