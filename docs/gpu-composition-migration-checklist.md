@@ -223,6 +223,13 @@ scoped test results; live/product acceptance remains unchecked.
     runs per backend plus existing fallback checks pass in Debug/Release. Width/reflow/body movement,
     wider application-loop separation, live
     alignment and total product workload acceptance remain open.
+  - [x] Preserve feature-command sampling when renderer-only sampling overlaps it.
+    Per-surface ownership prevents the generic source-only fast path from freezing a finite feature
+    fallback, even when another surface overwrites the shared command buffer. Owned nonvisual
+    host probes pass in Debug/Release: mixed work rebuilds commands, renderer-only work skips
+    layout/commands, endpoint returns to idle, and hide/show/reset retire or republish ownership.
+    Both integrated builds, all 40 tests per configuration and architecture checks pass.
+
 - [ ] Verify completion, stale-generation rejection, hide/reset and supported fallback semantics on
   both backends; land one complete consumer and remove its obsolete tick/redraw path.
   - [x] Migrate Battery press feedback end to end using shared pressable intent and a retained

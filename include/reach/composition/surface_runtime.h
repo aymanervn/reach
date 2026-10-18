@@ -27,6 +27,7 @@ extern "C"
         reach_transform_f32 render_transform;
         int32_t retained_presentation;
         int32_t fallback_animation_active;
+        int32_t commands_require_content_sampling;
     } reach_surface_runtime;
 
     void reach_surface_runtime_init(reach_surface_runtime *runtime);
