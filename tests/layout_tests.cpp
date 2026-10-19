@@ -757,6 +757,113 @@ static void test_uniform_clip_radii_share_geometry_motion(void)
             }
 }
 
+static void test_canonical_clip_radius_ownership(void)
+{
+    reach_motion progress = {};
+    double started = reach_motion_now_seconds();
+    reach_motion_start_at(&progress, 0, 1, .2, REACH_EASING_EASE_IN_OUT, started);
+    reach_render_group group = {};
+    group.id = 1;
+    group.bounds = group.clip = {0, 0, 120, 40};
+    group.has_clip = group.clip_uniform_radius = 1;
+    group.clip_radius_motion = reach_motion_affine(&progress, 48, 0);
+    group.clip_insets[REACH_RENDER_CLIP_RIGHT] = reach_motion_affine(&progress, 80, 0);
+    group.clip_insets[REACH_RENDER_CLIP_BOTTOM] = reach_motion_affine(&progress, -40, 0);
+    reach_motion x = {}, y = {};
+    expect_true(reach_render_group_has_rounded_clip(&group) &&
+                    reach_render_group_clip_radii_motion(&group, &x, &y) == REACH_OK,
+                "a zero-start radius retains its canonical rounded owner");
+    for (int index = 0; index <= 200; ++index)
+    {
+        double now = started + index / 1000.0;
+        auto clip = reach_render_group_clip_at(&group, now);
+        float expected = fminf(reach_motion_value_at(&group.clip_radius_motion, now),
+                               fminf(clip.width, clip.height) * .5f);
+        expect_near(reach_motion_value_at(&x, now), expected, .0001f,
+                    "radius motion clamps to the same event-time geometry");
+        expect_near(reach_motion_value_at(&y, now), expected, .0001f,
+                    "uniform radius shares both canonical dimensions");
+    }
+    for (float dpi : {1.f, 1.25f, 1.5f, 2.f})
+    {
+        auto scaled = group;
+        scaled.bounds = scaled.clip = {20 * dpi, 20 * dpi, 200 * dpi, 80 * dpi};
+        scaled.clip_radius_motion = reach_motion_affine(&progress, 60 * dpi, 0);
+        scaled.clip_insets[REACH_RENDER_CLIP_RIGHT] = reach_motion_affine(&progress, 100 * dpi, 0);
+        scaled.clip_insets[REACH_RENDER_CLIP_BOTTOM] = reach_motion_affine(&progress, -20 * dpi, 0);
+        float minimum = 0, maximum = 0;
+        expect_true(reach_render_group_clip_radii_motion(&scaled, &x, &y) == REACH_OK &&
+                        reach_motion_range(&x, &minimum, &maximum) == REACH_OK && minimum >= 0 &&
+                        reach_motion_value_at(&x, started) == 0,
+                    "composed native radii cannot drift below their nonnegative envelope");
+        for (double phase : {0.0, .23, .5, .73, 1.0})
+        {
+            double now = started + phase * progress.duration_seconds;
+            auto clip = reach_render_group_clip_at(&scaled, now);
+            float expected = fminf(reach_motion_value_at(&scaled.clip_radius_motion, now),
+                                   fminf(clip.width, clip.height) * .5f);
+            auto radii = reach_render_group_clip_radii_at(&scaled, now);
+            expect_true(radii.x == expected && radii.y == expected,
+                        "CPU radius sampling preserves the canonical scalar arithmetic exactly");
+        }
+    }
+    auto buffer = std::make_unique<reach_render_command_buffer>();
+    reach_render_command_buffer_clear(buffer.get());
+    expect_true(reach_render_command_buffer_begin_group(buffer.get(), &group) == REACH_OK &&
+                    reach_render_command_buffer_motion_active(buffer.get()),
+                "canonical radius participates in retained validation and fallback demand");
+    reach_render_command_buffer_end_group(buffer.get());
+    auto changed = group;
+    changed.clip_radius_motion.started_seconds += .1;
+    expect_true(!reach_render_group_equal(&group, &changed) &&
+                    reach_render_group_clip_radii_motion(&changed, &x, &y) ==
+                        REACH_INVALID_ARGUMENT,
+                "incompatible radius epochs reject without sampling a replacement");
+    changed = group;
+    changed.clip_radius_motion = reach_motion_affine(&progress, -1, 0);
+    size_t count = buffer->group_count;
+    changed.id = 2;
+    expect_true(reach_render_command_buffer_begin_group(buffer.get(), &changed) ==
+                        REACH_INVALID_ARGUMENT &&
+                    buffer->group_count == count,
+                "negative radius ranges reject before publishing a group");
+    changed = group;
+    changed.id = 2;
+    changed.has_clip = 0;
+    expect_true(reach_render_command_buffer_begin_group(buffer.get(), &changed) ==
+                        REACH_INVALID_ARGUMENT &&
+                    buffer->group_count == count,
+                "a radius driver requires a clip owner");
+    changed = group;
+    changed.clip_radius = 12;
+    reach_motion_set(&changed.clip_radius_motion, 0);
+    expect_true(!reach_render_group_has_rounded_clip(&changed),
+                "a constant zero driver overrides legacy radius and keeps an aliased rectangle");
+    reach_render_command_buffer_clear(buffer.get());
+    reach_render_group source = {};
+    source.id = 10;
+    source.bounds = {0, 0, 120, 80};
+    source.clip_radius_motion = group.clip_radius_motion;
+    reach_rect_motion bounds = {};
+    bounds.width = reach_motion_affine(&progress, 100, 20);
+    bounds.height = reach_motion_affine(&progress, 40, 40);
+    reach_color color = {1, 1, 1, 1};
+    expect_true(reach_render_push_rect_motion(buffer.get(), &source, &bounds, 0, color) ==
+                        REACH_OK &&
+                    reach_render_command_buffer_validate_groups(buffer.get()) == REACH_OK,
+                "fitted solid paint preserves its optional canonical radius");
+    reach_render_command image = {};
+    image.type = REACH_RENDER_COMMAND_ICON;
+    image.icon_id = 1;
+    source.id = 20;
+    count = buffer->group_count;
+    size_t commands = buffer->count;
+    expect_true(reach_render_push_image_motion(buffer.get(), &source, &bounds, 0, &image) ==
+                        REACH_INVALID_ARGUMENT &&
+                    buffer->group_count == count && buffer->count == commands,
+                "unsupported fitted image radius rejects atomically");
+}
+
 static void test_group_hierarchy_rejects_ambiguous_ownership_and_order(void)
 {
     auto storage = std::make_unique<reach_render_command_buffer>();
@@ -933,6 +1040,10 @@ static void test_group_equality_preserves_intent_without_padding(void)
          at < offsetof(reach_render_group, tint); ++at)
         bytes[at] = 0xa5;
     for (size_t at = offsetof(reach_render_group, shadow) + sizeof(second.shadow);
+         at < offsetof(reach_render_group, clip_radius_motion); ++at)
+        bytes[at] = 0xa5;
+    for (size_t at =
+             offsetof(reach_render_group, clip_radius_motion) + sizeof(second.clip_radius_motion);
          at < sizeof(second); ++at)
         bytes[at] = 0xa5;
     expect_true(reach_render_group_equal(&first, &second),
@@ -1392,6 +1503,7 @@ int main(void)
     test_group_hierarchy_rejects_ambiguous_ownership_and_order();
     test_rounded_clip_motion_preserves_compact_axes();
     test_uniform_clip_radii_share_geometry_motion();
+    test_canonical_clip_radius_ownership();
     test_retained_tint_samples_one_timeline();
     test_animated_clip_samples_absolute_geometry();
     test_dock_reserves_side_safe_margins();

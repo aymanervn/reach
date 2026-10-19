@@ -63,7 +63,7 @@ static void stop_layer_repetition(reach_render_backend *backend, reach_d2d_retai
     bool x = group.x.repeating;
     const reach_motion motions[] = {group.x, group.y, group.opacity, group.scale,
                                     reach_render_group_y_scale(&group)};
-    bool active = x || group.tint_rgb_mix.repeating;
+    bool active = x || group.tint_rgb_mix.repeating || group.clip_radius_motion.repeating;
     for (const auto &motion : motions)
         active = active || motion.repeating;
     for (const auto &motion : group.clip_insets)
@@ -83,6 +83,8 @@ static void stop_layer_repetition(reach_render_backend *backend, reach_d2d_retai
         if (group.tint_rgb_mix.repeating)
             stop_wuc_repetition(layer.tint_properties.Get(), L"Mix");
         const wchar_t *clips[] = {L"LeftInset", L"TopInset", L"RightInset", L"BottomInset"};
+        if (group.clip_radius_motion.repeating)
+            stop_rounded_clip_motion(layer);
         for (const auto &motion : group.clip_insets)
             if (motion.repeating)
             {
@@ -122,8 +124,8 @@ static void stop_layer_repetition(reach_render_backend *backend, reach_d2d_retai
         }
         if (layer.dcomp_clip != nullptr)
         {
-            bool rounded = group.clip_radius > 0;
-            bool clip_repeating = false;
+            bool rounded = reach_render_group_has_rounded_clip(&group) != 0;
+            bool clip_repeating = group.clip_radius_motion.repeating != 0;
             for (const auto &motion : group.clip_insets)
                 clip_repeating = clip_repeating || motion.repeating;
             if (rounded && clip_repeating)
@@ -544,6 +546,8 @@ static HRESULT sync_clip(reach_render_backend *backend, reach_d2d_retained_layer
             hr = layer.container.As(&container);
             if (SUCCEEDED(hr))
                 hr = container->put_Clip(nullptr);
+            if (SUCCEEDED(hr))
+                hr = container->put_BorderMode(CompositionBorderMode_Inherit);
         }
         else if (layer.dcomp_clip != nullptr)
         {
@@ -561,17 +565,18 @@ static HRESULT sync_clip(reach_render_backend *backend, reach_d2d_retained_layer
         }
         return hr;
     }
-    unsigned mask = !initialized || !layer.group.has_clip ||
-                            group.clip.width != layer.group.clip.width ||
-                            group.clip.height != layer.group.clip.height ||
-                            (group.clip_radius != layer.group.clip_radius ||
-                             group.clip_uniform_radius != layer.group.clip_uniform_radius)
-                        ? 15
-                        : 0;
+    unsigned mask =
+        !initialized || !layer.group.has_clip || group.clip.width != layer.group.clip.width ||
+                group.clip.height != layer.group.clip.height ||
+                (group.clip_radius != layer.group.clip_radius ||
+                 group.clip_uniform_radius != layer.group.clip_uniform_radius ||
+                 !reach_motion_equal(&group.clip_radius_motion, &layer.group.clip_radius_motion))
+            ? 15
+            : 0;
     for (size_t edge = 0; edge < REACH_RENDER_CLIP_EDGE_COUNT; ++edge)
         if (!reach_motion_equal(&group.clip_insets[edge], &layer.group.clip_insets[edge]))
             mask |= 1u << edge;
-    if (group.clip_radius > 0 && backend->compositor != nullptr)
+    if (reach_render_group_has_rounded_clip(&group) && backend->compositor != nullptr)
     {
         if (mask == 0 && layer.rounded_clip != nullptr)
             return S_OK;
@@ -622,6 +627,8 @@ static HRESULT sync_clip(reach_render_backend *backend, reach_d2d_retained_layer
             hr = layer.container.As(&container);
         if (SUCCEEDED(hr))
             hr = container->put_Clip(clip.Get());
+        if (SUCCEEDED(hr) && (!initialized || !reach_render_group_has_rounded_clip(&layer.group)))
+            hr = container->put_BorderMode(CompositionBorderMode_Soft);
         if (SUCCEEDED(hr))
         {
             const wchar_t *insets[] = {L"LeftInset", L"TopInset", L"RightInset", L"BottomInset"};
@@ -651,6 +658,8 @@ static HRESULT sync_clip(reach_render_backend *backend, reach_d2d_retained_layer
                 hr = layer.container.As(&container);
             if (SUCCEEDED(hr))
                 hr = container->put_Clip(clip.Get());
+            if (SUCCEEDED(hr))
+                hr = container->put_BorderMode(CompositionBorderMode_Hard);
             if (FAILED(hr))
             {
                 layer.inset_clip.Reset();
@@ -686,10 +695,12 @@ static HRESULT sync_clip(reach_render_backend *backend, reach_d2d_retained_layer
         return hr;
     }
     bool created = layer.dcomp_clip == nullptr;
-    if (created || !initialized || group.clip_radius != layer.group.clip_radius)
-        hr = layer.dcomp_container->SetBorderMode(group.clip_radius > 0
+    if (created || !initialized ||
+        reach_render_group_has_rounded_clip(&group) !=
+            reach_render_group_has_rounded_clip(&layer.group))
+        hr = layer.dcomp_container->SetBorderMode(reach_render_group_has_rounded_clip(&group)
                                                       ? DCOMPOSITION_BORDER_MODE_SOFT
-                                                      : DCOMPOSITION_BORDER_MODE_INHERIT);
+                                                      : DCOMPOSITION_BORDER_MODE_HARD);
     if (FAILED(hr))
         return hr;
     if (created)
@@ -705,13 +716,14 @@ static HRESULT sync_clip(reach_render_backend *backend, reach_d2d_retained_layer
     }
     if (created || !initialized ||
         (group.clip_radius != layer.group.clip_radius ||
-         group.clip_uniform_radius != layer.group.clip_uniform_radius) ||
-        (group.clip_radius > 0 && mask != 0))
+         group.clip_uniform_radius != layer.group.clip_uniform_radius ||
+         !reach_motion_equal(&group.clip_radius_motion, &layer.group.clip_radius_motion)) ||
+        (reach_render_group_has_rounded_clip(&group) && mask != 0))
     {
         reach_motion radius_x = {}, radius_y = {};
-        reach_motion_set(&radius_x, group.clip_radius);
-        reach_motion_set(&radius_y, group.clip_radius);
-        if (group.clip_radius > 0)
+        reach_motion_set(&radius_x, 0);
+        reach_motion_set(&radius_y, 0);
+        if (reach_render_group_has_rounded_clip(&group))
         {
             if (reach_render_group_clip_radii_motion(&group, &radius_x, &radius_y) != REACH_OK)
                 return E_INVALIDARG;
@@ -2125,7 +2137,7 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
         }
         if (first.type == REACH_RENDER_COMMAND_RECT && first.rect_fit_to_clip && end == index + 1 &&
             first.radius == 0 && !first.has_scissor && group.has_clip && !group.has_shadow &&
-            (group.clip_uniform_radius || group.clip_radius == 0) &&
+            (group.clip_uniform_radius || !reach_render_group_has_rounded_clip(&group)) &&
             reach_motion_value_at(&group.x, 0) == 0 && reach_motion_value_at(&group.y, 0) == 0 &&
             raster_group_fixed(group) &&
             std::none_of(commands->groups, commands->groups + commands->group_count,
@@ -2141,6 +2153,14 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
                 fixed = fixed && reach_motion_range(motion, &minimum, &maximum) == REACH_OK &&
                         minimum == maximum;
             }
+            reach_motion radius_x = {}, radius_y = {};
+            float minimum = 0, maximum = 0;
+            fixed =
+                fixed &&
+                reach_render_group_clip_radii_motion(&group, &radius_x, &radius_y) == REACH_OK &&
+                reach_motion_range(&radius_x, &minimum, &maximum) == REACH_OK &&
+                minimum == maximum &&
+                reach_motion_range(&radius_y, &minimum, &maximum) == REACH_OK && minimum == maximum;
             auto clip = reach_rect_motion_value_at(&clip_motion, 0);
             if (fixed && clip.width > 0 && clip.height > 0 && first.rect.x <= clip.x &&
                 first.rect.y <= clip.y && first.rect.x + first.rect.width >= clip.x + clip.width &&
@@ -2150,10 +2170,10 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
                 base->owned.assign(1, first);
                 base->owned[0].rect_fit_to_clip = 0;
                 base->owned[0].rect = clip;
-                base->owned[0].radius =
-                    fminf(group.clip_radius, fminf(clip.width, clip.height) * .5f);
+                base->owned[0].radius = reach_motion_value_at(&radius_x, 0);
                 base->commands = base->owned.data();
                 base->group.has_clip = 0;
+                base->group.clip_radius_motion = {};
                 base->group.bounds = clip;
                 preserve_raster_bounds(*base);
             }

@@ -391,6 +391,7 @@ reach_result reach_d2d_draw_group_shadow(reach_render_backend *backend,
         source_group.has_shadow = 0;
         source_group.has_clip = 0;
         source_group.clip_radius = 0;
+        source_group.clip_radius_motion = {};
         source_group.clip_uniform_radius = 0;
         source_group.x = source_group.y = source_group.opacity = source_group.scale =
             source_group.scale_y = {};

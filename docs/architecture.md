@@ -577,8 +577,14 @@ the native clip. `reach_render_group_clip_at` provides the same event-time recta
 and geometry consumers, and active clip motion participates in generic fallback frame demand.
 Root-presentation clipping remains unsupported. Rounded groups default to independent radius
 clamping on each axis. `clip_uniform_radius` selects circular corners whose shared radius follows
-the smaller animated dimension. `reach_render_group_clip_radii_motion` supplies that same canonical
-geometry to both compositors and CPU masks; incompatible axis epochs are rejected.
+the smaller animated dimension. An optional `clip_radius_motion` replaces the scalar radius,
+including an explicit zero, and shares the finite or repeating canonical owner. Its full range must
+be nonnegative; incompatible moving epochs are rejected. `reach_render_group_clip_radii_motion`
+supplies bounded radius curves to both compositors. `reach_render_group_clip_radii_at` samples the
+radius and clip dimensions directly for CPU masks and fitted solid paint, preserving scalar
+rounding at the event time. Native rectangular clips use hard edges and rounded clips use soft
+edges; removing a clip restores inherited edge policy and retires its native bindings. Specialized
+fitted image sources reject a radius driver atomically and may retain a separate parent mask.
 
 `reach_render_retain_commands` gives individual paint commands independent cached source groups,
 preserving overlapping paint when ancestor opacity changes. It validates the complete batch before
