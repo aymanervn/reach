@@ -167,7 +167,7 @@ static float scalar_value(reach_render_backend *backend, const reach_motion &mot
 {
     if (motion.generation == 0)
         return fallback;
-    double now = motion.repeating ? motion_sample_time(backend) : reach_motion_now_seconds();
+    double now = motion_sample_time(backend);
     return reach_motion_value_at(&motion, now);
 }
 
@@ -182,7 +182,7 @@ static HRESULT wuc_motion(reach_render_backend *backend, IInspectable *visual,
         hr = WindowsCreateString(property_name, (UINT32)wcslen(property_name), &property);
     }
     reach_motion_segment segments[REACH_MOTION_MAX_REPEAT_SEGMENTS] = {};
-    double now = motion.repeating ? motion_sample_time(backend) : reach_motion_now_seconds();
+    double now = motion_sample_time(backend);
     size_t count = motion.repeating ? reach_motion_compile_repeat_at(&motion, now, segments)
                                     : reach_motion_compile_at(&motion, now, segments);
     if (SUCCEEDED(hr))
@@ -273,7 +273,7 @@ static HRESULT dcomp_motion(reach_render_backend *backend, const reach_motion &m
                             ComPtr<IDCompositionAnimation> *animation)
 {
     reach_motion_segment segments[REACH_MOTION_MAX_REPEAT_SEGMENTS] = {};
-    double now = motion.repeating ? motion_sample_time(backend) : reach_motion_now_seconds();
+    double now = motion_sample_time(backend);
     size_t count = motion.repeating ? reach_motion_compile_repeat_at(&motion, now, segments)
                                     : reach_motion_compile_at(&motion, now, segments);
     if (count == 0)
@@ -856,9 +856,7 @@ static HRESULT wuc_properties(reach_render_backend *backend, IInspectable *inspe
     }
     if (SUCCEEDED(hr))
     {
-        double now = group.scale.repeating || reach_render_group_y_scale(&group).repeating
-                         ? motion_sample_time(backend)
-                         : reach_motion_now_seconds();
+        double now = motion_sample_time(backend);
         reach_point_f32 scale = reach_render_group_scale_at(&group, now);
         if (mask & 24)
             hr = visual->put_Scale({scale.x, scale.y, 1.0f});
@@ -1777,6 +1775,7 @@ reach_result reach_d2d_presentation_complete(reach_render_backend *backend, uint
         *out_complete = 1;
         return REACH_OK;
     }
+    motion_sample_scope sample(backend);
     reach_render_group settled = backend->scene_presentation;
     settled.x.duration_seconds = settled.y.duration_seconds = 0.0;
     settled.opacity.duration_seconds = settled.scale.duration_seconds = 0.0;

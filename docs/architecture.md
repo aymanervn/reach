@@ -749,6 +749,11 @@ the native compiler approximates it with bounded cubic Hermite pieces, retaining
 boundaries and returning no native curve when its fixed segment budget is exhausted. Consumers
 must keep that fallback finite and preserve their own input, extents and source-lifetime policy.
 
+Each retained submission samples initial native property values and compiles finite/repeating
+curves from one captured timestamp. Renderer-owned source sampling uses the same scoped policy.
+Presentation completion observes its deadline at the current time and scopes its settled property
+publication separately, so a completed submission cannot retain a stale timestamp.
+
 Native raster planning preserves physical pixel phase for fitted text and isolated vector icons
 under fixed unit-scale ancestry. Moving unchanged content can reuse its existing raster origin;
 settled descriptors realign it at the next legitimate submission. Explicit solid-clip fill owners

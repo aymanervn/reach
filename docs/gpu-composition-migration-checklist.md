@@ -186,6 +186,12 @@ scoped test results; live/product acceptance remains unchecked.
     visual trees, including explicit initialized/reset zero intent. Both builds, all 40 tests and
     five full native runs per backend plus fallback pass in Debug/Release. This does not migrate
     the remaining visual consumers or settle loader/scroll/native choreography timing and product acceptance.
+  - [x] Sample initial native property values and finite/repeating curves at one submission time.
+    Both adapters reuse the existing scoped timestamp; completion publication restores its scope.
+    Owned independent ancestry markers reduce root/global phase drift from 0.008405 to 0.000101,
+    with zero application executions/raster/tree/property updates during motion. Both builds,
+    all 40 tests per configuration and full native/fallback suites pass. Stage text filtering,
+    snapped chrome geometry and complete consumer/product acceptance remain open.
   - [x] Add a finite absolute-time scrolling response and bounded native exponential compilation.
     The shared policy matches the former 60Hz decay, preserves event-time reversal, and ends at one
     exact deadline. Debug/Release builds and all 40 test groups pass; independent dense compilation

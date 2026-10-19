@@ -1972,3 +1972,30 @@ These checks prove the shared radius contract, not whole-consumer appearance or 
 Settings rounded-edge/vector differences, Stage text source phase, other outstanding consumer
 comparisons and live/product CPU/GPU/power/memory acceptance remain open. No Reach deployment,
 restart, shell/task repair or OS power/radio action was performed for this milestone.
+
+## 2026-10-19: One native submission timestamp
+
+Finite native properties previously sampled the clock separately while compiling each binding;
+repetition already shared a scoped timestamp. Initial scalar values, initial WUC scale and finite
+curves now use that same scope. Presentation completion still observes deadlines at the current
+time and separately scopes its settled publication, preventing a cached timestamp from escaping.
+This adds no descriptor storage, application frames or source rasterization.
+
+The owned Stage control measures a global marker and independent markers under actual tile/label
+ancestors. Across 16 visible poses on both backends, baseline maximum progress differences are
+0.008405181 (root X), 0.00833586 (root Y) and 0.006419571 (label height). The coordinator's current
+production run reduces these to 0.000100227, 0.0000285212 and 0.000256443 respectively. Each native
+interval records zero executions, rasters, tree mutations and property submissions. All terminal
+poses match exactly. Evidence is `stage-pixel-snap/{baseline-timing-v2,shared-time-v2,
+production-shared-time-v2}.log` under `build/gpu-composition-migration`.
+
+The corrected endpoint reference maps terminal progress to the true deadline; the former inverse
+selected the earliest float-rounded zero and produced a false late-scene failure. The original
+logs remain preserved. All three timing variants still fail 24 original whole-scene/text fidelity
+assertions: timing alignment does not resolve retained glyph filtering or the former snapped outer
+border geometry. These remain implementation/acceptance work, without a tolerance change.
+
+Both integrated product builds pass (`build-shared-time-{debug,release}.log`), as do all 40 tests
+per configuration (`ctest-shared-time-{debug,release}.log`) and five WUC/five DirectComposition runs
+plus HWND fallback (`full-shared-time-{debug,release}.log`, zero failures). Architecture, formatting
+and whitespace checks pass. No Reach deployment, restart, shell/task repair or OS change was made.

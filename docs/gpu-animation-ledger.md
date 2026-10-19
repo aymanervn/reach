@@ -185,6 +185,11 @@ published unchanged to retained groups. Existing scalar consumers still need the
 migration, and direct loader/scroll/native choreography timing remains separately pending.
 
 The shared retained adapter caches ordered group/parent ownership and scene content matrices.
+Initial scalar values and finite/repeating native curves now share one timestamp per submission;
+the former finite path sampled each property separately. Completion publication restores the
+previous sampling scope. This removes intra-submission phase drift without adding application
+frames or a second timeline. It does not resolve the separate Stage text filtering or snapped
+chrome geometry differences; their consumer acceptance remains open.
 Raster edits and property motion do not rebuild unchanged native trees. Membership/order/reparenting,
 font-source replacement and recreation invalidate the appropriate ownership; partial rebuilds are
 not cached as successful. The two-layer native comparison removes 300 tree mutations and 100 matrix
