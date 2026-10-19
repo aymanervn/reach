@@ -113,10 +113,13 @@ static void test_navigation_pages(void)
     expect_true(interrupted_position > 0.0f && interrupted_position < 7.0f,
                 "navigation indicator travels between rows");
 
+    reach_motion interrupted_motion = model->nav_selection;
     reach_settings_model_select_page(model.get(), REACH_SETTINGS_PAGE_ACCOUNT);
-    expect_true(fabsf(model->nav_selection.from - interrupted_position) < 0.01f &&
-                    model->nav_selection.to == 2.0f,
-                "navigation indicator retargets from its current position");
+    expect_true(
+        model->nav_selection.from ==
+                reach_motion_value_at(&interrupted_motion, model->nav_selection.started_seconds) &&
+            model->nav_selection.to == 2.0f,
+        "navigation indicator retargets from its exact event-time position");
     double retarget_elapsed = model->nav_selection.started_seconds;
     reach_settings_model_select_page(model.get(), REACH_SETTINGS_PAGE_ACCOUNT);
     expect_true(model->nav_selection.started_seconds == retarget_elapsed,

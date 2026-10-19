@@ -19,6 +19,7 @@ int32_t reach_render_group_equal(const reach_render_group *first, const reach_re
         first->has_clip != second->has_clip ||
         !reach_render_rect_equal(first->clip, second->clip) ||
         first->clip_radius != second->clip_radius ||
+        !reach_motion_equal(&first->clip_radius_motion, &second->clip_radius_motion) ||
         first->clip_uniform_radius != second->clip_uniform_radius ||
         first->has_tint != second->has_tint || first->has_shadow != second->has_shadow ||
         (first->has_shadow && (first->shadow.offset_x != second->shadow.offset_x ||
@@ -54,6 +55,8 @@ static int32_t reach_render_group_motion_active(const reach_render_group *group)
             if (reach_motion_active(&group->tint[edge]))
                 return 1;
     if (group->has_tint && reach_motion_active(&group->tint_rgb_mix))
+        return 1;
+    if (group->has_clip && reach_motion_active(&group->clip_radius_motion))
         return 1;
     if (group->has_clip)
         for (edge = 0; edge < REACH_RENDER_CLIP_EDGE_COUNT; ++edge)
@@ -150,6 +153,35 @@ reach_result reach_render_group_clip_motion(const reach_render_group *group,
     return REACH_OK;
 }
 
+int32_t reach_render_group_has_rounded_clip(const reach_render_group *group)
+{
+    if (group == 0 || !group->has_clip)
+        return 0;
+    if (group->clip_radius_motion.generation == 0)
+        return group->clip_radius > 0;
+    float minimum = 0, maximum = 0;
+    return reach_motion_range(&group->clip_radius_motion, &minimum, &maximum) != REACH_OK ||
+           maximum > 0;
+}
+
+reach_point_f32 reach_render_group_clip_radii_at(const reach_render_group *group,
+                                                 double now_seconds)
+{
+    reach_point_f32 radii = {0};
+    if (group == 0 || !group->has_clip)
+        return radii;
+    reach_rect_f32 clip = reach_render_group_clip_at(group, now_seconds);
+    float radius = group->clip_radius_motion.generation != 0
+                       ? reach_motion_value_at(&group->clip_radius_motion, now_seconds)
+                       : group->clip_radius;
+    radius = fmaxf(0, radius);
+    radii.x = fminf(radius, clip.width * .5f);
+    radii.y = fminf(radius, clip.height * .5f);
+    if (group->clip_uniform_radius)
+        radii.x = radii.y = fminf(radii.x, radii.y);
+    return radii;
+}
+
 reach_result reach_render_group_clip_radii_motion(const reach_render_group *group,
                                                   reach_motion *out_x, reach_motion *out_y)
 {
@@ -163,6 +195,16 @@ reach_result reach_render_group_clip_radii_motion(const reach_render_group *grou
     reach_motion half_y = reach_motion_affine(&clip.height, 0.5f, 0);
     reach_motion x = reach_motion_clamp(&half_x, 0, group->clip_radius);
     reach_motion y = reach_motion_clamp(&half_y, 0, group->clip_radius);
+    float radius_maximum = group->clip_radius;
+    if (group->clip_radius_motion.generation != 0)
+    {
+        float minimum = 0, maximum = 0;
+        if (reach_motion_range(&group->clip_radius_motion, &minimum, &maximum) != REACH_OK ||
+            minimum < 0 || reach_motion_min(&half_x, &group->clip_radius_motion, &x) != REACH_OK ||
+            reach_motion_min(&half_y, &group->clip_radius_motion, &y) != REACH_OK)
+            return REACH_INVALID_ARGUMENT;
+        radius_maximum = maximum;
+    }
     if (group->clip_uniform_radius)
     {
         reach_motion radius = {0};
@@ -170,8 +212,8 @@ reach_result reach_render_group_clip_radii_motion(const reach_render_group *grou
             return REACH_INVALID_ARGUMENT;
         x = y = radius;
     }
-    *out_x = x;
-    *out_y = y;
+    *out_x = reach_motion_clamp(&x, 0, radius_maximum);
+    *out_y = reach_motion_clamp(&y, 0, radius_maximum);
     return REACH_OK;
 }
 
@@ -271,7 +313,17 @@ static int32_t reach_render_repetition_valid(const reach_render_group *group, in
         (group->clip_uniform_radius && root) || !isfinite(group->clip_radius) ||
         group->clip_radius < 0 || (root && group->clip_radius > 0))
         return 0;
-    if (group->has_clip && group->clip_radius > 0)
+    if (group->clip_radius_motion.generation != 0)
+    {
+        float minimum = 0, maximum = 0;
+        if (root || !group->has_clip || !isfinite(group->clip_radius_motion.started_seconds) ||
+            !isfinite(group->clip_radius_motion.duration_seconds) ||
+            group->clip_radius_motion.duration_seconds < 0 ||
+            reach_motion_range(&group->clip_radius_motion, &minimum, &maximum) != REACH_OK ||
+            minimum < 0)
+            return 0;
+    }
+    if (reach_render_group_has_rounded_clip(group))
     {
         reach_motion radius_x = {0}, radius_y = {0};
         if (reach_render_group_clip_radii_motion(group, &radius_x, &radius_y) != REACH_OK)
@@ -290,7 +342,8 @@ static int32_t reach_render_repetition_valid(const reach_render_group *group, in
                                      &group->tint[1],
                                      &group->tint[2],
                                      &group->tint[3],
-                                     &group->tint_rgb_mix};
+                                     &group->tint_rgb_mix,
+                                     &group->clip_radius_motion};
     for (index = 0; index < sizeof(motions) / sizeof(motions[0]); ++index)
     {
         const reach_motion *motion = motions[index];
@@ -335,8 +388,9 @@ static int32_t reach_render_width_text_valid(const reach_render_command *command
                                              const reach_render_group *viewport)
 {
     if (command == 0 || viewport == 0 || command->type != REACH_RENDER_COMMAND_TEXT ||
-        !viewport->has_clip || viewport->clip_radius != 0 || viewport->has_tint ||
-        viewport->has_shadow || !reach_render_rect_equal(viewport->clip, command->rect) ||
+        !viewport->has_clip || reach_render_group_has_rounded_clip(viewport) ||
+        viewport->has_tint || viewport->has_shadow ||
+        !reach_render_rect_equal(viewport->clip, command->rect) ||
         !reach_render_rect_equal(viewport->bounds, command->rect) || !isfinite(command->rect.x) ||
         !isfinite(command->rect.y) || !isfinite(command->rect.width) ||
         !isfinite(command->rect.height) || command->rect.width <= 0 || command->rect.height <= 0)
@@ -361,7 +415,8 @@ static int32_t reach_render_fitted_rect_valid(const reach_render_command *comman
 {
     return source != 0 &&
            (command->type == REACH_RENDER_COMMAND_RECT ||
-            (command->type == REACH_RENDER_COMMAND_ICON && command->icon_id != 0 &&
+            (command->type == REACH_RENDER_COMMAND_ICON &&
+             source->clip_radius_motion.generation == 0 && command->icon_id != 0 &&
              command->icon_fade_start == 0)) &&
            command->radius == 0 && command->stroke_width == 0 && !command->has_clip_rect &&
            !command->has_scissor && source->has_clip && source->clip_uniform_radius &&
@@ -584,7 +639,7 @@ static int32_t reach_render_group_clips_at(const reach_render_command_buffer *bu
         return 0;
     while (group != 0 && depth++ < buffer->group_count)
     {
-        if (group->has_clip && (!rectangular_only || group->clip_radius == 0))
+        if (group->has_clip && (!rectangular_only || !reach_render_group_has_rounded_clip(group)))
         {
             reach_rect_f32 clip = reach_render_group_clip_at(group, now_seconds);
             reach_transform_f32 transform = reach_render_command_buffer_group_transform_at(
@@ -1067,10 +1122,11 @@ reach_result reach_render_push_image_motion(reach_render_command_buffer *buffer,
 {
     if (buffer == 0 || source == 0 ||
         reach_render_command_buffer_group_shadow(buffer, source->parent_id) != 0 || image == 0 ||
-        image->type != REACH_RENDER_COMMAND_ICON || image->icon_id == 0 || image->radius != 0 ||
-        image->icon_fade_start != 0 || image->has_clip_rect || image->has_scissor ||
-        image->rect_fit_to_clip || image->text_fit_to_clip || image->stroke_width != 0 ||
-        image->caret_group_id != 0 || image->text_color_group_id != 0 ||
+        source->clip_radius_motion.generation != 0 || image->type != REACH_RENDER_COMMAND_ICON ||
+        image->icon_id == 0 || image->radius != 0 || image->icon_fade_start != 0 ||
+        image->has_clip_rect || image->has_scissor || image->rect_fit_to_clip ||
+        image->text_fit_to_clip || image->stroke_width != 0 || image->caret_group_id != 0 ||
+        image->text_color_group_id != 0 ||
         (image->corner_mask != 0 && image->corner_mask != REACH_RENDER_CORNER_ALL))
         return REACH_INVALID_ARGUMENT;
     if (bounds == 0)

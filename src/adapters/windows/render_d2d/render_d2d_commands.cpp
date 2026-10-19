@@ -206,19 +206,16 @@ reach_result reach_d2d_push_group_masks(reach_render_backend *backend, ID2D1Rend
     const reach_render_group *group = reach_render_command_buffer_group(commands, id);
     while (group != nullptr)
     {
-        if (group->has_clip && group->clip_radius > 0)
+        if (reach_render_group_has_rounded_clip(group))
         {
             reach_rect_f32 clip = reach_render_group_clip_at(group, now_seconds);
-            reach_motion radius_x = {}, radius_y = {};
-            if (reach_render_group_clip_radii_motion(group, &radius_x, &radius_y) != REACH_OK)
-                return REACH_ERROR;
+            reach_point_f32 radii = reach_render_group_clip_radii_at(group, now_seconds);
             ComPtr<ID2D1RoundedRectangleGeometry> geometry;
             ComPtr<ID2D1Layer> layer;
             HRESULT hr = backend->factory->CreateRoundedRectangleGeometry(
                 D2D1::RoundedRect(
-                    D2D1::RectF(clip.x, clip.y, clip.x + clip.width, clip.y + clip.height),
-                    reach_motion_value_at(&radius_x, now_seconds),
-                    reach_motion_value_at(&radius_y, now_seconds)),
+                    D2D1::RectF(clip.x, clip.y, clip.x + clip.width, clip.y + clip.height), radii.x,
+                    radii.y),
                 &geometry);
             if (SUCCEEDED(hr))
                 hr = target->CreateLayer(&layer);
@@ -328,8 +325,7 @@ reach_result reach_d2d_execute_fallback(reach_render_backend *backend,
             command.rect = reach_render_group_clip_at(group, now_seconds);
             if (command.rect.width <= 0 || command.rect.height <= 0)
                 continue;
-            command.radius =
-                fminf(group->clip_radius, fminf(command.rect.width, command.rect.height) * .5f);
+            command.radius = reach_render_group_clip_radii_at(group, now_seconds).x;
             command.rect_fit_to_clip = 0;
             clip_owner_id = group->parent_id;
         }

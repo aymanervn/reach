@@ -53,6 +53,7 @@ extern "C"
         reach_color tint_rgb_target;
         int32_t has_shadow;
         reach_shadow shadow;
+        reach_motion clip_radius_motion;
     } reach_render_group;
 
     typedef struct reach_render_stretch
@@ -278,8 +279,11 @@ extern "C"
     reach_render_command_buffer_group_shadow(const reach_render_command_buffer *buffer,
                                              uint64_t id);
     reach_rect_f32 reach_render_group_clip_at(const reach_render_group *group, double now_seconds);
+    reach_point_f32 reach_render_group_clip_radii_at(const reach_render_group *group,
+                                                     double now_seconds);
     reach_result reach_render_group_clip_motion(const reach_render_group *group,
                                                 reach_rect_motion *out_clip);
+    int32_t reach_render_group_has_rounded_clip(const reach_render_group *group);
     reach_result reach_render_group_clip_radii_motion(const reach_render_group *group,
                                                       reach_motion *out_x, reach_motion *out_y);
     int32_t reach_render_group_equal(const reach_render_group *first,

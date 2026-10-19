@@ -1927,3 +1927,48 @@ Evidence under `build/gpu-composition-migration` includes `dock_ratio_dense_cand
 Both product configurations and architecture pass; all 40 tests pass in each configuration at the
 `build-source-coverage-*`/`ctest-source-coverage-*` checkpoint. The descriptor has no size increase.
 Native consumer pixel differences, source/driver memory and complete product efficiency remain open.
+
+## 2026-10-19: Canonical clip radius and edge policy
+
+Retained groups now accept an optional finite/repeating `clip_radius_motion`. Zero generation keeps
+legacy scalar behavior; an explicit zero driver overrides it. Radius range/epoch validation,
+equality, fallback demand, native updates and retirement share the same descriptor. Fitted solid
+paint supports it; specialized fitted images reject a radius driver atomically. Rectangular native
+clips use hard edges and rounded clips use soft edges, matching the existing CPU clip policies.
+
+An independent static-sampled comparison covers 80 owned poses per configuration: both native
+backends, 100/125/150/200% DPI, five progress values, fixed and changing width/height. Native error is
+at most one channel and CPU error is zero. Radius-only changes cause no raster passes or application
+content sampling. A constant-zero override matches a plain rectangular clip exactly. A radius-only
+repeating owner binds both WUC corner-radius controllers and stops them on retirement; both backends
+release the retained layers. Evidence is `radius-motion-check/native-final-{debug,release}.log` under
+`build/gpu-composition-migration`.
+
+The initial fixture exposed a real negative-radius failure: piecewise minimum composition drifted
+about 0.0000114px below zero, which WUC rejected. Native radius outputs now retain a nonnegative
+physical envelope. CPU masks sample the radius and dimensions directly instead of sampling that
+rounded derived curve; this also removes the six/nine-channel static-reference differences caused
+by tiny radius rounding changes. Original failing logs remain preserved.
+
+The radius adds 152 bytes per group and 34,200 bytes per render buffer, including presentation.
+At the existing 496-command/224-group limits the command/group/buffer sizes are
+1040/2400/1056240 bytes. The separate uncommitted Stage command-capacity increase is excluded from
+these milestone sizes. Both current product builds and all 40 tests in each configuration pass
+(`build-radius-retirement-*`, `build-dock-static-generation-*`, `ctest-radius-final-*`). The existing
+Settings navigation fixture now compares interruption at the recorded retarget time; its earlier
+wall-clock sample could fail under scheduling delay. Twenty repeated runs per configuration pass.
+
+Both complete native suites also pass five WUC runs, five DirectComposition runs and HWND fallback
+per configuration (`radius-motion-check/full-fixed-{debug,release}.log`, zero failures). The initial
+52-failure Debug run is preserved: the private padding fixture overwrote the new descriptor, the
+Clipboard fixture bypassed capsule layout/searched an obsolete source ID, and an unmoved Dock press
+replaced an identical constant placement generation. The corrected fixtures retain their original
+criteria, and Dock preserves the existing descriptor for that identical pose. Its broader consumer
+milestone remains uncommitted. An independent HEAD-plus-radius export builds and passes architecture,
+and passes all 40 tests (`radius-milestone-review/ctest-debug.log`), so the selected shared change
+builds and tests without the other feature migrations.
+
+These checks prove the shared radius contract, not whole-consumer appearance or efficiency.
+Settings rounded-edge/vector differences, Stage text source phase, other outstanding consumer
+comparisons and live/product CPU/GPU/power/memory acceptance remain open. No Reach deployment,
+restart, shell/task repair or OS power/radio action was performed for this milestone.

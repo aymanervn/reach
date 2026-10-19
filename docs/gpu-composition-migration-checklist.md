@@ -104,6 +104,13 @@ scoped test results; live/product acceptance remains unchecked.
     Cached/fallback coverage matches static viewport coverage at six widths/four DPI scales.
     Installed Reach is restarted through reachctl and verified alive. The descriptor adds 1,800 bytes
     per render buffer (0.18%). Consumer appearance, shadows and width fitting remain open.
+  - [x] Support an optional canonical radius on retained clip owners.
+    A finite or repeating radius driver overrides the scalar, including zero, and clamps against
+    animated dimensions without a second clock. Invalid ranges/epochs and unsupported fitted-image
+    drivers reject atomically. Both native bindings reuse paint and retire radius-only repetition;
+    CPU masks sample canonical scalars directly. Both builds/all 40 tests and 80 owned poses per
+    configuration across both backends/four DPI values pass (native maximum one, CPU zero).
+    This shared capability does not accept outstanding consumer edge/text appearance or product cost.
   - [x] Preserve width-dependent text layout through retained source parts.
     Shared text/viewport ownership, bounded canonical finite lookup and DirectWrite trim-state
     blocks are implemented on both native backends, with ordinary sampled fallback. Owner-based
