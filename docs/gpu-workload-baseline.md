@@ -1999,3 +1999,26 @@ Both integrated product builds pass (`build-shared-time-{debug,release}.log`), a
 per configuration (`ctest-shared-time-{debug,release}.log`) and five WUC/five DirectComposition runs
 plus HWND fallback (`full-shared-time-{debug,release}.log`, zero failures). Architecture, formatting
 and whitespace checks pass. No Reach deployment, restart, shell/task repair or OS change was made.
+
+## 2026-10-19: Input during native bar movement
+
+Position-only bar frames move the native content window while preserving the capsule's shown
+layout. Pointer dispatch previously passed the moved screen position straight to that shown
+geometry, missing controls during reveal/return. Popup-owner dismissal guards also bypassed the
+retained-root inverse. Both now share one generic screen-point projection: native bars translate
+between published content origins, while retained roots invert canonical translation and scale.
+Shadow padding and the existing popup-local conversion retain their single owners.
+
+The independent actual-host probe passes 1,760 checks in each configuration
+(`coordinator-bar-native-input-{debug,release}.log`). Genuine Dock and three Top Bar styles cover
+four DPIs, initialized hide/return/native-only frames, stable shown geometry, shadow padding,
+original-target capture/leave/rearm/release with actual route callbacks and settled endpoints.
+Retained root X/Y scales/centers, input providers/bounds, popup-local and nonbar controls are also
+covered. The same corrected fixture against former source reports 296 failures; its first
+exploration contained an erroneous action assertion and remains excluded from acceptance evidence.
+
+Both integrated builds and all 40 tests per configuration pass
+(`build-bar-input-scanning-*`, `ctest-bar-input-scanning-*`); formatting/whitespace and architecture
+checks pass. These are mocked-port host checks, not installed interaction or total-cost acceptance.
+Moving popup anchors and item-menu stable-owner handling remain unimplemented. No Reach deployment,
+restart, shell/task repair or OS settings change was performed.

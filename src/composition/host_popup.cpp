@@ -67,6 +67,13 @@ static int32_t reach_host_press_holds_surface_open(reach_host *host,
         return 0;
     }
 
+    reach_feature_surface_geometry geometry = {};
+    if (owner->definition->capsule_ops->surface_geometry != nullptr)
+    {
+        owner->definition->capsule_ops->surface_geometry(owner->capsule, &geometry);
+    }
+    point = reach_host_project_surface_screen_point(owner, &geometry, point,
+                                                    reach_motion_now_seconds());
     reach_feature_control control = {};
     if (!owner->definition->capsule_ops->control_at_point(owner->capsule, point.x, point.y,
                                                           &control) ||

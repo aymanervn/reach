@@ -32,6 +32,49 @@ static int32_t reach_rect_contains(reach_rect_f32 rect, int32_t x, int32_t y)
            (float)y <= rect.y + rect.height;
 }
 
+reach_point_i32
+reach_host_project_surface_screen_point(const reach_feature_runtime *desc,
+                                        const reach_feature_surface_geometry *geometry,
+                                        reach_point_i32 point, double now_seconds)
+{
+    if (desc == nullptr || geometry == nullptr)
+    {
+        return point;
+    }
+    if (!geometry->presentation.retained && desc->definition->surface.bar_reveal.ops != nullptr &&
+        desc->surface != nullptr && desc->surface->bounds_valid &&
+        geometry->visible_bounds.width > 0.0f && geometry->visible_bounds.height > 0.0f)
+    {
+        point.x = (int32_t)lroundf((float)point.x + geometry->visible_bounds.x -
+                                   desc->surface->last_bounds.x);
+        point.y = (int32_t)lroundf((float)point.y + geometry->visible_bounds.y -
+                                   desc->surface->last_bounds.y);
+    }
+    if (geometry->presentation.retained)
+    {
+        const reach_render_group *group = &geometry->presentation.group;
+        reach_point_f32 scale = reach_render_group_scale_at(group, now_seconds);
+        float center_x = geometry->visible_bounds.x +
+                         (geometry->presentation.center_x.generation
+                              ? reach_motion_value_at(&geometry->presentation.center_x, now_seconds)
+                              : geometry->visible_bounds.width * .5f);
+        float center_y = geometry->visible_bounds.y +
+                         (geometry->presentation.center_y.generation
+                              ? reach_motion_value_at(&geometry->presentation.center_y, now_seconds)
+                              : geometry->visible_bounds.height * .5f);
+        if (scale.x > 0.0f && scale.y > 0.0f)
+        {
+            point.x = (int32_t)lroundf(center_x + ((float)point.x - center_x -
+                                                   reach_motion_value_at(&group->x, now_seconds)) /
+                                                      scale.x);
+            point.y = (int32_t)lroundf(center_y + ((float)point.y - center_y -
+                                                   reach_motion_value_at(&group->y, now_seconds)) /
+                                                      scale.y);
+        }
+    }
+    return point;
+}
+
 reach_pointer_event reach_host_surface_pointer_event(const reach_feature_runtime *desc,
                                                      const reach_ui_event *event,
                                                      reach_pointer_event_kind kind)
@@ -70,29 +113,12 @@ reach_pointer_event reach_host_surface_pointer_event(const reach_feature_runtime
         desc->definition->capsule_ops->surface_geometry(desc->capsule, &geometry);
     }
     double now_seconds = reach_motion_now_seconds();
+    reach_point_i32 projected = reach_host_project_surface_screen_point(
+        desc, &geometry, {pointer.x, pointer.y}, now_seconds);
+    pointer.x = projected.x;
+    pointer.y = projected.y;
     if (geometry.presentation.retained)
     {
-        const reach_render_group *group = &geometry.presentation.group;
-        reach_point_f32 scale = reach_render_group_scale_at(group, now_seconds);
-        float center_x = geometry.visible_bounds.x +
-                         (geometry.presentation.center_x.generation
-                              ? reach_motion_value_at(&geometry.presentation.center_x, now_seconds)
-                              : geometry.visible_bounds.width * .5f);
-        float center_y = geometry.visible_bounds.y +
-                         (geometry.presentation.center_y.generation
-                              ? reach_motion_value_at(&geometry.presentation.center_y, now_seconds)
-                              : geometry.visible_bounds.height * .5f);
-        if (scale.x > 0.0f && scale.y > 0.0f)
-        {
-            pointer.x =
-                (int32_t)lroundf(center_x + ((float)pointer.x - center_x -
-                                             reach_motion_value_at(&group->x, now_seconds)) /
-                                                scale.x);
-            pointer.y =
-                (int32_t)lroundf(center_y + ((float)pointer.y - center_y -
-                                             reach_motion_value_at(&group->y, now_seconds)) /
-                                                scale.y);
-        }
         pointer.surface_relation =
             reach_rect_contains(geometry.visible_bounds, pointer.x, pointer.y)
                 ? REACH_POINTER_SURFACE_INSIDE
