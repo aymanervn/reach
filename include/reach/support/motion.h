@@ -17,7 +17,9 @@ extern "C"
         REACH_MOTION_MAX_EXTRA_KNOTS = 7,
         REACH_MOTION_MAX_SEGMENTS = 32,
         REACH_MOTION_MAX_REPEAT_SEGMENTS = 68,
-        REACH_MOTION_MAPPING_STEPS = 2
+        REACH_MOTION_MAPPING_STEPS = 2,
+        REACH_MOTION_MAPPING_RATIO = 3,
+        REACH_MOTION_MAPPING_QUADRATIC = 4
     };
 
     typedef struct reach_motion
@@ -71,6 +73,10 @@ extern "C"
     void reach_motion_animate_to_at(reach_motion *motion, float to, double duration_seconds,
                                     reach_easing easing, double now_seconds);
     reach_motion reach_motion_affine(const reach_motion *motion, float multiplier, float offset);
+    reach_result reach_motion_multiply(const reach_motion *first, const reach_motion *second,
+                                       reach_motion *out_motion);
+    reach_result reach_motion_ratio(const reach_motion *numerator, const reach_motion *denominator,
+                                    reach_motion *out_motion);
     reach_result reach_motion_peak(const reach_motion *motion, float center, float radius,
                                    reach_motion *out_motion);
     reach_result reach_motion_hinge(const reach_motion *motion, float center, float value,

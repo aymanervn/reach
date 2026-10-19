@@ -1898,3 +1898,32 @@ Both full product builds and all 40 tests in each configuration pass at this int
 (`build-radius-integrated-*`, `ctest-radius-integrated-*`). These are scheduling and nonvisual
 ownership checks; installed interaction, bar appearance and total CPU/GPU/power/memory acceptance
 remain open.
+
+## 2026-10-19: Canonical ratio and product fitting
+
+`reach_motion_ratio` and `reach_motion_multiply` use existing descriptor fields for finite rational
+and quadratic maps. Same-epoch ordinary inputs, constants, output affine transforms/limits,
+interior extrema, exact future crossings and event-time interruption share the canonical owner.
+Nested mappings, active input limits and incompatible moving epochs reject without mutating output.
+Both maps compile into the existing 32 native cubic pieces; the error bound remains 2e-7 times the
+output magnitude. Maximal accepted intervals replace ratio-only recursive halving, so a real
+150%-DPI bottom anchor (96 - 96 * 384 / width, width 404.4 to 480) now fits 30 pieces without changing
+precision or increasing the budget.
+
+The independent ratio comparison covers 5,760 curve/property/submission cases in each build:
+5,745 accepted, 15 explicit exponential budget rejections, 2,798,397 sampled poses, peak 31 pieces and
+maximum physical error 0.000466776px after applying large Dock source extents. It loses no previously
+accepted case and gains 58. The independent former Dock layout proof passes 1,120,688 checks after
+that compiler fix; this proves geometry/capacity eligibility, not native paint equivalence.
+A separate quadratic sweep covers 360 cases, 260 accepted and 100 budget rejections, 1,076,830 poses,
+peak 30 pieces and maximum native/CPU difference 0.005011894px at large coordinates. Rejections include
+nonmonotonic and exponential shapes needing more than 32 pieces; they are not accepted capabilities.
+Actual ordinary Stage output separately compiles 5,796 active axes with peak 20 pieces and no rejection
+across 10,232 pure checks. Independent-clock Stage source sampling remains a separate disposition.
+
+Evidence under `build/gpu-composition-migration` includes `dock_ratio_dense_candidate-{debug,release}.log`,
+`dock_geometry_policy_probe_candidate-{debug,release}.log`, `quadratic-dense-debug.log`,
+`quadratic-classify-debug.log` and `stage-check/stage_axis_budget_probe-integrated.log`.
+Both product configurations and architecture pass; all 40 tests pass in each configuration at the
+`build-source-coverage-*`/`ctest-source-coverage-*` checkpoint. The descriptor has no size increase.
+Native consumer pixel differences, source/driver memory and complete product efficiency remain open.

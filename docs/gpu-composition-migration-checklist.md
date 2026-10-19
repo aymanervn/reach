@@ -185,6 +185,13 @@ scoped test results; live/product acceptance remains unchecked.
     checks cover 5,887,882 poses with at most 29/32 segments and 0.061898px error. The former Euler
     response varied with refresh cadence, so other refresh rates require timing review R10.
     This prerequisite does not complete Clipboard/Settings scrolling consumers or product acceptance.
+  - [x] Add bounded same-epoch ratio and quadratic-product motion without another clock or descriptor
+    growth. Core retained validation and fixed-cap derivation accept both maps; CPU range, affine
+    limits, retarget and crossing queries share their canonical intent. Focused pure checks, dense
+    curve comparisons and both builds/all 40 tests pass. Ratio compilation preserves the existing
+    precision and 32-piece budget, including bottom-anchor cancellation. Explicit unsupported input
+    and compilation-budget rejections remain; this prerequisite does not accept Dock/Stage consumer
+    pixels, all eligible combinations, native lifecycle or total product cost.
   - [x] Remove stationary scrollbar-drag frame demand in Clipboard and Settings.
     Pointer events preserve capture, immediate geometry, repaint and release/cancellation. Actual
     sizing/scrolling, worker completion, service notifications and renderer fallback still wake.

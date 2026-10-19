@@ -21,6 +21,9 @@ static int32_t reach_render_stretch_fixed(const reach_motion *motion, float expe
 
 static reach_motion reach_render_stretch_scale(const reach_motion *motion, float caps, float band)
 {
+    if (motion->has_mapping == REACH_MOTION_MAPPING_RATIO ||
+        motion->has_mapping == REACH_MOTION_MAPPING_QUADRATIC)
+        return reach_motion_affine(motion, 1 / band, -caps / band);
     reach_motion result = *motion;
     if (result.has_mapping)
     {

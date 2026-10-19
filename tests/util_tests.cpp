@@ -716,8 +716,242 @@ static void test_lookup_motion_preflight_and_mapped_sources(void)
     }
 }
 
+static void test_ratio_motion_sampling_compilation_and_interruption(void)
+{
+    for (reach_easing easing :
+         {REACH_EASING_EASE_IN, REACH_EASING_EASE_OUT, REACH_EASING_EASE_IN_OUT})
+        for (bool reverse : {false, true})
+        {
+            reach_motion denominator = {}, numerator = {}, ratio = {};
+            reach_motion_start_at(&denominator, reverse ? 2000 : 1800, reverse ? 1800 : 2000, .25,
+                                  easing, 10);
+            reach_motion_set(&numerator, 1920);
+            expect(reach_motion_ratio(&numerator, &denominator, &ratio) == REACH_OK &&
+                       ratio.generation == denominator.generation &&
+                       ratio.started_seconds == denominator.started_seconds &&
+                       ratio.duration_seconds == denominator.duration_seconds,
+                   "ratio fitting preserves the canonical clock and generation");
+            ratio = reach_motion_clamp(&ratio, 0, 1);
+            auto height = reach_motion_affine(&ratio, -128, 128);
+            for (double elapsed : {0.0, .07, .19})
+            {
+                reach_motion_segment pieces[REACH_MOTION_MAX_SEGMENTS] = {};
+                size_t count = reach_motion_compile_at(&height, 10 + elapsed, pieces);
+                expect(count > 0 && count <= REACH_MOTION_MAX_SEGMENTS,
+                       "ordinary capacity ratio compiles within the existing native budget");
+                for (size_t index = 0; index < count; ++index)
+                    for (int step = 0; step <= 32; ++step)
+                    {
+                        const auto &piece = pieces[index];
+                        double t = (piece.end - piece.start) * step / 32;
+                        double now = 10 + elapsed + piece.start + t;
+                        double compiled =
+                            piece.value +
+                            t * (piece.linear + t * (piece.quadratic + t * piece.cubic));
+                        expect(fabs(compiled - reach_motion_value_at(&height, now)) < .00015,
+                               "ratio native cubic follows analytic capacity fitting");
+                    }
+            }
+            for (int step = 0; step <= 1000; ++step)
+            {
+                double now = 10 + .25 * step / 1000;
+                float expected = fminf(1, 1920 / reach_motion_value_at(&denominator, now));
+                expect(fabsf(reach_motion_value_at(&ratio, now) - expected) < .000001f,
+                       "CPU ratio and clamping preserve exact fitting semantics");
+            }
+            double crossing = reach_motion_time_to_value_at(&ratio, .98f, 10);
+            expect(crossing >= 0 && crossing <= .25 &&
+                       fabsf(reach_motion_value_at(&ratio, 10 + crossing) - .98f) < .000001f,
+                   "ratio crossings use the analytic timeline");
+            float current = reach_motion_value_at(&ratio, 10.12);
+            reach_motion_animate_to_at(&ratio, .7f, .2, easing, 10.12);
+            expect(ratio.from == current && !ratio.has_mapping && ratio.started_seconds == 10.12 &&
+                       ratio.duration_seconds == .2,
+                   "ratio interruption starts ordinary intent at the exact visible sample");
+        }
+}
+
+static void test_ratio_motion_affine_cancellation_compilation(void)
+{
+    for (bool reverse : {false, true})
+    {
+        reach_motion width = {}, available = {}, scale = {};
+        reach_motion_start_at(&width, reverse ? 480 : 404.4f, reverse ? 404.4f : 480, .25,
+                              REACH_EASING_EASE_IN_OUT, 10);
+        reach_motion_set(&available, 384);
+        expect(reach_motion_ratio(&available, &width, &scale) == REACH_OK,
+               "narrow capacity fitting retains its exact reciprocal");
+        auto position = reach_motion_affine(&scale, -96, 96);
+        for (double elapsed : {0.0, .07, .19})
+        {
+            reach_motion_segment pieces[REACH_MOTION_MAX_SEGMENTS] = {};
+            size_t count = reach_motion_compile_at(&position, 10 + elapsed, pieces);
+            expect(count > 0 && count <= REACH_MOTION_MAX_SEGMENTS,
+                   "bottom-anchor cancellation fits the existing native segment budget");
+            for (size_t index = 0; index < count; ++index)
+                for (int step = 0; step <= 32; ++step)
+                {
+                    const auto &piece = pieces[index];
+                    double t = (piece.end - piece.start) * step / 32;
+                    double now = 10 + elapsed + piece.start + t;
+                    double compiled =
+                        piece.value + t * (piece.linear + t * (piece.quadratic + t * piece.cubic));
+                    expect(fabs(compiled - reach_motion_value_at(&position, now)) < .00015,
+                           "bottom-anchor native pieces preserve analytic ratio precision");
+                }
+        }
+    }
+}
+
+static void test_ratio_motion_preflight_and_identity(void)
+{
+    reach_motion clock = {}, numerator = {}, ratio = {}, previous = {}, other = {};
+    reach_motion_start_at(&clock, 10800, 10856, .25, REACH_EASING_EASE_IN_OUT, 10);
+    reach_motion_set(&numerator, 1920);
+    expect(reach_motion_ratio(&numerator, &clock, &ratio) == REACH_OK,
+           "192 item capacity fitting derives one reciprocal descriptor");
+    float minimum = 0, maximum = 0;
+    expect(reach_motion_range(&ratio, &minimum, &maximum) == REACH_OK &&
+               fabsf(minimum - 1920.f / 10856) < .000001f &&
+               fabsf(maximum - 1920.f / 10800) < .000001f,
+           "ratio range includes the exact endpoint capacity bounds");
+    for (reach_easing easing : {REACH_EASING_EASE_IN, REACH_EASING_EASE_OUT,
+                                REACH_EASING_EASE_IN_OUT, REACH_EASING_EXPONENTIAL_OUT})
+    {
+        auto ordinary = clock;
+        ordinary.easing = easing;
+        reach_motion fitting = {};
+        expect(reach_motion_ratio(&numerator, &ordinary, &fitting) == REACH_OK,
+               "ordinary maximum-membership fitting keeps analytic ratio intent");
+        auto height = reach_motion_affine(&fitting, -128, 128);
+        reach_motion_segment pieces[REACH_MOTION_MAX_SEGMENTS] = {};
+        expect(reach_motion_compile_at(&fitting, 10, pieces) > 0 &&
+                   reach_motion_compile_at(&height, 10, pieces) > 0,
+               "ordinary 192-item scale and height fit the native piece budget for every easing");
+    }
+    previous = ratio;
+    auto active_clamp = reach_motion_clamp(&clock, 10810, 10850);
+    expect(reach_motion_ratio(&numerator, &active_clamp, &ratio) == REACH_INVALID_ARGUMENT &&
+               reach_motion_equal(&ratio, &previous),
+           "ratio rejects active input clamps without mutating output");
+    expect(reach_motion_ratio(&previous, &clock, &ratio) == REACH_INVALID_ARGUMENT &&
+               reach_motion_equal(&ratio, &previous),
+           "ratio rejects nested nonlinear mappings without mutation");
+    reach_motion_start_at(&other, 1, 2, .25, REACH_EASING_EASE_IN_OUT, 10.01);
+    expect(reach_motion_ratio(&other, &clock, &ratio) == REACH_INVALID_ARGUMENT &&
+               reach_motion_equal(&ratio, &previous),
+           "ratio rejects incompatible clocks without retargeting timing");
+    expect(reach_motion_combine(&previous, 1, &clock, 1, 0, &ratio) == REACH_INVALID_ARGUMENT &&
+               reach_motion_equal(&ratio, &previous),
+           "unsupported mixed nonlinear composition rejects before mutation");
+    auto invalid = clock;
+    invalid.from = -1;
+    expect(reach_motion_ratio(&numerator, &invalid, &ratio) == REACH_INVALID_ARGUMENT &&
+               reach_motion_equal(&ratio, &previous),
+           "ratio rejects a denominator crossing zero before mutation");
+    auto changed = previous;
+    changed.mapping_right_slope += 1;
+    expect(!reach_motion_equal(&changed, &previous),
+           "ratio denominator coefficients participate in retained intent identity");
+}
+
+static void test_quadratic_motion_geometry_and_compilation(void)
+{
+    for (reach_easing easing :
+         {REACH_EASING_EASE_IN, REACH_EASING_EASE_OUT, REACH_EASING_EASE_IN_OUT})
+        for (bool reverse : {false, true})
+        {
+            reach_motion extent = {}, reveal = {}, product = {}, x = {};
+            reach_motion_start_at(&extent, reverse ? 600 : 200, reverse ? 200 : 600, .18, easing,
+                                  10);
+            reveal =
+                reach_motion_affine(&extent, reverse ? -.0003f : .0003f, reverse ? 1.06f : .82f);
+            expect(reach_motion_multiply(&extent, &reveal, &product) == REACH_OK &&
+                       product.generation == extent.generation && product.started_seconds == 10,
+                   "same-epoch multiplication preserves canonical geometry timing");
+            auto position = reach_motion_affine(&extent, .5f, 30);
+            expect(reach_motion_combine(&position, 1, &product, -.5f, 0, &x) == REACH_OK,
+                   "quadratic extent and affine position combine without a second timeline");
+            for (int step = 0; step <= 1000; ++step)
+            {
+                double now = 10 + .18 * step / 1000;
+                float width = reach_motion_value_at(&extent, now);
+                float scale = reach_motion_value_at(&reveal, now);
+                expect(fabsf(reach_motion_value_at(&x, now) - (30 + .5f * width * (1 - scale))) <
+                           .0001f,
+                       "quadratic motion preserves centered reveal geometry");
+            }
+            for (double elapsed : {0.0, .03, .11})
+            {
+                reach_motion_segment pieces[REACH_MOTION_MAX_SEGMENTS] = {};
+                size_t count = reach_motion_compile_at(&product, 10 + elapsed, pieces);
+                expect(count > 0 && count <= REACH_MOTION_MAX_SEGMENTS,
+                       "ordinary insertion fits the existing native segment budget");
+                for (size_t at = 0; at < count; ++at)
+                    for (int step = 0; step <= 32; ++step)
+                    {
+                        const auto &piece = pieces[at];
+                        double t = (piece.end - piece.start) * step / 32;
+                        double value = piece.value +
+                                       t * (piece.linear + t * (piece.quadratic + t * piece.cubic));
+                        expect(fabs(value - reach_motion_value_at(
+                                                &product, 10 + elapsed + piece.start + t)) < .0003,
+                               "native quadratic approximation agrees with analytic sampling");
+                    }
+            }
+        }
+}
+
+static void test_quadratic_motion_extrema_crossings_and_rejection(void)
+{
+    reach_motion clock = {}, falling = {}, peak = {};
+    reach_motion_start_at(&clock, 0, 1, 1, REACH_EASING_EASE_IN_OUT, 10);
+    falling = reach_motion_affine(&clock, -1, 1);
+    expect(reach_motion_multiply(&clock, &falling, &peak) == REACH_OK,
+           "opposing affine inputs produce a nonmonotonic canonical motion");
+    float minimum = 0, maximum = 0;
+    expect(reach_motion_range(&peak, &minimum, &maximum) == REACH_OK && minimum == 0 &&
+               maximum == .25f,
+           "quadratic range includes the internal extremum");
+    auto bounded = reach_motion_clamp(&peak, .1f, .2f);
+    expect(reach_motion_range(&bounded, &minimum, &maximum) == REACH_OK && minimum == .1f &&
+               maximum == .2f,
+           "quadratic limits include both sides of the internal extremum");
+    double first = reach_motion_time_to_value_at(&peak, .1875f, 10);
+    double second = reach_motion_time_to_value_at(&peak, .1875f, 10.5);
+    expect(first > 0 && first < .5 && second > 0 && second < .5 &&
+               fabsf(reach_motion_value_at(&peak, 10 + first) - .1875f) < .000001f &&
+               fabsf(reach_motion_value_at(&peak, 10.5 + second) - .1875f) < .000001f,
+           "quadratic inverse selects the earliest future crossing on either side");
+    reach_motion_segment pieces[REACH_MOTION_MAX_SEGMENTS] = {};
+    expect(reach_motion_compile_at(&bounded, 10, pieces) > 0,
+           "clamped nonmonotonic quadratic compiles both extrema and limit crossings");
+    reach_motion previous = peak, other = clock;
+    other.started_seconds += .01;
+    expect(reach_motion_multiply(&clock, &other, &peak) == REACH_INVALID_ARGUMENT &&
+               reach_motion_equal(&peak, &previous),
+           "independent-epoch products reject without mutation");
+    expect(reach_motion_multiply(&previous, &clock, &peak) == REACH_INVALID_ARGUMENT &&
+               reach_motion_equal(&peak, &previous),
+           "nested products reject degree growth without mutation");
+    auto active_clamp = reach_motion_clamp(&clock, .2f, .8f);
+    expect(reach_motion_multiply(&active_clamp, &clock, &peak) == REACH_INVALID_ARGUMENT &&
+               reach_motion_equal(&peak, &previous),
+           "products reject active input limits without mutation");
+    reach_motion constant = {};
+    reach_motion_set(&constant, 3);
+    expect(reach_motion_multiply(&constant, &previous, &peak) == REACH_OK &&
+               fabsf(reach_motion_value_at(&peak, 10.5) - .75f) < .000001f,
+           "constant products preserve existing nonlinear intent through affine mapping");
+}
+
 int main(void)
 {
+    test_quadratic_motion_geometry_and_compilation();
+    test_quadratic_motion_extrema_crossings_and_rejection();
+    test_ratio_motion_sampling_compilation_and_interruption();
+    test_ratio_motion_preflight_and_identity();
+    test_ratio_motion_affine_cancellation_compilation();
     test_lookup_motion_sampling_compilation_and_retarget();
     test_lookup_motion_preflight_and_mapped_sources();
     test_composed_periodic_motion_preserves_phase();
