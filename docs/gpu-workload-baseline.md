@@ -1881,3 +1881,20 @@ in each configuration (`probe-power-selection-full-{debug,release}.log`, zero fa
 architecture, formatting, whitespace and obsolete Power-API searches pass. No Reach restart, deployment, reinstall, shell/task
 repair or OS power action was performed; live editing/focus/DPI acceptance and total product CPU/GPU,
 power, latency and memory cost remain open in review R9 and the broader acceptance gates.
+
+## 2026-10-19: Bar terminal native position
+
+The generic position-only bar path now includes an unpublished terminal position even after the
+position manager reports inactive. It publishes native bounds and the existing position callback
+once and updates the cached layout bounds. Previously the terminal sample required an ordinary
+arrange, command build and execution.
+
+The private actual-host/capsule probe passes 56 checks in both Debug and Release. Five active samples
+plus one terminal sample perform six bounds publications and six push callbacks with zero arrange,
+command builds or renderer executions; the next idle sample performs none. Actual Dock and Top Bar
+owners also pass one-clock, game-return, reset and constraint-cut checks. Evidence is
+`bar_position_endpoint_probe-{debug,release}.log` under `build/gpu-composition-migration`.
+Both full product builds and all 40 tests in each configuration pass at this integrated checkpoint
+(`build-radius-integrated-*`, `ctest-radius-integrated-*`). These are scheduling and nonvisual
+ownership checks; installed interaction, bar appearance and total CPU/GPU/power/memory acceptance
+remain open.

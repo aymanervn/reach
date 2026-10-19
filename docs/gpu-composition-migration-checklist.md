@@ -533,6 +533,12 @@ scoped test results; live/product acceptance remains unchecked.
   synchronization must sample canonical motion only while needed and avoid unchanged-content redraw.
 - [ ] Separate bar visuals from necessary HWND movement/window push, preserve one physical timeline,
   and ensure required native CPU updates stop when movement settles.
+  - [x] Publish the final position through the generic native-only bar path after the position
+    manager settles. A fresh Debug/Release actual-host probe passes 56 checks per build: five active
+    samples and one terminal bounds/push callback produce no arrange, command build or execution;
+    the next idle sample does no work. Game return, reset and constraint cuts use the existing
+    Dock/Top Bar owners. Broader bar visual migration, installed interaction and total-cost gates
+    remain open.
 
 ## 7. Behavior and resource verification
 
