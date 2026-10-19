@@ -1192,6 +1192,12 @@ without forcing content redraw by themselves. Hide clears the cache, relationshi
 demand. Synchronized presentation continues through the existing full path. This separates native
 sampling from retained content work without feature-specific composition branches; broader layout,
 input and consumer migrations remain pending.
+Bar position-only frames also publish the terminal native position after the capsule's position
+manager becomes inactive. The shared host compares the last published bounds with that endpoint,
+updates the same native window and position callback once, and advances its cached layout bounds.
+This avoids a completion-only arrange, command rebuild and renderer execution. Existing dirty and
+content-motion guards still require the ordinary full frame when necessary.
+
 Native overlay items may also publish a canonical destination rectangle. The runtime samples its
 four properties at the same timestamp as root presentation, then applies the existing client-space
 projection. Destination motion participates in active-only native demand and the terminal sample.

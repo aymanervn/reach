@@ -296,8 +296,7 @@ reach_result reach_host_refresh_monitor_layout(reach_host *host)
     host->monitor_refresh_retry.scheduled = 0;
     host->monitor_topology.confirmation_scheduled = 0;
 
-    reach_monitor_topology_result topology_result =
-        reach_monitor_topology_refresh(&host->monitors);
+    reach_monitor_topology_result topology_result = reach_monitor_topology_refresh(&host->monitors);
     if (topology_result == REACH_MONITOR_TOPOLOGY_FAILED)
     {
         reach_host_defer_monitor_refresh(host);
@@ -403,7 +402,9 @@ int32_t reach_host_can_move_bars_without_redraw(const reach_host *host)
         {
             return 0;
         }
-        position_animating = position_animating || animation.position_animating;
+        position_animating = position_animating || animation.position_animating ||
+                             (desc->surface != nullptr && desc->surface->bounds_valid &&
+                              desc->surface->last_bounds.y != animation.animated_y);
     }
 
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
@@ -430,7 +431,7 @@ reach_result reach_host_move_bar_animation_frame(reach_host *host)
 
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
-        const reach_feature_runtime *desc = &host->feature_runtimes[index];
+        reach_feature_runtime *desc = &host->feature_runtimes[index];
         if (!reach_host_bar_reveal_enabled(desc) ||
             desc->definition->surface.bar_reveal.ops->animation == nullptr ||
             desc->surface == nullptr)
@@ -439,7 +440,8 @@ reach_result reach_host_move_bar_animation_frame(reach_host *host)
         }
         reach_bar_reveal_animation animation =
             desc->definition->surface.bar_reveal.ops->animation(desc->capsule);
-        if (!animation.position_animating)
+        if (!animation.position_animating &&
+            (!desc->surface->bounds_valid || desc->surface->last_bounds.y == animation.animated_y))
         {
             continue;
         }
@@ -458,6 +460,11 @@ reach_result reach_host_move_bar_animation_frame(reach_host *host)
         if (desc->definition->surface.bar_reveal.ops->position_frame != nullptr)
         {
             desc->definition->surface.bar_reveal.ops->position_frame(desc->capsule);
+        }
+        if (desc->frame_context_valid)
+        {
+            desc->layout_context.last_bounds = desc->surface->last_bounds;
+            desc->layout_context.bounds_valid = desc->surface->bounds_valid;
         }
     }
 
