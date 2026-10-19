@@ -757,6 +757,10 @@ reach_window_thumbnail_placement reach_host_native_overlay_placement(
     reach_window_thumbnail_placement placement, const reach_feature_surface_geometry *geometry,
     const reach_feature_surface_context *ctx, reach_shadow_pad shadow_pad, double now_seconds);
 
+reach_point_i32
+reach_host_project_surface_screen_point(const reach_feature_runtime *desc,
+                                        const reach_feature_surface_geometry *geometry,
+                                        reach_point_i32 point, double now_seconds);
 reach_pointer_event reach_host_surface_pointer_event(const reach_feature_runtime *desc,
                                                      const reach_ui_event *event,
                                                      reach_pointer_event_kind kind);

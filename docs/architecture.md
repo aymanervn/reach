@@ -1387,6 +1387,11 @@ content rect, so hit testing, popup placement, trespass, dock-local conversion a
 bar's window-push band all keep working untouched. A fourth consumer would be the failure
 this shape exists to prevent.
 
+Native-only bar movement keeps the capsule's shown content geometry stable. Generic input
+projection translates the actual published content origin back to that capsule geometry;
+pointer dispatch and popup-owner dismissal guards share the same projection. Retained root
+translation/scale is inverted there as well. Shadow margins remain outside this content contract.
+
 The margin is not empty space the renderer may ignore. The WUC host-backdrop visual is
 sized to the whole window, so it must be inset-clipped to `content_rect` or the acrylic
 fills the margin with a hard-edged rectangle. Bars need the same care at the other end:

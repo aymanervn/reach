@@ -560,6 +560,12 @@ scoped test results; live/product acceptance remains unchecked.
     Dock/Top Bar owners. Broader bar visual migration, installed interaction and total-cost gates
     remain open.
 
+  - [x] Project native-only bar pointer events and popup-owner guards into the capsule's stable
+    shown geometry. One generic helper also owns retained-root inverse translation/scale; no
+    feature-specific host branch is added. Actual-host Debug/Release checks pass 1,760 cases each,
+    including reveal/return, capture/rearm/release, shadow padding and transformed popup guards.
+    Both builds/all 40 tests pass. Moving popup anchors and broader live/product acceptance remain open.
+
 ## 7. Behavior and resource verification
 
 - [ ] **Review needed:** Verify appearance, easing, retargeting, capture, hit regions, focus, activation and game mode,
