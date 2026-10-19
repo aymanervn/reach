@@ -432,6 +432,14 @@ are rejected without changing the output. The descriptor stores seven additional
 unused storage does not affect retained intent identity. Output limits and affine transforms retain
 the full mapping. `reach_motion_range` includes every interior extremum.
 
+`reach_motion_ratio` derives a finite ratio with a positive denominator from compatible ordinary
+inputs; `reach_motion_multiply` derives a quadratic product from compatible ordinary inputs.
+Constants need no common epoch. Both reuse existing descriptor storage, preserve the source epoch,
+and support output affine mapping, limits, range and crossing queries. Nested or incompatible
+moving inputs reject without output mutation. Ratio and quadratic native curves share bounded
+adaptive cubic compilation with the existing 32-piece cap and precision. Budget rejection remains
+explicit; consumers must retain a finite canonical fallback for unsupported combinations.
+
 `reach_motion_lookup` projects a finite monotone source into up to eight discrete threshold changes
 without growing the descriptor or introducing another owner. Source mapping/clamp intersections
 resolve into its raw domain; constant native pieces jump through the existing WUC step/DC cubic

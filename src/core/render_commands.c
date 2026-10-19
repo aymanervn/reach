@@ -295,7 +295,9 @@ static int32_t reach_render_repetition_valid(const reach_render_group *group, in
     {
         const reach_motion *motion = motions[index];
         if (motion->has_mapping != 0 && motion->has_mapping != 1 &&
-            motion->has_mapping != REACH_MOTION_MAPPING_STEPS)
+            motion->has_mapping != REACH_MOTION_MAPPING_STEPS &&
+            motion->has_mapping != REACH_MOTION_MAPPING_RATIO &&
+            motion->has_mapping != REACH_MOTION_MAPPING_QUADRATIC)
             return 0;
         if (motion->has_mapping || motion->mapping_extra_count != 0)
         {
