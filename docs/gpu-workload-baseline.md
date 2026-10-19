@@ -2022,3 +2022,39 @@ Both integrated builds and all 40 tests per configuration pass
 checks pass. These are mocked-port host checks, not installed interaction or total-cost acceptance.
 Moving popup anchors and item-menu stable-owner handling remain unimplemented. No Reach deployment,
 restart, shell/task repair or OS settings change was performed.
+
+## 2026-10-19: Complete bounded Settings command output
+
+The shared command bound is now 2,048. The previous committed 496-command bound and intermediate
+776-command worktree bound could silently omit visible Installed Apps rows because void painting
+helpers discarded a full-buffer push error. The actual 1100x16000/100% app scene returned success
+with 106 of 221 visible titles at 776; it now paints all 221 with 1,584 commands. The viewport fits
+the adapter's 16384px dimension and 128MiB scalar source limits, so it cannot be dismissed as an
+unsupported scene. Source/layer-budget fallback remains a separate renderer responsibility.
+
+The maximal bounded Installed Apps scene needs 1,833 paints: 256 rows times seven paints, 39 header
+paints including busy/status variants, and two scrollbar paints. The 64-entry Startup and Update
+scenes remain below that bound. The coordinator independently reran 4,440 actual-app cases and
+610,928 checks in each configuration, with zero missing viewport-visible titles or selected Update
+checkboxes; peak command/group counts are 1,833/221 (`coordinator-capacity-{debug,release}.log`).
+Cases cover 25/50/75/100/125/150/200% DPI, heights through 16384px, all-data-visible overflow,
+icons, busy/status variants and forward/static/reverse scroll.
+
+The first capacity fixture incorrectly expected cached Update rows during scanning, when the
+renderer displays only its loader. That failure remains preserved. Its corrected count oracle
+also passes the complete matrix against source with the separate scanning lifecycle fix reversed
+(`exhaustive_capacity_probe-*-before-scanning-lifecycle.log`); capacity proof does not depend on
+that fix. Hidden scanning controls and scroll demand are separate consumer work.
+
+Commands remain 1,040 bytes and groups 2,400 bytes. The fixed buffer is 2,670,320 bytes: +1,614,080
+versus committed 496, or +1,322,880 versus intermediate 776. Reach owns two persistent heap buffers
+and Settings one: aggregate growth is 4,842,240 bytes versus committed 496, or 3,968,640 versus 776.
+Two simultaneous popup scratch buffers add the same two-buffer amplification transiently; full
+buffer initialization/copy work also grows. Ordinary clear resets metadata without clearing the
+whole command array. No production or tracked-test full buffer is automatically stack allocated.
+These are nominal storage counts, not accepted process/driver memory or performance measurements.
+
+Both coherent product builds and all 40 tests per configuration pass (`build-capacity-*`,
+`ctest-capacity-*`), with the later integrated bar/scanning builds/tests also passing. Architecture,
+formatting and whitespace checks pass. Full product/native resource and efficiency gates remain
+open; no Reach deployment, restart, shell/task repair or OS settings change was performed.

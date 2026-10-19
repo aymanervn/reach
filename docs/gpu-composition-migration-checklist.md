@@ -583,6 +583,12 @@ scoped test results; live/product acceptance remains unchecked.
     path probes still require one execution on the worker. Twenty repeated focused runs in each
     configuration and both full 40-test suites pass; service behavior is unchanged.
 
+  - [x] Size shared command storage for complete bounded Settings output.
+    The 2,048-command bound covers the measured 1,833-paint maximum. Independent actual-app
+    Debug/Release matrices each pass 4,440 cases/610,928 checks with no omitted visible rows or
+    selected checkboxes; both builds/all 40 tests pass. Fixed-buffer growth and transient copies
+    are recorded in the baseline; whole-product memory/performance acceptance remains open.
+
 ## 8. Final acceptance
 
 - [ ] **Review needed:** Publish comparable repeated performance measurements; show no meaningful regression in total
