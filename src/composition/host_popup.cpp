@@ -86,7 +86,8 @@ static int32_t reach_host_press_holds_surface_open(reach_host *host,
     {
         return 1;
     }
-    return control.slot == anchor.slot && (!match_index || control.index == anchor.index);
+    return match_index ? reach_host_layout_anchor_matches_control(&anchor, &control)
+                       : control.slot == anchor.slot;
 }
 
 static void reach_host_handle_global_mouse_down(reach_host *host, reach_point_i32 point)

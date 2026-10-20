@@ -117,6 +117,7 @@ extern "C"
 
     int32_t reach_context_menu_window_list_is_open(const reach_context_menu *menu);
     size_t reach_context_menu_window_list_target(const reach_context_menu *menu);
+    uint64_t reach_context_menu_owner_identity(const reach_context_menu *menu);
     int32_t reach_context_menu_window_list_holds_pointer(const reach_context_menu *menu,
                                                          float screen_x, float screen_y);
     int32_t reach_context_menu_window_list_hover_bounds(const reach_context_menu *menu,

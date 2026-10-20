@@ -941,16 +941,23 @@ static const reach_feature_surface_ops reach_dock_surface_ops = {
 };
 
 static int32_t reach_dock_resolve_anchor(const void *capsule, uint32_t slot, size_t index,
-                                         reach_feature_anchor *out)
+                                         uint64_t identity, reach_feature_anchor *out)
 {
     if (slot != REACH_DOCK_CONTROL_ITEM || out == nullptr)
     {
         return 0;
     }
+    const reach_dock *dock = static_cast<const reach_dock *>(capsule);
+    if (identity != 0)
+    {
+        const reach_dock_state *state = reach_dock_state_ptr(const_cast<reach_dock *>(dock));
+        if (state == nullptr || identity > UINT32_MAX)
+            return 0;
+        index = reach_dock_feature_model_find_item_key(&state->model, (uint32_t)identity);
+    }
     reach_rect_f32 button = {};
     float bar_edge_y = 0.0f;
-    if (!reach_dock_item_anchor(static_cast<const reach_dock *>(capsule), index, &button,
-                                &bar_edge_y))
+    if (!reach_dock_item_anchor(dock, index, &button, &bar_edge_y))
     {
         return 0;
     }
@@ -1029,6 +1036,10 @@ static int32_t reach_context_menu_surface_layout_anchor(const void *capsule,
     out->surface = state->power_open ? REACH_SURFACE_ID_TOP_BAR : REACH_SURFACE_ID_DOCK;
     out->slot = state->power_open ? REACH_TOP_BAR_CONTROL_POWER : REACH_DOCK_CONTROL_ITEM;
     out->index = state->power_open ? 0 : state->target_index;
+    out->identity =
+        state->power_open
+            ? 0
+            : reach_context_menu_owner_identity(static_cast<const reach_context_menu *>(capsule));
     return 1;
 }
 
@@ -1298,12 +1309,12 @@ static const reach_feature_surface_ops reach_clipboard_surface_ops = {
 };
 
 static int32_t reach_top_bar_resolve_anchor(const void *capsule, uint32_t slot, size_t index,
-                                            reach_feature_anchor *out)
+                                            uint64_t identity, reach_feature_anchor *out)
 {
     (void)index;
     const reach_top_bar *top_bar = static_cast<const reach_top_bar *>(capsule);
     const reach_top_bar_state *state = reach_top_bar_state_ptr(top_bar);
-    if (state == nullptr || out == nullptr)
+    if (state == nullptr || out == nullptr || identity != 0)
     {
         return 0;
     }

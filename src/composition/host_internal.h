@@ -273,6 +273,7 @@ typedef struct reach_feature_layout_anchor
     reach_surface_id surface;
     uint32_t slot;
     size_t index;
+    uint64_t identity;
 } reach_feature_layout_anchor;
 
 typedef enum reach_popup_activation_mode
@@ -366,7 +367,7 @@ typedef struct reach_feature_definition
     const reach_feature_capsule_ops *capsule_ops;
     const reach_feature_surface_ops *surface_ops;
     const reach_feature_control_ops *control_ops;
-    int32_t (*resolve_anchor)(const void *capsule, uint32_t slot, size_t index,
+    int32_t (*resolve_anchor)(const void *capsule, uint32_t slot, size_t index, uint64_t identity,
                               reach_feature_anchor *out);
     reach_surface_spec surface;
     reach_layout_spec layout;
@@ -401,6 +402,10 @@ typedef struct reach_feature_runtime
     reach_window_id frame_native_target;
     reach_feature_surface_context layout_context;
     reach_feature_surface_context native_overlay_context;
+    reach_feature_layout_anchor resolved_anchor_owner;
+    reach_feature_anchor resolved_anchor;
+    reach_rect_f32 resolved_anchor_bounds;
+    int32_t resolved_anchor_valid;
     reach_feature_surface_geometry frame_geometry;
     reach_shadow_pad native_overlay_shadow_pad;
     const reach_feature_definition *definition;
@@ -467,6 +472,10 @@ void reach_host_close_registered_surface(reach_host *host, reach_surface_id id,
 void reach_host_set_pointer_observation(reach_host *host, reach_surface_id id,
                                         reach_rect_f32 bounds, int32_t enabled);
 void reach_host_close_surfaces_on_persistent_press(reach_host *host);
+int32_t reach_host_layout_anchor_equal(const reach_feature_layout_anchor *left,
+                                       const reach_feature_layout_anchor *right);
+int32_t reach_host_layout_anchor_matches_control(const reach_feature_layout_anchor *anchor,
+                                                 const reach_feature_control *control);
 reach_popup_activation_decision
 reach_host_popup_activation_decide(int32_t open, const reach_feature_layout_anchor *current,
                                    const reach_feature_layout_anchor *requested,

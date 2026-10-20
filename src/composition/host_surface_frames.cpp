@@ -701,6 +701,7 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
         desc->surface->fallback_animation_active = 0;
         desc->surface->commands_require_content_sampling = 0;
         desc->frame_context_valid = 0;
+        desc->resolved_anchor_valid = 0;
         if (desc->surface->window.ops.set_input_presentation != nullptr)
             (void)desc->surface->window.ops.set_input_presentation(desc->surface->window.window,
                                                                    nullptr);
@@ -727,6 +728,8 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
         (void)desc->definition->surface_ops->layout_anchor(desc->capsule, &layout_anchor);
     }
     reach_surface_id anchor_id = layout_anchor.surface;
+    if (!reach_host_layout_anchor_equal(&layout_anchor, &desc->resolved_anchor_owner))
+        desc->resolved_anchor_valid = 0;
     if (anchor_id < REACH_HOST_SURFACE_COUNT)
     {
         const reach_feature_runtime *anchor = &host->feature_runtimes[anchor_id];
@@ -739,12 +742,23 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
         {
             reach_feature_anchor resolved = {};
             if (anchor->definition->resolve_anchor(anchor->capsule, layout_anchor.slot,
-                                                   layout_anchor.index, &resolved))
+                                                   layout_anchor.index, layout_anchor.identity,
+                                                   &resolved))
             {
-                surface_ctx.anchor_button = resolved.button;
-                surface_ctx.anchor_bar_edge_y = resolved.bar_edge_y;
-                surface_ctx.anchor_bar_height = resolved.bar_height;
-                surface_ctx.anchor_direction = resolved.direction;
+                desc->resolved_anchor_owner = layout_anchor;
+                desc->resolved_anchor = resolved;
+                desc->resolved_anchor_bounds = surface_ctx.anchor_bounds;
+                desc->resolved_anchor_valid = 1;
+            }
+            else if (layout_anchor.identity == 0)
+                desc->resolved_anchor_valid = 0;
+            if (desc->resolved_anchor_valid)
+            {
+                surface_ctx.anchor_bounds = desc->resolved_anchor_bounds;
+                surface_ctx.anchor_button = desc->resolved_anchor.button;
+                surface_ctx.anchor_bar_edge_y = desc->resolved_anchor.bar_edge_y;
+                surface_ctx.anchor_bar_height = desc->resolved_anchor.bar_height;
+                surface_ctx.anchor_direction = desc->resolved_anchor.direction;
                 surface_ctx.anchor_valid = 1;
             }
         }

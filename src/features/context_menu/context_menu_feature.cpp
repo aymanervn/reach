@@ -476,6 +476,11 @@ void reach_context_menu_command_action(const reach_menu_request *request,
     }
 }
 
+uint64_t reach_context_menu_owner_identity(const reach_context_menu *menu)
+{
+    return menu != nullptr ? menu->request.owner_identity : 0;
+}
+
 void reach_context_menu_open_for_item(reach_context_menu *menu, size_t target_index,
                                       const reach_context_menu_open_context *ctx)
 {

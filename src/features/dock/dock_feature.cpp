@@ -587,7 +587,7 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
         {
             out->handled = 1;
             out->control = {REACH_DOCK_CONTROL_ITEM, hit.index, 1,
-                            event->button == REACH_POINTER_BUTTON_SECONDARY};
+                            event->button == REACH_POINTER_BUTTON_SECONDARY, target};
             if (event->button == REACH_POINTER_BUTTON_PRIMARY)
             {
                 reach_dock_interaction_result interaction = {};
@@ -763,6 +763,7 @@ static int32_t reach_dock_capsule_control_at_point(const void *capsule, int32_t 
     case REACH_DOCK_HIT_ITEM:
         out->slot = REACH_DOCK_CONTROL_ITEM;
         out->index = hit.index;
+        out->identity = reach_dock_item_key_at(&dock->state.model, hit.index);
         out->valid = 1;
         return 1;
     case REACH_DOCK_HIT_TRIGGER:
@@ -1308,6 +1309,7 @@ int32_t reach_dock_build_menu_request(reach_dock *dock, size_t item_index, float
     out_request->drop_direction = REACH_POPUP_DROP_UP;
 
     const reach_dock_item_model *item = reach_dock_item_at(dock, item_index);
+    out_request->owner_identity = item->key;
     out_request->window = item->window;
     out_request->pin_id = item->pin_id;
     reach_copy_utf16(out_request->path, REACH_MENU_TEXT_CAPACITY, item->application.launch.path);

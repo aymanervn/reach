@@ -2058,3 +2058,22 @@ Both coherent product builds and all 40 tests per configuration pass (`build-cap
 `ctest-capacity-*`), with the later integrated bar/scanning builds/tests also passing. Architecture,
 formatting and whitespace checks pass. Full product/native resource and efficiency gates remain
 open; no Reach deployment, restart, shell/task repair or OS settings change was performed.
+
+## 2026-10-20: Stable popup owner identity
+
+Optional owner identities now accompany public controls and immutable menu requests. The generic
+runtime resolves keyed owners by their current model identity and matches activation/dismissal by
+that same key. Dock publishes its application key; Context Menu exposes the copied request key
+through its public capsule API. Reorder cannot attach the menu to a replacement item at its former
+index. If the original context owner disappears, the menu keeps its immutable commands and the
+last resolved original button, surface bounds and shown-bar edge. Preview departure retains its
+existing close/relationship-release policy; unkeyed callers preserve index matching.
+
+The coordinator reviewed the actual incremental production diff and independently compiled and
+ran the actual-host pure fixture in both configurations: 517 checks each, zero failures
+(`coordinator-popup-owner-{debug,release}.log`). Four DPI scales, context menus and previews,
+preceding removal/reorder, original-owner loss, original unpin action, stable/legacy matching and
+exact relationship release are covered. Coherent product builds, architecture and all 40 tests
+per configuration pass (`build-owner-ink-*`, `ctest-owner-ink-*`). These mocked-port host checks
+do not establish installed visual/input behavior or total resource cost. Continuous moving popup
+anchors, monitor-clamped reflow, live preview alignment and performance acceptance remain open.

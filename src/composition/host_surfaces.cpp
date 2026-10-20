@@ -349,11 +349,29 @@ void reach_host_set_registered_surface_open(reach_host *host, reach_surface_id i
     reach_host_apply_feature_tick_result(host, runtime, &result);
 }
 
-static int32_t reach_host_layout_anchor_equal(const reach_feature_layout_anchor *left,
-                                              const reach_feature_layout_anchor *right)
+static int32_t reach_host_owner_identity_equal(size_t left_index, uint64_t left_identity,
+                                               size_t right_index, uint64_t right_identity)
+{
+    return left_identity != 0 || right_identity != 0 ? left_identity == right_identity
+                                                     : left_index == right_index;
+}
+
+int32_t reach_host_layout_anchor_equal(const reach_feature_layout_anchor *left,
+                                       const reach_feature_layout_anchor *right)
 {
     return left != nullptr && right != nullptr && left->surface == right->surface &&
-           left->slot == right->slot && left->index == right->index;
+           left->slot == right->slot &&
+           reach_host_owner_identity_equal(left->index, left->identity, right->index,
+                                           right->identity);
+}
+
+int32_t reach_host_layout_anchor_matches_control(const reach_feature_layout_anchor *anchor,
+                                                 const reach_feature_control *control)
+{
+    return anchor != nullptr && control != nullptr && control->valid &&
+           anchor->slot == control->slot &&
+           reach_host_owner_identity_equal(anchor->index, anchor->identity, control->index,
+                                           control->identity);
 }
 
 reach_popup_activation_decision
