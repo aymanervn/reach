@@ -1904,10 +1904,16 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
         const reach_render_command *commands = nullptr;
         size_t count = 0;
         std::vector<reach_render_command> owned;
+        reach_rect_f32 requested_bounds = {};
+        bool requested_bounds_valid = false;
+        bool raster_birth_aligned = false;
+        bool raster_finite_translation = false;
     };
     std::vector<retained_plan> plans;
     auto preserve_raster_bounds = [&](retained_plan &plan)
     {
+        plan.requested_bounds = plan.group.bounds;
+        plan.requested_bounds_valid = true;
         auto bounds = raster_source_bounds(commands, plan.group);
         if (!raster_translation_fixed(commands, plan.group) && plan.count == 1)
         {
@@ -2470,23 +2476,6 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
         if (limit_fit_sources() != REACH_OK)
             return REACH_ERROR;
     }
-    for (const auto &fit : fitted_textboxes)
-        if (!fit.expanded &&
-            reach_d2d_textbox_color_active(fit.source.color, motion_sample_time(backend)))
-            backend->sampled_textboxes.push_back(fit.source);
-    for (const auto &fit : fitted_text)
-        if (!fit.expanded && reach_motion_active_at(&fit.width, motion_sample_time(backend)))
-            backend->sampled_text.push_back({fit.owner, fit.command, fit.width});
-    for (const auto &fit : fitted_images)
-        if (!fit.expanded)
-        {
-            bool active = false;
-            for (const reach_motion *motion : {&fit.source.bounds.x, &fit.source.bounds.y,
-                                               &fit.source.bounds.width, &fit.source.bounds.height})
-                active = active || reach_motion_active_at(motion, motion_sample_time(backend));
-            if (active)
-                backend->sampled_images.push_back(fit.source);
-        }
     backend->image_fit_owners.erase(
         std::remove_if(backend->image_fit_owners.begin(), backend->image_fit_owners.end(),
                        [&](const reach_d2d_fit_owner &owner)
@@ -2505,6 +2494,155 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
                                                { return fit.owner == owner.owner; });
                        }),
         backend->text_width_owners.end());
+    auto align_ink_sources = [&]()
+    {
+        for (auto &plan : plans)
+        {
+            plan.raster_birth_aligned = false;
+            plan.raster_finite_translation = false;
+            if (plan.count == 0 || plan.group.has_shadow ||
+                !std::all_of(plan.commands, plan.commands + plan.count,
+                             [](const reach_render_command &paint)
+                             {
+                                 return paint.type == REACH_RENDER_COMMAND_TEXT ||
+                                        paint.type == REACH_RENDER_COMMAND_VECTOR_ICON;
+                             }) ||
+                std::any_of(plans.begin(), plans.end(), [&](const retained_plan &child)
+                            { return child.group.parent_id == plan.group.id; }))
+                continue;
+            auto requested =
+                plan.requested_bounds_valid ? plan.requested_bounds : plan.group.bounds;
+            plan.group.bounds = requested;
+            auto unit = [](const reach_motion &motion)
+            {
+                if (motion.generation == 0)
+                    return true;
+                float minimum = 0, maximum = 0;
+                return reach_motion_range(&motion, &minimum, &maximum) == REACH_OK &&
+                       minimum == 1 && maximum == 1;
+            };
+            bool valid = commands->content_transform.scale_x == 1 &&
+                         commands->content_transform.scale_y == 1;
+            double now = motion_sample_time(backend);
+            float x = commands->content_transform.offset_x,
+                  y = commands->content_transform.offset_y;
+            bool finite_translation = false, constant_translation = true;
+            auto inspect_translation = [&](const reach_render_group &transform)
+            {
+                for (const auto *axis : {&transform.x, &transform.y})
+                {
+                    if (axis->generation == 0)
+                        continue;
+                    finite_translation =
+                        finite_translation || (axis->duration_seconds > 0 && !axis->repeating);
+                    constant_translation =
+                        constant_translation && axis->duration_seconds <= 0 && !axis->repeating;
+                }
+            };
+            const reach_render_group *group = &plan.group;
+            size_t depth = 0;
+            while (valid && group != nullptr && depth++ <= plans.size())
+            {
+                inspect_translation(*group);
+                valid = unit(group->scale) && unit(reach_render_group_y_scale(group));
+                x += reach_motion_value_at(&group->x, now);
+                y += reach_motion_value_at(&group->y, now);
+                if (group->parent_id == 0)
+                    group = nullptr;
+                else
+                {
+                    auto parent = plan_for(group->parent_id);
+                    if (parent == plans.end())
+                    {
+                        valid = false;
+                        break;
+                    }
+                    group = &parent->group;
+                }
+            }
+            valid = valid && group == nullptr;
+            if (valid && commands->has_presentation)
+            {
+                const auto &root = commands->presentation;
+                inspect_translation(root);
+                valid = unit(root.scale) && unit(reach_render_group_y_scale(&root));
+                x += reach_motion_value_at(&root.x, now);
+                y += reach_motion_value_at(&root.y, now);
+            }
+            plan.requested_bounds = requested;
+            plan.requested_bounds_valid = true;
+            if (!valid)
+                continue;
+            plan.raster_finite_translation = finite_translation;
+            auto previous = std::find_if(
+                backend->retained_layers.begin(), backend->retained_layers.end(),
+                [&](const reach_d2d_retained_layer &layer) { return layer.id == plan.group.id; });
+            bool same =
+                previous != backend->retained_layers.end() && previous->raster_birth_aligned &&
+                !(previous->raster_finite_translation && constant_translation) &&
+                memcmp(&requested, &previous->raster_requested_bounds, sizeof(requested)) == 0 &&
+                previous->commands.size() == plan.count;
+            for (size_t at = 0; same && at < plan.count; ++at)
+            {
+                auto paint = plan.commands[at];
+                localize(paint, previous->group.bounds);
+                same = memcmp(&paint, &previous->commands[at], sizeof(paint)) == 0;
+            }
+            if (same)
+            {
+                plan.group.bounds = previous->group.bounds;
+                plan.raster_birth_aligned = true;
+                continue;
+            }
+            auto bounds = requested;
+            float left = floorf(bounds.x + x), top = floorf(bounds.y + y);
+            bounds.width = ceilf(bounds.x + x + bounds.width) - left;
+            bounds.height = ceilf(bounds.y + y + bounds.height) - top;
+            bounds.x = left - x;
+            bounds.y = top - y;
+            if (bounds.width > 0 && bounds.height > 0 &&
+                bounds.width <= REACH_D2D_MAX_SURFACE_DIMENSION &&
+                bounds.height <= REACH_D2D_MAX_SURFACE_DIMENSION)
+            {
+                plan.group.bounds = bounds;
+                plan.raster_birth_aligned = true;
+            }
+        }
+    };
+    auto expanded_fit_count = [&]()
+    {
+        auto expanded = [](const auto &fit) { return fit.expanded; };
+        return std::count_if(fitted_text.begin(), fitted_text.end(), expanded) +
+               std::count_if(fitted_images.begin(), fitted_images.end(), expanded) +
+               std::count_if(fitted_textboxes.begin(), fitted_textboxes.end(), expanded);
+    };
+    align_ink_sources();
+    while (planned_bytes() > REACH_D2D_MAX_SURFACE_BYTES ||
+           plans.size() > REACH_MAX_RENDER_GROUPS * 2 + 1)
+    {
+        auto expanded = expanded_fit_count();
+        if (limit_fit_sources() != REACH_OK || expanded_fit_count() >= expanded)
+            return REACH_ERROR;
+        align_ink_sources();
+    }
+    for (const auto &fit : fitted_textboxes)
+        if (!fit.expanded &&
+            reach_d2d_textbox_color_active(fit.source.color, motion_sample_time(backend)))
+            backend->sampled_textboxes.push_back(fit.source);
+    for (const auto &fit : fitted_text)
+        if (!fit.expanded && reach_motion_active_at(&fit.width, motion_sample_time(backend)))
+            backend->sampled_text.push_back({fit.owner, fit.command, fit.width});
+    for (const auto &fit : fitted_images)
+        if (!fit.expanded)
+        {
+            bool active = false;
+            for (const reach_motion *motion : {&fit.source.bounds.x, &fit.source.bounds.y,
+                                               &fit.source.bounds.width, &fit.source.bounds.height})
+                active = active || reach_motion_active_at(motion, motion_sample_time(backend));
+            if (active)
+                backend->sampled_images.push_back(fit.source);
+        }
+
     bool topology_changed =
         !backend->retained_topology_valid || plans.size() != backend->retained_topology.size() ||
         !std::equal(plans.begin(), plans.end(), backend->retained_topology.begin(),
@@ -2608,6 +2746,8 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
             allow_text_snap = text_snap_transform(ancestor);
             ancestor_id = ancestor.parent_id;
         }
+        found->raster_birth_aligned = false;
+        found->raster_finite_translation = false;
         if (SUCCEEDED(hr))
             hr = sync_layer(backend, *found, plan.group, plan.commands, plan.count, origin,
                             allow_text_snap);
@@ -2761,6 +2901,14 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
                 hr = end_hr;
         }
     }
+    if (SUCCEEDED(hr))
+        for (auto &layer : backend->retained_layers)
+        {
+            const auto &plan = *plan_for(layer.id);
+            layer.raster_requested_bounds = plan.requested_bounds;
+            layer.raster_birth_aligned = plan.raster_birth_aligned;
+            layer.raster_finite_translation = plan.raster_finite_translation;
+        }
     record_retained_bytes(backend);
     return SUCCEEDED(hr) ? REACH_OK : REACH_ERROR;
 }

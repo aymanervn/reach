@@ -148,6 +148,7 @@ struct reach_d2d_retained_layer
     std::shared_ptr<reach_d2d_shadow_scene> shadow_scene;
     uint64_t shadow_bytes = 0;
     reach_render_group group = {};
+    reach_rect_f32 raster_requested_bounds = {};
     std::vector<reach_render_command> commands;
     ComPtr<ABI::Windows::UI::Composition::IContainerVisual> container;
     ComPtr<ABI::Windows::UI::Composition::ISpriteVisual> visual;
@@ -169,6 +170,8 @@ struct reach_d2d_retained_layer
     UINT width = 0;
     UINT height = 0;
     bool initialized = false;
+    bool raster_birth_aligned = false;
+    bool raster_finite_translation = false;
     bool has_children = false;
     bool text_phase_valid = false;
     bool text_pixel_aligned = false;

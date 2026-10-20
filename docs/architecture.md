@@ -755,8 +755,18 @@ Presentation completion observes its deadline at the current time and scopes its
 publication separately, so a completed submission cannot retain a stale timestamp.
 
 Native raster planning preserves physical pixel phase for fitted text and isolated vector icons
-under fixed unit-scale ancestry. Moving unchanged content can reuse its existing raster origin;
-settled descriptors realign it at the next legitimate submission. Explicit solid-clip fill owners
+under fixed unit-scale ancestry. Leaf sources containing only text and vector paint also align
+their birth envelope through unit-scale native translation ancestry, using the submission's
+captured timestamp. Each layer keeps its raw requested envelope separately from the aligned raster
+origin. Matching paint/envelopes reuse that origin through finite retargets, clip/tint changes and
+compatible reparenting. A finite-to-constant translation cut realigns once at the legitimate cleanup
+submission; static reparenting retains reuse. Attempted synchronization invalidates that layer's
+alignment metadata, and only a fully successful synchronization publishes replacement metadata.
+Alignment participates in the aggregate source/layer budget. Planning reapplies existing finite
+fit fallbacks until the aligned allocation fits; each retry must remove an expansion, and an
+irreducible overflow rejects before layer synchronization. Sampled-source ownership is published
+after those decisions settle. No application frame or extra animation clock is added.
+Explicit solid-clip fill owners
 can bake fixed rounded geometry into their source; arbitrary viewport clips retain unchanged source
 pixels. CPU fallback draws the same sampled fill directly
 and retains ancestor clipping/tint. Moving geometry retains native clips.
