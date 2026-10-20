@@ -2077,3 +2077,38 @@ exact relationship release are covered. Coherent product builds, architecture an
 per configuration pass (`build-owner-ink-*`, `ctest-owner-ink-*`). These mocked-port host checks
 do not establish installed visual/input behavior or total resource cost. Continuous moving popup
 anchors, monitor-clamped reflow, live preview alignment and performance acceptance remain open.
+
+## 2026-10-20: Source birth alignment, budget and endpoint cleanup
+
+Retained text/vector leaf sources now keep raw requested bounds separately from a physically
+aligned birth envelope under unit-scale translation ancestry. Unchanged paint, finite retargets,
+clips, tint and compatible reparenting retain the same source. Metadata is invalidated before an
+attempted layer synchronization and published only after the whole synchronization succeeds.
+Finite-to-constant translation cuts realign at one legitimate cleanup submission; zero-generation
+motion fields retain their constant-default semantics. Static reparenting still reuses its source.
+
+The coordinator independently reproduced the generic endpoint defect on both backends: no repaint,
+81 maximum channel difference and 3,731 differing channels. After the fix, Debug/Release each
+produce one repaint and zero difference from the fresh static reference on both backends
+(`endpoint-coordinator-{before-debug,after-debug,after-release}.log`). Actual Stage opening cleanup
+already replaced its fitted banks with static output; all four DPI scales match exactly with one
+cleanup repaint. The fixture also asserts unchanged paint/raw envelopes, finite retarget reuse,
+static reparent reuse, zero work while waiting and final retirement. This accepts that cleanup
+boundary, not the outstanding finite Stage glyph/filter and snapped-border comparisons.
+
+Alignment now participates in the existing 128MiB/layer preflight before native layer sync. Each
+retry must reduce expanded-fit ownership; sampling lists are published only after the final fit
+decisions. Independent near-budget native cases in both configurations/backends start at
+134,217,600 raw bytes, below the 134,217,728 limit. Alignment selects the existing finite text
+sampling fallback and retains 133,833,628 bytes in three layers, with one sampled text owner
+(`birth-budget-coordinator-{debug,release}.log`). The original pure boundary example grows from
+134,217,216 raw bytes to 134,290,836 aligned bytes, demonstrating why pre-alignment accounting
+was insufficient. Per-layer metadata grows; no public render command/group/buffer fields change.
+
+Both coherent product builds/all 40 tests pass (`build-final-birth-*`, `ctest-final-birth-*`).
+The coordinator ran five full WUC and five DirectComposition regressions plus HWND fallback in
+each configuration; both exit zero (`final-birth-full/{debug,release}/full-native.log`). Capture
+output paths are isolated; suite checks and tolerances are unchanged. The focused staged source
+also compiles independently in both configurations with unrelated image-material WIP excluded.
+Finite consumer fidelity, live/product behavior, actual resource cost and performance gates remain
+open. The separate rounded-fill cap experiment is private and has unresolved strict pixel failures.

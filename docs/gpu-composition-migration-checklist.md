@@ -288,6 +288,15 @@ scoped test results; live/product acceptance remains unchecked.
     Debug/Release and final lifecycle-counter probes pass. Displayed pixels, actual device loss
     and repeated total product workload acceptance remain open.
 
+  - [x] Preserve translated text/vector source birth alignment and finite endpoint cleanup.
+    Per-layer raw/aligned envelopes reuse unchanged paint through retarget and reparenting; a
+    finite-to-constant cut realigns once. Alignment is included in the shared allocation budget
+    before layer sync, with bounded existing fit fallback and success-only metadata publication.
+    Independent Debug/Release endpoint and near-128MiB native checks pass on both backends;
+    generic endpoint pixels improve from a maximum channel difference of 81 to zero with one repaint.
+    Both builds/all 40 tests and five full native runs per backend plus HWND fallback pass in each
+    configuration. Finite consumer text/edge appearance and total product cost remain open.
+
 ## 4. Feedback and repetition
 
 - [ ] Migrate eligible hover, press, selection and close feedback across Context Menu, Battery, tray,
