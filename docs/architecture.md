@@ -1118,6 +1118,12 @@ composition-side translator. A press that only composition's pointer policy read
 at all: the capsule publishes an opaque `reach_feature_control` naming which of its own controls was
 pressed, and those same slot tokens serve as the anchor slots in `reach_feature_layout_anchor`, so
 one vocabulary describes both "this control was pressed" and "this popup hangs off that control".
+Controls and layout anchors may also carry a stable owner identity. Keyed owners compare that
+identity instead of a mutable list index; unkeyed owners retain index matching. Dock menu requests
+copy the application key with their immutable command payload. Generic anchor resolution follows
+that key through reorder, and retains the last resolved original anchor if the keyed owner
+disappears. It never substitutes the replacement item at the opening index. Hidden surfaces clear
+the cached anchor. Continuous following during GPU-only owner motion remains migration work.
 An action that opens or changes
 another feature is not in the vocabulary at all: the feature exposes a neutral outbound slot
 (`reach_dock_routes`, `reach_top_bar_routes`) and `interfeature_routes.cpp` alone decides what it

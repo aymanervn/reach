@@ -428,8 +428,8 @@ int32_t reach_host_popup_owner_trigger(const reach_feature_runtime *popup,
     {
         return 0;
     }
-    return owner.surface == source->definition->id && owner.slot == source_result->control.slot &&
-           owner.index == source_result->control.index;
+    return owner.surface == source->definition->id &&
+           reach_host_layout_anchor_matches_control(&owner, &source_result->control);
 }
 
 typedef struct reach_host_popup_pointer_result

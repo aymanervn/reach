@@ -54,6 +54,7 @@ extern "C"
         size_t index;
         int32_t valid;
         int32_t popup_trigger;
+        uint64_t identity;
     } reach_feature_control;
 
     typedef struct reach_pointer_event

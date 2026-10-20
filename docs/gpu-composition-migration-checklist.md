@@ -566,6 +566,13 @@ scoped test results; live/product acceptance remains unchecked.
     including reveal/return, capture/rearm/release, shadow padding and transformed popup guards.
     Both builds/all 40 tests pass. Moving popup anchors and broader live/product acceptance remain open.
 
+  - [x] Preserve stable popup-owner identity through Dock model changes.
+    Optional identities flow through controls, immutable menu requests, generic activation/dismissal
+    matching and anchor resolution. Reorder follows the original key; owner loss preserves the last
+    resolved original context-menu anchor and commands. Preview lifetime retains its existing
+    source-loss policy. Independent actual-host probes pass 517 checks per configuration, with both
+    builds/all 40 tests passing. Continuous moving anchors and installed interaction remain open.
+
 ## 7. Behavior and resource verification
 
 - [ ] **Review needed:** Verify appearance, easing, retargeting, capture, hit regions, focus, activation and game mode,

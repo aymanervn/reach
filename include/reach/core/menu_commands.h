@@ -63,6 +63,7 @@ extern "C"
         int32_t anchored;
         float pointer_x;
         float pointer_y;
+        uint64_t owner_identity;
     } reach_menu_request;
 
     static inline int32_t reach_menu_request_allows(const reach_menu_request *request,
