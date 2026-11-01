@@ -716,6 +716,41 @@ static void test_lookup_motion_preflight_and_mapped_sources(void)
     }
 }
 
+static void test_lookup_range_preserves_first_threshold_extrema(void)
+{
+    const float thresholds[] = {10, 20, 30};
+    for (int direction : {0, 1})
+        for (float peak : {-1.f, 1.f})
+        {
+            reach_motion source = {}, steps = {};
+            reach_motion_start_at(&source, direction ? 35.f : 5.f, direction ? 5.f : 35.f, 1,
+                                  REACH_EASING_EASE_OUT, 10);
+            const float values[] = {0, peak, 0, peak * .5f};
+            expect(reach_motion_lookup(&source, thresholds, values, 3, &steps) == REACH_OK,
+                   "range regression constructs first-threshold peak");
+            float minimum = 71, maximum = 72;
+            expect(reach_motion_range(&steps, &minimum, &maximum) == REACH_OK &&
+                       minimum == fminf(0, peak) && maximum == fmaxf(0, peak),
+                   "step range includes both sides of first threshold in either direction");
+            auto clamped = reach_motion_clamp(&steps, -.25f, .25f);
+            expect(reach_motion_range(&clamped, &minimum, &maximum) == REACH_OK &&
+                       minimum == fmaxf(-.25f, fminf(0, peak)) &&
+                       maximum == fminf(.25f, fmaxf(0, peak)),
+                   "step range preserves first-threshold extrema through output limits");
+            steps.from = direction ? 20.f : 10.f;
+            steps.to = direction ? 10.f : 20.f;
+            expect(reach_motion_range(&steps, &minimum, &maximum) == REACH_OK &&
+                       minimum == fminf(0, peak) && maximum == fmaxf(0, peak),
+                   "step range includes interior state when endpoints are threshold equalities");
+            steps.mapping_extra_count = REACH_MOTION_MAX_EXTRA_KNOTS + 1;
+            minimum = 71;
+            maximum = 72;
+            expect(reach_motion_range(&steps, &minimum, &maximum) == REACH_INVALID_ARGUMENT &&
+                       minimum == 71 && maximum == 72,
+                   "invalid step range leaves both outputs untouched");
+        }
+}
+
 static void test_ratio_motion_sampling_compilation_and_interruption(void)
 {
     for (reach_easing easing :
@@ -954,6 +989,7 @@ int main(void)
     test_ratio_motion_affine_cancellation_compilation();
     test_lookup_motion_sampling_compilation_and_retarget();
     test_lookup_motion_preflight_and_mapped_sources();
+    test_lookup_range_preserves_first_threshold_extrema();
     test_composed_periodic_motion_preserves_phase();
     test_composed_motion_capacity_and_identity();
     test_composed_fitting_motion_preserves_constraints();
