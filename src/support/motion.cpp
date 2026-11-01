@@ -242,28 +242,30 @@ reach_result reach_motion_range(const reach_motion *motion, float *out_minimum, 
             maximum = fmaxf(maximum, value);
         }
     }
-    if (motion->has_mapping == 1 && motion->mapping_center > fminf(motion->from, motion->to) &&
-        motion->mapping_center < fmaxf(motion->from, motion->to))
+    auto include_boundary = [&](float center)
     {
-        float middle = reach_motion_limit(motion, motion->mapping_center);
-        if (!isfinite(middle))
-            return REACH_INVALID_ARGUMENT;
-        minimum = fminf(minimum, middle);
-        maximum = fmaxf(maximum, middle);
-    }
-    if (!isfinite(minimum) || !isfinite(maximum))
+        float low = fminf(motion->from, motion->to), high = fmaxf(motion->from, motion->to);
+        if (center < low || center > high)
+            return true;
+        for (float raw : {center, nextafterf(center, -INFINITY), nextafterf(center, INFINITY)})
+        {
+            if (raw < low || raw > high ||
+                (raw != center && motion->has_mapping != REACH_MOTION_MAPPING_STEPS))
+                continue;
+            float value = reach_motion_limit(motion, raw);
+            if (!isfinite(value))
+                return false;
+            minimum = fminf(minimum, value);
+            maximum = fmaxf(maximum, value);
+        }
+        return true;
+    };
+    if ((motion->has_mapping == 1 || motion->has_mapping == REACH_MOTION_MAPPING_STEPS) &&
+        !include_boundary(motion->mapping_center))
         return REACH_INVALID_ARGUMENT;
     for (int32_t at = 0; at < motion->mapping_extra_count; ++at)
-    {
-        float center = motion->mapping_extra_centers[at];
-        if (center <= fminf(motion->from, motion->to) || center >= fmaxf(motion->from, motion->to))
-            continue;
-        float value = reach_motion_limit(motion, center);
-        if (!isfinite(value))
+        if (!include_boundary(motion->mapping_extra_centers[at]))
             return REACH_INVALID_ARGUMENT;
-        minimum = fminf(minimum, value);
-        maximum = fmaxf(maximum, value);
-    }
     *out_minimum = minimum;
     *out_maximum = maximum;
     return REACH_OK;
