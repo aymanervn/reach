@@ -156,7 +156,6 @@ struct reach_d2d_retained_layer
     ComPtr<ABI::Windows::UI::Composition::ICompositionSurfaceBrush> surface_brush;
     ComPtr<ABI::Windows::UI::Composition::ICompositionMaskBrush> tint_mask;
     ComPtr<ABI::Windows::UI::Composition::ICompositionColorBrush> tint_brush;
-    ComPtr<ABI::Windows::UI::Composition::ICompositionColorBrush> solid_brush;
     ComPtr<ABI::Windows::UI::Composition::ICompositionPropertySet> tint_properties;
     ComPtr<ABI::Windows::UI::Composition::IInsetClip> inset_clip;
     ComPtr<ABI::Windows::UI::Composition::ICompositionRoundedRectangleGeometry> rounded_geometry;
@@ -173,7 +172,6 @@ struct reach_d2d_retained_layer
     UINT capacity_width = 0;
     UINT capacity_height = 0;
     bool initialized = false;
-    bool solid = false;
     bool raster_birth_aligned = false;
     bool raster_finite_translation = false;
     bool has_children = false;
