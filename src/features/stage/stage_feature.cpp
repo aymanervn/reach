@@ -658,6 +658,7 @@ reach_result reach_stage_thumbnail_at(const reach_stage *stage, size_t index,
 
     out_placement->window = tile->window;
     out_placement->destination = tile->current_rect;
+    out_placement->destination_motion = tile->rect_motion;
     out_placement->source_screen = tile->source_rect;
     out_placement->opacity = tile->presence;
     out_placement->backdrop_opacity = state->backdrop_opacity;
