@@ -10,6 +10,7 @@
 #define REACH_STAGE_TILE_GROUP_TAG UINT64_C(0x1000000000000000)
 #define REACH_STAGE_MOVING_GROUP_COUNT 20
 #define REACH_STAGE_RASTER_GROUP_COUNT 4
+#define REACH_STAGE_SNAP_MARGIN 1.0f
 
 enum
 {
@@ -413,7 +414,8 @@ static reach_result reach_stage_push_fill(reach_render_command_buffer *commands,
                                           uint64_t parent, const reach_rect_motion &rect,
                                           float radius, reach_color color,
                                           const reach_motion *opacity,
-                                          const reach_stage_fill_tint *tint)
+                                          const reach_stage_fill_tint *tint,
+                                          const reach_motion *radius_motion = nullptr)
 {
     reach_render_group source = {};
     source.id = id;
@@ -423,6 +425,11 @@ static reach_result reach_stage_push_fill(reach_render_command_buffer *commands,
     if (opacity != nullptr)
     {
         source.opacity = *opacity;
+    }
+    if (radius_motion != nullptr)
+    {
+        source.clip_radius_motion = *radius_motion;
+        radius = reach_stage_motion_maximum(*radius_motion);
     }
     if (tint != nullptr)
     {
@@ -619,6 +626,57 @@ static reach_result reach_stage_push_moving_placeholder(const reach_stage_render
     return result;
 }
 
+static reach_motion reach_stage_snapped_edge(const reach_motion &edge)
+{
+    float minimum = 0.0f;
+    float maximum = 0.0f;
+    float first = reach_motion_value_at(&edge, -HUGE_VAL);
+    float last = reach_motion_value_at(&edge, HUGE_VAL);
+    float snapped_first = roundf(first);
+    float snapped_last = roundf(last);
+    float scale = first != last ? (snapped_last - snapped_first) / (last - first) : 1.0f;
+    if (reach_motion_range(&edge, &minimum, &maximum) != REACH_OK || minimum == maximum ||
+        scale == 0.0f)
+    {
+        return reach_stage_constant_motion(snapped_last);
+    }
+    return reach_motion_affine(&edge, scale, snapped_last - scale * last);
+}
+
+static reach_result reach_stage_snapped_frame(const reach_stage_render_context *ctx,
+                                              const reach_stage_tile *tile, float border,
+                                              const reach_motion &origin_x,
+                                              const reach_motion &origin_y,
+                                              reach_rect_motion *out_frame)
+{
+    const reach_rect_motion &rect = tile->rect_motion;
+    reach_motion left = reach_motion_affine(&rect.x, 1.0f, -ctx->bounds.x - border);
+    reach_motion right = {};
+    reach_motion top = {};
+    reach_motion bottom = {};
+    if (reach_motion_combine(&rect.x, 1.0f, &rect.width, 1.0f, border - ctx->bounds.x, &right) !=
+            REACH_OK ||
+        reach_motion_combine(&rect.y, 1.0f, &tile->bar_motion, -1.0f, -ctx->bounds.y - border,
+                             &top) != REACH_OK ||
+        reach_motion_combine(&rect.y, 1.0f, &rect.height, 1.0f, border - ctx->bounds.y, &bottom) !=
+            REACH_OK)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    left = reach_stage_snapped_edge(left);
+    right = reach_stage_snapped_edge(right);
+    top = reach_stage_snapped_edge(top);
+    bottom = reach_stage_snapped_edge(bottom);
+    if (reach_motion_combine(&left, 1.0f, &origin_x, -1.0f, 0.0f, &out_frame->x) != REACH_OK ||
+        reach_motion_combine(&top, 1.0f, &origin_y, -1.0f, 0.0f, &out_frame->y) != REACH_OK ||
+        reach_motion_combine(&right, 1.0f, &left, -1.0f, 0.0f, &out_frame->width) != REACH_OK ||
+        reach_motion_combine(&bottom, 1.0f, &top, -1.0f, 0.0f, &out_frame->height) != REACH_OK)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    return REACH_OK;
+}
+
 static reach_result reach_stage_push_moving_tile(reach_stage *stage,
                                                  const reach_stage_render_context *ctx,
                                                  size_t index, float border,
@@ -631,7 +689,8 @@ static reach_result reach_stage_push_moving_tile(reach_stage *stage,
     const reach_motion &bar = tile->bar_motion;
     const reach_motion &fade = tile->fade_motion;
     uint64_t base = reach_stage_group_base(tile->window);
-    float hover = state->has_hover && state->hover_index == index ? 1.0f : 0.0f;
+    float hover = !tile->desktop && state->has_hover && state->hover_index == index ? 1.0f : 0.0f;
+    float margin = tile->desktop ? 0.0f : REACH_STAGE_SNAP_MARGIN;
 
     reach_motion outer_width = reach_motion_affine(&rect.width, 1.0f, border * 2.0f);
     reach_motion outer_height = {};
@@ -640,12 +699,13 @@ static reach_result reach_stage_push_moving_tile(reach_stage *stage,
     {
         return REACH_INVALID_ARGUMENT;
     }
-    float tile_width = fmaxf(1.0f, ceilf(reach_stage_motion_maximum(outer_width)));
-    float tile_height = fmaxf(1.0f, ceilf(reach_stage_motion_maximum(outer_height)));
+    float tile_width = fmaxf(1.0f, ceilf(reach_stage_motion_maximum(outer_width))) + margin * 2.0f;
+    float tile_height =
+        fmaxf(1.0f, ceilf(reach_stage_motion_maximum(outer_height))) + margin * 2.0f;
 
     reach_render_group tile_group = {};
     tile_group.id = base + REACH_STAGE_GROUP_TILE;
-    tile_group.bounds = {0.0f, 0.0f, tile_width, tile_height};
+    tile_group.bounds = {-margin, -margin, tile_width, tile_height};
     tile_group.x = reach_motion_affine(&rect.x, 1.0f, -border - ctx->bounds.x);
     if (tile->desktop)
     {
@@ -662,15 +722,27 @@ static reach_result reach_stage_push_moving_tile(reach_stage *stage,
         return result;
     }
 
+    reach_rect_motion frame = {reach_stage_constant_motion(0.0f), reach_stage_constant_motion(0.0f),
+                               outer_width, outer_height};
+    if (!tile->desktop && reach_stage_snapped_frame(ctx, tile, border, tile_group.x, tile_group.y,
+                                                    &frame) != REACH_OK)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
     reach_render_group clip = {};
     clip.id = base + REACH_STAGE_GROUP_CLIP;
     clip.parent_id = tile_group.id;
     clip.bounds = clip.clip = tile_group.bounds;
     clip.has_clip = 1;
-    clip.clip_insets[REACH_RENDER_CLIP_RIGHT] =
-        reach_motion_affine(&outer_width, -1.0f, tile_width);
-    clip.clip_insets[REACH_RENDER_CLIP_BOTTOM] =
-        reach_motion_affine(&outer_height, -1.0f, tile_height);
+    clip.clip_insets[REACH_RENDER_CLIP_LEFT] = reach_motion_affine(&frame.x, 1.0f, margin);
+    clip.clip_insets[REACH_RENDER_CLIP_TOP] = reach_motion_affine(&frame.y, 1.0f, margin);
+    if (reach_motion_combine(&frame.x, -1.0f, &frame.width, -1.0f, tile_width - margin,
+                             &clip.clip_insets[REACH_RENDER_CLIP_RIGHT]) != REACH_OK ||
+        reach_motion_combine(&frame.y, -1.0f, &frame.height, -1.0f, tile_height - margin,
+                             &clip.clip_insets[REACH_RENDER_CLIP_BOTTOM]) != REACH_OK)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
     result = reach_stage_push_group(commands, clip);
     if (result != REACH_OK)
     {
@@ -714,40 +786,48 @@ static reach_result reach_stage_push_moving_tile(reach_stage *stage,
         return REACH_OK;
     }
 
-    float radius = reach_stage_scaled(ctx, theme->radius_small);
-    float limit = tile->bar_height * 0.5f;
-    radius = radius < limit ? radius : limit;
-    float outer_radius = radius + border;
+    reach_motion half_bar = reach_motion_affine(&bar, 0.5f, 0.0f);
+    reach_motion radius =
+        reach_motion_clamp(&half_bar, 0.0f, reach_stage_scaled(ctx, theme->radius_small));
+    reach_motion outer_radius = reach_motion_affine(&radius, 1.0f, border);
+    float radius_maximum = reach_stage_motion_maximum(radius);
 
     if (border > 0.0f)
     {
-        reach_motion outer_extent = reach_motion_affine(&outer_height, 1.0f, outer_radius);
-        result =
-            reach_stage_push_fill(commands, base + REACH_STAGE_GROUP_OUTER, clip.id,
-                                  reach_stage_local_rect(zero, zero, outer_width, outer_extent),
-                                  outer_radius, background, nullptr, &border_tint);
+        reach_motion outer_extent =
+            reach_motion_affine(&frame.height, 1.0f, radius_maximum + border);
+        result = reach_stage_push_fill(
+            commands, base + REACH_STAGE_GROUP_OUTER, clip.id,
+            reach_stage_local_rect(frame.x, frame.y, frame.width, outer_extent),
+            radius_maximum + border, background, nullptr, &border_tint, &outer_radius);
         if (result != REACH_OK)
         {
             return result;
         }
 
-        reach_motion inner_extent = {};
-        if (reach_motion_combine(&rect.height, 1.0f, &bar, 1.0f, radius, &inner_extent) != REACH_OK)
+        reach_motion inner_x = reach_motion_affine(&frame.x, 1.0f, border);
+        reach_motion inner_y = reach_motion_affine(&frame.y, 1.0f, border);
+        reach_motion inner_width = reach_motion_affine(&frame.width, 1.0f, -border * 2.0f);
+        reach_motion inner_extent =
+            reach_motion_affine(&frame.height, 1.0f, radius_maximum - border * 2.0f);
+        result = reach_stage_push_fill(
+            commands, base + REACH_STAGE_GROUP_INNER, clip.id,
+            reach_stage_local_rect(inner_x, inner_y, inner_width, inner_extent), radius_maximum,
+            background, nullptr, nullptr, &radius);
+        if (result != REACH_OK)
+        {
+            return result;
+        }
+
+        reach_motion strip_y = {};
+        if (reach_motion_combine(&frame.y, 1.0f, &frame.height, 1.0f, -border, &strip_y) !=
+            REACH_OK)
         {
             return REACH_INVALID_ARGUMENT;
         }
-        result =
-            reach_stage_push_fill(commands, base + REACH_STAGE_GROUP_INNER, clip.id,
-                                  reach_stage_local_rect(inset, inset, rect.width, inner_extent),
-                                  radius, background, nullptr, nullptr);
-        if (result != REACH_OK)
-        {
-            return result;
-        }
-
-        reach_motion strip_y = reach_motion_affine(&outer_height, 1.0f, -border);
         result = reach_stage_push_fill(commands, base + REACH_STAGE_GROUP_STRIP, clip.id,
-                                       reach_stage_local_rect(zero, strip_y, outer_width, inset),
+                                       reach_stage_local_rect(frame.x, strip_y, frame.width,
+                                                              reach_stage_constant_motion(border)),
                                        0.0f, background, nullptr, &border_tint);
         if (result != REACH_OK)
         {
@@ -762,23 +842,23 @@ static reach_result reach_stage_push_moving_tile(reach_stage *stage,
         header_clip.parent_id = clip.id;
         header_clip.bounds = header_clip.clip = tile_group.bounds;
         header_clip.has_clip = 1;
-        reach_motion_set(&header_clip.clip_insets[REACH_RENDER_CLIP_LEFT], border);
-        reach_motion_set(&header_clip.clip_insets[REACH_RENDER_CLIP_TOP], border);
+        reach_motion_set(&header_clip.clip_insets[REACH_RENDER_CLIP_LEFT], border + margin);
+        reach_motion_set(&header_clip.clip_insets[REACH_RENDER_CLIP_TOP], border + margin);
         header_clip.clip_insets[REACH_RENDER_CLIP_RIGHT] =
-            reach_motion_affine(&rect.width, -1.0f, tile_width - border);
+            reach_motion_affine(&rect.width, -1.0f, tile_width - margin - border);
         header_clip.clip_insets[REACH_RENDER_CLIP_BOTTOM] =
-            reach_motion_affine(&bar, -1.0f, tile_height - border);
+            reach_motion_affine(&bar, -1.0f, tile_height - margin - border);
         result = reach_stage_push_group(commands, header_clip);
         if (result != REACH_OK)
         {
             return result;
         }
-        reach_motion header_extent = reach_motion_affine(&bar, 1.0f, radius);
+        reach_motion header_extent = reach_motion_affine(&bar, 1.0f, radius_maximum);
         reach_color header_color = theme->stage_tile_header_background;
         result =
             reach_stage_push_fill(commands, base + REACH_STAGE_GROUP_HEADER, header_clip.id,
                                   reach_stage_local_rect(inset, inset, rect.width, header_extent),
-                                  radius, header_color, &fade, nullptr);
+                                  radius_maximum, header_color, &fade, nullptr, &radius);
         if (result != REACH_OK)
         {
             return result;
