@@ -167,6 +167,74 @@ static void test_planned_bytes_count_kept_capacity(void)
            "empty bounds cost nothing");
 }
 
+static reach_render_command solid_rect(float x, float y, float width, float height)
+{
+    reach_render_command command = {};
+    command.type = REACH_RENDER_COMMAND_RECT;
+    command.rect = {x, y, width, height};
+    command.color = {0.25f, 0.5f, 0.75f, 1.0f};
+    return command;
+}
+
+static void test_solid_fill_detection(void)
+{
+    reach_color color = {};
+    reach_render_command fill = solid_rect(10.0f, 20.0f, 40.0f, 30.0f);
+    expect(reach_d2d_solid_fill(&fill, 1, {10.0f, 20.0f, 40.0f, 30.0f}, &color),
+           "a single covering fill is solid");
+    expect(color.r == 0.25f && color.g == 0.5f && color.b == 0.75f && color.a == 1.0f,
+           "the solid color is the fill color");
+
+    fill.rect_fit_to_clip = 1;
+    expect(reach_d2d_solid_fill(&fill, 1, {10.0f, 20.0f, 40.0f, 30.0f}, &color),
+           "a fitted covering fill is solid");
+    fill.rect_fit_to_clip = 0;
+
+    reach_render_command pair[2] = {fill, fill};
+    expect(!reach_d2d_solid_fill(pair, 2, {10.0f, 20.0f, 40.0f, 30.0f}, &color),
+           "two commands are not solid");
+    expect(!reach_d2d_solid_fill(nullptr, 0, {10.0f, 20.0f, 40.0f, 30.0f}, &color),
+           "no commands are not solid");
+
+    reach_render_command rounded = fill;
+    rounded.radius = 4.0f;
+    expect(!reach_d2d_solid_fill(&rounded, 1, {10.0f, 20.0f, 40.0f, 30.0f}, &color),
+           "a rounded fill needs its raster");
+
+    reach_render_command stroked = fill;
+    stroked.stroke_width = 1.0f;
+    expect(!reach_d2d_solid_fill(&stroked, 1, {10.0f, 20.0f, 40.0f, 30.0f}, &color),
+           "a stroked rect needs its raster");
+
+    reach_render_command scissored = fill;
+    scissored.has_scissor = 1;
+    scissored.scissor_rect = {10.0f, 20.0f, 10.0f, 10.0f};
+    expect(!reach_d2d_solid_fill(&scissored, 1, {10.0f, 20.0f, 40.0f, 30.0f}, &color),
+           "a scissored fill needs its raster");
+
+    reach_render_command clipped = fill;
+    clipped.has_clip_rect = 1;
+    expect(!reach_d2d_solid_fill(&clipped, 1, {10.0f, 20.0f, 40.0f, 30.0f}, &color),
+           "a clipped fill needs its raster");
+
+    reach_render_command text = fill;
+    text.type = REACH_RENDER_COMMAND_TEXT;
+    expect(!reach_d2d_solid_fill(&text, 1, {10.0f, 20.0f, 40.0f, 30.0f}, &color),
+           "text is not solid");
+
+    expect(!reach_d2d_solid_fill(&fill, 1, {10.0f, 20.0f, 41.0f, 30.0f}, &color),
+           "a fill narrower than its surface is not solid");
+    expect(!reach_d2d_solid_fill(&fill, 1, {9.0f, 20.0f, 40.0f, 30.0f}, &color),
+           "a fill offset from its surface is not solid");
+
+    reach_render_command fractional = solid_rect(0.0f, 0.0f, 11.0f, 7.0f);
+    expect(reach_d2d_solid_fill(&fractional, 1, {0.0f, 0.0f, 10.5f, 6.25f}, &color),
+           "a fill covering the rounded-up surface is solid");
+    reach_render_command partial = solid_rect(0.0f, 0.0f, 10.5f, 6.25f);
+    expect(!reach_d2d_solid_fill(&partial, 1, {0.0f, 0.0f, 10.5f, 6.25f}, &color),
+           "a fill with antialiased edges is not solid");
+}
+
 struct buffer_entry
 {
     uint64_t group_id;
@@ -267,6 +335,7 @@ int main(void)
     test_reuse_and_shrink();
     test_growth_respects_budget_and_limits();
     test_planned_bytes_count_kept_capacity();
+    test_solid_fill_detection();
     test_ungrouped_run_survives_unrelated_insertions();
     test_textbox_runs_split_and_stay_distinct();
     test_ungrouped_run_ids_stay_in_the_reserved_range();
