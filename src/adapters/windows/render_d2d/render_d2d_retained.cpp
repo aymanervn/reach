@@ -1491,6 +1491,11 @@ static HRESULT sync_layer(reach_render_backend *backend, reach_d2d_retained_laye
 
 int32_t reach_d2d_retained_supported(const reach_render_backend *backend)
 {
+    // Workaround: temporary Stage A/B measurement switch; delete with the experiment.
+    if (backend != nullptr && backend->immediate_only)
+    {
+        return 0;
+    }
     return backend != nullptr &&
            ((backend->compositor != nullptr && backend->composition_graphics_device != nullptr) ||
             backend->dcomp_device != nullptr);

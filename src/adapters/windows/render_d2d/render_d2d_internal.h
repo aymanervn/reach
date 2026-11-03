@@ -226,6 +226,8 @@ struct reach_render_backend
     ID2D1Device *shadow_fallback_parent_device = nullptr;
     uint64_t reported_retained_bytes = 0;
     bool requires_content_sampling = false;
+    // Workaround: temporary Stage A/B measurement switch; delete with the experiment.
+    bool immediate_only = false;
     std::vector<reach_d2d_sampled_text> sampled_text;
     std::vector<reach_d2d_sampled_textbox> sampled_textboxes;
     std::vector<reach_d2d_sampled_image> sampled_images;

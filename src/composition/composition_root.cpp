@@ -3,6 +3,7 @@
 #include "host_internal.h"
 #include "reach/platform/windows_adapters.h"
 
+#include <memory>
 #include <new>
 
 static void reach_app_on_input(void *user, const reach_ui_event *event)
@@ -221,6 +222,19 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
         if (result == REACH_OK)
         {
             result = reach_windows_create_config_store(config_path, &dependencies.config_store);
+        }
+        if (result == REACH_OK)
+        {
+            // Workaround: temporary Stage A/B measurement switch; delete with the experiment.
+            std::unique_ptr<reach_config_snapshot> experiment(new (std::nothrow)
+                                                                  reach_config_snapshot());
+            if (experiment != nullptr &&
+                dependencies.config_store.ops.load(dependencies.config_store.store,
+                                                   experiment.get()) == REACH_OK &&
+                experiment->stage_motion_experiment == 1)
+            {
+                reach_windows_render_backend_force_immediate(&dependencies.stage_renderer);
+            }
         }
     }
     if (result == REACH_OK)
