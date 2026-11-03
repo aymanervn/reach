@@ -85,26 +85,6 @@ uint64_t reach_d2d_planned_layer_bytes(float width, float height, bool has_paint
     return (uint64_t)kept.width * kept.height * 4 + shadow;
 }
 
-bool reach_d2d_solid_fill(const reach_render_command *commands, size_t count, reach_rect_f32 bounds,
-                          reach_color *out_color)
-{
-    if (commands == nullptr || out_color == nullptr || count != 1)
-        return false;
-    const reach_render_command &fill = commands[0];
-    if (!isfinite(bounds.x) || !isfinite(bounds.y) || !isfinite(bounds.width) ||
-        !isfinite(bounds.height) || fill.type != REACH_RENDER_COMMAND_RECT || fill.radius != 0 ||
-        fill.stroke_width != 0 || fill.has_scissor || fill.has_clip_rect)
-        return false;
-    float width = std::max(1.0f, ceilf(bounds.width));
-    float height = std::max(1.0f, ceilf(bounds.height));
-    if (fill.rect.x != bounds.x || fill.rect.y != bounds.y || fill.rect.width != width ||
-        fill.rect.height != height || !isfinite(fill.color.r) || !isfinite(fill.color.g) ||
-        !isfinite(fill.color.b) || !isfinite(fill.color.a))
-        return false;
-    *out_color = fill.color;
-    return true;
-}
-
 uint64_t reach_d2d_ungrouped_run_id(uint64_t anchor, uint64_t ordinal)
 {
     return REACH_D2D_UNGROUPED_RUN_BASE |
