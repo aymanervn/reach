@@ -55,6 +55,7 @@ void reach_host_request_bar_visibility_update(reach_host *host)
         return;
     }
 
+    host->dirty.bar_visibility = 1;
     reach_host_request_update(host);
 }
 
