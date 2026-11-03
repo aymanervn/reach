@@ -7,16 +7,31 @@ static void reach_host_on_edge_reveal_event(void *user, reach_screen_hotspot_eve
     {
         return;
     }
+    const reach_feature_runtime *owner = runtime->owner;
+    int32_t bar_reveal = owner->definition->surface.bar_reveal.ops != nullptr;
+    if (bar_reveal && event == REACH_SCREEN_HOTSPOT_LEAVE)
+    {
+        runtime->enter_suppressed = 0;
+    }
     if (runtime->host->window_manipulation.relevant)
     {
+        if (bar_reveal && event == REACH_SCREEN_HOTSPOT_ENTER)
+        {
+            runtime->enter_suppressed = 1;
+            reach_host_request_bar_visibility_update(runtime->host);
+        }
         return;
     }
 
-    const reach_feature_runtime *owner = runtime->owner;
-    if (owner->definition->surface.bar_reveal.ops != nullptr)
+    if (bar_reveal)
     {
         if (!reach_host_bar_reveal_enabled(owner) || !owner->bar_auto_hide_active)
         {
+            if (event == REACH_SCREEN_HOTSPOT_ENTER)
+            {
+                runtime->enter_suppressed = 1;
+                reach_host_request_bar_visibility_update(runtime->host);
+            }
             return;
         }
         if (event == REACH_SCREEN_HOTSPOT_ENTER &&

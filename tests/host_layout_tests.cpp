@@ -51,6 +51,7 @@ static reach_host foreground_reconciliation_host;
 static reach_host closable_host;
 static reach_host dismiss_guard_host;
 static reach_host bar_conditions_host;
+static reach_host bar_enter_host;
 static reach_host pointer_release_host;
 static reach_host popup_trigger_host;
 static reach_host popup_owner_host;
@@ -1411,6 +1412,178 @@ static void test_forced_bars_hold_through_a_closing_stage(void)
     reach_host_destroy_registered_features(host);
 }
 
+static reach_screen_hotspot_callback bar_hotspot_callback;
+static void *bar_hotspot_user;
+static int bar_hotspot_tokens[REACH_HOST_SURFACE_COUNT];
+static size_t bar_hotspot_created;
+
+static reach_result fake_hotspot_noop(reach_screen_hotspot *hotspot)
+{
+    (void)hotspot;
+    return REACH_OK;
+}
+
+static reach_result fake_hotspot_set_bounds(reach_screen_hotspot *hotspot, reach_rect_f32 bounds)
+{
+    (void)hotspot;
+    (void)bounds;
+    return REACH_OK;
+}
+
+static reach_result fake_hotspot_set_callback(reach_screen_hotspot *hotspot,
+                                              reach_screen_hotspot_callback callback, void *user)
+{
+    reach_host_edge_reveal_runtime *runtime = static_cast<reach_host_edge_reveal_runtime *>(user);
+    if (runtime->owner->definition->id == REACH_SURFACE_ID_TOP_BAR)
+    {
+        bar_hotspot_callback = callback;
+        bar_hotspot_user = user;
+    }
+    (void)hotspot;
+    return REACH_OK;
+}
+
+static reach_result fake_hotspot_create(void *factory, reach_screen_hotspot_port *out_port)
+{
+    (void)factory;
+    *out_port = {};
+    out_port->hotspot =
+        reinterpret_cast<reach_screen_hotspot *>(&bar_hotspot_tokens[bar_hotspot_created++]);
+    out_port->ops.set_bounds = fake_hotspot_set_bounds;
+    out_port->ops.show = fake_hotspot_noop;
+    out_port->ops.hide = fake_hotspot_noop;
+    out_port->ops.set_callback = fake_hotspot_set_callback;
+    return REACH_OK;
+}
+
+static reach_result fake_trespassing_outer_bounds(const reach_window_manager *manager,
+                                                  reach_window_id window, reach_rect_f32 *out)
+{
+    (void)manager;
+    (void)window;
+    *out = {100.0f, 0.0f, 800.0f, 600.0f};
+    return REACH_OK;
+}
+
+typedef struct bar_enter_fixture
+{
+    reach_host *host;
+    reach_window_tracking *windows;
+    reach_app_control *apps;
+    reach_top_bar *top_bar;
+} bar_enter_fixture;
+
+static void bar_enter_reconcile(bar_enter_fixture *fixture)
+{
+    reach_feature_surface_geometry geometry = {};
+    (void)reach_host_reconcile_bar_visibility(fixture->host, REACH_SURFACE_ID_TOP_BAR,
+                                              {100.0f, 0.0f, 800.0f, 40.0f},
+                                              {0.0f, 0.0f, 1000.0f, 800.0f}, &geometry);
+}
+
+static int32_t bar_enter_hidden(const bar_enter_fixture *fixture)
+{
+    return reach_top_bar_state_ptr(fixture->top_bar)->visibility.target_hidden;
+}
+
+static void bar_enter_setup(bar_enter_fixture *fixture)
+{
+    reach_host *host = fixture->host;
+    bar_hotspot_created = 0;
+    bar_hotspot_callback = nullptr;
+    bar_hotspot_user = nullptr;
+    reach_host_init_feature_registry(host);
+    host->screen_hotspots.ops.create = fake_hotspot_create;
+    expect_true(reach_host_create_registered_features(host) == REACH_OK,
+                "registered top bar is available for the dropped-enter scenario");
+    expect_true(reach_host_create_edge_reveals(host) == REACH_OK,
+                "edge reveal hotspots are created for the dropped-enter scenario");
+    reach_host_init_layout(host);
+    expect_true(reach_host_start_edge_reveals(host) == REACH_OK,
+                "edge reveal callbacks are installed for the dropped-enter scenario");
+    host->layout_dpi_scale = 1.0f;
+    host->input_source.ops.get_pointer_position = fake_get_pointer_position;
+
+    reach_window_manager_port port = {};
+    port.ops.window_count = fake_foreground_window_count;
+    port.ops.window_at = fake_foreground_window_at;
+    port.ops.outer_bounds = fake_trespassing_outer_bounds;
+    observed_foreground_window = 126;
+    foreground_window_available = 1;
+    expect_true(reach_window_tracking_create(port, &fixture->windows) == REACH_OK,
+                "window tracking is available for the dropped-enter scenario");
+    (void)reach_window_tracking_refresh(fixture->windows, nullptr);
+    expect_true(reach_app_control_create({}, {}, {}, port, nullptr, nullptr, &fixture->apps) ==
+                    REACH_OK,
+                "app control is available for the dropped-enter scenario");
+
+    fixture->top_bar = reach_host_feature_capsule<reach_top_bar>(host, REACH_SURFACE_ID_TOP_BAR);
+    reach_top_bar_attach_services(fixture->top_bar, nullptr, nullptr, fixture->windows, nullptr,
+                                  nullptr, nullptr, nullptr);
+    reach_top_bar_attach_app_control(fixture->top_bar, fixture->apps);
+    host->feature_runtimes[REACH_SURFACE_ID_TOP_BAR].bar_auto_hide_active = 1;
+
+    observed_pointer = {500, 400};
+    bar_enter_reconcile(fixture);
+    expect_true(bar_enter_hidden(fixture), "the bar settles hidden while the pointer is away");
+    expect_true(bar_hotspot_callback != nullptr, "the top bar hotspot callback was captured");
+}
+
+static void bar_enter_teardown(bar_enter_fixture *fixture)
+{
+    reach_host_destroy_edge_reveals(fixture->host);
+    reach_host_destroy_registered_features(fixture->host);
+    reach_app_control_destroy(fixture->apps);
+    reach_window_tracking_destroy(fixture->windows);
+    foreground_window_available = 0;
+}
+
+static void bar_enter_fire(reach_screen_hotspot_event event)
+{
+    bar_hotspot_callback(bar_hotspot_user, event);
+}
+
+static void test_dropped_bar_enter_reveals_after_manipulation_clears(void)
+{
+    bar_enter_fixture fixture = {&bar_enter_host};
+    bar_enter_setup(&fixture);
+    reach_host *host = fixture.host;
+
+    observed_pointer = {500, 0};
+    host->window_manipulation.relevant = 1;
+    bar_enter_fire(REACH_SCREEN_HOTSPOT_ENTER);
+    host->window_manipulation.relevant = 0;
+    bar_enter_reconcile(&fixture);
+    expect_true(!bar_enter_hidden(&fixture),
+                "an enter dropped during manipulation reveals the bar once it clears");
+
+    bar_enter_teardown(&fixture);
+}
+
+static void test_dropped_bar_enter_is_discarded_by_leave_or_committed_hide(void)
+{
+    bar_enter_fixture fixture = {&bar_enter_host};
+    bar_enter_setup(&fixture);
+    reach_host *host = fixture.host;
+
+    observed_pointer = {500, 0};
+    host->window_manipulation.relevant = 1;
+    bar_enter_fire(REACH_SCREEN_HOTSPOT_ENTER);
+    bar_enter_fire(REACH_SCREEN_HOTSPOT_LEAVE);
+    host->window_manipulation.relevant = 0;
+    bar_enter_reconcile(&fixture);
+    expect_true(bar_enter_hidden(&fixture), "a leave discards a dropped enter");
+
+    host->window_manipulation.relevant = 1;
+    bar_enter_fire(REACH_SCREEN_HOTSPOT_ENTER);
+    bar_enter_reconcile(&fixture);
+    host->window_manipulation.relevant = 0;
+    bar_enter_reconcile(&fixture);
+    expect_true(bar_enter_hidden(&fixture), "a committed hide discards a dropped enter");
+
+    bar_enter_teardown(&fixture);
+}
+
 static int32_t bar_condition_active(const reach_host *host, reach_layout_condition condition)
 {
     return (host->layout_manager.active_conditions & (1u << (uint32_t)condition)) != 0;
@@ -1545,6 +1718,8 @@ int main(void)
     test_registered_surface_frame_syncs_native_overlay();
     test_forced_bars_hold_through_a_closing_stage();
     test_bar_conditions_sync_once_from_host_state();
+    test_dropped_bar_enter_reveals_after_manipulation_clears();
+    test_dropped_bar_enter_is_discarded_by_leave_or_committed_hide();
     test_switcher_publishes_arranged_surface_geometry();
 
     if (failures != 0)

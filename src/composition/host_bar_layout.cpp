@@ -208,6 +208,12 @@ reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surfa
     {
         return shown_bounds;
     }
+    reach_host_edge_reveal_runtime *edge_reveal = reach_host_edge_reveal_for_surface(host, id);
+    int32_t enter_suppressed = edge_reveal != nullptr && edge_reveal->enter_suppressed;
+    if (edge_reveal != nullptr)
+    {
+        edge_reveal->enter_suppressed = 0;
+    }
     if (!reach_host_bar_reveal_enabled(desc))
     {
         reach_host_set_pointer_observation(host, id, {}, 0);
@@ -217,8 +223,14 @@ reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surfa
                                           geometry->force_topmost,
                                           desc->definition->surface.bar_reveal.active_layer);
         }
-        reach_host_apply_edge_reveal(host, reach_host_edge_reveal_for_surface(host, id), 0, {});
+        reach_host_apply_edge_reveal(host, edge_reveal, 0, {});
         return shown_bounds;
+    }
+
+    if (enter_suppressed && !host->window_manipulation.relevant && desc->bar_auto_hide_active &&
+        desc->definition->surface.bar_reveal.ops->begin_session != nullptr)
+    {
+        desc->definition->surface.bar_reveal.ops->begin_session(desc->capsule);
     }
 
     reach_bar_visibility_request request = {};
@@ -255,8 +267,7 @@ reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surfa
         desc->surface->dirty_flags = 1;
     }
 
-    reach_host_apply_edge_reveal(host, reach_host_edge_reveal_for_surface(host, id),
-                                 result.reveal_edge_shown, result.reveal_bounds);
+    reach_host_apply_edge_reveal(host, edge_reveal, result.reveal_edge_shown, result.reveal_bounds);
 
     return result.animated_bounds;
 }
