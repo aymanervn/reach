@@ -45,6 +45,7 @@ static void test_layer_bytes_saturates(void)
 }
 
 static const uint64_t BUDGET = UINT64_C(128) * 1024 * 1024;
+static const reach_d2d_surface_size UNLIMITED = {16384, 16384};
 
 static bool same_size(reach_d2d_surface_size left, reach_d2d_surface_size right)
 {
@@ -62,7 +63,7 @@ static int simulate_allocations(const std::vector<reach_d2d_surface_size> &needs
     int allocations = 0;
     for (const reach_d2d_surface_size &need : needs)
     {
-        reach_d2d_surface_size next = reach_d2d_surface_capacity(capacity, need, BUDGET);
+        reach_d2d_surface_size next = reach_d2d_surface_capacity(capacity, need, BUDGET, UNLIMITED);
         expect(next.width >= need.width && next.height >= need.height,
                "the capacity always covers the needed size");
         expect(area(need) * 2 >= area(next), "the capacity never exceeds twice the needed area");
@@ -75,7 +76,7 @@ static int simulate_allocations(const std::vector<reach_d2d_surface_size> &needs
 
 static void test_first_allocation_is_exact(void)
 {
-    reach_d2d_surface_size next = reach_d2d_surface_capacity({0, 0}, {137, 59}, BUDGET);
+    reach_d2d_surface_size next = reach_d2d_surface_capacity({0, 0}, {137, 59}, BUDGET, UNLIMITED);
     expect(same_size(next, {137, 59}), "a static layer gets no padding");
 }
 
@@ -97,29 +98,48 @@ static void test_growth_reuses_surfaces(void)
 
 static void test_reuse_and_shrink(void)
 {
-    expect(same_size(reach_d2d_surface_capacity({400, 400}, {400, 400}, BUDGET), {400, 400}),
+    expect(same_size(reach_d2d_surface_capacity({400, 400}, {400, 400}, BUDGET, UNLIMITED),
+                     {400, 400}),
            "an unchanged size reuses the surface");
-    expect(same_size(reach_d2d_surface_capacity({400, 400}, {300, 300}, BUDGET), {400, 400}),
+    expect(same_size(reach_d2d_surface_capacity({400, 400}, {300, 300}, BUDGET, UNLIMITED),
+                     {400, 400}),
            "a size above half the area reuses the surface");
-    expect(same_size(reach_d2d_surface_capacity({400, 400}, {200, 200}, BUDGET), {200, 200}),
+    expect(same_size(reach_d2d_surface_capacity({400, 400}, {200, 200}, BUDGET, UNLIMITED),
+                     {200, 200}),
            "a size below half the area shrinks to the exact size");
-    expect(same_size(reach_d2d_surface_capacity({400, 400}, {400, 100}, BUDGET), {400, 100}),
+    expect(same_size(reach_d2d_surface_capacity({400, 400}, {400, 100}, BUDGET, UNLIMITED),
+                     {400, 100}),
            "a thin size shrinks to the exact size");
 }
 
 static void test_growth_respects_budget_and_limits(void)
 {
-    expect(same_size(reach_d2d_surface_capacity({100, 100}, {200, 200}, BUDGET), {256, 256}),
+    expect(same_size(reach_d2d_surface_capacity({100, 100}, {200, 200}, BUDGET, UNLIMITED),
+                     {256, 256}),
            "growth rounds up to the step");
-    expect(same_size(reach_d2d_surface_capacity({100, 100}, {200, 200}, 200 * 200 * 4 + 1),
-                     {200, 200}),
-           "growth falls back to the exact size when the padded surface exceeds the budget");
-    expect(same_size(reach_d2d_surface_capacity({100, 100}, {200, 200}, 0), {200, 200}),
+    expect(
+        same_size(reach_d2d_surface_capacity({100, 100}, {200, 200}, 200 * 200 * 4 + 1, UNLIMITED),
+                  {200, 200}),
+        "growth falls back to the exact size when the padded surface exceeds the budget");
+    expect(same_size(reach_d2d_surface_capacity({100, 100}, {200, 200}, 0, UNLIMITED), {200, 200}),
            "an exhausted budget still yields the exact size");
-    expect(same_size(reach_d2d_surface_capacity({16000, 100}, {16300, 100}, BUDGET), {16384, 100}),
+    expect(same_size(reach_d2d_surface_capacity({16000, 100}, {16300, 100}, BUDGET, UNLIMITED),
+                     {16384, 100}),
            "growth is clamped to the maximum surface extent");
-    expect(same_size(reach_d2d_surface_capacity({10, 10}, {20, 10}, BUDGET), {20, 10}),
+    expect(same_size(reach_d2d_surface_capacity({10, 10}, {20, 10}, BUDGET, UNLIMITED), {20, 10}),
            "padding that would exceed twice the needed area is dropped");
+    expect(same_size(reach_d2d_surface_capacity({100, 100}, {200, 200}, BUDGET, {220, 220}),
+                     {220, 220}),
+           "growth is clamped to the growth limit");
+    expect(same_size(reach_d2d_surface_capacity({100, 100}, {200, 200}, BUDGET, {200, 200}),
+                     {200, 200}),
+           "a growth limit equal to the need allocates the exact size");
+    expect(same_size(reach_d2d_surface_capacity({100, 100}, {300, 200}, BUDGET, {250, 250}),
+                     {300, 250}),
+           "an axis that needs more than the limit keeps its needed size");
+    expect(
+        same_size(reach_d2d_surface_capacity({100, 100}, {200, 200}, BUDGET, {0, 0}), {200, 200}),
+        "an empty growth limit allocates the exact size");
 }
 
 static void test_planned_bytes_count_kept_capacity(void)
