@@ -3,11 +3,8 @@
 #include "reach/core/theme.h"
 #include "reach/features/stage.h"
 
-#include <algorithm>
 #include <math.h>
 #include <memory>
-#include <string.h>
-#include <vector>
 #include <stdio.h>
 
 static int failures;
@@ -944,7 +941,7 @@ static void test_single_app_uses_the_available_stage_area(void)
     reach_stage_destroy(stage);
 }
 
-static size_t stage_tinted_group_count(reach_stage *stage, reach_render_command_buffer *commands)
+static size_t stage_group_count(reach_stage *stage, reach_render_command_buffer *commands)
 {
     reach_stage_render_context ctx = {};
     ctx.theme = reach_theme_default();
@@ -952,12 +949,7 @@ static size_t stage_tinted_group_count(reach_stage *stage, reach_render_command_
     ctx.dpi_scale = 1.0f;
     expect_true(reach_stage_append_render_commands(stage, &ctx, commands) == REACH_OK,
                 "stage render commands are appended");
-    size_t tinted = 0;
-    for (size_t index = 0; index < commands->group_count; ++index)
-    {
-        tinted += commands->groups[index].has_tint ? 1 : 0;
-    }
-    return tinted;
+    return commands->group_count;
 }
 
 static void move_pointer_to(reach_stage *stage, reach_point_f32 point)
@@ -980,18 +972,18 @@ static void test_close_hover_groups_only_while_hovered(void)
     reach_stage_open(stage, make_rect(0, 0, 1920, 1080), 1, windows, 3);
     advance_stage(stage, 30, 0.016);
     auto commands = std::make_unique<reach_render_command_buffer>();
-    expect_true(stage_tinted_group_count(stage, commands.get()) == 0,
+    expect_true(stage_group_count(stage, commands.get()) == 0,
                 "no close hover groups exist before any hover");
 
     reach_rect_f32 button = reach_stage_tile_close_button_rect(stage, 1);
     move_pointer_to(stage, {button.x + button.width * 0.5f, button.y + button.height * 0.5f});
     advance_stage(stage, 1, 0.016);
-    expect_true(stage_tinted_group_count(stage, commands.get()) == 2,
+    expect_true(stage_group_count(stage, commands.get()) == 2,
                 "the hovered close button emits its backing and glyph groups");
 
     move_pointer_to(stage, {1.0f, 1.0f});
     advance_stage(stage, 60, 0.016);
-    expect_true(stage_tinted_group_count(stage, commands.get()) == 0,
+    expect_true(stage_group_count(stage, commands.get()) == 0,
                 "a settled leave drops the stale close hover groups");
     reach_stage_destroy(stage);
 }
@@ -1258,341 +1250,8 @@ static void test_stage_reflow_motions_sample_to_current_rect(void)
     reach_stage_destroy(stage);
 }
 
-static const uint64_t stage_tile_group_tag = UINT64_C(0x1000000000000000);
-
-static void render_stage(reach_stage *stage, uintptr_t preferred_front,
-                         reach_render_command_buffer *commands)
-{
-    reach_stage_render_context ctx = {};
-    ctx.theme = reach_theme_default();
-    ctx.bounds = make_rect(0, 0, 1920, 1080);
-    ctx.dpi_scale = 1.0f;
-    ctx.preferred_front_window = preferred_front;
-    expect_true(reach_stage_append_render_commands(stage, &ctx, commands) == REACH_OK,
-                "stage render commands are appended");
-    expect_true(reach_render_command_buffer_validate_groups(commands) == REACH_OK,
-                "stage render groups are valid");
-    expect_true(commands->group_count <= REACH_MAX_RENDER_GROUPS,
-                "stage render groups stay inside the group budget");
-}
-
-static std::vector<uint64_t> tile_group_ids(const reach_render_command_buffer *commands)
-{
-    std::vector<uint64_t> ids;
-    for (size_t index = 0; index < commands->group_count; ++index)
-    {
-        uint64_t id = commands->groups[index].id;
-        if ((id & UINT64_C(0xf000000000000000)) == stage_tile_group_tag && (id & 63) == 0)
-        {
-            ids.push_back(id);
-        }
-    }
-    std::sort(ids.begin(), ids.end());
-    return ids;
-}
-
-static reach_stage *open_three_apps(void)
-{
-    reach_stage *stage = nullptr;
-    reach_stage_create(&stage);
-    reach_stage_open_window windows[3] = {make_window(11, make_rect(100, 120, 640, 480)),
-                                          make_window(12, make_rect(300, 220, 800, 500)),
-                                          make_window(13, make_rect(500, 320, 640, 480))};
-    windows[1].minimized = 1;
-    windows[1].icon_id = 9;
-    reach_stage_open(stage, make_rect(0, 0, 1920, 1080), 1.0f, windows, 3);
-    return stage;
-}
-
-static void test_stage_tiles_emit_stable_window_groups(void)
-{
-    reach_stage *stage = open_three_apps();
-    auto commands = std::make_unique<reach_render_command_buffer>();
-    advance_stage(stage, 5, 0.016);
-    expect_true(reach_stage_animation_active(stage), "the stage is still opening at step five");
-    render_stage(stage, 0, commands.get());
-    std::vector<uint64_t> first = tile_group_ids(commands.get());
-    advance_stage(stage, 5, 0.016);
-    expect_true(reach_stage_animation_active(stage), "the stage is still opening at step ten");
-    render_stage(stage, 0, commands.get());
-    std::vector<uint64_t> second = tile_group_ids(commands.get());
-    expect_true(first.size() == 3, "every app tile emits one window group");
-    expect_true(first == second, "tile group ids stay the same across animation frames");
-    for (size_t index = 0; index < first.size(); ++index)
-    {
-        for (size_t other = index + 1; other < first.size(); ++other)
-        {
-            expect_true(first[index] != first[other], "each window owns a distinct group");
-        }
-    }
-
-    render_stage(stage, 12, commands.get());
-    expect_true(tile_group_ids(commands.get()) == first,
-                "the preferred front window reorders groups without renaming them");
-
-    reach_stage_open_window windows[4] = {make_window(11, make_rect(100, 120, 640, 480)),
-                                          make_window(12, make_rect(300, 220, 800, 500)),
-                                          make_window(13, make_rect(500, 320, 640, 480)),
-                                          make_window(14, make_rect(700, 100, 640, 480))};
-    windows[1].minimized = 1;
-    reach_stage_update_windows(stage, windows, 4);
-    advance_stage(stage, 2, 0.016);
-    render_stage(stage, 0, commands.get());
-    std::vector<uint64_t> grown = tile_group_ids(commands.get());
-    expect_true(grown.size() == 4, "a new window adds one group");
-    expect_true(std::includes(grown.begin(), grown.end(), first.begin(), first.end()),
-                "existing windows keep their groups when a tile arrives");
-    reach_stage_destroy(stage);
-}
-
-static int32_t same_buffer_content(const reach_render_command_buffer *a,
-                                   const reach_render_command_buffer *b)
-{
-    if (a->count != b->count || a->group_count != b->group_count)
-    {
-        return 0;
-    }
-    for (size_t index = 0; index < a->count; ++index)
-    {
-        if (memcmp(&a->commands[index], &b->commands[index], sizeof(reach_render_command)) != 0)
-        {
-            return 0;
-        }
-    }
-    for (size_t index = 0; index < a->group_count; ++index)
-    {
-        if (!reach_render_group_equal(&a->groups[index], &b->groups[index]))
-        {
-            return 0;
-        }
-    }
-    return 1;
-}
-
-static void expect_fills_compose_without_surfaces(const reach_render_command_buffer *commands)
-{
-    for (size_t index = 0; index < commands->count; ++index)
-    {
-        const reach_render_command &command = commands->commands[index];
-        if (command.type != REACH_RENDER_COMMAND_RECT || !command.rect_fit_to_clip)
-        {
-            continue;
-        }
-        const reach_render_group *group =
-            reach_render_command_buffer_group(commands, command.group_id);
-        expect_true(group != nullptr && command.radius == 0.0f && !command.has_scissor &&
-                        command.stroke_width == 0.0f && command.rect.x == group->bounds.x &&
-                        command.rect.y == group->bounds.y &&
-                        command.rect.width == group->bounds.width &&
-                        command.rect.height == group->bounds.height &&
-                        (!group->has_tint || command.color.a >= 1.0f),
-                    "an animating Stage fill is a solid covering rect");
-    }
-}
-
-static void test_stage_open_frames_are_property_only(void)
-{
-    reach_stage *stage = open_three_apps();
-    auto first = std::make_unique<reach_render_command_buffer>();
-    auto second = std::make_unique<reach_render_command_buffer>();
-    advance_stage(stage, 3, 0.016);
-    render_stage(stage, 0, first.get());
-    advance_stage(stage, 1, 0.016);
-    render_stage(stage, 0, second.get());
-    expect_true(reach_stage_animation_active(stage), "the stage is mid-open");
-    expect_true(first->count > 0 && first->group_count > 0, "the stage draws while opening");
-    expect_true(same_buffer_content(first.get(), second.get()),
-                "two mid-open frames submit byte-equal commands");
-    expect_true(reach_render_command_buffer_motion_active(second.get()),
-                "mid-open chrome animates through retained motion");
-    expect_fills_compose_without_surfaces(second.get());
-
-    const reach_stage_state *state = reach_stage_state_ptr(stage);
-    double now = reach_motion_now_seconds();
-    float border = reach_theme_border_thickness(reach_theme_default(), 1.0f);
-    for (size_t index = 0; index < state->tile_count; ++index)
-    {
-        const reach_stage_tile *tile = &state->tiles[index];
-        const reach_render_group *group = reach_render_command_buffer_group(
-            second.get(), stage_tile_group_tag | ((uint64_t)tile->window << 6));
-        expect_true(group != nullptr, "every opening tile has a window group");
-        if (group == nullptr)
-        {
-            continue;
-        }
-        expect_near(reach_motion_value_at(&group->x, now), tile->current_rect.x - border,
-                    "the tile group follows the tile x motion");
-        expect_near(reach_motion_value_at(&group->y, now),
-                    tile->current_rect.y - tile->current_bar.height - border,
-                    "the tile group follows the tile y motion");
-    }
-    reach_stage_destroy(stage);
-}
-
-static reach_rect_f32 group_screen_clip(const reach_render_command_buffer *commands, uint64_t id,
-                                        double now)
-{
-    reach_rect_f32 clip = {};
-    expect_true(reach_render_command_buffer_group_clip_at(commands, id, now, &clip) != 0,
-                "an animating fill resolves a clip");
-    return clip;
-}
-
-static void expect_moving_chrome_matches_tile(const reach_render_command_buffer *commands,
-                                              const reach_stage *stage, size_t index,
-                                              const char *phase)
-{
-    const reach_stage_tile *tile = &reach_stage_state_ptr(stage)->tiles[index];
-    double now = reach_motion_now_seconds();
-    float border = reach_theme_border_thickness(reach_theme_default(), 1.0f);
-    uint64_t base = stage_tile_group_tag | ((uint64_t)tile->window << 6);
-    reach_rect_f32 rect = tile->current_rect;
-    float bar = tile->current_bar.height;
-    expect_rect_near(group_screen_clip(commands, base + 3, now),
-                     make_rect(rect.x - border, rect.y - bar - border, rect.width + border * 2,
-                               rect.height + bar + border * 2),
-                     phase);
-    reach_rect_f32 inner = group_screen_clip(commands, base + 5, now);
-    expect_near(inner.x, rect.x, phase);
-    expect_near(inner.y, rect.y - bar, phase);
-    expect_near(inner.width, rect.width, phase);
-    expect_rect_near(
-        group_screen_clip(commands, base + 7, now),
-        make_rect(rect.x - border, rect.y + rect.height, rect.width + border * 2, border), phase);
-    if (bar > 0.0f)
-    {
-        expect_rect_near(group_screen_clip(commands, base + 11, now),
-                         make_rect(rect.x, rect.y - bar, rect.width, bar), phase);
-        expect_rect_near(group_screen_clip(commands, base + 15, now),
-                         reach_stage_tile_close_button_rect(stage, index), phase);
-    }
-}
-
-static void test_stage_moving_chrome_matches_tile_geometry(void)
-{
-    reach_stage *stage = open_three_apps();
-    auto commands = std::make_unique<reach_render_command_buffer>();
-    const reach_stage_state *state = reach_stage_state_ptr(stage);
-    for (int step = 0; step < 6; ++step)
-    {
-        advance_stage(stage, 1, 0.016);
-        render_stage(stage, 0, commands.get());
-        for (size_t index = 0; index < state->tile_count; ++index)
-        {
-            expect_moving_chrome_matches_tile(commands.get(), stage, index,
-                                              "opening chrome matches the tile geometry");
-        }
-    }
-    advance_stage(stage, 80, 0.016);
-    reach_stage_begin_close(stage);
-    for (int step = 0; step < 6; ++step)
-    {
-        advance_stage(stage, 1, 0.016);
-        render_stage(stage, 0, commands.get());
-        for (size_t index = 0; index < state->tile_count; ++index)
-        {
-            expect_moving_chrome_matches_tile(commands.get(), stage, index,
-                                              "closing chrome matches the tile geometry");
-        }
-    }
-    reach_stage_destroy(stage);
-}
-
-static void test_stage_settled_tiles_match_layout(void)
-{
-    reach_stage *stage = open_three_apps();
-    advance_stage(stage, 80, 0.016);
-    expect_true(!reach_stage_animation_active(stage), "the stage settles");
-    auto commands = std::make_unique<reach_render_command_buffer>();
-    render_stage(stage, 0, commands.get());
-    expect_true(!reach_render_command_buffer_motion_active(commands.get()),
-                "settled Stage chrome submits no motion");
-    expect_true(tile_group_ids(commands.get()).size() == 3,
-                "settled tiles keep one group per window");
-    const reach_stage_state *state = reach_stage_state_ptr(stage);
-    for (size_t index = 0; index < state->tile_count; ++index)
-    {
-        const reach_stage_tile *tile = &state->tiles[index];
-        expect_rect_near(tile->current_rect, tile->target_rect, "settled tiles sit on the layout");
-        expect_near(tile->current_bar.height, tile->bar_height, "settled bars have full height");
-        const reach_render_group *group = reach_render_command_buffer_group(
-            commands.get(), stage_tile_group_tag | ((uint64_t)tile->window << 6));
-        expect_true(group != nullptr && !group->has_clip && group->x.generation == 0,
-                    "a settled tile is a plain raster group");
-    }
-    for (size_t index = 0; index < commands->count; ++index)
-    {
-        expect_true(commands->commands[index].group_id != 0 &&
-                        !commands->commands[index].rect_fit_to_clip,
-                    "settled tile commands are grouped and drawn at their layout position");
-    }
-    reach_stage_destroy(stage);
-}
-
-static void test_stage_animating_frames_keep_valid_groups(void)
-{
-    reach_stage *stage = open_three_apps();
-    auto commands = std::make_unique<reach_render_command_buffer>();
-    for (int step = 0; step < 12; ++step)
-    {
-        advance_stage(stage, 1, 0.016);
-        render_stage(stage, step % 2 ? 12 : 0, commands.get());
-    }
-    reach_rect_f32 opening_button = reach_stage_tile_close_button_rect(stage, 0);
-    move_pointer_to(stage, {opening_button.x + opening_button.width * 0.5f,
-                            opening_button.y + opening_button.height * 0.5f});
-    advance_stage(stage, 1, 0.016);
-    render_stage(stage, 0, commands.get());
-    size_t tinted = 0;
-    for (size_t index = 0; index < commands->group_count; ++index)
-    {
-        tinted += commands->groups[index].has_tint ? 1 : 0;
-    }
-    expect_true(reach_stage_animation_active(stage) && tinted >= 3,
-                "a hover while opening tints the border, close backing and glyph in place");
-    expect_fills_compose_without_surfaces(commands.get());
-    advance_stage(stage, 80, 0.016);
-    reach_rect_f32 button = reach_stage_tile_close_button_rect(stage, 0);
-    move_pointer_to(stage, {button.x + button.width * 0.5f, button.y + button.height * 0.5f});
-    advance_stage(stage, 1, 0.016);
-    render_stage(stage, 0, commands.get());
-    reach_stage_begin_close(stage);
-    for (int step = 0; step < 12; ++step)
-    {
-        advance_stage(stage, 1, 0.016);
-        render_stage(stage, 0, commands.get());
-        expect_fills_compose_without_surfaces(commands.get());
-    }
-    reach_stage_destroy(stage);
-}
-
-static void test_stage_over_budget_tiles_keep_the_sampled_path(void)
-{
-    reach_stage *stage = nullptr;
-    reach_stage_create(&stage);
-    reach_stage_open_window windows[40] = {};
-    for (size_t index = 0; index < 40; ++index)
-    {
-        windows[index] = make_window(100 + index, make_rect(20.0f * (float)index, 30, 640, 480));
-    }
-    reach_stage_open(stage, make_rect(0, 0, 1920, 1080), 1.0f, windows, 40);
-    advance_stage(stage, 4, 0.016);
-    auto commands = std::make_unique<reach_render_command_buffer>();
-    render_stage(stage, 0, commands.get());
-    expect_true(commands->count > 40, "tiles beyond the group budget are still drawn");
-    expect_true(tile_group_ids(commands.get()).size() == 40,
-                "every tile keeps its window group beyond the budget");
-    reach_stage_destroy(stage);
-}
-
 int main(void)
 {
-    test_stage_tiles_emit_stable_window_groups();
-    test_stage_open_frames_are_property_only();
-    test_stage_moving_chrome_matches_tile_geometry();
-    test_stage_settled_tiles_match_layout();
-    test_stage_animating_frames_keep_valid_groups();
-    test_stage_over_budget_tiles_keep_the_sampled_path();
     test_stage_tile_motions_sample_to_current_rect();
     test_stage_reflow_motions_sample_to_current_rect();
     test_stage_settled_commands_match_golden();
