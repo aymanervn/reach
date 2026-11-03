@@ -2071,8 +2071,17 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
     {
         uint64_t bytes = 0;
         for (const auto &plan : plans)
-            bytes += reach_d2d_layer_bytes(plan.group.bounds.width, plan.group.bounds.height,
-                                           plan.count != 0, plan.group.has_shadow);
+        {
+            auto existing = std::find_if(
+                backend->retained_layers.begin(), backend->retained_layers.end(),
+                [&](const reach_d2d_retained_layer &layer) { return layer.id == plan.group.id; });
+            reach_d2d_surface_size capacity = {};
+            if (existing != backend->retained_layers.end() && existing->surface != nullptr)
+                capacity = {existing->capacity_width, existing->capacity_height};
+            bytes +=
+                reach_d2d_planned_layer_bytes(plan.group.bounds.width, plan.group.bounds.height,
+                                              plan.count != 0, plan.group.has_shadow, capacity);
+        }
         return bytes;
     };
     auto fit_bytes = [&](uint64_t prefix)
