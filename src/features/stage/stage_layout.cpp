@@ -435,157 +435,6 @@ void reach_stage_rebuild_layout(reach_stage *stage)
     }
 }
 
-typedef struct reach_stage_value
-{
-    reach_motion motion;
-    float value;
-    int32_t exact;
-} reach_stage_value;
-
-typedef struct reach_stage_rect_value
-{
-    reach_stage_value x;
-    reach_stage_value y;
-    reach_stage_value width;
-    reach_stage_value height;
-} reach_stage_rect_value;
-
-static reach_stage_value reach_stage_constant(float value)
-{
-    reach_stage_value result = {};
-    reach_motion_set(&result.motion, value);
-    result.value = value;
-    result.exact = 1;
-    return result;
-}
-
-static reach_stage_value reach_stage_track(const reach_stage *stage, size_t track, float value)
-{
-    reach_stage_value result = reach_stage_constant(value);
-    if (reach_animation_manager_active(&stage->animations, track))
-    {
-        result.motion = *reach_animation_manager_motion(&stage->animations, track);
-    }
-    return result;
-}
-
-static int32_t reach_stage_varies(const reach_stage_value *input)
-{
-    float minimum = 0.0f;
-    float maximum = 0.0f;
-    return input->exact && reach_motion_range(&input->motion, &minimum, &maximum) == REACH_OK &&
-           minimum != maximum;
-}
-
-static reach_stage_value reach_stage_affine(reach_stage_value input, float multiplier, float offset)
-{
-    reach_stage_value result = {};
-    result.value = input.value * multiplier + offset;
-    result.exact = input.exact;
-    if (input.exact)
-    {
-        result.motion = reach_motion_affine(&input.motion, multiplier, offset);
-    }
-    return result;
-}
-
-static reach_stage_value reach_stage_combine(reach_stage_value first, float first_factor,
-                                             reach_stage_value second, float second_factor)
-{
-    reach_stage_value result = {};
-    result.value = first_factor * first.value + second_factor * second.value;
-    result.exact = first.exact && second.exact &&
-                   reach_motion_combine(&first.motion, first_factor, &second.motion, second_factor,
-                                        0.0f, &result.motion) == REACH_OK;
-    return result;
-}
-
-static reach_stage_value reach_stage_product(reach_stage_value first, reach_stage_value second)
-{
-    reach_stage_value result = {};
-    result.value = first.value * second.value;
-    result.exact = first.exact && second.exact &&
-                   reach_motion_multiply(&first.motion, &second.motion, &result.motion) == REACH_OK;
-    return result;
-}
-
-static reach_stage_value reach_stage_lerp(reach_stage_value from, reach_stage_value to,
-                                          reach_stage_value factor)
-{
-    reach_stage_value travel =
-        reach_stage_product(reach_stage_combine(to, 1.0f, from, -1.0f), factor);
-    reach_stage_value result = {};
-    result.value = from.value + travel.value;
-    result.exact = from.exact && travel.exact &&
-                   reach_motion_combine(&from.motion, 1.0f, &travel.motion, 1.0f, 0.0f,
-                                        &result.motion) == REACH_OK;
-    return result;
-}
-
-static reach_stage_rect_value reach_stage_rect_constant(reach_rect_f32 rect)
-{
-    return {reach_stage_constant(rect.x), reach_stage_constant(rect.y),
-            reach_stage_constant(rect.width), reach_stage_constant(rect.height)};
-}
-
-static reach_stage_rect_value reach_stage_rect_lerp(reach_stage_rect_value from,
-                                                    reach_stage_rect_value to,
-                                                    reach_stage_value factor)
-{
-    return {reach_stage_lerp(from.x, to.x, factor), reach_stage_lerp(from.y, to.y, factor),
-            reach_stage_lerp(from.width, to.width, factor),
-            reach_stage_lerp(from.height, to.height, factor)};
-}
-
-static reach_stage_rect_value reach_stage_rect_scaled(reach_stage_rect_value rect,
-                                                      reach_stage_value scale)
-{
-    reach_stage_rect_value result = {};
-    result.width = reach_stage_product(rect.width, scale);
-    result.height = reach_stage_product(rect.height, scale);
-    reach_stage_value inset_x =
-        reach_stage_affine(reach_stage_combine(rect.width, 1.0f, result.width, -1.0f), 0.5f, 0.0f);
-    reach_stage_value inset_y = reach_stage_affine(
-        reach_stage_combine(rect.height, 1.0f, result.height, -1.0f), 0.5f, 0.0f);
-    result.x = reach_stage_combine(rect.x, 1.0f, inset_x, 1.0f);
-    result.y = reach_stage_combine(rect.y, 1.0f, inset_y, 1.0f);
-    return result;
-}
-
-static reach_motion reach_stage_publish(const reach_stage_value *input)
-{
-    if (reach_stage_varies(input))
-    {
-        return input->motion;
-    }
-    reach_motion result = {};
-    reach_motion_set(&result, input->value);
-    return result;
-}
-
-static reach_stage_value reach_stage_close_progress(const reach_stage_tile *tile,
-                                                    reach_stage_value progress)
-{
-    if (tile->close_from_progress <= 0.0f)
-    {
-        return reach_stage_constant(0.0f);
-    }
-    reach_stage_value result = {};
-    result.value = progress.value / tile->close_from_progress;
-    result.exact = progress.exact;
-    if (progress.exact)
-    {
-        result.motion =
-            reach_motion_affine(&progress.motion, 1.0f / tile->close_from_progress, 0.0f);
-        result.motion = reach_motion_clamp(&result.motion, 0.0f, 1.0f);
-    }
-    if (result.value > 1.0f)
-    {
-        result.value = 1.0f;
-    }
-    return result;
-}
-
 void reach_stage_apply_progress(reach_stage *stage)
 {
     REACH_ASSERT(stage != nullptr);
@@ -595,71 +444,51 @@ void reach_stage_apply_progress(reach_stage *stage)
     }
 
     reach_stage_state *state = &stage->state;
-    reach_stage_value apps_progress =
-        reach_stage_track(stage, REACH_STAGE_ANIMATION_PROGRESS, state->progress);
-    reach_stage_value desktop_progress =
-        reach_stage_track(stage, REACH_STAGE_ANIMATION_DESKTOP_PROGRESS, state->desktop_progress);
-    reach_stage_value reflow =
-        reach_stage_track(stage, REACH_STAGE_ANIMATION_REFLOW, state->reflow);
-    reach_stage_value departure =
-        reach_stage_track(stage, REACH_STAGE_ANIMATION_DEPARTURE, state->departure_progress);
-    reach_stage_value retarget =
-        reach_stage_track(stage, REACH_STAGE_ANIMATION_RETARGET, state->retarget_progress);
-
     for (size_t index = 0; index < state->tile_count; ++index)
     {
         reach_stage_tile *tile = &state->tiles[index];
 
         float presence_target = tile->departing ? 0.0f : 1.0f;
-        reach_stage_value presence =
-            reach_stage_affine(tile->departing ? departure : reflow,
-                               presence_target - tile->presence_from, tile->presence_from);
-        tile->presence = presence.value;
+        float presence_progress = tile->departing ? state->departure_progress : state->reflow;
+        tile->presence =
+            tile->presence_from + (presence_target - tile->presence_from) * presence_progress;
 
-        reach_stage_rect_value resolved =
-            reach_stage_rect_lerp(reach_stage_rect_constant(tile->reflow_from),
-                                  reach_stage_rect_constant(tile->target_rect), reflow);
-        if (presence.value < 1.0f || reach_stage_varies(&presence))
+        reach_rect_f32 resolved =
+            reach_stage_interpolate_rect(tile->reflow_from, tile->target_rect, state->reflow);
+        if (tile->presence < 1.0f)
         {
-            resolved = reach_stage_rect_scaled(
-                resolved, reach_stage_affine(presence, 1.0f - REACH_STAGE_PRESENCE_MIN_SCALE,
-                                             REACH_STAGE_PRESENCE_MIN_SCALE));
+            resolved = reach_stage_scale_rect(
+                resolved, REACH_STAGE_PRESENCE_MIN_SCALE +
+                              (1.0f - REACH_STAGE_PRESENCE_MIN_SCALE) * tile->presence);
         }
 
-        reach_stage_value progress = tile->desktop ? desktop_progress : apps_progress;
-        reach_stage_rect_value current = {};
+        float progress = tile->desktop ? state->desktop_progress : state->progress;
         if (state->closing && tile->close_retargeting)
         {
-            current =
-                reach_stage_rect_lerp(reach_stage_rect_constant(tile->close_destination_rect),
-                                      reach_stage_rect_constant(tile->close_from_rect), retarget);
+            tile->current_rect = reach_stage_interpolate_rect(
+                tile->close_destination_rect, tile->close_from_rect, state->retarget_progress);
         }
         else if (state->closing)
         {
-            current = reach_stage_rect_lerp(reach_stage_rect_constant(tile->close_destination_rect),
-                                            reach_stage_rect_constant(tile->close_from_rect),
-                                            reach_stage_close_progress(tile, progress));
+            float close_progress =
+                tile->close_from_progress > 0.0f ? progress / tile->close_from_progress : 0.0f;
+            if (close_progress > 1.0f)
+            {
+                close_progress = 1.0f;
+            }
+            tile->current_rect = reach_stage_interpolate_rect(
+                tile->close_destination_rect, tile->close_from_rect, close_progress);
         }
         else
         {
-            current = reach_stage_rect_lerp(reach_stage_rect_constant(tile->source_rect), resolved,
-                                            progress);
+            tile->current_rect =
+                reach_stage_interpolate_rect(tile->source_rect, resolved, progress);
         }
 
-        reach_stage_value bar =
-            reach_stage_product(reach_stage_affine(progress, tile->bar_height, 0.0f), presence);
-        reach_stage_value fade = reach_stage_product(apps_progress, presence);
-
-        tile->current_rect = {current.x.value, current.y.value, current.width.value,
-                              current.height.value};
+        float bar = tile->bar_height * progress * tile->presence;
         tile->current_bar.x = tile->current_rect.x;
-        tile->current_bar.y = tile->current_rect.y - bar.value;
+        tile->current_bar.y = tile->current_rect.y - bar;
         tile->current_bar.width = tile->current_rect.width;
-        tile->current_bar.height = bar.value;
-        tile->rect_motion = {reach_stage_publish(&current.x), reach_stage_publish(&current.y),
-                             reach_stage_publish(&current.width),
-                             reach_stage_publish(&current.height)};
-        tile->bar_motion = reach_stage_publish(&bar);
-        tile->fade_motion = reach_stage_publish(&fade);
+        tile->current_bar.height = bar;
     }
 }
