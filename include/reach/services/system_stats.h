@@ -30,7 +30,6 @@ extern "C"
 
     void reach_system_stats_set_enabled(reach_system_stats *service, int32_t enabled);
 
-    int32_t reach_system_stats_take_changed(reach_system_stats *service);
     void reach_system_stats_snapshot_take(const reach_system_stats *service,
                                           reach_system_stats_snapshot *out_snapshot);
 

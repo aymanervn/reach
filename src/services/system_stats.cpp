@@ -22,7 +22,6 @@ struct reach_system_stats
     int32_t stop = 0;
     int32_t enabled = 0;
     int32_t rebaseline = 0;
-    int32_t changed = 0;
 
     reach_system_stats_snapshot snapshot = {};
 };
@@ -136,10 +135,6 @@ static void reach_system_stats_thread_main(reach_system_stats *service)
         {
             std::lock_guard<std::mutex> lock(service->mutex);
             service->snapshot = next;
-            if (differs)
-            {
-                service->changed = 1;
-            }
         }
 
         if (differs && service->notify != nullptr)
@@ -149,9 +144,8 @@ static void reach_system_stats_thread_main(reach_system_stats *service)
     }
 }
 
-reach_result reach_system_stats_create(reach_system_stats_port source,
-                                       void (*notify)(void *user), void *notify_user,
-                                       reach_system_stats **out_service)
+reach_result reach_system_stats_create(reach_system_stats_port source, void (*notify)(void *user),
+                                       void *notify_user, reach_system_stats **out_service)
 {
     if (out_service == nullptr)
     {
@@ -238,18 +232,6 @@ void reach_system_stats_set_enabled(reach_system_stats *service, int32_t enabled
         }
     }
     service->cv.notify_one();
-}
-
-int32_t reach_system_stats_take_changed(reach_system_stats *service)
-{
-    if (service == nullptr)
-    {
-        return 0;
-    }
-    std::lock_guard<std::mutex> lock(service->mutex);
-    int32_t changed = service->changed;
-    service->changed = 0;
-    return changed;
 }
 
 void reach_system_stats_snapshot_take(const reach_system_stats *service,

@@ -17,6 +17,8 @@ typedef struct reach_top_bar_tray_drag_state
     reach_motion snap;
 } reach_top_bar_tray_drag_state;
 
+#define REACH_TOP_BAR_STATS_SLOT_COUNT 4
+
 struct reach_top_bar
 {
     reach_animation_manager manager;
@@ -31,7 +33,6 @@ struct reach_top_bar
     reach_icon_service *icons;
     reach_window_tracking *windows;
     reach_app_control *apps;
-    reach_system_stats *stats;
     reach_clock *clock;
     reach_input_language_service *input_language;
     reach_system_status *status;
@@ -45,6 +46,7 @@ struct reach_top_bar
     float current_app_target_width;
     float tray_target_width;
     float quick_settings_target_width;
+    float stats_advances[REACH_TOP_BAR_STATS_SLOT_COUNT];
     reach_rect_f32 push_monitor_bounds;
     reach_rect_f32 push_shown_bounds;
     float push_shadow_clearance;

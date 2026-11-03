@@ -823,6 +823,10 @@ static reach_result reach_host_handle_surface_event(reach_host *host, const reac
         notification.kind = event->type == REACH_UI_EVENT_NOW_PLAYING_CHANGED
                                 ? REACH_FEATURE_NOTIFICATION_NOW_PLAYING_CHANGED
                                 : REACH_FEATURE_NOTIFICATION_SYSTEM_STATS_CHANGED;
+        if (event->type == REACH_UI_EVENT_SYSTEM_STATS_CHANGED)
+        {
+            reach_system_stats_snapshot_take(host->system_stats, &notification.system_stats);
+        }
         reach_host_notify_registered_features(host, &notification);
         reach_host_request_update(host);
         return REACH_OK;

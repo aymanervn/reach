@@ -184,7 +184,7 @@ extern "C"
     void reach_top_bar_attach_services(reach_top_bar *top_bar,
                                        reach_now_playing_service *now_playing,
                                        reach_icon_service *icons, reach_window_tracking *windows,
-                                       reach_system_stats *stats, reach_clock *clock,
+                                       reach_clock *clock,
                                        reach_input_language_service *input_language,
                                        reach_tray_service *tray);
 
@@ -225,6 +225,11 @@ extern "C"
     } reach_top_bar_build_context;
 
     void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_build_context *ctx);
+
+    int32_t reach_top_bar_apply_stats(reach_top_bar *top_bar,
+                                      const reach_system_stats_snapshot *snapshot,
+                                      const reach_text_measure_port *measure, float dpi_scale,
+                                      int32_t *out_layout_changed);
 
     reach_point_i32 reach_top_bar_local_point(const reach_top_bar_layout *layout, int32_t x,
                                               int32_t y);
