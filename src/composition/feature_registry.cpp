@@ -1180,6 +1180,8 @@ static reach_result reach_stage_native_overlay_item(const void *capsule, size_t 
     out->plane = placement.behind_surface ? REACH_WINDOW_THUMBNAIL_PLANE_BEHIND_TARGET
                                           : REACH_WINDOW_THUMBNAIL_PLANE_TARGET;
     out->placement.destination = placement.destination;
+    out->destination_motion = placement.destination_motion;
+    out->has_destination_motion = 1;
     out->placement.source_screen = placement.source_screen;
     out->placement.opacity = placement.opacity;
     out->placement.visible = placement.visible;
