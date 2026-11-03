@@ -169,6 +169,8 @@ struct reach_d2d_retained_layer
     ComPtr<IDCompositionColorMatrixEffect> dcomp_tint_mix;
     UINT width = 0;
     UINT height = 0;
+    UINT capacity_width = 0;
+    UINT capacity_height = 0;
     bool initialized = false;
     bool raster_birth_aligned = false;
     bool raster_finite_translation = false;

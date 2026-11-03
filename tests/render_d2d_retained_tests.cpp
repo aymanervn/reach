@@ -44,6 +44,84 @@ static void test_layer_bytes_saturates(void)
            "infinite bounds exceed the retained budget");
 }
 
+static const uint64_t BUDGET = UINT64_C(128) * 1024 * 1024;
+
+static bool same_size(reach_d2d_surface_size left, reach_d2d_surface_size right)
+{
+    return left.width == right.width && left.height == right.height;
+}
+
+static uint64_t area(reach_d2d_surface_size size)
+{
+    return (uint64_t)size.width * size.height;
+}
+
+static int simulate_allocations(const std::vector<reach_d2d_surface_size> &needs)
+{
+    reach_d2d_surface_size capacity = {};
+    int allocations = 0;
+    for (const reach_d2d_surface_size &need : needs)
+    {
+        reach_d2d_surface_size next = reach_d2d_surface_capacity(capacity, need, BUDGET);
+        expect(next.width >= need.width && next.height >= need.height,
+               "the capacity always covers the needed size");
+        expect(area(need) * 2 >= area(next), "the capacity never exceeds twice the needed area");
+        if (!same_size(next, capacity))
+            ++allocations;
+        capacity = next;
+    }
+    return allocations;
+}
+
+static void test_first_allocation_is_exact(void)
+{
+    reach_d2d_surface_size next = reach_d2d_surface_capacity({0, 0}, {137, 59}, BUDGET);
+    expect(same_size(next, {137, 59}), "a static layer gets no padding");
+}
+
+static void test_growth_reuses_surfaces(void)
+{
+    expect(simulate_allocations({{100, 100}, {180, 180}, {260, 260}, {400, 400}}) <= 4,
+           "a coarse growth sequence reallocates at most three times after the first surface");
+    std::vector<reach_d2d_surface_size> animation;
+    for (uint32_t size = 100; size <= 400; size += 4)
+        animation.push_back({size, size});
+    expect(simulate_allocations(animation) <= 8,
+           "a continuous resize reuses surfaces between growth steps");
+    std::vector<reach_d2d_surface_size> there_and_back = animation;
+    for (uint32_t size = 400; size >= 100; size -= 4)
+        there_and_back.push_back({size, size});
+    expect(simulate_allocations(there_and_back) <= 12,
+           "closing back down does not reallocate every frame");
+}
+
+static void test_reuse_and_shrink(void)
+{
+    expect(same_size(reach_d2d_surface_capacity({400, 400}, {400, 400}, BUDGET), {400, 400}),
+           "an unchanged size reuses the surface");
+    expect(same_size(reach_d2d_surface_capacity({400, 400}, {300, 300}, BUDGET), {400, 400}),
+           "a size above half the area reuses the surface");
+    expect(same_size(reach_d2d_surface_capacity({400, 400}, {200, 200}, BUDGET), {200, 200}),
+           "a size below half the area shrinks to the exact size");
+    expect(same_size(reach_d2d_surface_capacity({400, 400}, {400, 100}, BUDGET), {400, 100}),
+           "a thin size shrinks to the exact size");
+}
+
+static void test_growth_respects_budget_and_limits(void)
+{
+    expect(same_size(reach_d2d_surface_capacity({100, 100}, {200, 200}, BUDGET), {256, 256}),
+           "growth rounds up to the step");
+    expect(same_size(reach_d2d_surface_capacity({100, 100}, {200, 200}, 200 * 200 * 4 + 1),
+                     {200, 200}),
+           "growth falls back to the exact size when the padded surface exceeds the budget");
+    expect(same_size(reach_d2d_surface_capacity({100, 100}, {200, 200}, 0), {200, 200}),
+           "an exhausted budget still yields the exact size");
+    expect(same_size(reach_d2d_surface_capacity({16000, 100}, {16300, 100}, BUDGET), {16384, 100}),
+           "growth is clamped to the maximum surface extent");
+    expect(same_size(reach_d2d_surface_capacity({10, 10}, {20, 10}, BUDGET), {20, 10}),
+           "padding that would exceed twice the needed area is dropped");
+}
+
 struct buffer_entry
 {
     uint64_t group_id;
@@ -139,6 +217,10 @@ int main(void)
 {
     test_layer_bytes();
     test_layer_bytes_saturates();
+    test_first_allocation_is_exact();
+    test_growth_reuses_surfaces();
+    test_reuse_and_shrink();
+    test_growth_respects_budget_and_limits();
     test_ungrouped_run_survives_unrelated_insertions();
     test_textbox_runs_split_and_stay_distinct();
     test_ungrouped_run_ids_stay_in_the_reserved_range();

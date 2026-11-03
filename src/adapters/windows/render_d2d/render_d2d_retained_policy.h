@@ -15,7 +15,16 @@ struct reach_d2d_retained_run
     uint64_t id;
 };
 
+struct reach_d2d_surface_size
+{
+    uint32_t width;
+    uint32_t height;
+};
+
 uint64_t reach_d2d_layer_bytes(float width, float height, bool has_paint, bool has_shadow);
+reach_d2d_surface_size reach_d2d_surface_capacity(reach_d2d_surface_size capacity,
+                                                  reach_d2d_surface_size need,
+                                                  uint64_t budget_left);
 uint64_t reach_d2d_ungrouped_run_id(uint64_t anchor, uint64_t ordinal);
 void reach_d2d_retained_runs(const reach_render_command_buffer *buffer,
                              std::vector<reach_d2d_retained_run> *out);
