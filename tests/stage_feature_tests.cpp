@@ -1022,11 +1022,12 @@ static reach_stage *open_golden_stage(float dpi)
 }
 
 static void append_golden_commands(reach_stage *stage, float dpi,
-                                   reach_render_command_buffer *commands)
+                                   reach_render_command_buffer *commands,
+                                   reach_rect_f32 bounds = {0.0f, 0.0f, 1920.0f, 1080.0f})
 {
     reach_stage_render_context ctx = {};
     ctx.theme = reach_theme_default();
-    ctx.bounds = make_rect(0, 0, 1920, 1080);
+    ctx.bounds = bounds;
     ctx.dpi_scale = dpi;
     expect_true(reach_stage_append_render_commands(stage, &ctx, commands) == REACH_OK,
                 "golden stage render commands are appended");
@@ -1704,13 +1705,14 @@ static reach_rect_f32 final_clip(const reach_render_command_buffer *commands, ui
     return clip;
 }
 
-static void expect_final_border_matches_settled(float dpi)
+static void expect_final_border_matches_settled(float dpi, reach_rect_f32 bounds = {
+                                                               0.0f, 0.0f, 1920.0f, 1080.0f})
 {
     reach_stage *stage = open_golden_windows(dpi);
     advance_stage(stage, 4, 0.016);
     const reach_stage_state *state = reach_stage_state_ptr(stage);
     auto moving = std::make_unique<reach_render_command_buffer>();
-    append_golden_commands(stage, dpi, moving.get());
+    append_golden_commands(stage, dpi, moving.get(), bounds);
     expect_true(reach_stage_animation_active(stage) &&
                     reach_render_command_buffer_motion_active(moving.get()),
                 "the border is animating before the final sample");
@@ -1730,7 +1732,7 @@ static void expect_final_border_matches_settled(float dpi)
 
     advance_stage(stage, 80, 0.016);
     auto settled = std::make_unique<reach_render_command_buffer>();
-    append_golden_commands(stage, dpi, settled.get());
+    append_golden_commands(stage, dpi, settled.get(), bounds);
     float border = reach_theme_border_thickness(reach_theme_default(), dpi);
     size_t slot = 0;
     for (size_t index = 0; index < state->tile_count; ++index)
@@ -1777,11 +1779,17 @@ static void test_stage_final_border_lands_on_the_settled_pixels(void)
     expect_final_border_matches_settled(1.5f);
 }
 
+static void test_stage_final_edges_snap_like_the_settled_raster_at_half_pixels(void)
+{
+    expect_final_border_matches_settled(1.0f, make_rect(31.8333759f, 0.0f, 1920.0f, 1080.0f));
+}
+
 int main(void)
 {
     test_stage_moving_desktop_tile_ignores_pointer_hover();
     test_stage_moving_radius_follows_the_bar();
     test_stage_final_border_lands_on_the_settled_pixels();
+    test_stage_final_edges_snap_like_the_settled_raster_at_half_pixels();
     test_stage_tiles_emit_stable_window_groups();
     test_stage_open_frames_are_property_only();
     test_stage_moving_chrome_matches_tile_geometry();
