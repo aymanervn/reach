@@ -43,9 +43,6 @@ extern "C"
         reach_rect_f32 reflow_from;
         reach_rect_f32 current_rect;
         reach_rect_f32 current_bar;
-        reach_rect_motion rect_motion;
-        reach_motion bar_motion;
-        reach_motion fade_motion;
         reach_rect_f32 close_from_rect;
         reach_rect_f32 close_destination_rect;
         float close_from_progress;
@@ -104,7 +101,6 @@ extern "C"
     {
         uintptr_t window;
         reach_rect_f32 destination;
-        reach_rect_motion destination_motion;
         reach_rect_f32 source_screen;
         float opacity;
         int32_t visible;
