@@ -228,6 +228,15 @@ reach_result reach_windows_create_d2d_render_backend(reach_platform_window *wind
     return REACH_OK;
 }
 
+void reach_windows_render_backend_force_immediate(reach_render_backend_port *port)
+{
+    // Workaround: temporary Stage A/B measurement switch; delete with the experiment.
+    if (port != nullptr && port->backend != nullptr)
+    {
+        port->backend->immediate_only = true;
+    }
+}
+
 reach_result reach_windows_create_dcomp_render_backend(reach_platform_window *window,
                                                        reach_render_backend_port *out_port)
 {

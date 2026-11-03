@@ -226,6 +226,9 @@ static reach_result reach_config_store_load(reach_config_store *store,
                                           : REACH_CONFIG_THEME_FOLLOW_REACH;
     out_snapshot->stage_animation_ms =
         (int32_t)GetPrivateProfileIntW(L"stage", L"animation_ms", 280, path);
+    // Workaround: temporary Stage A/B measurement switch; delete with the experiment.
+    out_snapshot->stage_motion_experiment =
+        (int32_t)GetPrivateProfileIntW(L"experiment", L"stage_motion", 0, path) == 1 ? 1 : 0;
     GetPrivateProfileStringW(L"wallpaper", L"path", L"",
                              reinterpret_cast<wchar_t *>(out_snapshot->wallpaper_path), 260, path);
     for (size_t index = 0; index < REACH_MAX_WALLPAPER_MONITORS; ++index)
@@ -366,6 +369,11 @@ static reach_result reach_config_store_save(reach_config_store *store,
     text.append(std::to_wstring((int32_t)snapshot->windows_app_theme));
     text.append(L"\r\n\r\n[stage]\r\nanimation_ms=");
     text.append(std::to_wstring(snapshot->stage_animation_ms));
+    // Workaround: temporary Stage A/B measurement switch; delete with the experiment.
+    if (snapshot->stage_motion_experiment == 1)
+    {
+        text.append(L"\r\n\r\n[experiment]\r\nstage_motion=1");
+    }
     text.append(L"\r\n\r\n[wallpaper]\r\npath=");
     text.append(reinterpret_cast<const wchar_t *>(snapshot->wallpaper_path));
     text.append(L"\r\n");

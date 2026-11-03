@@ -79,6 +79,8 @@ extern "C"
                                                          reach_render_backend_port *out_port);
     reach_result reach_windows_create_dcomp_render_backend(reach_platform_window *window,
                                                            reach_render_backend_port *out_port);
+    // Workaround: temporary Stage A/B measurement switch; delete with the experiment.
+    void reach_windows_render_backend_force_immediate(reach_render_backend_port *port);
     reach_result reach_windows_create_search_provider(reach_search_provider_port *out_port);
     reach_result reach_windows_create_wifi(reach_wifi_port *out_port);
     reach_result reach_windows_create_bluetooth(reach_bluetooth_port *out_port);
