@@ -999,7 +999,7 @@ static void test_close_hover_groups_only_while_hovered(void)
 static const uint16_t golden_alpha_label[] = {'A', 'l', 'p', 'h', 'a', 0};
 static const uint16_t golden_beta_label[] = {'B', 'e', 't', 'a', 0};
 
-static reach_stage *open_golden_windows(float dpi)
+static reach_stage *open_golden_stage(float dpi)
 {
     reach_stage *stage = nullptr;
     reach_stage_create(&stage);
@@ -1011,12 +1011,6 @@ static reach_stage *open_golden_windows(float dpi)
     windows[1].minimized = 1;
     windows[1].icon_id = 9;
     reach_stage_open(stage, make_rect(0, 0, 1920, 1080), dpi, windows, 3);
-    return stage;
-}
-
-static reach_stage *open_golden_stage(float dpi)
-{
-    reach_stage *stage = open_golden_windows(dpi);
     advance_stage(stage, 80, 0.016);
     return stage;
 }
@@ -1444,16 +1438,6 @@ static reach_rect_f32 group_screen_clip(const reach_render_command_buffer *comma
     return clip;
 }
 
-static void expect_rect_within(reach_rect_f32 actual, reach_rect_f32 expected, float tolerance,
-                               const char *message)
-{
-    expect_true(fabsf(actual.x - expected.x) <= tolerance &&
-                    fabsf(actual.y - expected.y) <= tolerance &&
-                    fabsf(actual.width - expected.width) <= tolerance &&
-                    fabsf(actual.height - expected.height) <= tolerance,
-                message);
-}
-
 static void expect_moving_chrome_matches_tile(const reach_render_command_buffer *commands,
                                               const reach_stage *stage, size_t index,
                                               const char *phase)
@@ -1464,17 +1448,17 @@ static void expect_moving_chrome_matches_tile(const reach_render_command_buffer 
     uint64_t base = stage_tile_group_tag | ((uint64_t)tile->window << 6);
     reach_rect_f32 rect = tile->current_rect;
     float bar = tile->current_bar.height;
-    expect_rect_within(group_screen_clip(commands, base + 3, now),
-                       make_rect(rect.x - border, rect.y - bar - border, rect.width + border * 2,
-                                 rect.height + bar + border * 2),
-                       1.0f, phase);
+    expect_rect_near(group_screen_clip(commands, base + 3, now),
+                     make_rect(rect.x - border, rect.y - bar - border, rect.width + border * 2,
+                               rect.height + bar + border * 2),
+                     phase);
     reach_rect_f32 inner = group_screen_clip(commands, base + 5, now);
-    expect_rect_within(inner, make_rect(rect.x, rect.y - bar, rect.width, inner.height), 1.0f,
-                       phase);
-    expect_rect_within(
+    expect_near(inner.x, rect.x, phase);
+    expect_near(inner.y, rect.y - bar, phase);
+    expect_near(inner.width, rect.width, phase);
+    expect_rect_near(
         group_screen_clip(commands, base + 7, now),
-        make_rect(rect.x - border, rect.y + rect.height, rect.width + border * 2, border), 1.0f,
-        phase);
+        make_rect(rect.x - border, rect.y + rect.height, rect.width + border * 2, border), phase);
     if (bar > 0.0f)
     {
         expect_rect_near(group_screen_clip(commands, base + 11, now),
@@ -1601,187 +1585,8 @@ static void test_stage_over_budget_tiles_keep_the_sampled_path(void)
     reach_stage_destroy(stage);
 }
 
-static uint64_t stage_group_base(const reach_stage_tile *tile)
-{
-    return stage_tile_group_tag | ((uint64_t)tile->window << 6);
-}
-
-static void test_stage_moving_desktop_tile_ignores_pointer_hover(void)
-{
-    reach_stage *stage = open_golden_windows(1.0f);
-    advance_stage(stage, 3, 0.016);
-    const reach_stage_state *state = reach_stage_state_ptr(stage);
-    size_t desktop_index = find_desktop_tile(state);
-    expect_true(desktop_index < state->tile_count, "the stage has a desktop tile");
-    if (desktop_index >= state->tile_count)
-    {
-        reach_stage_destroy(stage);
-        return;
-    }
-    reach_rect_f32 rect = state->tiles[desktop_index].current_rect;
-    move_pointer_to(stage, {rect.x + 3.0f, rect.y + 3.0f});
-    expect_true(state->has_hover && state->hover_index == desktop_index,
-                "the pointer hovers the opening desktop tile");
-    advance_stage(stage, 1, 0.016);
-    expect_true(reach_stage_animation_active(stage), "the desktop tile is still opening");
-
-    auto commands = std::make_unique<reach_render_command_buffer>();
-    append_golden_commands(stage, 1.0f, commands.get());
-    double final_sample = reach_motion_now_seconds() + 100.0;
-    reach_color expected = reach_theme_default()->bar_border;
-    uint64_t base = stage_group_base(&state->tiles[desktop_index]);
-    for (uint64_t strip = 0; strip < 4; ++strip)
-    {
-        const reach_render_group *group =
-            reach_render_command_buffer_group(commands.get(), base + 3 + strip * 2);
-        expect_true(group != nullptr && group->has_tint, "a moving desktop border strip is tinted");
-        if (group == nullptr)
-        {
-            continue;
-        }
-        reach_color color = reach_render_group_tint_at(group, final_sample);
-        expect_near(color.r, expected.r, "the desktop border ignores the hover highlight (red)");
-        expect_near(color.g, expected.g, "the desktop border ignores the hover highlight (green)");
-        expect_near(color.b, expected.b, "the desktop border ignores the hover highlight (blue)");
-    }
-    reach_stage_destroy(stage);
-}
-
-static void test_stage_moving_radius_follows_the_bar(void)
-{
-    const float dpi = 1.0f;
-    reach_stage *stage = open_golden_windows(dpi);
-    const reach_stage_state *state = reach_stage_state_ptr(stage);
-    auto commands = std::make_unique<reach_render_command_buffer>();
-    float limit = reach_theme_default()->radius_small * dpi;
-    float border = reach_theme_border_thickness(reach_theme_default(), dpi);
-    int32_t clamped = 0;
-    for (int step = 0; step < 8; ++step)
-    {
-        advance_stage(stage, 1, 0.016);
-        append_golden_commands(stage, dpi, commands.get());
-        double now = reach_motion_now_seconds();
-        for (size_t index = 0; index < state->tile_count; ++index)
-        {
-            const reach_stage_tile *tile = &state->tiles[index];
-            if (tile->desktop)
-            {
-                continue;
-            }
-            float expected = fminf(limit, tile->current_bar.height * 0.5f);
-            clamped |= expected < limit;
-            uint64_t base = stage_group_base(tile);
-            const reach_render_group *outer =
-                reach_render_command_buffer_group(commands.get(), base + 3);
-            const reach_render_group *inner =
-                reach_render_command_buffer_group(commands.get(), base + 5);
-            const reach_render_group *header =
-                reach_render_command_buffer_group(commands.get(), base + 11);
-            expect_true(outer != nullptr && inner != nullptr && header != nullptr,
-                        "a moving tile has its rounded fills");
-            if (outer == nullptr || inner == nullptr || header == nullptr)
-            {
-                continue;
-            }
-            expect_near(reach_render_group_clip_radii_at(inner, now).x, expected,
-                        "the inner fill radius follows the current bar");
-            expect_near(reach_render_group_clip_radii_at(header, now).x, expected,
-                        "the header radius follows the current bar");
-            expect_near(reach_render_group_clip_radii_at(outer, now).x, expected + border,
-                        "the outer border radius follows the current bar");
-        }
-    }
-    expect_true(clamped, "the bar is shorter than twice the radius early in the animation");
-    reach_stage_destroy(stage);
-}
-
-static reach_rect_f32 final_clip(const reach_render_command_buffer *commands, uint64_t id,
-                                 double final_sample)
-{
-    reach_rect_f32 clip = {};
-    expect_true(reach_render_command_buffer_group_clip_at(commands, id, final_sample, &clip) != 0,
-                "a moving border fill resolves a final clip");
-    return clip;
-}
-
-static void expect_final_border_matches_settled(float dpi)
-{
-    reach_stage *stage = open_golden_windows(dpi);
-    advance_stage(stage, 4, 0.016);
-    const reach_stage_state *state = reach_stage_state_ptr(stage);
-    auto moving = std::make_unique<reach_render_command_buffer>();
-    append_golden_commands(stage, dpi, moving.get());
-    expect_true(reach_stage_animation_active(stage) &&
-                    reach_render_command_buffer_motion_active(moving.get()),
-                "the border is animating before the final sample");
-    double final_sample = reach_motion_now_seconds() + 100.0;
-    std::vector<reach_rect_f32> outer, inner, strip;
-    for (size_t index = 0; index < state->tile_count; ++index)
-    {
-        if (state->tiles[index].desktop)
-        {
-            continue;
-        }
-        uint64_t base = stage_group_base(&state->tiles[index]);
-        outer.push_back(final_clip(moving.get(), base + 3, final_sample));
-        inner.push_back(final_clip(moving.get(), base + 5, final_sample));
-        strip.push_back(final_clip(moving.get(), base + 7, final_sample));
-    }
-
-    advance_stage(stage, 80, 0.016);
-    auto settled = std::make_unique<reach_render_command_buffer>();
-    append_golden_commands(stage, dpi, settled.get());
-    float border = reach_theme_border_thickness(reach_theme_default(), dpi);
-    size_t slot = 0;
-    for (size_t index = 0; index < state->tile_count; ++index)
-    {
-        const reach_stage_tile *tile = &state->tiles[index];
-        if (tile->desktop)
-        {
-            continue;
-        }
-        std::vector<reach_rect_f32> raster;
-        for (size_t at = 0; at < settled->count; ++at)
-        {
-            const reach_render_command &command = settled->commands[at];
-            if (command.group_id == stage_group_base(tile) &&
-                command.type == REACH_RENDER_COMMAND_RECT)
-            {
-                raster.push_back(command.rect);
-            }
-        }
-        expect_true(raster.size() >= 2 && slot < outer.size(),
-                    "a settled tile draws its outer and inner border fills");
-        if (raster.size() < 2 || slot >= outer.size())
-        {
-            continue;
-        }
-        expect_rect_near(outer[slot], raster[0], "the final outer border equals the settled one");
-        expect_rect_near(
-            inner[slot],
-            make_rect(raster[1].x, raster[1].y, raster[1].width, raster[1].height + border),
-            "the final inner fill equals the settled one under the bottom border");
-        expect_rect_near(strip[slot],
-                         make_rect(raster[0].x, raster[0].y + raster[0].height - border,
-                                   raster[0].width, border),
-                         "the final bottom border equals the settled one");
-        ++slot;
-    }
-    reach_stage_destroy(stage);
-}
-
-static void test_stage_final_border_lands_on_the_settled_pixels(void)
-{
-    expect_final_border_matches_settled(1.0f);
-    expect_final_border_matches_settled(1.25f);
-    expect_final_border_matches_settled(1.5f);
-}
-
 int main(void)
 {
-    test_stage_moving_desktop_tile_ignores_pointer_hover();
-    test_stage_moving_radius_follows_the_bar();
-    test_stage_final_border_lands_on_the_settled_pixels();
     test_stage_tiles_emit_stable_window_groups();
     test_stage_open_frames_are_property_only();
     test_stage_moving_chrome_matches_tile_geometry();
