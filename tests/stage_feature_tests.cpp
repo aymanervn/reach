@@ -988,8 +988,166 @@ static void test_close_hover_groups_only_while_hovered(void)
     reach_stage_destroy(stage);
 }
 
+static const uint16_t golden_alpha_label[] = {'A', 'l', 'p', 'h', 'a', 0};
+static const uint16_t golden_beta_label[] = {'B', 'e', 't', 'a', 0};
+
+static reach_stage *open_golden_stage(float dpi)
+{
+    reach_stage *stage = nullptr;
+    reach_stage_create(&stage);
+    reach_stage_open_window windows[3] = {make_window(1, make_rect(100, 120, 640, 480)),
+                                          make_window(2, make_rect(300, 220, 800, 500)),
+                                          make_desktop(5, make_rect(0, 0, 1920, 1080))};
+    windows[0].label = golden_alpha_label;
+    windows[1].label = golden_beta_label;
+    windows[1].minimized = 1;
+    windows[1].icon_id = 9;
+    reach_stage_open(stage, make_rect(0, 0, 1920, 1080), dpi, windows, 3);
+    advance_stage(stage, 80, 0.016);
+    return stage;
+}
+
+static void append_golden_commands(reach_stage *stage, float dpi,
+                                   reach_render_command_buffer *commands)
+{
+    reach_stage_render_context ctx = {};
+    ctx.theme = reach_theme_default();
+    ctx.bounds = make_rect(0, 0, 1920, 1080);
+    ctx.dpi_scale = dpi;
+    expect_true(reach_stage_append_render_commands(stage, &ctx, commands) == REACH_OK,
+                "golden stage render commands are appended");
+}
+
+struct golden_row
+{
+    int type;
+    float x, y, width, height, radius;
+    int corner_mask;
+    float r, g, b, a;
+    unsigned tag;
+};
+
+static const golden_row golden_rows_100[] = {
+    {1, 60.0f, 220.0f, 810.0f, 640.0f, 13.0f, 3, 0.39607844f, 0.39607844f, 0.39607844f, 1.0f, 0},
+    {1, 61.0f, 221.0f, 808.0f, 638.0f, 12.0f, 3, 0.06666667f, 0.07058824f, 0.06666667f, 1.0f, 0},
+    {1, 61.333374f, 221.04547f, 807.8788f, 32.0f, 12.0f, 3, 0.14509805f, 0.14901961f, 0.14509805f,
+     0.45f, 0},
+    {2, 69.333374f, 221.04547f, 775.8788f, 32.0f, 0.0f, 0, 0.79607844f, 0.79607844f, 0.79607844f,
+     1.0f, 65},
+    {1, 845.21216f, 229.04547f, 16.0f, 16.0f, 8.0f, 0, 0.5803922f, 0.5882353f, 0.5803922f, 1.0f, 0},
+    {10, 849.0522f, 232.88547f, 8.32f, 8.32f, 0.0f, 0, 1.0f, 1.0f, 1.0f, 0.8f, 35},
+    {1, 888.0f, 220.0f, 972.0f, 640.0f, 13.0f, 3, 0.39607844f, 0.39607844f, 0.39607844f, 1.0f, 0},
+    {1, 889.0f, 221.0f, 970.0f, 638.0f, 12.0f, 3, 0.06666667f, 0.07058824f, 0.06666667f, 1.0f, 0},
+    {1, 889.21216f, 221.04547f, 969.4545f, 32.0f, 12.0f, 3, 0.14509805f, 0.14901961f, 0.14509805f,
+     0.45f, 0},
+    {2, 897.21216f, 221.04547f, 937.4545f, 32.0f, 0.0f, 0, 0.79607844f, 0.79607844f, 0.79607844f,
+     1.0f, 66},
+    {1, 1834.6667f, 229.04547f, 16.0f, 16.0f, 8.0f, 0, 0.5803922f, 0.5882353f, 0.5803922f, 1.0f, 0},
+    {10, 1838.5067f, 232.88547f, 8.32f, 8.32f, 0.0f, 0, 1.0f, 1.0f, 1.0f, 0.8f, 35},
+    {1, 889.21216f, 253.04547f, 969.4545f, 605.90906f, 0.0f, 0, 0.13333334f, 0.14117648f,
+     0.13333334f, 1.0f, 0},
+    {3, 1349.9395f, 532.0f, 48.0f, 48.0f, 0.0f, 0, 1.0f, 1.0f, 1.0f, 1.0f, 9},
+    {1, 36.333313f, 20.0f, 1847.3334f, 1.0f, 0.0f, 0, 0.39607844f, 0.39607844f, 0.39607844f, 1.0f,
+     0},
+    {1, 36.333313f, 1059.0f, 1847.3334f, 1.0f, 0.0f, 0, 0.39607844f, 0.39607844f, 0.39607844f, 1.0f,
+     0},
+    {1, 36.333313f, 21.0f, 1.0f, 1038.0f, 0.0f, 0, 0.39607844f, 0.39607844f, 0.39607844f, 1.0f, 0},
+    {1, 1882.6667f, 21.0f, 1.0f, 1038.0f, 0.0f, 0, 0.39607844f, 0.39607844f, 0.39607844f, 1.0f, 0},
+};
+
+static const golden_row golden_rows_125[] = {
+    {1, 75.0f, 222.0f, 795.0f, 636.0f, 16.25f, 3, 0.39607844f, 0.39607844f, 0.39607844f, 1.0f, 0},
+    {1, 76.25f, 223.25f, 792.5f, 633.5f, 15.0f, 3, 0.06666667f, 0.07058824f, 0.06666667f, 1.0f, 0},
+    {1, 76.66675f, 223.12503f, 791.6666f, 40.0f, 15.0f, 3, 0.14509805f, 0.14901961f, 0.14509805f,
+     0.45f, 0},
+    {2, 86.66675f, 223.12503f, 751.6666f, 40.0f, 0.0f, 0, 0.79607844f, 0.79607844f, 0.79607844f,
+     1.0f, 65},
+    {1, 838.3334f, 233.12503f, 20.0f, 20.0f, 10.0f, 0, 0.5803922f, 0.5882353f, 0.5803922f, 1.0f, 0},
+    {10, 843.13336f, 237.92503f, 10.400001f, 10.400001f, 0.0f, 0, 1.0f, 1.0f, 1.0f, 0.8f, 35},
+    {1, 892.0f, 222.0f, 953.0f, 636.0f, 16.25f, 3, 0.39607844f, 0.39607844f, 0.39607844f, 1.0f, 0},
+    {1, 893.25f, 223.25f, 950.5f, 633.5f, 15.0f, 3, 0.06666667f, 0.07058824f, 0.06666667f, 1.0f, 0},
+    {1, 893.3334f, 223.12503f, 949.99994f, 40.0f, 15.0f, 3, 0.14509805f, 0.14901961f, 0.14509805f,
+     0.45f, 0},
+    {2, 903.3334f, 223.12503f, 909.99994f, 40.0f, 0.0f, 0, 0.79607844f, 0.79607844f, 0.79607844f,
+     1.0f, 66},
+    {1, 1813.3333f, 233.12503f, 20.0f, 20.0f, 10.0f, 0, 0.5803922f, 0.5882353f, 0.5803922f, 1.0f,
+     0},
+    {10, 1818.1333f, 237.92503f, 10.400001f, 10.400001f, 0.0f, 0, 1.0f, 1.0f, 1.0f, 0.8f, 35},
+    {1, 893.3334f, 263.12503f, 949.99994f, 593.74994f, 0.0f, 0, 0.13333334f, 0.14117648f,
+     0.13333334f, 1.0f, 0},
+    {3, 1338.3334f, 530.0f, 60.0f, 60.0f, 0.0f, 0, 1.0f, 1.0f, 1.0f, 1.0f, 9},
+    {1, 45.416687f, 25.0f, 1829.1666f, 1.25f, 0.0f, 0, 0.39607844f, 0.39607844f, 0.39607844f, 1.0f,
+     0},
+    {1, 45.416687f, 1053.75f, 1829.1666f, 1.25f, 0.0f, 0, 0.39607844f, 0.39607844f, 0.39607844f,
+     1.0f, 0},
+    {1, 45.416687f, 26.25f, 1.25f, 1027.5f, 0.0f, 0, 0.39607844f, 0.39607844f, 0.39607844f, 1.0f,
+     0},
+    {1, 1873.3333f, 26.25f, 1.25f, 1027.5f, 0.0f, 0, 0.39607844f, 0.39607844f, 0.39607844f, 1.0f,
+     0},
+};
+
+static const golden_row golden_rows_150[] = {
+    {1, 91.0f, 224.0f, 778.0f, 632.0f, 19.5f, 3, 0.39607844f, 0.39607844f, 0.39607844f, 1.0f, 0},
+    {1, 92.5f, 225.5f, 775.0f, 629.0f, 18.0f, 3, 0.06666667f, 0.07058824f, 0.06666667f, 1.0f, 0},
+    {1, 92.00012f, 225.20459f, 775.45447f, 48.0f, 18.0f, 3, 0.14509805f, 0.14901961f, 0.14509805f,
+     0.45f, 0},
+    {2, 104.00012f, 225.20459f, 727.45447f, 48.0f, 0.0f, 0, 0.79607844f, 0.79607844f, 0.79607844f,
+     1.0f, 65},
+    {1, 831.4546f, 237.20459f, 24.0f, 24.0f, 12.0f, 0, 0.5803922f, 0.5882353f, 0.5803922f, 1.0f, 0},
+    {10, 837.2146f, 242.96458f, 12.4800005f, 12.4800005f, 0.0f, 0, 1.0f, 1.0f, 1.0f, 0.8f, 35},
+    {1, 896.0f, 224.0f, 934.0f, 632.0f, 19.5f, 3, 0.39607844f, 0.39607844f, 0.39607844f, 1.0f, 0},
+    {1, 897.5f, 225.5f, 931.0f, 629.0f, 18.0f, 3, 0.06666667f, 0.07058824f, 0.06666667f, 1.0f, 0},
+    {1, 897.4546f, 225.20459f, 930.54535f, 48.0f, 18.0f, 3, 0.14509805f, 0.14901961f, 0.14509805f,
+     0.45f, 0},
+    {2, 909.4546f, 225.20459f, 882.54535f, 48.0f, 0.0f, 0, 0.79607844f, 0.79607844f, 0.79607844f,
+     1.0f, 66},
+    {1, 1792.0f, 237.20459f, 24.0f, 24.0f, 12.0f, 0, 0.5803922f, 0.5882353f, 0.5803922f, 1.0f, 0},
+    {10, 1797.76f, 242.96458f, 12.4800005f, 12.4800005f, 0.0f, 0, 1.0f, 1.0f, 1.0f, 0.8f, 35},
+    {1, 897.4546f, 273.2046f, 930.54535f, 581.5908f, 0.0f, 0, 0.13333334f, 0.14117648f, 0.13333334f,
+     1.0f, 0},
+    {3, 1326.7273f, 528.0f, 72.0f, 72.0f, 0.0f, 0, 1.0f, 1.0f, 1.0f, 1.0f, 9},
+    {1, 54.5f, 30.0f, 1811.0f, 1.5f, 0.0f, 0, 0.39607844f, 0.39607844f, 0.39607844f, 1.0f, 0},
+    {1, 54.5f, 1048.5f, 1811.0f, 1.5f, 0.0f, 0, 0.39607844f, 0.39607844f, 0.39607844f, 1.0f, 0},
+    {1, 54.5f, 31.5f, 1.5f, 1017.0f, 0.0f, 0, 0.39607844f, 0.39607844f, 0.39607844f, 1.0f, 0},
+    {1, 1864.0f, 31.5f, 1.5f, 1017.0f, 0.0f, 0, 0.39607844f, 0.39607844f, 0.39607844f, 1.0f, 0},
+};
+
+static void expect_golden_rows(float dpi, const golden_row *rows, size_t count)
+{
+    reach_stage *stage = open_golden_stage(dpi);
+    auto commands = std::make_unique<reach_render_command_buffer>();
+    append_golden_commands(stage, dpi, commands.get());
+    expect_true(commands->count == count, "the settled stage emits the golden command count");
+    for (size_t index = 0; index < count && index < commands->count; ++index)
+    {
+        const reach_render_command &c = commands->commands[index];
+        const golden_row &g = rows[index];
+        unsigned tag =
+            c.type == REACH_RENDER_COMMAND_TEXT ? (unsigned)c.text[0] : (unsigned)c.icon_id;
+        bool same = (int)c.type == g.type && c.rect.x == g.x && c.rect.y == g.y &&
+                    c.rect.width == g.width && c.rect.height == g.height && c.radius == g.radius &&
+                    c.corner_mask == g.corner_mask && c.color.r == g.r && c.color.g == g.g &&
+                    c.color.b == g.b && c.color.a == g.a && tag == g.tag;
+        if (!same)
+        {
+            fprintf(stderr, "golden dpi %.2f command %zu differs\n", (double)dpi, index);
+        }
+        expect_true(same, "a settled stage command matches the golden geometry and color");
+    }
+    reach_stage_destroy(stage);
+}
+
+static void test_stage_settled_commands_match_golden(void)
+{
+    expect_golden_rows(1.0f, golden_rows_100, sizeof(golden_rows_100) / sizeof(golden_rows_100[0]));
+    expect_golden_rows(1.25f, golden_rows_125,
+                       sizeof(golden_rows_125) / sizeof(golden_rows_125[0]));
+    expect_golden_rows(1.5f, golden_rows_150, sizeof(golden_rows_150) / sizeof(golden_rows_150[0]));
+}
+
 int main(void)
 {
+    test_stage_settled_commands_match_golden();
     test_close_hover_groups_only_while_hovered();
     test_close_requires_completion_before_teardown();
     test_close_handoff_holds_only_the_reveal();
