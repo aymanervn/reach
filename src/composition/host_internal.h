@@ -424,6 +424,7 @@ typedef struct reach_host_edge_reveal_runtime
     reach_screen_hotspot_port port;
     reach_layout_participant participant;
     int32_t bounds_valid;
+    int32_t enter_suppressed;
     reach_rect_f32 bounds;
 } reach_host_edge_reveal_runtime;
 
