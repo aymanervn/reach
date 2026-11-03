@@ -31,27 +31,29 @@ uint64_t reach_d2d_layer_bytes(float width, float height, bool has_paint, bool h
     return surface * ((has_paint ? 1 : 0) + (has_shadow ? 1 : 0));
 }
 
-static uint32_t reach_d2d_grown_extent(uint32_t need, uint32_t capacity)
+static uint32_t reach_d2d_grown_extent(uint32_t need, uint32_t capacity, uint32_t limit)
 {
     if (need <= capacity)
         return need;
     uint64_t grown = std::max<uint64_t>(need, (uint64_t)capacity * 5 / 4);
     grown = (grown + REACH_D2D_SURFACE_GROWTH_STEP - 1) / REACH_D2D_SURFACE_GROWTH_STEP *
             REACH_D2D_SURFACE_GROWTH_STEP;
-    return (uint32_t)std::max<uint64_t>(need,
-                                        std::min<uint64_t>(grown, REACH_D2D_SURFACE_MAX_EXTENT));
+    uint64_t ceiling = std::min<uint64_t>(REACH_D2D_SURFACE_MAX_EXTENT, std::max(need, limit));
+    return (uint32_t)std::max<uint64_t>(need, std::min<uint64_t>(grown, ceiling));
 }
 
 reach_d2d_surface_size reach_d2d_surface_capacity(reach_d2d_surface_size capacity,
-                                                  reach_d2d_surface_size need, uint64_t budget_left)
+                                                  reach_d2d_surface_size need, uint64_t budget_left,
+                                                  reach_d2d_surface_size growth_limit)
 {
     if (capacity.width == 0 || capacity.height == 0 || need.width == 0 || need.height == 0)
         return need;
     uint64_t need_area = (uint64_t)need.width * need.height;
     if (need.width <= capacity.width && need.height <= capacity.height)
         return reach_d2d_planned_surface(capacity, need);
-    reach_d2d_surface_size grown = {reach_d2d_grown_extent(need.width, capacity.width),
-                                    reach_d2d_grown_extent(need.height, capacity.height)};
+    reach_d2d_surface_size grown = {
+        reach_d2d_grown_extent(need.width, capacity.width, growth_limit.width),
+        reach_d2d_grown_extent(need.height, capacity.height, growth_limit.height)};
     uint64_t grown_area = (uint64_t)grown.width * grown.height;
     if (grown_area > need_area * 2 || grown_area * 4 > budget_left)
         return need;

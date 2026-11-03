@@ -1120,7 +1120,8 @@ static HRESULT draw_layer(reach_render_backend *backend, reach_d2d_retained_laye
         if (layer.surface != nullptr)
             current = {layer.capacity_width, layer.capacity_height};
         allocation = reach_d2d_surface_capacity(current, {width, height},
-                                                surface_budget_left(backend, layer));
+                                                surface_budget_left(backend, layer),
+                                                {backend->target_width, backend->target_height});
         if (layer.surface == nullptr || allocation.width != current.width ||
             allocation.height != current.height)
         {
