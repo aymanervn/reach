@@ -196,6 +196,9 @@ typedef enum reach_feature_notification_kind
 typedef struct reach_feature_notification
 {
     reach_feature_notification_kind kind;
+    reach_text_measure_port text_measure;
+    float dpi_scale;
+    reach_system_stats_snapshot system_stats;
     reach_now_playing_action media_action;
     reach_audio_volume_state volume;
     reach_brightness_state brightness;

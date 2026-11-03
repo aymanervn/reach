@@ -272,6 +272,10 @@ void reach_host_apply_feature_tick_result(reach_host *host, reach_feature_runtim
         runtime->surface->dirty_flags = 1;
         host->dirty.render = 1;
     }
+    if (result->repaint && runtime->surface != nullptr)
+    {
+        runtime->surface->dirty_flags = 1;
+    }
     if (result->relayout)
     {
         host->dirty.layout = 1;
@@ -571,7 +575,14 @@ void reach_host_notify_registered_features(reach_host *host,
         }
         int32_t was_open = reach_host_surface_is_open(runtime);
         reach_feature_tick_result result = {};
-        control->notify(runtime->capsule, notification, &result);
+        reach_feature_notification contextual = *notification;
+        if (runtime->surface != nullptr)
+        {
+            contextual.text_measure.context = runtime->surface->renderer.backend;
+            contextual.text_measure.measure = runtime->surface->renderer.ops.measure_text;
+        }
+        contextual.dpi_scale = reach_host_layout_dpi_scale(host);
+        control->notify(runtime->capsule, &contextual, &result);
         int32_t open = reach_host_surface_is_open(runtime);
         if (open != was_open)
         {

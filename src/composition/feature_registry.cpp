@@ -37,7 +37,6 @@ static void reach_feature_attach_top_bar(void *capsule,
                                   dependencies != nullptr ? dependencies->now_playing : nullptr,
                                   dependencies != nullptr ? dependencies->icons : nullptr,
                                   dependencies != nullptr ? dependencies->windows : nullptr,
-                                  dependencies != nullptr ? dependencies->system_stats : nullptr,
                                   dependencies != nullptr ? dependencies->clock : nullptr,
                                   dependencies != nullptr ? dependencies->input_language : nullptr,
                                   dependencies != nullptr ? dependencies->tray : nullptr);
@@ -285,8 +284,25 @@ static void reach_feature_notify_top_bar(void *capsule,
                                          const reach_feature_notification *notification,
                                          reach_feature_tick_result *out)
 {
-    if (capsule == nullptr || notification == nullptr || out == nullptr ||
-        notification->kind != REACH_FEATURE_NOTIFICATION_CONFIG_CHANGED ||
+    if (capsule == nullptr || notification == nullptr || out == nullptr)
+    {
+        return;
+    }
+
+    if (notification->kind == REACH_FEATURE_NOTIFICATION_SYSTEM_STATS_CHANGED)
+    {
+        int32_t layout_changed = 0;
+        if (reach_top_bar_apply_stats(static_cast<reach_top_bar *>(capsule),
+                                      &notification->system_stats, &notification->text_measure,
+                                      notification->dpi_scale, &layout_changed))
+        {
+            out->repaint = 1;
+            out->relayout = layout_changed;
+        }
+        return;
+    }
+
+    if (notification->kind != REACH_FEATURE_NOTIFICATION_CONFIG_CHANGED ||
         notification->config == nullptr)
     {
         return;

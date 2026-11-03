@@ -310,11 +310,6 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
         host->surfaces[REACH_SURFACE_ID_TOP_BAR].dirty_flags = 1;
         host->dirty.layout = 1;
     }
-    if (reach_system_stats_take_changed(host->system_stats))
-    {
-        host->surfaces[REACH_SURFACE_ID_TOP_BAR].dirty_flags = 1;
-        host->dirty.layout = 1;
-    }
 
     if (host->surfaces[REACH_SURFACE_ID_LAUNCHER].window.ops.set_bounds != nullptr &&
         host->monitors.list != nullptr && host->monitors.ops.count != nullptr &&

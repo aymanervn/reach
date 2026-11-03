@@ -7,6 +7,7 @@
 #include <math.h>
 #include <new>
 #include <stdio.h>
+#include <string.h>
 
 static const reach_bar_edge REACH_TOP_BAR_EDGE = REACH_BAR_EDGE_TOP;
 
@@ -99,8 +100,7 @@ void reach_top_bar_destroy(reach_top_bar *top_bar)
 
 void reach_top_bar_attach_services(reach_top_bar *top_bar, reach_now_playing_service *now_playing,
                                    reach_icon_service *icons, reach_window_tracking *windows,
-                                   reach_system_stats *stats, reach_clock *clock,
-                                   reach_input_language_service *input_language,
+                                   reach_clock *clock, reach_input_language_service *input_language,
                                    reach_tray_service *tray)
 {
     if (top_bar != nullptr)
@@ -108,7 +108,6 @@ void reach_top_bar_attach_services(reach_top_bar *top_bar, reach_now_playing_ser
         top_bar->now_playing = now_playing;
         top_bar->icons = icons;
         top_bar->windows = windows;
-        top_bar->stats = stats;
         top_bar->clock = clock;
         top_bar->input_language = input_language;
         top_bar->tray = tray;
@@ -217,28 +216,39 @@ static void reach_top_bar_format_rate(uint16_t *dst, size_t dst_count, uint16_t 
     reach_copy_ascii_to_utf16(dst + 1, dst_count - 1, text);
 }
 
-static void reach_top_bar_update_stats(reach_top_bar *top_bar)
+static int32_t reach_top_bar_stats_text_equal(const uint16_t *left, const uint16_t *right)
+{
+    return memcmp(left, right, 16 * sizeof(uint16_t)) == 0;
+}
+
+static int32_t reach_top_bar_update_stats(reach_top_bar *top_bar,
+                                          const reach_system_stats_snapshot *snapshot)
 {
     reach_top_bar_state *state = &top_bar->state;
-    reach_system_stats_snapshot snapshot = {};
-    reach_system_stats_snapshot_take(top_bar->stats, &snapshot);
-
-    state->stats_valid = snapshot.valid;
-    if (!snapshot.valid)
+    uint16_t cpu[16] = {};
+    uint16_t memory[16] = {};
+    uint16_t download[16] = {};
+    uint16_t upload[16] = {};
+    if (snapshot->valid)
     {
-        state->stats_cpu_text[0] = 0;
-        state->stats_memory_text[0] = 0;
-        state->stats_download_text[0] = 0;
-        state->stats_upload_text[0] = 0;
-        return;
+        reach_top_bar_format_percent(cpu, 16, "CPU", snapshot->cpu_percent);
+        reach_top_bar_format_percent(memory, 16, "RAM", snapshot->memory_percent);
+        reach_top_bar_format_rate(download, 16, 0x2193,
+                                  snapshot->network_received_bytes_per_second);
+        reach_top_bar_format_rate(upload, 16, 0x2191, snapshot->network_sent_bytes_per_second);
     }
 
-    reach_top_bar_format_percent(state->stats_cpu_text, 16, "CPU", snapshot.cpu_percent);
-    reach_top_bar_format_percent(state->stats_memory_text, 16, "RAM", snapshot.memory_percent);
-    reach_top_bar_format_rate(state->stats_download_text, 16, 0x2193,
-                              snapshot.network_received_bytes_per_second);
-    reach_top_bar_format_rate(state->stats_upload_text, 16, 0x2191,
-                              snapshot.network_sent_bytes_per_second);
+    int32_t changed = (state->stats_valid != 0) != (snapshot->valid != 0) ||
+                      !reach_top_bar_stats_text_equal(state->stats_cpu_text, cpu) ||
+                      !reach_top_bar_stats_text_equal(state->stats_memory_text, memory) ||
+                      !reach_top_bar_stats_text_equal(state->stats_download_text, download) ||
+                      !reach_top_bar_stats_text_equal(state->stats_upload_text, upload);
+    state->stats_valid = snapshot->valid;
+    memcpy(state->stats_cpu_text, cpu, sizeof(cpu));
+    memcpy(state->stats_memory_text, memory, sizeof(memory));
+    memcpy(state->stats_download_text, download, sizeof(download));
+    memcpy(state->stats_upload_text, upload, sizeof(upload));
+    return changed;
 }
 
 static uint32_t reach_top_bar_network_icon_id(const reach_network_state *network, int32_t valid)
@@ -437,6 +447,49 @@ static float reach_top_bar_stats_slot_advance(const reach_text_measure_port *mea
     return advance > minimum ? advance : minimum;
 }
 
+static void reach_top_bar_stats_advances(const reach_top_bar *top_bar,
+                                         const reach_text_measure_port *measure, float scale,
+                                         float out_advances[REACH_TOP_BAR_STATS_SLOT_COUNT])
+{
+    for (size_t slot = 0; slot < REACH_TOP_BAR_STATS_SLOT_COUNT; ++slot)
+    {
+        out_advances[slot] = 0.0f;
+    }
+    if (!top_bar->state.stats_valid)
+    {
+        return;
+    }
+    const reach_top_bar_metrics &metrics = reach_top_bar_metrics_values;
+    const float size = metrics.stats_text_size * scale;
+    const uint16_t *texts[REACH_TOP_BAR_STATS_SLOT_COUNT] = {
+        top_bar->state.stats_cpu_text, top_bar->state.stats_memory_text,
+        top_bar->state.stats_download_text, top_bar->state.stats_upload_text};
+    const uint16_t *widest[REACH_TOP_BAR_STATS_SLOT_COUNT] = {
+        (const uint16_t *)L"CPU 100%", (const uint16_t *)L"RAM 100%",
+        (const uint16_t *)L"\u2193 999KB", (const uint16_t *)L"\u2191 999KB"};
+    for (size_t slot = 0; slot < REACH_TOP_BAR_STATS_SLOT_COUNT; ++slot)
+    {
+        out_advances[slot] = reach_top_bar_stats_slot_advance(measure, texts[slot], widest[slot],
+                                                              size, metrics.stats_text_weight);
+    }
+}
+
+int32_t reach_top_bar_apply_stats(reach_top_bar *top_bar,
+                                  const reach_system_stats_snapshot *snapshot,
+                                  const reach_text_measure_port *measure, float dpi_scale,
+                                  int32_t *out_layout_changed)
+{
+    *out_layout_changed = 0;
+    if (top_bar == nullptr || snapshot == nullptr || !reach_top_bar_update_stats(top_bar, snapshot))
+    {
+        return 0;
+    }
+    float advances[REACH_TOP_BAR_STATS_SLOT_COUNT];
+    reach_top_bar_stats_advances(top_bar, measure, dpi_scale > 0.0f ? dpi_scale : 1.0f, advances);
+    *out_layout_changed = memcmp(advances, top_bar->stats_advances, sizeof(advances)) != 0 ? 1 : 0;
+    return 1;
+}
+
 static float reach_top_bar_resolve_animated_width(reach_top_bar *top_bar, size_t track,
                                                   float *target_store, float target)
 {
@@ -535,7 +588,6 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
         layout->now_playing.x - dot_gap - dot_size, (height - dot_size) * 0.5f, dot_size, dot_size);
 
     reach_top_bar_update_language(top_bar);
-    reach_top_bar_update_stats(top_bar);
 
     float right = layout->bounds.width - edge_inset;
     float button_size = height * metrics.bar_button_scale;
@@ -552,29 +604,17 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
     float battery_width = top_bar->state.battery_valid ? metrics.battery_width * scale : 0.0f;
     float battery_gap = battery_width > 0.0f ? pill_gap : 0.0f;
 
-    const float stats_size = metrics.stats_text_size * scale;
     const float stats_gap = metrics.stats_gap * scale;
     const float stats_group_gap = metrics.stats_group_gap * scale;
-    float cpu_advance = 0.0f;
-    float memory_advance = 0.0f;
-    float download_advance = 0.0f;
-    float upload_advance = 0.0f;
+    reach_top_bar_stats_advances(top_bar, &ctx->text_measure, scale, top_bar->stats_advances);
+    float cpu_advance = top_bar->stats_advances[0];
+    float memory_advance = top_bar->stats_advances[1];
+    float download_advance = top_bar->stats_advances[2];
+    float upload_advance = top_bar->stats_advances[3];
     float stats_width = 0.0f;
     int32_t show_stats = top_bar->state.stats_valid;
     if (show_stats)
     {
-        cpu_advance = reach_top_bar_stats_slot_advance(
-            &ctx->text_measure, top_bar->state.stats_cpu_text, (const uint16_t *)L"CPU 100%",
-            stats_size, metrics.stats_text_weight);
-        memory_advance = reach_top_bar_stats_slot_advance(
-            &ctx->text_measure, top_bar->state.stats_memory_text, (const uint16_t *)L"RAM 100%",
-            stats_size, metrics.stats_text_weight);
-        download_advance = reach_top_bar_stats_slot_advance(
-            &ctx->text_measure, top_bar->state.stats_download_text,
-            (const uint16_t *)L"\u2193 999KB", stats_size, metrics.stats_text_weight);
-        upload_advance = reach_top_bar_stats_slot_advance(
-            &ctx->text_measure, top_bar->state.stats_upload_text, (const uint16_t *)L"\u2191 999KB",
-            stats_size, metrics.stats_text_weight);
         stats_width = cpu_advance + stats_gap + memory_advance + stats_group_gap +
                       download_advance + stats_gap + upload_advance + pill_gap;
     }

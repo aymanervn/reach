@@ -1519,7 +1519,7 @@ static void bar_enter_setup(bar_enter_fixture *fixture)
 
     fixture->top_bar = reach_host_feature_capsule<reach_top_bar>(host, REACH_SURFACE_ID_TOP_BAR);
     reach_top_bar_attach_services(fixture->top_bar, nullptr, nullptr, fixture->windows, nullptr,
-                                  nullptr, nullptr, nullptr);
+                                  nullptr, nullptr);
     reach_top_bar_attach_app_control(fixture->top_bar, fixture->apps);
     host->feature_runtimes[REACH_SURFACE_ID_TOP_BAR].bar_auto_hide_active = 1;
 
@@ -1751,6 +1751,99 @@ static void test_native_overlay_placement_follows_surface_presentation(void)
                 "native content and helper background follow the shared opacity");
 }
 
+static reach_host stats_host;
+
+static reach_result fake_stats_measure_text(void *context, const uint16_t *text, float text_size,
+                                            int32_t text_weight, float *out_width)
+{
+    (void)context;
+    (void)text_size;
+    (void)text_weight;
+    float width = 0.0f;
+    for (; *text != 0; ++text)
+        width += *text == 'M' ? 8.0f : 4.0f;
+    *out_width = width;
+    return REACH_OK;
+}
+
+static void stats_notify(reach_host *host, float cpu, uint64_t received, int32_t valid)
+{
+    reach_feature_notification notification = {};
+    notification.kind = REACH_FEATURE_NOTIFICATION_SYSTEM_STATS_CHANGED;
+    notification.system_stats.valid = valid;
+    notification.system_stats.cpu_percent = cpu;
+    notification.system_stats.memory_percent = 40.0f;
+    notification.system_stats.network_received_bytes_per_second = received;
+    reach_host_notify_registered_features(host, &notification);
+}
+
+static void stats_settle(reach_host *host, reach_top_bar *top_bar)
+{
+    reach_top_bar_build_context build = {};
+    build.theme = reach_theme_default();
+    build.monitor_bounds = {0.0f, 0.0f, 1920.0f, 1080.0f};
+    build.dpi_scale = 1.0f;
+    build.text_measure = {reinterpret_cast<void *>(1), fake_stats_measure_text};
+    reach_top_bar_build_layout(top_bar, &build);
+    host->dirty = {};
+    host->feature_runtimes[REACH_SURFACE_ID_TOP_BAR].surface->dirty_flags = 0;
+}
+
+static void test_system_stats_change_repaints_without_relayout(void)
+{
+    reach_host *host = &stats_host;
+    reach_host_init_feature_registry(host);
+    expect_true(reach_host_create_registered_features(host) == REACH_OK,
+                "registered top bar is available for the stats scenario");
+    reach_host_init_layout(host);
+    reach_feature_runtime *runtime = &host->feature_runtimes[REACH_SURFACE_ID_TOP_BAR];
+    runtime->surface->renderer.backend = reinterpret_cast<reach_render_backend *>(1);
+    runtime->surface->renderer.ops.measure_text = fake_stats_measure_text;
+    reach_top_bar *top_bar =
+        reach_host_feature_capsule<reach_top_bar>(host, REACH_SURFACE_ID_TOP_BAR);
+    stats_settle(host, top_bar);
+
+    stats_notify(host, 0.0f, 0, 0);
+    expect_true(runtime->surface->dirty_flags == 0 && !host->dirty.layout && !host->dirty.render,
+                "an invalid sample leaves the top bar clean");
+
+    stats_notify(host, 50.0f, 0, 1);
+    expect_true(runtime->surface->dirty_flags == 1 && host->dirty.layout,
+                "the first valid sample relayouts because the stats appear");
+    stats_settle(host, top_bar);
+
+    stats_notify(host, 50.0f, 1200, 1);
+    expect_true(runtime->surface->dirty_flags == 1 && !host->dirty.layout && !host->dirty.render,
+                "a text change inside its slot repaints only the top bar");
+    stats_settle(host, top_bar);
+
+    stats_notify(host, 50.0f, 1300, 1);
+    expect_true(runtime->surface->dirty_flags == 0 && !host->dirty.layout && !host->dirty.render &&
+                    !host->dirty.update_requested,
+                "an unchanged formatted text causes no repaint");
+
+    stats_notify(host, 60.0f, 1300, 1);
+    expect_true(runtime->surface->dirty_flags == 1 && !host->dirty.layout && !host->dirty.render,
+                "another text change inside its slot repaints only the top bar");
+    stats_settle(host, top_bar);
+
+    stats_notify(host, 60.0f, UINT64_C(500) * 1024 * 1024, 1);
+    expect_true(runtime->surface->dirty_flags == 1 && host->dirty.layout,
+                "a text wider than its slot relayouts");
+    stats_settle(host, top_bar);
+
+    stats_notify(host, 60.0f, UINT64_C(400) * 1024 * 1024, 1);
+    expect_true(runtime->surface->dirty_flags == 1 && !host->dirty.layout && !host->dirty.render,
+                "a text of the same width repaints without relayout");
+    stats_settle(host, top_bar);
+
+    stats_notify(host, 0.0f, 0, 0);
+    expect_true(runtime->surface->dirty_flags == 1 && host->dirty.layout,
+                "losing the sample relayouts because the stats disappear");
+
+    reach_host_destroy_registered_features(host);
+}
+
 int main(void)
 {
     test_native_overlay_placement_follows_surface_presentation();
@@ -1781,6 +1874,7 @@ int main(void)
     test_dropped_bar_enter_is_discarded_by_leave_or_committed_hide();
     test_bar_visibility_request_reconciles_idle_top_bar();
     test_switcher_publishes_arranged_surface_geometry();
+    test_system_stats_change_repaints_without_relayout();
 
     if (failures != 0)
     {
