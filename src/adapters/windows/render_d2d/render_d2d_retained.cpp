@@ -3,6 +3,7 @@
 #include "reach/support/workload.h"
 
 #include <algorithm>
+#include <dxgi1_3.h>
 #include <math.h>
 #include <wrl/event.h>
 #include <wrl/wrappers/corewrappers.h>
@@ -972,6 +973,24 @@ static void retire_swap_chain(reach_render_backend *backend)
     }
 }
 
+static void release_swap_chain(reach_render_backend *backend)
+{
+    if (backend->swap_chain_visual != nullptr && backend->root_visual != nullptr)
+    {
+        ComPtr<IVisualCollection> children;
+        ComPtr<IVisual> visual;
+        if (SUCCEEDED(backend->root_visual->get_Children(&children)) &&
+            SUCCEEDED(backend->swap_chain_visual.As(&visual)))
+        {
+            reach_workload_add(REACH_WORKLOAD_VISUAL_TREE_MUTATIONS, 1);
+            (void)children->Remove(visual.Get());
+        }
+    }
+    if (backend->dcomp_visual != nullptr && backend->swap_chain != nullptr)
+        (void)backend->dcomp_visual->SetContent(nullptr);
+    retire_swap_chain(backend);
+}
+
 static HRESULT create_scene(reach_render_backend *backend)
 {
     if (backend->scene_visual != nullptr || backend->dcomp_scene_visual != nullptr)
@@ -1676,16 +1695,41 @@ void reach_d2d_release_retained(reach_render_backend *backend)
     backend->has_scene_presentation = 0;
 }
 
+static void trim_devices(reach_render_backend *backend)
+{
+    if (backend->d2d_device != nullptr)
+        (void)backend->d2d_device->ClearResources(0);
+    if (backend->d3d_device != nullptr)
+    {
+        ComPtr<ID3D11DeviceContext> immediate;
+        backend->d3d_device->GetImmediateContext(&immediate);
+        if (immediate != nullptr)
+        {
+            immediate->ClearState();
+            immediate->Flush();
+        }
+    }
+    ComPtr<IDXGIDevice3> dxgi_device;
+    if (backend->dxgi_device != nullptr &&
+        SUCCEEDED(backend->dxgi_device->QueryInterface(IID_PPV_ARGS(&dxgi_device))))
+        dxgi_device->Trim();
+}
+
 void reach_d2d_suspend(reach_render_backend *backend)
 {
     if (backend != nullptr)
         backend->requires_content_sampling = false;
     reach_d2d_release_retained(backend);
+    bool retained = backend != nullptr && reach_d2d_retained_supported(backend);
+    if (retained)
+        release_swap_chain(backend);
     if (backend != nullptr && backend->dcomp_device != nullptr)
     {
         reach_workload_add(REACH_WORKLOAD_DCOMP_COMMITS, 1);
         (void)backend->dcomp_device->Commit();
     }
+    if (retained)
+        trim_devices(backend);
 }
 
 static reach_result reach_d2d_fail_presentation(reach_render_backend *backend,
