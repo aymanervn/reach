@@ -1584,6 +1584,65 @@ static void test_dropped_bar_enter_is_discarded_by_leave_or_committed_hide(void)
     bar_enter_teardown(&fixture);
 }
 
+static void bar_enter_frame_surface(bar_enter_fixture *fixture)
+{
+    reach_host_frame_context frame = {};
+    frame.monitor_bounds = {0.0f, 0.0f, 1000.0f, 800.0f};
+    expect_true(reach_host_frame_registered_surface(
+                    fixture->host, &fixture->host->feature_runtimes[REACH_SURFACE_ID_TOP_BAR],
+                    &frame) == REACH_OK,
+                "the top bar frames");
+}
+
+static void bar_enter_settle(bar_enter_fixture *fixture)
+{
+    for (int32_t step = 0; step < 8; ++step)
+    {
+        reach_test_motion_clock_advance(0.5);
+        bar_enter_frame_surface(fixture);
+    }
+    fixture->host->dirty = {};
+    fixture->host->feature_runtimes[REACH_SURFACE_ID_TOP_BAR].surface->dirty_flags = 0;
+}
+
+static void test_bar_visibility_request_reconciles_idle_top_bar(void)
+{
+    bar_enter_fixture fixture = {&bar_enter_host};
+    bar_enter_setup(&fixture);
+    reach_host *host = fixture.host;
+    reach_feature_runtime *top_bar = &host->feature_runtimes[REACH_SURFACE_ID_TOP_BAR];
+    top_bar->surface->window.window = reinterpret_cast<reach_platform_window *>(9);
+    top_bar->surface->window.ops.set_bounds = fake_set_bounds;
+    top_bar->surface->window.ops.native_id = fake_window_id;
+    top_bar->surface->renderer.backend = reinterpret_cast<reach_render_backend *>(1);
+    top_bar->surface->renderer.ops.begin_frame = fake_begin_frame;
+    top_bar->surface->renderer.ops.end_frame = fake_end_frame;
+    top_bar->surface->renderer.ops.execute = fake_execute;
+    host->has_layout = 1;
+
+    observed_pointer = {500, 400};
+    top_bar->surface->dirty_flags = 1;
+    bar_enter_settle(&fixture);
+    expect_true(top_bar->bar_auto_hide_active, "the dynamic top bar keeps auto hide active");
+    expect_true(bar_enter_hidden(&fixture), "the bar settles hidden while the pointer is away");
+
+    observed_pointer = {500, 0};
+    bar_enter_fire(REACH_SCREEN_HOTSPOT_ENTER);
+    expect_true(top_bar->surface->dirty_flags == 0, "the idle top bar has no pending redraw");
+    bar_enter_frame_surface(&fixture);
+    expect_true(!bar_enter_hidden(&fixture), "an enter reveals the idle top bar on the next frame");
+
+    bar_enter_reconcile(&fixture);
+    bar_enter_settle(&fixture);
+    expect_true(!bar_enter_hidden(&fixture), "the bar rests revealed while the pointer is on it");
+    observed_pointer = {500, 400};
+    reach_host_request_bar_visibility_update(host);
+    bar_enter_frame_surface(&fixture);
+    expect_true(bar_enter_hidden(&fixture), "a leave hides the idle top bar on the next frame");
+
+    bar_enter_teardown(&fixture);
+}
+
 static int32_t bar_condition_active(const reach_host *host, reach_layout_condition condition)
 {
     return (host->layout_manager.active_conditions & (1u << (uint32_t)condition)) != 0;
@@ -1720,6 +1779,7 @@ int main(void)
     test_bar_conditions_sync_once_from_host_state();
     test_dropped_bar_enter_reveals_after_manipulation_clears();
     test_dropped_bar_enter_is_discarded_by_leave_or_committed_hide();
+    test_bar_visibility_request_reconciles_idle_top_bar();
     test_switcher_publishes_arranged_surface_geometry();
 
     if (failures != 0)

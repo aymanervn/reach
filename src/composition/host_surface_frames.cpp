@@ -788,9 +788,11 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
                                 renderer.ops.sample_content != nullptr &&
                                 renderer.ops.content_sampling_required != nullptr &&
                                 renderer.ops.content_sampling_required(renderer.backend);
+    int32_t bar_visibility_pending =
+        host->dirty.bar_visibility && desc->definition->surface.bar_reveal.ops != nullptr;
     if ((!needs_frame || renderer_sampling) && !host->dirty.layout && !host->dirty.render &&
         !desc->surface->dirty_flags && !current_geometry.synchronize_presentation &&
-        !frame_context_changed)
+        !frame_context_changed && !bar_visibility_pending)
     {
         reach_result sampling_result = REACH_OK;
         if (renderer_sampling)

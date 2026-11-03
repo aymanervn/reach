@@ -160,6 +160,7 @@ static reach_result reach_host_finish_update(reach_host *host)
     host->dirty.layout = 0;
     host->dirty.render = 0;
     host->dirty.update_requested = 0;
+    host->dirty.bar_visibility = 0;
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
         reach_surface_runtime *surface = host->feature_runtimes[index].surface;

@@ -588,6 +588,7 @@ typedef struct reach_host_dirty_state
     int32_t z_order;
     int32_t render;
     int32_t update_requested;
+    int32_t bar_visibility;
     int32_t events_dispatched_this_cycle;
     int32_t monitors;
 } reach_host_dirty_state;
