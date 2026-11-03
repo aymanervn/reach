@@ -211,6 +211,7 @@ add_library(reach_windows_adapters STATIC
     src/adapters/windows/render_d2d/render_d2d_text.cpp
     src/adapters/windows/render_d2d/render_d2d_commands.cpp
     src/adapters/windows/render_d2d/render_d2d_retained.cpp
+    src/adapters/windows/render_d2d/render_d2d_retained_policy.cpp
     src/adapters/windows/search_retriever_win32.cpp
     src/adapters/windows/search_catalog_win32.cpp
     src/adapters/windows/app_launcher_win32.cpp
@@ -715,6 +716,19 @@ target_compile_definitions(reach_svg_document_tests PRIVATE
     REACH_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
 )
 
+add_executable(reach_render_d2d_retained_tests
+    tests/render_d2d_retained_tests.cpp
+    src/adapters/windows/render_d2d/render_d2d_retained_policy.cpp
+)
+
+reach_configure_common(reach_render_d2d_retained_tests)
+target_compile_features(reach_render_d2d_retained_tests PRIVATE
+    cxx_std_17
+)
+target_include_directories(reach_render_d2d_retained_tests PRIVATE
+    src/adapters/windows/render_d2d
+)
+
 add_executable(reach_util_tests
     tests/util_tests.cpp
 )
@@ -1117,6 +1131,7 @@ target_compile_features(reach_system_controls_network_tests PRIVATE
 )
 
     add_test(NAME reach_svg_document_tests COMMAND reach_svg_document_tests)
+    add_test(NAME reach_render_d2d_retained_tests COMMAND reach_render_d2d_retained_tests)
     add_test(NAME reach_util_tests COMMAND reach_util_tests)
     add_test(NAME reach_now_playing_animation_tests COMMAND reach_now_playing_animation_tests)
     add_test(NAME reach_wifi_tests COMMAND reach_wifi_tests)
