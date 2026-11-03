@@ -151,7 +151,11 @@ static reach_result reach_stage_push_close_button(reach_stage *stage,
     button.x -= ctx->bounds.x;
     button.y -= ctx->bounds.y;
 
-    const reach_motion *hover = state->close_hover_index == index ? &stage->close_hover : nullptr;
+    const reach_motion *hover =
+        state->close_hover_index == index &&
+                (stage->close_hover.to > 0.0f || reach_motion_active(&stage->close_hover))
+            ? &stage->close_hover
+            : nullptr;
     const reach_theme *theme = ctx->theme;
     reach_render_command backing = {};
     backing.type = REACH_RENDER_COMMAND_RECT;

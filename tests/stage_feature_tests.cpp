@@ -4,6 +4,7 @@
 #include "reach/features/stage.h"
 
 #include <math.h>
+#include <memory>
 #include <stdio.h>
 
 static int failures;
@@ -940,8 +941,56 @@ static void test_single_app_uses_the_available_stage_area(void)
     reach_stage_destroy(stage);
 }
 
+static size_t stage_group_count(reach_stage *stage, reach_render_command_buffer *commands)
+{
+    reach_stage_render_context ctx = {};
+    ctx.theme = reach_theme_default();
+    ctx.bounds = make_rect(0, 0, 1920, 1080);
+    ctx.dpi_scale = 1.0f;
+    expect_true(reach_stage_append_render_commands(stage, &ctx, commands) == REACH_OK,
+                "stage render commands are appended");
+    return commands->group_count;
+}
+
+static void move_pointer_to(reach_stage *stage, reach_point_f32 point)
+{
+    reach_pointer_event event = {};
+    event.kind = REACH_POINTER_EVENT_MOVE;
+    event.x = (int32_t)point.x;
+    event.y = (int32_t)point.y;
+    reach_capsule_pointer_result result = {};
+    reach_stage_capsule_ops()->handle_pointer(stage, &event, &result);
+}
+
+static void test_close_hover_groups_only_while_hovered(void)
+{
+    reach_stage *stage = nullptr;
+    reach_stage_create(&stage);
+    reach_stage_open_window windows[3] = {make_window(1, make_rect(100, 120, 640, 480)),
+                                          make_window(2, make_rect(300, 220, 640, 480)),
+                                          make_window(3, make_rect(500, 320, 640, 480))};
+    reach_stage_open(stage, make_rect(0, 0, 1920, 1080), 1, windows, 3);
+    advance_stage(stage, 30, 0.016);
+    auto commands = std::make_unique<reach_render_command_buffer>();
+    expect_true(stage_group_count(stage, commands.get()) == 0,
+                "no close hover groups exist before any hover");
+
+    reach_rect_f32 button = reach_stage_tile_close_button_rect(stage, 1);
+    move_pointer_to(stage, {button.x + button.width * 0.5f, button.y + button.height * 0.5f});
+    advance_stage(stage, 1, 0.016);
+    expect_true(stage_group_count(stage, commands.get()) == 2,
+                "the hovered close button emits its backing and glyph groups");
+
+    move_pointer_to(stage, {1.0f, 1.0f});
+    advance_stage(stage, 60, 0.016);
+    expect_true(stage_group_count(stage, commands.get()) == 0,
+                "a settled leave drops the stale close hover groups");
+    reach_stage_destroy(stage);
+}
+
 int main(void)
 {
+    test_close_hover_groups_only_while_hovered();
     test_close_requires_completion_before_teardown();
     test_close_handoff_holds_only_the_reveal();
     test_app_click_uses_shared_close_animation();
