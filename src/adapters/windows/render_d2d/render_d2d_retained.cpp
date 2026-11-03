@@ -2127,22 +2127,18 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
         }
         return REACH_OK;
     };
-    for (size_t index = 0; index < commands->count;)
+    std::vector<reach_d2d_retained_run> runs;
+    reach_d2d_retained_runs(commands, &runs);
+    for (const reach_d2d_retained_run &run : runs)
     {
+        const size_t index = run.begin;
+        const size_t end = run.end;
         const reach_render_command &first = commands->commands[index];
-        size_t end = index + 1;
-        if (first.group_id != 0 || first.type != REACH_RENDER_COMMAND_TEXTBOX)
-        {
-            while (end < commands->count && commands->commands[end].group_id == first.group_id &&
-                   (first.group_id != 0 ||
-                    commands->commands[end].type != REACH_RENDER_COMMAND_TEXTBOX))
-                ++end;
-        }
         reach_render_group group = {};
         if (first.group_id != 0)
             group = *reach_render_command_buffer_group(commands, first.group_id);
         else
-            group.id = UINT64_C(0x8000000000000000) | (uint64_t)(index + 1);
+            group.id = run.id;
         if (group.bounds.width <= 0.0f || group.bounds.height <= 0.0f)
             group.bounds = run_bounds(commands->commands + index, end - index);
         if (group.bounds.width > 0.0f && group.bounds.height > 0.0f)
@@ -2506,7 +2502,6 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
             for (auto &part : text_parts)
                 plans.push_back(std::move(part));
         }
-        index = end;
         if (limit_fit_sources() != REACH_OK)
             return REACH_ERROR;
     }
