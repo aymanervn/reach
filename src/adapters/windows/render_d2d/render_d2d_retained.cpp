@@ -1083,29 +1083,53 @@ static void record_retained_bytes(reach_render_backend *backend)
         return;
     uint64_t bytes = 0;
     for (const auto &layer : backend->retained_layers)
-        bytes += reach_d2d_layer_bytes((float)layer.width, (float)layer.height, true, false) +
+        bytes += reach_d2d_layer_bytes((float)layer.capacity_width, (float)layer.capacity_height,
+                                       true, false) +
                  layer.shadow_bytes;
     reach_workload_adjust_retained_bytes((int64_t)bytes -
                                          (int64_t)backend->reported_retained_bytes);
     backend->reported_retained_bytes = bytes;
 }
 
+static uint64_t surface_budget_left(const reach_render_backend *backend,
+                                    const reach_d2d_retained_layer &layer)
+{
+    uint64_t used = layer.shadow_bytes;
+    for (const auto &other : backend->retained_layers)
+        if (&other != &layer)
+            used += reach_d2d_layer_bytes((float)other.capacity_width, (float)other.capacity_height,
+                                          true, false) +
+                    other.shadow_bytes;
+    return used < REACH_D2D_MAX_SURFACE_BYTES ? REACH_D2D_MAX_SURFACE_BYTES - used : 0;
+}
+
 static HRESULT draw_layer(reach_render_backend *backend, reach_d2d_retained_layer &layer,
                           const std::vector<reach_render_command> &commands, UINT width,
-                          UINT height)
+                          UINT height, bool *recreated = nullptr)
 {
     HRESULT hr = S_OK;
     ComPtr<ID2D1DeviceContext> context;
     POINT offset = {};
     ComPtr<ICompositionDrawingSurfaceInterop> interop;
-    bool resized = width != layer.width || height != layer.height;
+    reach_d2d_surface_size allocation = {width, height};
+    if (recreated != nullptr)
+        *recreated = false;
     if (backend->compositor != nullptr)
     {
-        if (resized || layer.surface == nullptr)
+        reach_d2d_surface_size current = {};
+        if (layer.surface != nullptr)
+            current = {layer.capacity_width, layer.capacity_height};
+        allocation = reach_d2d_surface_capacity(current, {width, height},
+                                                surface_budget_left(backend, layer));
+        if (layer.surface == nullptr || allocation.width != current.width ||
+            allocation.height != current.height)
         {
+            if (recreated != nullptr)
+                *recreated = true;
             layer.surface.Reset();
+            layer.capacity_width = layer.capacity_height = 0;
             hr = backend->composition_graphics_device->CreateDrawingSurface(
-                {(float)width, (float)height},
+                {(float)allocation.width, (float)allocation.height},
                 ABI::Windows::Graphics::DirectX::DirectXPixelFormat_B8G8R8A8UIntNormalized,
                 ABI::Windows::Graphics::DirectX::DirectXAlphaMode_Premultiplied, &layer.surface);
             ComPtr<ICompositionSurface> surface;
@@ -1118,6 +1142,10 @@ static HRESULT draw_layer(reach_render_backend *backend, reach_d2d_retained_laye
             if (SUCCEEDED(hr))
                 hr = layer.surface_brush->put_Stretch(CompositionStretch_None);
             if (SUCCEEDED(hr))
+                hr = layer.surface_brush->put_HorizontalAlignmentRatio(0.0f);
+            if (SUCCEEDED(hr))
+                hr = layer.surface_brush->put_VerticalAlignmentRatio(0.0f);
+            if (SUCCEEDED(hr))
                 hr = layer.surface_brush.As(&base);
             if (SUCCEEDED(hr))
                 hr = layer.visual->put_Brush(base.Get());
@@ -1129,8 +1157,10 @@ static HRESULT draw_layer(reach_render_backend *backend, reach_d2d_retained_laye
     }
     else
     {
-        if (resized || layer.dcomp_surface == nullptr)
+        if (width != layer.width || height != layer.height || layer.dcomp_surface == nullptr)
         {
+            if (recreated != nullptr)
+                *recreated = true;
             layer.dcomp_surface.Reset();
             hr = backend->dcomp_device->CreateSurface(width, height, DXGI_FORMAT_B8G8R8A8_UNORM,
                                                       DXGI_ALPHA_MODE_PREMULTIPLIED,
@@ -1157,6 +1187,8 @@ static HRESULT draw_layer(reach_render_backend *backend, reach_d2d_retained_laye
         return end_hr;
     layer.width = width;
     layer.height = height;
+    layer.capacity_width = allocation.width;
+    layer.capacity_height = allocation.height;
     layer.commands = commands;
     record_retained_bytes(backend);
     return S_OK;
@@ -1335,10 +1367,10 @@ static HRESULT sync_layer(reach_render_backend *backend, reach_d2d_retained_laye
         width != layer.width || height != layer.height || local.size() != layer.commands.size() ||
         (!local.empty() && memcmp(local.data(), layer.commands.data(),
                                   local.size() * sizeof(reach_render_command)) != 0);
-    bool surface_recreated = content_changed && (width != layer.width || height != layer.height);
+    bool surface_recreated = false;
     HRESULT hr = S_OK;
     if (content_changed && count != 0)
-        hr = draw_layer(backend, layer, local, width, height);
+        hr = draw_layer(backend, layer, local, width, height, &surface_recreated);
     else if (content_changed)
     {
         hr = backend->compositor != nullptr ? layer.visual->put_Brush(nullptr)
@@ -1350,6 +1382,7 @@ static HRESULT sync_layer(reach_render_backend *backend, reach_d2d_retained_laye
             layer.dcomp_surface.Reset();
             layer.commands.clear();
             layer.width = layer.height = 0;
+            layer.capacity_width = layer.capacity_height = 0;
             record_retained_bytes(backend);
         }
     }

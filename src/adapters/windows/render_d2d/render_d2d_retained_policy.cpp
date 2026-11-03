@@ -4,6 +4,9 @@
 
 #include <algorithm>
 
+static const uint32_t REACH_D2D_SURFACE_GROWTH_STEP = 64;
+static const uint32_t REACH_D2D_SURFACE_MAX_EXTENT = 16384;
+
 static const uint64_t REACH_D2D_UNGROUPED_RUN_BASE = UINT64_C(0x8000000000000000);
 static const uint64_t REACH_D2D_UNGROUPED_RUN_MASK = UINT64_C(0x3fffffffffffffff);
 
@@ -26,6 +29,33 @@ uint64_t reach_d2d_layer_bytes(float width, float height, bool has_paint, bool h
 {
     uint64_t surface = reach_d2d_surface_extent(width) * reach_d2d_surface_extent(height) * 4;
     return surface * ((has_paint ? 1 : 0) + (has_shadow ? 1 : 0));
+}
+
+static uint32_t reach_d2d_grown_extent(uint32_t need, uint32_t capacity)
+{
+    if (need <= capacity)
+        return need;
+    uint64_t grown = std::max<uint64_t>(need, (uint64_t)capacity * 5 / 4);
+    grown = (grown + REACH_D2D_SURFACE_GROWTH_STEP - 1) / REACH_D2D_SURFACE_GROWTH_STEP *
+            REACH_D2D_SURFACE_GROWTH_STEP;
+    return (uint32_t)std::max<uint64_t>(need,
+                                        std::min<uint64_t>(grown, REACH_D2D_SURFACE_MAX_EXTENT));
+}
+
+reach_d2d_surface_size reach_d2d_surface_capacity(reach_d2d_surface_size capacity,
+                                                  reach_d2d_surface_size need, uint64_t budget_left)
+{
+    if (capacity.width == 0 || capacity.height == 0 || need.width == 0 || need.height == 0)
+        return need;
+    uint64_t need_area = (uint64_t)need.width * need.height;
+    if (need.width <= capacity.width && need.height <= capacity.height)
+        return need_area * 2 >= (uint64_t)capacity.width * capacity.height ? capacity : need;
+    reach_d2d_surface_size grown = {reach_d2d_grown_extent(need.width, capacity.width),
+                                    reach_d2d_grown_extent(need.height, capacity.height)};
+    uint64_t grown_area = (uint64_t)grown.width * grown.height;
+    if (grown_area > need_area * 2 || grown_area * 4 > budget_left)
+        return need;
+    return grown;
 }
 
 uint64_t reach_d2d_ungrouped_run_id(uint64_t anchor, uint64_t ordinal)
