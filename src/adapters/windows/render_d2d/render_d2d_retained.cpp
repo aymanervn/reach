@@ -1,4 +1,5 @@
 #include "render_d2d_internal.h"
+#include "render_d2d_retained_policy.h"
 #include "reach/support/workload.h"
 
 #include <algorithm>
@@ -1063,7 +1064,8 @@ static void record_retained_bytes(reach_render_backend *backend)
         return;
     uint64_t bytes = 0;
     for (const auto &layer : backend->retained_layers)
-        bytes += (uint64_t)layer.width * layer.height * 4 + layer.shadow_bytes;
+        bytes += reach_d2d_layer_bytes((float)layer.width, (float)layer.height, true, false) +
+                 layer.shadow_bytes;
     reach_workload_adjust_retained_bytes((int64_t)bytes -
                                          (int64_t)backend->reported_retained_bytes);
     backend->reported_retained_bytes = bytes;
@@ -1302,15 +1304,6 @@ static HRESULT sync_layer(reach_render_backend *backend, reach_d2d_retained_laye
         return E_INVALIDARG;
     UINT width = count != 0 ? (UINT)std::max(1.0f, ceilf(group.bounds.width)) : 0;
     UINT height = count != 0 ? (UINT)std::max(1.0f, ceilf(group.bounds.height)) : 0;
-    uint64_t shadow_bytes = group.has_shadow ? (uint64_t)ceilf(group.bounds.width) *
-                                                   (uint64_t)ceilf(group.bounds.height) * 4
-                                             : 0;
-    uint64_t bytes = (uint64_t)width * height * 4 + shadow_bytes;
-    for (const auto &other : backend->retained_layers)
-        if (&other != &layer)
-            bytes += (uint64_t)other.width * other.height * 4 + other.shadow_bytes;
-    if (bytes > REACH_D2D_MAX_SURFACE_BYTES)
-        return E_OUTOFMEMORY;
     std::vector<reach_render_command> local;
     if (count != 0)
         local.assign(commands, commands + count);
@@ -1999,13 +1992,10 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
     };
     auto planned_bytes = [&]()
     {
-        double bytes = 0;
+        uint64_t bytes = 0;
         for (const auto &plan : plans)
-            bytes += (plan.count != 0 || plan.group.has_shadow)
-                         ? (double)ceilf(plan.group.bounds.width) *
-                               ceilf(plan.group.bounds.height) * 4 *
-                               ((plan.count != 0 && plan.group.has_shadow) ? 2 : 1)
-                         : 0;
+            bytes += reach_d2d_layer_bytes(plan.group.bounds.width, plan.group.bounds.height,
+                                           plan.count != 0, plan.group.has_shadow);
         return bytes;
     };
     auto fit_bytes = [&](uint64_t prefix)
