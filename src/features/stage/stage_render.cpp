@@ -74,20 +74,10 @@ static void reach_stage_end_group(reach_render_command_buffer *commands)
 static reach_color reach_stage_tile_border(const reach_stage_render_context *ctx, float hover,
                                            float alpha);
 
-static reach_rect_f32 reach_stage_tile_outer_rect(reach_rect_f32 rect, float bar, float border)
-{
-    reach_rect_f32 item = rect;
-    item.y -= bar;
-    item.height += bar;
-    return {item.x - border, item.y - border, item.width + border * 2.0f,
-            item.height + border * 2.0f};
-}
-
 static reach_result reach_stage_push_tile_background(const reach_stage_render_context *ctx,
                                                      reach_render_command_buffer *commands,
-                                                     reach_rect_f32 rect, float bar,
-                                                     float header_radius, float width, float hover,
-                                                     float alpha)
+                                                     reach_rect_f32 item, float header_radius,
+                                                     float width, float hover, float alpha)
 {
     if (ctx == nullptr || commands == nullptr || width <= 0.0f)
     {
@@ -96,7 +86,8 @@ static reach_result reach_stage_push_tile_background(const reach_stage_render_co
 
     reach_render_command shape = {};
     shape.type = REACH_RENDER_COMMAND_RECT;
-    shape.rect = reach_stage_tile_outer_rect(rect, bar, width);
+    shape.rect = {item.x - width, item.y - width, item.width + width * 2.0f,
+                  item.height + width * 2.0f};
     shape.radius = header_radius + width;
     shape.corner_mask = REACH_RENDER_CORNER_TOP_LEFT | REACH_RENDER_CORNER_TOP_RIGHT;
 
@@ -348,11 +339,14 @@ static reach_result reach_stage_push_raster_tile(reach_stage *stage,
         return result;
     }
 
+    reach_rect_f32 item = rect;
+    item.y -= tile->current_bar.height;
+    item.height += tile->current_bar.height;
     float hover = state->has_hover && state->hover_index == index ? 1.0f : 0.0f;
     reach_stage_begin_group(out_commands, base + REACH_STAGE_GROUP_TILE);
     reach_result result = reach_stage_push_tile_background(
-        ctx, out_commands, rect, tile->current_bar.height,
-        reach_stage_header_radius(ctx, tile->current_bar), border, hover, alpha);
+        ctx, out_commands, item, reach_stage_header_radius(ctx, tile->current_bar), border, hover,
+        alpha);
     if (result == REACH_OK)
     {
         result = reach_stage_push_tile_header(stage, ctx, index, alpha, out_commands);
@@ -632,24 +626,14 @@ static reach_result reach_stage_push_moving_placeholder(const reach_stage_render
     return result;
 }
 
-static reach_rect_f32 reach_stage_snapped_outer_at(const reach_stage_render_context *ctx,
-                                                   const reach_stage_tile *tile, float border,
-                                                   double now)
-{
-    reach_rect_f32 rect = reach_rect_motion_value_at(&tile->rect_motion, now);
-    float bar = reach_motion_value_at(&tile->bar_motion, now);
-    rect.x -= ctx->bounds.x;
-    rect.y -= ctx->bounds.y;
-    return reach_render_pixel_aligned_rect(reach_stage_tile_outer_rect(rect, bar, border));
-}
-
-static reach_motion reach_stage_snapped_edge(const reach_motion &edge, float snapped_first,
-                                             float snapped_last)
+static reach_motion reach_stage_snapped_edge(const reach_motion &edge)
 {
     float minimum = 0.0f;
     float maximum = 0.0f;
     float first = reach_motion_value_at(&edge, -HUGE_VAL);
     float last = reach_motion_value_at(&edge, HUGE_VAL);
+    float snapped_first = roundf(first);
+    float snapped_last = roundf(last);
     float scale = first != last ? (snapped_last - snapped_first) / (last - first) : 1.0f;
     if (reach_motion_range(&edge, &minimum, &maximum) != REACH_OK || minimum == maximum ||
         scale == 0.0f)
@@ -679,12 +663,10 @@ static reach_result reach_stage_snapped_frame(const reach_stage_render_context *
     {
         return REACH_INVALID_ARGUMENT;
     }
-    reach_rect_f32 first = reach_stage_snapped_outer_at(ctx, tile, border, -HUGE_VAL);
-    reach_rect_f32 last = reach_stage_snapped_outer_at(ctx, tile, border, HUGE_VAL);
-    left = reach_stage_snapped_edge(left, first.x, last.x);
-    right = reach_stage_snapped_edge(right, first.x + first.width, last.x + last.width);
-    top = reach_stage_snapped_edge(top, first.y, last.y);
-    bottom = reach_stage_snapped_edge(bottom, first.y + first.height, last.y + last.height);
+    left = reach_stage_snapped_edge(left);
+    right = reach_stage_snapped_edge(right);
+    top = reach_stage_snapped_edge(top);
+    bottom = reach_stage_snapped_edge(bottom);
     if (reach_motion_combine(&left, 1.0f, &origin_x, -1.0f, 0.0f, &out_frame->x) != REACH_OK ||
         reach_motion_combine(&top, 1.0f, &origin_y, -1.0f, 0.0f, &out_frame->y) != REACH_OK ||
         reach_motion_combine(&right, 1.0f, &left, -1.0f, 0.0f, &out_frame->width) != REACH_OK ||
