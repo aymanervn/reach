@@ -49,13 +49,38 @@ reach_d2d_surface_size reach_d2d_surface_capacity(reach_d2d_surface_size capacit
         return need;
     uint64_t need_area = (uint64_t)need.width * need.height;
     if (need.width <= capacity.width && need.height <= capacity.height)
-        return need_area * 2 >= (uint64_t)capacity.width * capacity.height ? capacity : need;
+        return reach_d2d_planned_surface(capacity, need);
     reach_d2d_surface_size grown = {reach_d2d_grown_extent(need.width, capacity.width),
                                     reach_d2d_grown_extent(need.height, capacity.height)};
     uint64_t grown_area = (uint64_t)grown.width * grown.height;
     if (grown_area > need_area * 2 || grown_area * 4 > budget_left)
         return need;
     return grown;
+}
+
+reach_d2d_surface_size reach_d2d_planned_surface(reach_d2d_surface_size capacity,
+                                                 reach_d2d_surface_size need)
+{
+    if (capacity.width == 0 || capacity.height == 0 || need.width == 0 || need.height == 0)
+        return need;
+    if (need.width <= capacity.width && need.height <= capacity.height)
+        return (uint64_t)need.width * need.height * 2 >= (uint64_t)capacity.width * capacity.height
+                   ? capacity
+                   : need;
+    return need;
+}
+
+uint64_t reach_d2d_planned_layer_bytes(float width, float height, bool has_paint, bool has_shadow,
+                                       reach_d2d_surface_size capacity)
+{
+    uint64_t need_width = reach_d2d_surface_extent(width);
+    uint64_t need_height = reach_d2d_surface_extent(height);
+    uint64_t shadow = has_shadow ? need_width * need_height * 4 : 0;
+    if (!has_paint)
+        return shadow;
+    reach_d2d_surface_size kept =
+        reach_d2d_planned_surface(capacity, {(uint32_t)need_width, (uint32_t)need_height});
+    return (uint64_t)kept.width * kept.height * 4 + shadow;
 }
 
 uint64_t reach_d2d_ungrouped_run_id(uint64_t anchor, uint64_t ordinal)

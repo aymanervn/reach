@@ -122,6 +122,31 @@ static void test_growth_respects_budget_and_limits(void)
            "padding that would exceed twice the needed area is dropped");
 }
 
+static void test_planned_bytes_count_kept_capacity(void)
+{
+    expect(same_size(reach_d2d_planned_surface({400, 400}, {300, 300}), {400, 400}),
+           "a reused surface is planned at its kept capacity");
+    expect(same_size(reach_d2d_planned_surface({400, 400}, {200, 200}), {200, 200}),
+           "a surface below half the area is planned at the exact size");
+    expect(same_size(reach_d2d_planned_surface({400, 400}, {500, 300}), {500, 300}),
+           "a surface that must grow is planned at the exact size");
+    expect(same_size(reach_d2d_planned_surface({0, 0}, {300, 300}), {300, 300}),
+           "a new surface is planned at the exact size");
+    expect(reach_d2d_planned_layer_bytes(300.0f, 300.0f, true, false, {400, 400}) ==
+               400u * 400u * 4u,
+           "planned bytes count the kept capacity instead of the needed size");
+    expect(reach_d2d_planned_layer_bytes(300.0f, 300.0f, true, true, {400, 400}) ==
+               400u * 400u * 4u + 300u * 300u * 4u,
+           "a shadow is planned at the needed size beside the kept paint surface");
+    expect(reach_d2d_planned_layer_bytes(300.2f, 300.0f, true, false, {0, 0}) == 301u * 300u * 4u,
+           "a layer without a surface is planned at the rounded needed size");
+    expect(reach_d2d_planned_layer_bytes(300.0f, 300.0f, false, true, {400, 400}) ==
+               300u * 300u * 4u,
+           "a shadow-only layer ignores the paint capacity");
+    expect(reach_d2d_planned_layer_bytes(0.0f, 300.0f, true, true, {400, 400}) == 0,
+           "empty bounds cost nothing");
+}
+
 struct buffer_entry
 {
     uint64_t group_id;
@@ -221,6 +246,7 @@ int main(void)
     test_growth_reuses_surfaces();
     test_reuse_and_shrink();
     test_growth_respects_budget_and_limits();
+    test_planned_bytes_count_kept_capacity();
     test_ungrouped_run_survives_unrelated_insertions();
     test_textbox_runs_split_and_stay_distinct();
     test_ungrouped_run_ids_stay_in_the_reserved_range();
