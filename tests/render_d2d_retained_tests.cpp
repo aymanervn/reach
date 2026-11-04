@@ -258,6 +258,22 @@ static void test_ungrouped_run_ids_stay_in_the_reserved_range(void)
     expect(runs.size() == 2048 && unique.size() == 2048, "2048 runs get unique ids");
 }
 
+static void test_suspend_plan(void)
+{
+    reach_d2d_suspend_steps wuc = reach_d2d_suspend_plan(true, true, false);
+    expect(wuc.release_swap_chain && wuc.trim_graphics_device && wuc.trim_devices &&
+               !wuc.commit_dcomp,
+           "WUC retained suspend releases the swap chain and trims every device");
+    reach_d2d_suspend_steps dcomp = reach_d2d_suspend_plan(true, false, true);
+    expect(dcomp.release_swap_chain && dcomp.commit_dcomp && dcomp.trim_devices &&
+               !dcomp.trim_graphics_device,
+           "DComp suspend commits and trims without the composition graphics device");
+    reach_d2d_suspend_steps immediate = reach_d2d_suspend_plan(false, true, false);
+    expect(!immediate.release_swap_chain && !immediate.trim_graphics_device &&
+               !immediate.trim_devices && !immediate.commit_dcomp,
+           "immediate-only suspend keeps its swap chain and trims nothing");
+}
+
 int main(void)
 {
     test_layer_bytes();
@@ -270,5 +286,6 @@ int main(void)
     test_ungrouped_run_survives_unrelated_insertions();
     test_textbox_runs_split_and_stay_distinct();
     test_ungrouped_run_ids_stay_in_the_reserved_range();
+    test_suspend_plan();
     return failed == 0 ? 0 : 1;
 }
