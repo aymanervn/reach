@@ -1734,6 +1734,14 @@ void reach_d2d_release_retained(reach_render_backend *backend)
     backend->has_scene_presentation = 0;
 }
 
+static void trim_graphics_device(reach_render_backend *backend)
+{
+    ComPtr<ABI::Windows::UI::Composition::ICompositionGraphicsDevice3> device;
+    if (backend->composition_graphics_device != nullptr &&
+        SUCCEEDED(backend->composition_graphics_device.As(&device)))
+        (void)device->Trim();
+}
+
 static void trim_devices(reach_render_backend *backend)
 {
     if (backend->d2d_device != nullptr)
@@ -1759,15 +1767,21 @@ void reach_d2d_suspend(reach_render_backend *backend)
     if (backend != nullptr)
         backend->requires_content_sampling = false;
     reach_d2d_release_retained(backend);
-    bool retained = backend != nullptr && reach_d2d_retained_supported(backend);
-    if (retained)
+    if (backend == nullptr)
+        return;
+    reach_d2d_suspend_steps steps =
+        reach_d2d_suspend_plan(reach_d2d_retained_supported(backend) != 0,
+                               backend->compositor != nullptr, backend->dcomp_device != nullptr);
+    if (steps.release_swap_chain)
         release_swap_chain(backend);
-    if (backend != nullptr && backend->dcomp_device != nullptr)
+    if (steps.commit_dcomp)
     {
         reach_workload_add(REACH_WORKLOAD_DCOMP_COMMITS, 1);
         (void)backend->dcomp_device->Commit();
     }
-    if (retained)
+    if (steps.trim_graphics_device)
+        trim_graphics_device(backend);
+    if (steps.trim_devices)
         trim_devices(backend);
 }
 
