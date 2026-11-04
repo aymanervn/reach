@@ -272,6 +272,9 @@ static void test_suspend_plan(void)
     expect(!immediate.release_swap_chain && !immediate.trim_graphics_device &&
                !immediate.trim_devices && !immediate.commit_dcomp,
            "immediate-only suspend keeps its swap chain and trims nothing");
+    expect(reach_d2d_retires_swap_chain_on_resize(true), "retained backend retires its swap chain");
+    expect(!reach_d2d_retires_swap_chain_on_resize(false),
+           "immediate-only backend resizes its swap chain");
 }
 
 int main(void)

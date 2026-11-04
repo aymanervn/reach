@@ -1489,6 +1489,11 @@ static HRESULT sync_layer(reach_render_backend *backend, reach_d2d_retained_laye
 }
 } // namespace
 
+void reach_d2d_release_swap_chain(reach_render_backend *backend)
+{
+    release_swap_chain(backend);
+}
+
 int32_t reach_d2d_retained_supported(const reach_render_backend *backend)
 {
     // Workaround: temporary Stage A/B measurement switch; delete with the experiment.
