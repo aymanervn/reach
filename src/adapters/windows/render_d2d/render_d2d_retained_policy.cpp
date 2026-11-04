@@ -135,3 +135,8 @@ reach_d2d_suspend_steps reach_d2d_suspend_plan(bool retained, bool has_composito
     steps.trim_devices = retained;
     return steps;
 }
+
+bool reach_d2d_retires_swap_chain_on_resize(bool retained)
+{
+    return retained;
+}
