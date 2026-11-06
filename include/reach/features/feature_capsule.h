@@ -21,7 +21,6 @@ extern "C"
     typedef struct reach_feature_tick_result
     {
         int32_t redraw;
-        int32_t repaint;
         int32_t relayout;
         int32_t request_update;
     } reach_feature_tick_result;

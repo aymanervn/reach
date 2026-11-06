@@ -1844,6 +1844,39 @@ static void test_system_stats_change_repaints_without_relayout(void)
     reach_host_destroy_registered_features(host);
 }
 
+static reach_host tick_scope_host;
+
+static void test_feature_tick_redraw_marks_only_its_own_surface(void)
+{
+    reach_host *host = &tick_scope_host;
+    reach_host_init_feature_registry(host);
+    expect_true(reach_host_create_registered_features(host) == REACH_OK,
+                "registered features are available to the tick scenario");
+    reach_host_init_layout(host);
+    reach_feature_runtime *dock = &host->feature_runtimes[REACH_SURFACE_ID_DOCK];
+    reach_feature_runtime *quick_settings =
+        &host->feature_runtimes[REACH_SURFACE_ID_QUICK_SETTINGS];
+    host->dirty = {};
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+        host->feature_runtimes[index].surface->dirty_flags = 0;
+
+    reach_feature_tick_result tick = {};
+    tick.redraw = 1;
+    reach_host_apply_feature_tick_result(host, quick_settings, &tick);
+    expect_true(quick_settings->surface->dirty_flags == 1 && dock->surface->dirty_flags == 0 &&
+                    host->feature_runtimes[REACH_SURFACE_ID_TOP_BAR].surface->dirty_flags == 0,
+                "a ticking capsule redraws only its own surface");
+    expect_true(!host->dirty.render && !host->dirty.layout,
+                "a tick redraw sets no host-wide dirty state");
+
+    tick.relayout = 1;
+    reach_host_apply_feature_tick_result(host, quick_settings, &tick);
+    expect_true(host->dirty.layout && !host->dirty.render,
+                "a tick relayout still relayouts every surface");
+
+    reach_host_destroy_registered_features(host);
+}
+
 int main(void)
 {
     test_native_overlay_placement_follows_surface_presentation();
@@ -1875,6 +1908,7 @@ int main(void)
     test_bar_visibility_request_reconciles_idle_top_bar();
     test_switcher_publishes_arranged_surface_geometry();
     test_system_stats_change_repaints_without_relayout();
+    test_feature_tick_redraw_marks_only_its_own_surface();
 
     if (failures != 0)
     {
