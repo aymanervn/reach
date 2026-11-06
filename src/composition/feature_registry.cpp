@@ -296,7 +296,7 @@ static void reach_feature_notify_top_bar(void *capsule,
                                       &notification->system_stats, &notification->text_measure,
                                       notification->dpi_scale, &layout_changed))
         {
-            out->repaint = 1;
+            out->redraw = 1;
             out->relayout = layout_changed;
         }
         return;

@@ -270,11 +270,6 @@ void reach_host_apply_feature_tick_result(reach_host *host, reach_feature_runtim
     if (result->redraw && runtime->surface != nullptr)
     {
         runtime->surface->dirty_flags = 1;
-        host->dirty.render = 1;
-    }
-    if (result->repaint && runtime->surface != nullptr)
-    {
-        runtime->surface->dirty_flags = 1;
     }
     if (result->relayout)
     {
