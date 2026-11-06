@@ -1,5 +1,4 @@
 #include "render_d2d_internal.h"
-#include "render_d2d_retained_policy.h"
 #include "reach/support/workload.h"
 
 #include <dwmapi.h>
@@ -31,12 +30,7 @@ reach_result reach_d2d_begin_frame(reach_render_backend *backend)
 
     if (width != backend->target_width || height != backend->target_height)
     {
-        if (backend->d2d_context != nullptr && backend->swap_chain != nullptr &&
-            reach_d2d_retires_swap_chain_on_resize(reach_d2d_retained_supported(backend) != 0))
-        {
-            reach_d2d_release_swap_chain(backend);
-        }
-        else if (backend->d2d_context != nullptr && backend->swap_chain != nullptr)
+        if (backend->d2d_context != nullptr && backend->swap_chain != nullptr)
         {
             backend->d2d_context->SetTarget(nullptr);
 

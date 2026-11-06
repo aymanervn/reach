@@ -293,7 +293,6 @@ reach_result reach_d2d_push_group_masks(reach_render_backend *backend, ID2D1Rend
 reach_result reach_d2d_presentation_complete(reach_render_backend *backend, uint64_t generation,
                                              int32_t *out_complete);
 void reach_d2d_suspend(reach_render_backend *backend);
-void reach_d2d_release_swap_chain(reach_render_backend *backend);
 reach_result reach_d2d_execute_commands(reach_render_backend *backend,
                                         const reach_render_command *commands, size_t count,
                                         float caret_opacity = 1);
