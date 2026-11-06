@@ -1054,6 +1054,18 @@ reach_settings_hit_result reach_settings_hit_test(const reach_settings_layout *l
             }
         }
     }
+    if (layout->display_scrollbar_thumb.height > 0.0f &&
+        reach_settings_rect_contains(layout->display_scrollbar_thumb, x, y))
+    {
+        result.type = REACH_SETTINGS_HIT_DISPLAY_SCROLLBAR_THUMB;
+        return result;
+    }
+    if (layout->display_scrollbar_thumb.height > 0.0f &&
+        reach_settings_rect_contains(layout->display_scrollbar_track, x, y))
+    {
+        result.type = REACH_SETTINGS_HIT_DISPLAY_SCROLLBAR_TRACK;
+        return result;
+    }
     int32_t display_pointer = layout->display_viewport.width > 0.0f &&
                               reach_settings_rect_contains(layout->display_viewport, x, y);
     const struct
