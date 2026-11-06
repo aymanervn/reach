@@ -21,15 +21,6 @@ struct reach_d2d_surface_size
     uint32_t height;
 };
 
-struct reach_d2d_suspend_steps
-{
-    bool release_swap_chain;
-    bool commit_dcomp;
-    bool trim_graphics_device;
-    bool trim_devices;
-};
-
-reach_d2d_suspend_steps reach_d2d_suspend_plan(bool retained, bool has_compositor, bool has_dcomp);
 uint64_t reach_d2d_layer_bytes(float width, float height, bool has_paint, bool has_shadow);
 reach_d2d_surface_size reach_d2d_surface_capacity(reach_d2d_surface_size capacity,
                                                   reach_d2d_surface_size need, uint64_t budget_left,

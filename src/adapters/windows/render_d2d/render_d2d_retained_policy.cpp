@@ -125,13 +125,3 @@ void reach_d2d_retained_runs(const reach_render_command_buffer *buffer,
         index = end;
     }
 }
-
-reach_d2d_suspend_steps reach_d2d_suspend_plan(bool retained, bool has_compositor, bool has_dcomp)
-{
-    reach_d2d_suspend_steps steps = {};
-    steps.release_swap_chain = retained;
-    steps.commit_dcomp = has_dcomp;
-    steps.trim_graphics_device = retained && has_compositor;
-    steps.trim_devices = retained;
-    return steps;
-}
