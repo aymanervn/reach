@@ -230,6 +230,8 @@ struct reach_render_backend
     bool requires_content_sampling = false;
     // Workaround: temporary Stage A/B measurement switch; delete with the experiment.
     bool immediate_only = false;
+    // Workaround: temporary Stage v3 A/B switch (stage-v3); delete with the losing path.
+    bool solid_fills_enabled = false;
     std::vector<reach_d2d_sampled_text> sampled_text;
     std::vector<reach_d2d_sampled_textbox> sampled_textboxes;
     std::vector<reach_d2d_sampled_image> sampled_images;

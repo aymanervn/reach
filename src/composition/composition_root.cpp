@@ -232,7 +232,11 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
                 dependencies.config_store.ops.load(dependencies.config_store.store,
                                                    experiment.get()) == REACH_OK)
             {
-                if (experiment->stage_motion_experiment == 1)
+                if (experiment->stage_motion_experiment == 2)
+                {
+                    reach_windows_render_backend_enable_solid_fills(&dependencies.stage_renderer);
+                }
+                else if (experiment->stage_motion_experiment == 1)
                 {
                     reach_windows_render_backend_force_immediate(&dependencies.stage_renderer);
                 }

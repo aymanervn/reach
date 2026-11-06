@@ -260,6 +260,7 @@ typedef struct reach_feature_surface_context
     int32_t anchor_direction;
     int32_t anchor_valid;
     int32_t retained_supported;
+    // Workaround: temporary Stage v3 A/B switch (stage-v3); delete with the losing path.
     int32_t solid_fills_composed;
     int32_t content_transform_active;
     reach_window_id preferred_front_source;

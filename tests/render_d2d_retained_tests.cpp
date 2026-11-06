@@ -252,6 +252,29 @@ static void test_solid_layers_cost_no_surface_bytes(void)
            "a painted layer plans its surface bytes");
 }
 
+static void test_solid_layer_is_gated(void)
+{
+    reach_render_command fill = solid_rect(0.0f, 0.0f, 640.0f, 480.0f);
+    reach_rect_f32 bounds = {0.0f, 0.0f, 640.0f, 480.0f};
+    reach_color color = {};
+    expect(!reach_d2d_solid_layer(false, false, false, &fill, 1, bounds, &color),
+           "a qualifying fill is not solid while solid fills are disabled");
+    expect(reach_d2d_planned_layer_bytes(
+               640.0f, 480.0f,
+               !reach_d2d_solid_layer(false, false, false, &fill, 1, bounds, &color), false,
+               {}) == 640u * 480u * 4u,
+           "a qualifying fill plans surface bytes while solid fills are disabled");
+    expect(reach_d2d_solid_layer(true, false, false, &fill, 1, bounds, &color),
+           "a qualifying fill is solid once solid fills are enabled");
+    expect(!reach_d2d_solid_layer(true, true, false, &fill, 1, bounds, &color),
+           "a shadowed fill is never solid");
+    fill.color.a = 0.5f;
+    expect(reach_d2d_solid_layer(true, false, false, &fill, 1, bounds, &color),
+           "a translucent fill is solid without a tint");
+    expect(!reach_d2d_solid_layer(true, false, true, &fill, 1, bounds, &color),
+           "a translucent tinted fill is not solid");
+}
+
 struct buffer_entry
 {
     uint64_t group_id;
@@ -354,6 +377,7 @@ int main(void)
     test_planned_bytes_count_kept_capacity();
     test_solid_fill_detection();
     test_solid_layers_cost_no_surface_bytes();
+    test_solid_layer_is_gated();
     test_ungrouped_run_survives_unrelated_insertions();
     test_textbox_runs_split_and_stay_distinct();
     test_ungrouped_run_ids_stay_in_the_reserved_range();

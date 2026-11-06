@@ -31,6 +31,9 @@ uint64_t reach_d2d_planned_layer_bytes(float width, float height, bool has_paint
                                        reach_d2d_surface_size capacity);
 bool reach_d2d_solid_fill(const reach_render_command *commands, size_t count, reach_rect_f32 bounds,
                           reach_color *out_color);
+bool reach_d2d_solid_layer(bool enabled, bool has_shadow, bool has_tint,
+                           const reach_render_command *commands, size_t count,
+                           reach_rect_f32 bounds, reach_color *out_color);
 uint64_t reach_d2d_ungrouped_run_id(uint64_t anchor, uint64_t ordinal);
 void reach_d2d_retained_runs(const reach_render_command_buffer *buffer,
                              std::vector<reach_d2d_retained_run> *out);

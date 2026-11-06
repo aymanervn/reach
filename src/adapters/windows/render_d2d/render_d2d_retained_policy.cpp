@@ -106,6 +106,14 @@ bool reach_d2d_solid_fill(const reach_render_command *commands, size_t count, re
     return true;
 }
 
+bool reach_d2d_solid_layer(bool enabled, bool has_shadow, bool has_tint,
+                           const reach_render_command *commands, size_t count,
+                           reach_rect_f32 bounds, reach_color *out_color)
+{
+    return enabled && !has_shadow && reach_d2d_solid_fill(commands, count, bounds, out_color) &&
+           (!has_tint || out_color->a >= 1.0f);
+}
+
 uint64_t reach_d2d_ungrouped_run_id(uint64_t anchor, uint64_t ordinal)
 {
     return REACH_D2D_UNGROUPED_RUN_BASE |

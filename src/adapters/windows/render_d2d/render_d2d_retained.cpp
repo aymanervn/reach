@@ -1203,9 +1203,9 @@ static HRESULT draw_layer(reach_render_backend *backend, reach_d2d_retained_laye
 static bool solid_layer(const reach_render_backend *backend, const reach_render_group &group,
                         const reach_render_command *commands, size_t count, reach_color *out_color)
 {
-    return backend->compositor != nullptr && !group.has_shadow &&
-           reach_d2d_solid_fill(commands, count, group.bounds, out_color) &&
-           (!group.has_tint || out_color->a >= 1.0f);
+    return reach_d2d_solid_layer(backend->solid_fills_enabled && backend->compositor != nullptr,
+                                 group.has_shadow, group.has_tint, commands, count, group.bounds,
+                                 out_color);
 }
 
 static unsigned char color_byte(float value)
@@ -1561,7 +1561,7 @@ int32_t reach_d2d_retained_supported(const reach_render_backend *backend)
 
 int32_t reach_d2d_solid_fills_composed(const reach_render_backend *backend)
 {
-    return backend != nullptr && backend->compositor != nullptr &&
+    return backend != nullptr && backend->solid_fills_enabled && backend->compositor != nullptr &&
            reach_d2d_retained_supported(backend);
 }
 
