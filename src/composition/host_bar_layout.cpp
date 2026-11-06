@@ -26,10 +26,17 @@ void reach_host_sync_bar_layout_conditions(reach_host *host)
     {
         return;
     }
+    const uint32_t forced_bit = 1u << (uint32_t)REACH_LAYOUT_CONDITION_BARS_FORCED;
+    const uint32_t held_bit = 1u << (uint32_t)REACH_LAYOUT_CONDITION_BARS_HELD;
+    const uint32_t before = host->layout_manager.active_conditions;
     reach_layout_set_condition(&host->layout_manager, REACH_LAYOUT_CONDITION_BARS_FORCED,
                                reach_host_bar_forced_shown(host));
     reach_layout_set_condition(&host->layout_manager, REACH_LAYOUT_CONDITION_BARS_HELD,
                                reach_host_popup_open(host));
+    if (((before ^ host->layout_manager.active_conditions) & (forced_bit | held_bit)) != 0)
+    {
+        reach_host_request_bar_visibility_update(host);
+    }
 }
 
 void reach_host_invalidate_bar_coverage(reach_host *host)

@@ -267,9 +267,16 @@ void reach_host_apply_feature_tick_result(reach_host *host, reach_feature_runtim
     {
         return;
     }
-    if (result->redraw && runtime->surface != nullptr)
+    if (result->redraw)
     {
-        runtime->surface->dirty_flags = 1;
+        for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+        {
+            reach_feature_runtime *sibling = &host->feature_runtimes[index];
+            if (sibling->surface != nullptr && sibling->capsule == runtime->capsule)
+            {
+                sibling->surface->dirty_flags = 1;
+            }
+        }
     }
     if (result->relayout)
     {
