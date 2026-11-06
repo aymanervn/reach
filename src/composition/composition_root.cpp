@@ -225,15 +225,22 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
         }
         if (result == REACH_OK)
         {
-            // Workaround: temporary Stage A/B measurement switch; delete with the experiment.
+            // Workaround: temporary Stage v3 A/B switch (stage-v3); delete with the losing path.
             std::unique_ptr<reach_config_snapshot> experiment(new (std::nothrow)
                                                                   reach_config_snapshot());
             if (experiment != nullptr &&
                 dependencies.config_store.ops.load(dependencies.config_store.store,
-                                                   experiment.get()) == REACH_OK &&
-                experiment->stage_motion_experiment == 1)
+                                                   experiment.get()) == REACH_OK)
             {
-                reach_windows_render_backend_force_immediate(&dependencies.stage_renderer);
+                if (experiment->stage_motion_experiment == 1)
+                {
+                    reach_windows_render_backend_force_immediate(&dependencies.stage_renderer);
+                }
+                else if (experiment->stage_motion_experiment == 3)
+                {
+                    reach_windows_render_backend_force_immediate(&dependencies.dock_renderer);
+                    reach_windows_render_backend_force_immediate(&dependencies.top_bar_renderer);
+                }
             }
         }
     }
