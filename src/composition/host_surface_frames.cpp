@@ -151,10 +151,6 @@ static void reach_host_fill_surface_context(reach_host *host, const reach_featur
     out->retained_supported =
         desc->surface->renderer.ops.retained_supported != nullptr &&
         desc->surface->renderer.ops.retained_supported(desc->surface->renderer.backend);
-    // Workaround: temporary Stage v3 A/B switch (stage-v3); delete with the losing path.
-    out->solid_fills_composed =
-        desc->surface->renderer.ops.solid_fills_composed != nullptr &&
-        desc->surface->renderer.ops.solid_fills_composed(desc->surface->renderer.backend);
     out->preferred_front_source = desc->native_overlay_front_source;
 }
 

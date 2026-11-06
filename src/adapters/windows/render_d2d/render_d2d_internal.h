@@ -156,7 +156,6 @@ struct reach_d2d_retained_layer
     ComPtr<ABI::Windows::UI::Composition::ICompositionSurfaceBrush> surface_brush;
     ComPtr<ABI::Windows::UI::Composition::ICompositionMaskBrush> tint_mask;
     ComPtr<ABI::Windows::UI::Composition::ICompositionColorBrush> tint_brush;
-    ComPtr<ABI::Windows::UI::Composition::ICompositionColorBrush> solid_brush;
     ComPtr<ABI::Windows::UI::Composition::ICompositionPropertySet> tint_properties;
     ComPtr<ABI::Windows::UI::Composition::IInsetClip> inset_clip;
     ComPtr<ABI::Windows::UI::Composition::ICompositionRoundedRectangleGeometry> rounded_geometry;
@@ -173,7 +172,6 @@ struct reach_d2d_retained_layer
     UINT capacity_width = 0;
     UINT capacity_height = 0;
     bool initialized = false;
-    bool solid = false;
     bool raster_birth_aligned = false;
     bool raster_finite_translation = false;
     bool has_children = false;
@@ -228,10 +226,6 @@ struct reach_render_backend
     ID2D1Device *shadow_fallback_parent_device = nullptr;
     uint64_t reported_retained_bytes = 0;
     bool requires_content_sampling = false;
-    // Workaround: temporary Stage A/B measurement switch; delete with the experiment.
-    bool immediate_only = false;
-    // Workaround: temporary Stage v3 A/B switch (stage-v3); delete with the losing path.
-    bool solid_fills_enabled = false;
     std::vector<reach_d2d_sampled_text> sampled_text;
     std::vector<reach_d2d_sampled_textbox> sampled_textboxes;
     std::vector<reach_d2d_sampled_image> sampled_images;
@@ -279,8 +273,6 @@ struct reach_render_backend
 
 ID2D1RenderTarget *reach_d2d_target(reach_render_backend *backend);
 int32_t reach_d2d_retained_supported(const reach_render_backend *backend);
-// Workaround: temporary Stage v3 A/B switch (stage-v3); delete with the losing path.
-int32_t reach_d2d_solid_fills_composed(const reach_render_backend *backend);
 int32_t reach_d2d_content_sampling_required(const reach_render_backend *backend);
 reach_result reach_d2d_sample_content(reach_render_backend *backend);
 reach_result reach_d2d_text_fit_bounds(reach_render_backend *backend,
