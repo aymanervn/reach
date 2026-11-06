@@ -1559,6 +1559,12 @@ int32_t reach_d2d_retained_supported(const reach_render_backend *backend)
             backend->dcomp_device != nullptr);
 }
 
+int32_t reach_d2d_solid_fills_composed(const reach_render_backend *backend)
+{
+    return backend != nullptr && backend->compositor != nullptr &&
+           reach_d2d_retained_supported(backend);
+}
+
 int32_t reach_d2d_content_sampling_required(const reach_render_backend *backend)
 {
     return backend != nullptr && backend->requires_content_sampling;

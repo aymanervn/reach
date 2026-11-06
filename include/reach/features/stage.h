@@ -161,6 +161,8 @@ extern "C"
         uintptr_t preferred_front_window;
         // Workaround: temporary Stage v3 A/B switch (stage-v3); delete with the losing path.
         int32_t retained_supported;
+        // Workaround: temporary Stage v3 A/B switch (stage-v3); delete with the losing path.
+        int32_t solid_fills_composed;
     } reach_stage_render_context;
 
     reach_result reach_stage_append_render_commands(reach_stage *stage,

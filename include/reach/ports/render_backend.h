@@ -28,6 +28,7 @@ extern "C"
         void (*suspend)(reach_render_backend *backend);
         int32_t (*content_sampling_required)(const reach_render_backend *backend);
         reach_result (*sample_content)(reach_render_backend *backend);
+        int32_t (*solid_fills_composed)(const reach_render_backend *backend);
     } reach_render_backend_ops;
 
     typedef struct reach_render_backend_port
