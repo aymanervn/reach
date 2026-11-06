@@ -325,7 +325,7 @@ static HRESULT sync_tint(reach_render_backend *backend, reach_d2d_retained_layer
         if (backend->compositor != nullptr)
         {
             ComPtr<ICompositionBrush> brush;
-            hr = layer.surface_brush.As(&brush);
+            hr = layer.solid ? layer.solid_brush.As(&brush) : layer.surface_brush.As(&brush);
             if (SUCCEEDED(hr))
                 hr = layer.visual->put_Brush(brush.Get());
         }
@@ -420,14 +420,19 @@ static HRESULT sync_tint(reach_render_backend *backend, reach_d2d_retained_layer
         ComPtr<ICompositionBrush> source, mask, brush;
         if (SUCCEEDED(hr))
             hr = layer.tint_brush.As(&source);
-        if (SUCCEEDED(hr))
-            hr = layer.surface_brush.As(&mask);
-        if (SUCCEEDED(hr))
-            hr = layer.tint_mask->put_Source(source.Get());
-        if (SUCCEEDED(hr))
-            hr = layer.tint_mask->put_Mask(mask.Get());
-        if (SUCCEEDED(hr))
-            hr = layer.tint_mask.As(&brush);
+        if (SUCCEEDED(hr) && layer.solid)
+            brush = source;
+        else
+        {
+            if (SUCCEEDED(hr))
+                hr = layer.surface_brush.As(&mask);
+            if (SUCCEEDED(hr))
+                hr = layer.tint_mask->put_Source(source.Get());
+            if (SUCCEEDED(hr))
+                hr = layer.tint_mask->put_Mask(mask.Get());
+            if (SUCCEEDED(hr))
+                hr = layer.tint_mask.As(&brush);
+        }
         if (SUCCEEDED(hr))
             hr = layer.visual->put_Brush(brush.Get());
         if (FAILED(hr))
@@ -1195,6 +1200,49 @@ static HRESULT draw_layer(reach_render_backend *backend, reach_d2d_retained_laye
     return S_OK;
 }
 
+static bool solid_layer(const reach_render_backend *backend, const reach_render_group &group,
+                        const reach_render_command *commands, size_t count, reach_color *out_color)
+{
+    return backend->compositor != nullptr && !group.has_shadow &&
+           reach_d2d_solid_fill(commands, count, group.bounds, out_color) &&
+           (!group.has_tint || out_color->a >= 1.0f);
+}
+
+static unsigned char color_byte(float value)
+{
+    return (unsigned char)(std::min(1.0f, std::max(0.0f, value)) * 255.0f + 0.5f);
+}
+
+static HRESULT apply_solid_fill(reach_render_backend *backend, reach_d2d_retained_layer &layer,
+                                reach_color color,
+                                const std::vector<reach_render_command> &commands, UINT width,
+                                UINT height)
+{
+    HRESULT hr = S_OK;
+    if (layer.solid_brush == nullptr)
+        hr = backend->compositor->CreateColorBrush(layer.solid_brush.ReleaseAndGetAddressOf());
+    if (SUCCEEDED(hr))
+        hr = layer.solid_brush->put_Color(
+            {color_byte(color.a), color_byte(color.r), color_byte(color.g), color_byte(color.b)});
+    ComPtr<ICompositionBrush> brush;
+    if (SUCCEEDED(hr))
+        hr = layer.solid_brush.As(&brush);
+    if (SUCCEEDED(hr))
+        hr = layer.visual->put_Brush(brush.Get());
+    if (FAILED(hr))
+        return hr;
+    layer.surface.Reset();
+    layer.surface_brush.Reset();
+    layer.capacity_width = layer.capacity_height = 0;
+    layer.solid = true;
+    reach_workload_add(REACH_WORKLOAD_SOLID_LAYER_FILLS, 1);
+    layer.width = width;
+    layer.height = height;
+    layer.commands = commands;
+    record_retained_bytes(backend);
+    return S_OK;
+}
+
 static reach_rect_f32 command_bounds(const reach_render_command &command)
 {
     reach_rect_f32 rect = command.rect;
@@ -1364,20 +1412,30 @@ static HRESULT sync_layer(reach_render_backend *backend, reach_d2d_retained_laye
     bool initialized = layer.initialized;
     bool previous_hard_border =
         initialized && !layer.commands.empty() && layer.group.scale_y.generation != 0;
+    reach_color solid_color = {};
+    bool solid = count != 0 && solid_layer(backend, group, commands, count, &solid_color);
     bool content_changed =
         width != layer.width || height != layer.height || local.size() != layer.commands.size() ||
+        solid != layer.solid ||
         (!local.empty() && memcmp(local.data(), layer.commands.data(),
                                   local.size() * sizeof(reach_render_command)) != 0);
     bool surface_recreated = false;
     HRESULT hr = S_OK;
-    if (content_changed && count != 0)
+    if (content_changed && solid)
+        hr = apply_solid_fill(backend, layer, solid_color, local, width, height);
+    else if (content_changed && count != 0)
+    {
         hr = draw_layer(backend, layer, local, width, height, &surface_recreated);
+        if (SUCCEEDED(hr))
+            layer.solid = false;
+    }
     else if (content_changed)
     {
         hr = backend->compositor != nullptr ? layer.visual->put_Brush(nullptr)
                                             : layer.dcomp_visual->SetContent(nullptr);
         if (SUCCEEDED(hr))
         {
+            layer.solid = false;
             layer.surface.Reset();
             layer.surface_brush.Reset();
             layer.dcomp_surface.Reset();
@@ -1414,7 +1472,7 @@ static HRESULT sync_layer(reach_render_backend *backend, reach_d2d_retained_laye
     if (SUCCEEDED(hr) && count == 0 && text_sampling_changed && layer.dcomp_visual != nullptr)
         hr = layer.dcomp_visual->SetBitmapInterpolationMode(
             DCOMPOSITION_BITMAP_INTERPOLATION_MODE_INHERIT);
-    if (SUCCEEDED(hr) && count != 0 &&
+    if (SUCCEEDED(hr) && count != 0 && !solid &&
         (text_sampling_changed ||
          (surface_recreated && text_pixel_aligned && backend->compositor != nullptr)))
     {
@@ -2084,9 +2142,12 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
             reach_d2d_surface_size capacity = {};
             if (existing != backend->retained_layers.end() && existing->surface != nullptr)
                 capacity = {existing->capacity_width, existing->capacity_height};
+            reach_color solid_color = {};
+            bool painted = plan.count != 0 && !solid_layer(backend, plan.group, plan.commands,
+                                                           plan.count, &solid_color);
             bytes +=
                 reach_d2d_planned_layer_bytes(plan.group.bounds.width, plan.group.bounds.height,
-                                              plan.count != 0, plan.group.has_shadow, capacity);
+                                              painted, plan.group.has_shadow, capacity);
         }
         return bytes;
     };

@@ -34,7 +34,8 @@ static const char *const counter_names[] = {"wakeups",
                                             "dcomp_executions",
                                             "fallback_executions",
                                             "visual_tree_mutations",
-                                            "scene_transform_submissions"};
+                                            "scene_transform_submissions",
+                                            "solid_layer_fills"};
 
 static_assert(sizeof(counter_names) / sizeof(counter_names[0]) == REACH_WORKLOAD_COUNTER_COUNT);
 
