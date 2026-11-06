@@ -142,6 +142,7 @@ struct reach_settings_app
     reach_settings_startup_worker startup_worker;
     uint16_t app_update_zip[260];
     reach_scrollbar_drag update_scrollbar_drag;
+    reach_scrollbar_drag display_scrollbar_drag;
     reach_scrollbar_drag startup_scrollbar_drag;
     reach_scrollbar_drag installed_apps_scrollbar_drag;
     reach_scrollbar_drag wifi_scrollbar_drag;
@@ -1803,6 +1804,8 @@ static uint64_t reach_settings_pressable_target(reach_settings_hit_result hit)
         detail = (uint32_t)hit.bluetooth_index;
         break;
     case REACH_SETTINGS_HIT_NONE:
+    case REACH_SETTINGS_HIT_DISPLAY_SCROLLBAR_TRACK:
+    case REACH_SETTINGS_HIT_DISPLAY_SCROLLBAR_THUMB:
     case REACH_SETTINGS_HIT_UPDATE_SCROLLBAR_TRACK:
     case REACH_SETTINGS_HIT_UPDATE_SCROLLBAR_THUMB:
     case REACH_SETTINGS_HIT_STARTUP_SCROLLBAR_TRACK:
@@ -2031,11 +2034,12 @@ static void reach_settings_handle_bluetooth_action(reach_settings_app *app,
 
 static void reach_settings_handle_pointer_up(reach_settings_app *app, const reach_ui_event *event)
 {
-    if (app->update_scrollbar_drag.active || app->startup_scrollbar_drag.active ||
-        app->installed_apps_scrollbar_drag.active || app->wifi_scrollbar_drag.active ||
-        app->bluetooth_scrollbar_drag.active)
+    if (app->update_scrollbar_drag.active || app->display_scrollbar_drag.active ||
+        app->startup_scrollbar_drag.active || app->installed_apps_scrollbar_drag.active ||
+        app->wifi_scrollbar_drag.active || app->bluetooth_scrollbar_drag.active)
     {
         reach_scrollbar_end_drag(&app->update_scrollbar_drag);
+        reach_scrollbar_end_drag(&app->display_scrollbar_drag);
         reach_scrollbar_end_drag(&app->startup_scrollbar_drag);
         reach_scrollbar_end_drag(&app->installed_apps_scrollbar_drag);
         reach_scrollbar_end_drag(&app->wifi_scrollbar_drag);
@@ -2408,6 +2412,15 @@ static void reach_settings_handle_pointer_down(reach_settings_app *app, const re
                                    &layout, y,
                                    hit.type == REACH_SETTINGS_HIT_UPDATE_SCROLLBAR_THUMB);
     }
+    else if (hit.type == REACH_SETTINGS_HIT_DISPLAY_SCROLLBAR_TRACK ||
+             hit.type == REACH_SETTINGS_HIT_DISPLAY_SCROLLBAR_THUMB)
+    {
+        reach_scrollbar_layout layout = {app->layout.display_scrollbar_track,
+                                         app->layout.display_scrollbar_thumb};
+        reach_scrollbar_begin_drag(&app->model.display_scrollbar, &app->display_scrollbar_drag,
+                                   &layout, y,
+                                   hit.type == REACH_SETTINGS_HIT_DISPLAY_SCROLLBAR_THUMB);
+    }
     else if (hit.type == REACH_SETTINGS_HIT_STARTUP_SCROLLBAR_TRACK ||
              hit.type == REACH_SETTINGS_HIT_STARTUP_SCROLLBAR_THUMB)
     {
@@ -2476,9 +2489,9 @@ static void reach_settings_handle_pointer_move(reach_settings_app *app, const re
         app->dirty = 1;
     }
 
-    if (!app->update_scrollbar_drag.active && !app->startup_scrollbar_drag.active &&
-        !app->installed_apps_scrollbar_drag.active && !app->wifi_scrollbar_drag.active &&
-        !app->bluetooth_scrollbar_drag.active)
+    if (!app->update_scrollbar_drag.active && !app->display_scrollbar_drag.active &&
+        !app->startup_scrollbar_drag.active && !app->installed_apps_scrollbar_drag.active &&
+        !app->wifi_scrollbar_drag.active && !app->bluetooth_scrollbar_drag.active)
     {
         return;
     }
@@ -2489,6 +2502,13 @@ static void reach_settings_handle_pointer_move(reach_settings_app *app, const re
         reach_scrollbar_layout layout = {app->layout.update_scrollbar_track,
                                          app->layout.update_scrollbar_thumb};
         reach_scrollbar_update_drag(&app->model.update_scrollbar, &app->update_scrollbar_drag,
+                                    &layout, y);
+    }
+    else if (app->display_scrollbar_drag.active)
+    {
+        reach_scrollbar_layout layout = {app->layout.display_scrollbar_track,
+                                         app->layout.display_scrollbar_thumb};
+        reach_scrollbar_update_drag(&app->model.display_scrollbar, &app->display_scrollbar_drag,
                                     &layout, y);
     }
     else if (app->installed_apps_scrollbar_drag.active)
@@ -2603,6 +2623,7 @@ static void reach_settings_handle_event(void *user, const reach_ui_event *event)
         reach_pressable_cancel(&app->model.button_pressable, &feedback, &result);
         reach_settings_apply_pressable_result(app, &result);
         reach_scrollbar_end_drag(&app->update_scrollbar_drag);
+        reach_scrollbar_end_drag(&app->display_scrollbar_drag);
         reach_scrollbar_end_drag(&app->startup_scrollbar_drag);
         reach_scrollbar_end_drag(&app->installed_apps_scrollbar_drag);
         reach_scrollbar_end_drag(&app->wifi_scrollbar_drag);

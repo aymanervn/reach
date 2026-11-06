@@ -640,6 +640,38 @@ static void test_top_bar_preferences(void)
     expect_true(reach_motion_active(&model->top_bar_style_selection),
                 "top bar preference changes animate their toggles");
 }
+static void test_display_scrollbar_hit_testing(void)
+{
+    std::unique_ptr<reach_settings_model> model(new reach_settings_model());
+    reach_settings_model_init(model.get());
+    reach_settings_model_select_page(model.get(), REACH_SETTINGS_PAGE_DISPLAY);
+    reach_rect_f32 bounds = {0.0f, 0.0f, 900.0f, 380.0f};
+    reach_settings_layout layout =
+        reach_settings_layout_for_bounds(bounds, nullptr, 1.0f, model.get());
+    expect_true(layout.display_scrollbar_thumb.height > 0.0f,
+                "overflowing display page lays out a scrollbar thumb");
+
+    reach_settings_hit_result hit = reach_settings_hit_test(
+        &layout, layout.display_scrollbar_thumb.x + 1.0f, layout.display_scrollbar_thumb.y + 1.0f);
+    expect_true(hit.type == REACH_SETTINGS_HIT_DISPLAY_SCROLLBAR_THUMB,
+                "display scrollbar thumb is hit-testable");
+
+    hit = reach_settings_hit_test(&layout, layout.display_scrollbar_track.x + 1.0f,
+                                  layout.display_scrollbar_track.y +
+                                      layout.display_scrollbar_track.height - 1.0f);
+    expect_true(hit.type == REACH_SETTINGS_HIT_DISPLAY_SCROLLBAR_TRACK,
+                "display scrollbar track is hit-testable");
+
+    reach_scrollbar_layout scrollbar = {layout.display_scrollbar_track,
+                                        layout.display_scrollbar_thumb};
+    reach_scrollbar_drag drag = {};
+    reach_scrollbar_begin_drag(&model->display_scrollbar, &drag, &scrollbar,
+                               layout.display_scrollbar_thumb.y + 1.0f, 1);
+    reach_scrollbar_update_drag(&model->display_scrollbar, &drag, &scrollbar,
+                                layout.display_scrollbar_thumb.y + 21.0f);
+    expect_true(model->display_scrollbar.target > 0.0f, "dragging the display thumb scrolls");
+}
+
 static void test_bluetooth_radio_stops_scan(void)
 {
     std::unique_ptr<reach_settings_model> model(new reach_settings_model());
@@ -713,6 +745,7 @@ int main(void)
     test_account_password_form();
     test_button_press_feedback();
     test_top_bar_preferences();
+    test_display_scrollbar_hit_testing();
     test_bluetooth_radio_stops_scan();
     test_installed_apps_loader();
     test_radio_toggle_animations();
