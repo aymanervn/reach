@@ -59,6 +59,8 @@ struct reach_stage
     reach_icon_service *icons;
     reach_app_control *apps;
     reach_display_environment display;
+    // Workaround: temporary Stage v3 A/B switch (stage-v3); delete with the losing path.
+    int32_t motion_layers;
 };
 
 reach_rect_f32 reach_stage_interpolate_rect(reach_rect_f32 from, reach_rect_f32 to, float factor);

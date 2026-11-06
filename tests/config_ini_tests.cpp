@@ -89,6 +89,20 @@ int main()
     failed += expect(store.ops.load(store.store, loaded.get()) == REACH_OK);
     failed += expect(loaded->pinned_app_count == 1);
 
+    for (int32_t mode = 2; mode <= 3; ++mode)
+    {
+        snapshot->stage_motion_experiment = mode;
+        failed += expect(store.ops.save(store.store, snapshot.get()) == REACH_OK);
+        std::memset(loaded.get(), 0, sizeof(*loaded));
+        failed += expect(store.ops.load(store.store, loaded.get()) == REACH_OK);
+        failed += expect(loaded->stage_motion_experiment == mode);
+    }
+    snapshot->stage_motion_experiment = 4;
+    failed += expect(store.ops.save(store.store, snapshot.get()) == REACH_OK);
+    std::memset(loaded.get(), 0, sizeof(*loaded));
+    failed += expect(store.ops.load(store.store, loaded.get()) == REACH_OK);
+    failed += expect(loaded->stage_motion_experiment == 0);
+
     wchar_t shortcut_path[260] = {};
     wchar_t shortcut_target[260] = {};
     wcscpy_s(shortcut_path, path);

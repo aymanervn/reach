@@ -212,10 +212,15 @@ static void reach_feature_notify_stage(void *capsule,
         reach_stage_set_display(stage, &notification->display);
     }
     else if (notification->kind == REACH_FEATURE_NOTIFICATION_CONFIG_CHANGED &&
-             notification->config != nullptr && notification->config->stage_animation_ms > 0)
+             notification->config != nullptr)
     {
-        reach_stage_set_animation_seconds(stage, (float)notification->config->stage_animation_ms /
-                                                     1000.0f);
+        // Workaround: temporary Stage v3 A/B switch (stage-v3); delete with the losing path.
+        reach_stage_set_motion_layers(stage, notification->config->stage_motion_experiment);
+        if (notification->config->stage_animation_ms > 0)
+        {
+            reach_stage_set_animation_seconds(
+                stage, (float)notification->config->stage_animation_ms / 1000.0f);
+        }
     }
     else if (notification->kind == REACH_FEATURE_NOTIFICATION_WINDOWS_CHANGED &&
              reach_stage_sync_windows(stage))
@@ -1147,6 +1152,8 @@ static reach_result reach_stage_surface_render(void *capsule,
     render.bounds = ctx->visible_bounds;
     render.dpi_scale = ctx->dpi_scale;
     render.preferred_front_window = ctx->preferred_front_source;
+    // Workaround: temporary Stage v3 A/B switch (stage-v3); delete with the losing path.
+    render.retained_supported = ctx->retained_supported;
     return reach_stage_append_render_commands(static_cast<reach_stage *>(capsule), &render,
                                               out_commands);
 }

@@ -127,6 +127,8 @@ extern "C"
     int32_t reach_stage_animation_active(const reach_stage *stage);
 
     void reach_stage_set_animation_seconds(reach_stage *stage, float seconds);
+    // Workaround: temporary Stage v3 A/B switch (stage-v3); delete with the losing path.
+    void reach_stage_set_motion_layers(reach_stage *stage, int32_t mode);
 
     reach_result reach_stage_open(reach_stage *stage, reach_rect_f32 monitor_bounds,
                                   float dpi_scale, const reach_stage_open_window *windows,
@@ -157,6 +159,8 @@ extern "C"
         reach_rect_f32 bounds;
         float dpi_scale;
         uintptr_t preferred_front_window;
+        // Workaround: temporary Stage v3 A/B switch (stage-v3); delete with the losing path.
+        int32_t retained_supported;
     } reach_stage_render_context;
 
     reach_result reach_stage_append_render_commands(reach_stage *stage,

@@ -59,6 +59,14 @@ void reach_stage_set_animation_seconds(reach_stage *stage, float seconds)
     }
 }
 
+void reach_stage_set_motion_layers(reach_stage *stage, int32_t mode)
+{
+    if (stage != nullptr)
+    {
+        stage->motion_layers = mode;
+    }
+}
+
 static int32_t reach_stage_has_desktop(const reach_stage_state *state)
 {
     for (size_t index = 0; index < state->tile_count; ++index)

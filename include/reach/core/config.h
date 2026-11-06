@@ -57,7 +57,7 @@ extern "C"
         reach_config_theme_preference windows_system_theme;
         reach_config_theme_preference windows_app_theme;
         int32_t stage_animation_ms;
-        // Workaround: temporary Stage A/B measurement switch; delete with the experiment.
+        // Workaround: temporary Stage v3 A/B switch (stage-v3); delete with the losing path.
         int32_t stage_motion_experiment;
     } reach_config_snapshot;
 
