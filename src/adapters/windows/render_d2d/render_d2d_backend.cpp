@@ -238,6 +238,15 @@ void reach_windows_render_backend_force_immediate(reach_render_backend_port *por
     }
 }
 
+// Workaround: temporary Stage v3 A/B switch (stage-v3); delete with the losing path.
+void reach_windows_render_backend_enable_solid_fills(reach_render_backend_port *port)
+{
+    if (port != nullptr && port->backend != nullptr)
+    {
+        port->backend->solid_fills_enabled = true;
+    }
+}
+
 reach_result reach_windows_create_dcomp_render_backend(reach_platform_window *window,
                                                        reach_render_backend_port *out_port)
 {
