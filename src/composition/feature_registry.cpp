@@ -1154,6 +1154,8 @@ static reach_result reach_stage_surface_render(void *capsule,
     render.preferred_front_window = ctx->preferred_front_source;
     // Workaround: temporary Stage v3 A/B switch (stage-v3); delete with the losing path.
     render.retained_supported = ctx->retained_supported;
+    // Workaround: temporary Stage v3 A/B switch (stage-v3); delete with the losing path.
+    render.solid_fills_composed = ctx->solid_fills_composed;
     return reach_stage_append_render_commands(static_cast<reach_stage *>(capsule), &render,
                                               out_commands);
 }

@@ -6,6 +6,7 @@
 #include <math.h>
 #include <memory>
 #include <stdio.h>
+#include <string.h>
 
 static int failures;
 
@@ -1145,9 +1146,258 @@ static void test_stage_settled_commands_match_golden(void)
     expect_golden_rows(1.5f, golden_rows_150, sizeof(golden_rows_150) / sizeof(golden_rows_150[0]));
 }
 
+static reach_stage *open_motion_stage(float dpi, int32_t mode, size_t extra_windows, int steps)
+{
+    reach_stage *stage = nullptr;
+    reach_stage_create(&stage);
+    reach_stage_set_motion_layers(stage, mode);
+    std::unique_ptr<reach_stage_open_window[]> windows(
+        new reach_stage_open_window[3 + extra_windows]);
+    windows[0] = make_window(1, make_rect(100, 120, 640, 480));
+    windows[0].label = golden_alpha_label;
+    windows[1] = make_window(2, make_rect(300, 220, 800, 500));
+    windows[1].label = golden_beta_label;
+    windows[1].minimized = 1;
+    windows[1].icon_id = 9;
+    windows[2] = make_desktop(5, make_rect(0, 0, 1920, 1080));
+    for (size_t extra = 0; extra < extra_windows; ++extra)
+    {
+        windows[3 + extra] = make_window(10 + extra, make_rect(40 + (float)extra, 60, 400, 300));
+    }
+    reach_stage_open(stage, make_rect(0, 0, 1920, 1080), dpi, windows.get(), 3 + extra_windows);
+    advance_stage(stage, steps, 0.016);
+    return stage;
+}
+
+static void append_motion_commands(reach_stage *stage, float dpi, int32_t solid_fills,
+                                   reach_render_command_buffer *commands)
+{
+    reach_stage_render_context ctx = {};
+    ctx.theme = reach_theme_default();
+    ctx.bounds = make_rect(0, 0, 1920, 1080);
+    ctx.dpi_scale = dpi;
+    ctx.retained_supported = 1;
+    ctx.solid_fills_composed = solid_fills;
+    expect_true(reach_stage_append_render_commands(stage, &ctx, commands) == REACH_OK,
+                "motion stage render commands are appended");
+}
+
+static int commands_equal(const reach_render_command_buffer *first,
+                          const reach_render_command_buffer *second)
+{
+    return first->count == second->count && first->group_count == second->group_count &&
+           memcmp(first->commands, second->commands, first->count * sizeof(reach_render_command)) ==
+               0;
+}
+
+static void test_v3_settled_frames_match_legacy_commands(void)
+{
+    for (float dpi : {1.0f, 1.25f, 1.5f})
+    {
+        reach_stage *legacy = open_motion_stage(dpi, 0, 0, 80);
+        reach_stage *skeleton = open_motion_stage(dpi, 2, 0, 80);
+        auto expected = std::make_unique<reach_render_command_buffer>();
+        auto actual = std::make_unique<reach_render_command_buffer>();
+        append_motion_commands(legacy, dpi, 1, expected.get());
+        append_motion_commands(skeleton, dpi, 1, actual.get());
+        expect_true(expected->group_count == 0 && expected->count > 0,
+                    "a settled legacy stage is one ungrouped run");
+        expect_true(commands_equal(expected.get(), actual.get()),
+                    "a settled stage with the v3 mode matches the legacy commands exactly");
+        reach_stage_destroy(legacy);
+        reach_stage_destroy(skeleton);
+    }
+}
+
+static void test_v3_requires_composed_solid_fills(void)
+{
+    reach_stage *legacy = open_motion_stage(1.0f, 0, 0, 6);
+    reach_stage *skeleton = open_motion_stage(1.0f, 2, 0, 6);
+    auto expected = std::make_unique<reach_render_command_buffer>();
+    auto actual = std::make_unique<reach_render_command_buffer>();
+    append_motion_commands(legacy, 1.0f, 1, expected.get());
+    append_motion_commands(skeleton, 1.0f, 0, actual.get());
+    expect_true(commands_equal(expected.get(), actual.get()),
+                "motion keeps the legacy run when solid fills would need drawing surfaces");
+    append_motion_commands(skeleton, 1.0f, 1, actual.get());
+    expect_true(actual->group_count > 0, "motion uses the skeleton when solid fills are composed");
+    append_motion_commands(legacy, 1.0f, 1, actual.get());
+    expect_true(commands_equal(expected.get(), actual.get()),
+                "the legacy mode ignores the solid fill capability");
+    reach_stage_destroy(legacy);
+    reach_stage_destroy(skeleton);
+}
+
+static int group_is_static(const reach_render_group &group)
+{
+    static const reach_motion none = {};
+    return !group.has_clip && !group.has_tint && !group.has_shadow && group.parent_id == 0 &&
+           memcmp(&group.x, &none, sizeof(none)) == 0 &&
+           memcmp(&group.y, &none, sizeof(none)) == 0 &&
+           memcmp(&group.scale_y, &none, sizeof(none)) == 0 && group.opacity.to == 1.0f &&
+           group.opacity.duration_seconds == 0.0 && group.scale.to == 1.0f &&
+           group.scale.duration_seconds == 0.0;
+}
+
+static size_t group_command_count(const reach_render_command_buffer *commands, uint64_t id)
+{
+    size_t count = 0;
+    for (size_t index = 0; index < commands->count; ++index)
+    {
+        count += commands->commands[index].group_id == id ? 1 : 0;
+    }
+    return count;
+}
+
+static const reach_render_command *group_first_command(const reach_render_command_buffer *commands,
+                                                       const reach_render_group &group)
+{
+    for (size_t index = 0; index < commands->count; ++index)
+    {
+        if (commands->commands[index].group_id == group.id)
+        {
+            return &commands->commands[index];
+        }
+    }
+    return nullptr;
+}
+
+static int group_is_solid_fill(const reach_render_command_buffer *commands,
+                               const reach_render_group &group)
+{
+    const reach_render_command *fill = nullptr;
+    for (size_t index = 0; index < commands->count; ++index)
+    {
+        if (commands->commands[index].group_id == group.id)
+        {
+            fill = &commands->commands[index];
+        }
+    }
+    return group_command_count(commands, group.id) == 1 &&
+           fill->type == REACH_RENDER_COMMAND_RECT && fill->radius == 0.0f &&
+           fill->corner_mask == 0 && fill->stroke_width == 0.0f && !fill->has_scissor &&
+           !fill->has_clip_rect && !fill->rect_fit_to_clip && fill->rect.x == group.bounds.x &&
+           fill->rect.y == group.bounds.y && fill->rect.width == ceilf(group.bounds.width) &&
+           fill->rect.height == ceilf(group.bounds.height);
+}
+
+static void test_v3_motion_uses_static_header_and_solid_groups(void)
+{
+    for (float dpi : {1.0f, 1.25f, 1.5f})
+    {
+        reach_stage *legacy = open_motion_stage(dpi, 0, 0, 6);
+        reach_stage *skeleton = open_motion_stage(dpi, 2, 0, 6);
+        auto expected = std::make_unique<reach_render_command_buffer>();
+        auto actual = std::make_unique<reach_render_command_buffer>();
+        append_motion_commands(legacy, dpi, 1, expected.get());
+        append_motion_commands(skeleton, dpi, 1, actual.get());
+        expect_true(actual->group_count > 0, "a moving stage emits skeleton groups");
+
+        const reach_stage_state *state = reach_stage_state_ptr(skeleton);
+        float border = reach_theme_border_thickness(reach_theme_default(), dpi);
+        float radius = reach_theme_default()->radius_small * dpi;
+        size_t heads = 0;
+        size_t solids = 0;
+        size_t icons = 0;
+        for (size_t index = 0; index < actual->group_count; ++index)
+        {
+            const reach_render_group &group = actual->groups[index];
+            expect_true(group_is_static(group), "no skeleton group has clip, opacity or motion");
+            expect_true(group.bounds.width > 0.0f && group.bounds.height > 0.0f,
+                        "no skeleton group is empty");
+            if (group_command_count(actual.get(), group.id) > 1)
+            {
+                ++heads;
+                expect_true(group.bounds.x == roundf(group.bounds.x) &&
+                                group.bounds.y == roundf(group.bounds.y) &&
+                                group.bounds.height == roundf(group.bounds.height),
+                            "a head strip has an integer origin and height");
+                float limit = ceilf(state->tiles[0].current_bar.height + radius + border) + 1.0f;
+                expect_true(group.bounds.height <= limit,
+                            "a head strip covers only the bar and its corner radius");
+            }
+            else if (group_command_count(actual.get(), group.id) == 1 &&
+                     group_first_command(actual.get(), group)->type == REACH_RENDER_COMMAND_ICON)
+            {
+                ++icons;
+                expect_true(group.bounds.width <= 48.0f * dpi, "the icon group stays small");
+            }
+            else
+            {
+                ++solids;
+                expect_true(group_is_solid_fill(actual.get(), group),
+                            "a body group passes the solid fill predicate");
+            }
+        }
+        expect_true(heads == 2, "each app tile emits one head strip");
+        expect_true(solids > heads, "bodies, plates and outlines are solid groups");
+        expect_true(icons == 1, "only the minimized tile emits an icon group");
+
+        const reach_render_command &outer = expected->commands[0];
+        const reach_render_group *head = nullptr;
+        const reach_render_group *body = nullptr;
+        for (size_t index = 0; index < actual->group_count; ++index)
+        {
+            const reach_render_group &group = actual->groups[index];
+            bool inside = group.bounds.x >= outer.rect.x &&
+                          group.bounds.x + group.bounds.width <= outer.rect.x + outer.rect.width &&
+                          group.bounds.y >= outer.rect.y &&
+                          group.bounds.y + group.bounds.height <= outer.rect.y + outer.rect.height;
+            if (!inside || group.bounds.width != outer.rect.width)
+            {
+                continue;
+            }
+            if (group_command_count(actual.get(), group.id) > 1 && head == nullptr)
+            {
+                head = &group;
+            }
+            else if (group_command_count(actual.get(), group.id) == 1 && body == nullptr &&
+                     group.bounds.y > outer.rect.y)
+            {
+                body = &group;
+            }
+        }
+        expect_true(head != nullptr && body != nullptr, "the first tile has a head and a body");
+        if (head != nullptr && body != nullptr)
+        {
+            expect_true(head->bounds.x == outer.rect.x && head->bounds.y == outer.rect.y,
+                        "the head strip starts at the outer tile corner");
+            expect_true(head->bounds.y + head->bounds.height == body->bounds.y,
+                        "the body starts where the head strip ends");
+            expect_true(body->bounds.y + body->bounds.height == outer.rect.y + outer.rect.height,
+                        "the body reaches the outer tile bottom");
+        }
+        reach_stage_destroy(legacy);
+        reach_stage_destroy(skeleton);
+    }
+}
+
+static void test_v3_group_overflow_falls_back_to_the_legacy_run(void)
+{
+    reach_stage *legacy = open_motion_stage(1.0f, 0, 80, 6);
+    reach_stage *skeleton = open_motion_stage(1.0f, 2, 80, 6);
+    auto expected = std::make_unique<reach_render_command_buffer>();
+    auto actual = std::make_unique<reach_render_command_buffer>();
+    append_motion_commands(legacy, 1.0f, 1, expected.get());
+    append_motion_commands(skeleton, 1.0f, 1, actual.get());
+    expect_true(reach_stage_state_ptr(skeleton)->tile_count == 83,
+                "the overflow stage keeps every tile");
+    expect_true(expected->count > 0 && expected->group_count == 0,
+
+                "the legacy stage emits an ungrouped run");
+    expect_true(commands_equal(expected.get(), actual.get()),
+                "more tiles than the group budget fall back to the legacy run");
+    reach_stage_destroy(legacy);
+    reach_stage_destroy(skeleton);
+}
+
 int main(void)
 {
     test_stage_settled_commands_match_golden();
+    test_v3_settled_frames_match_legacy_commands();
+    test_v3_requires_composed_solid_fills();
+    test_v3_motion_uses_static_header_and_solid_groups();
+    test_v3_group_overflow_falls_back_to_the_legacy_run();
     test_close_hover_groups_only_while_hovered();
     test_close_requires_completion_before_teardown();
     test_close_handoff_holds_only_the_reveal();
