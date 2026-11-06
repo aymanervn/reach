@@ -1670,7 +1670,12 @@ static void test_bar_conditions_sync_once_from_host_state(void)
     expect_true(reach_stage_open(stage, {0.0f, 0.0f, 1920.0f, 1080.0f}, 1.0f, &window, 1) ==
                     REACH_OK,
                 "Stage opens for the forced-bar condition");
+    host->dirty = {};
     reach_host_sync_bar_layout_conditions(host);
+    expect_true(host->dirty.bar_visibility, "Stage becoming presented requests a bar update");
+    host->dirty = {};
+    reach_host_sync_bar_layout_conditions(host);
+    expect_true(!host->dirty.bar_visibility, "an unchanged condition requests no bar update");
     expect_true(bar_condition_active(host, REACH_LAYOUT_CONDITION_BARS_FORCED),
                 "the host-level sync publishes the forced-bar condition");
 
@@ -1687,7 +1692,9 @@ static void test_bar_conditions_sync_once_from_host_state(void)
     reach_stage_force_close(stage);
     reach_battery_force_close(
         reach_host_feature_capsule<reach_battery>(host, REACH_SURFACE_ID_BATTERY));
+    host->dirty = {};
     reach_host_sync_bar_layout_conditions(host);
+    expect_true(host->dirty.bar_visibility, "Stage no longer presented requests a bar update");
     expect_true(!bar_condition_active(host, REACH_LAYOUT_CONDITION_BARS_FORCED) &&
                     !bar_condition_active(host, REACH_LAYOUT_CONDITION_BARS_HELD),
                 "one host-level sync clears both global conditions after closure");
@@ -1868,6 +1875,15 @@ static void test_feature_tick_redraw_marks_only_its_own_surface(void)
                 "a ticking capsule redraws only its own surface");
     expect_true(!host->dirty.render && !host->dirty.layout,
                 "a tick redraw sets no host-wide dirty state");
+
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+        host->feature_runtimes[index].surface->dirty_flags = 0;
+    reach_feature_runtime *tray = &host->feature_runtimes[REACH_SURFACE_ID_TRAY];
+    reach_host_apply_feature_tick_result(host, tray, &tick);
+    expect_true(tray->surface->dirty_flags == 1 &&
+                    host->feature_runtimes[REACH_SURFACE_ID_TOP_BAR].surface->dirty_flags == 1 &&
+                    dock->surface->dirty_flags == 0,
+                "a Tray redraw also redraws the Top Bar that shares its capsule");
 
     tick.relayout = 1;
     reach_host_apply_feature_tick_result(host, quick_settings, &tick);
