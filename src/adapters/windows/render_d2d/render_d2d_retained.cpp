@@ -1200,6 +1200,7 @@ static HRESULT draw_layer(reach_render_backend *backend, reach_d2d_retained_laye
     return S_OK;
 }
 
+// Workaround: temporary Stage v3 A/B switch (stage-v3); delete with the losing path.
 static bool solid_layer(const reach_render_backend *backend, const reach_render_group &group,
                         const reach_render_command *commands, size_t count, reach_color *out_color)
 {
@@ -1559,6 +1560,7 @@ int32_t reach_d2d_retained_supported(const reach_render_backend *backend)
             backend->dcomp_device != nullptr);
 }
 
+// Workaround: temporary Stage v3 A/B switch (stage-v3); delete with the losing path.
 int32_t reach_d2d_solid_fills_composed(const reach_render_backend *backend)
 {
     return backend != nullptr && backend->solid_fills_enabled && backend->compositor != nullptr &&
