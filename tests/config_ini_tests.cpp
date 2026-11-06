@@ -36,7 +36,6 @@ int main()
     failed += expect(snapshot->windows_app_theme == REACH_CONFIG_THEME_FOLLOW_REACH);
     failed += expect(snapshot->top_bar_style == REACH_CONFIG_TOP_BAR_STYLE_SPLIT);
     failed += expect(snapshot->top_bar_mode == REACH_CONFIG_TOP_BAR_MODE_DYNAMIC);
-    failed += expect(snapshot->stage_motion_experiment == 0);
 
     std::memset(snapshot.get(), 0, sizeof(*snapshot));
     snapshot->dock_height = 58.0f;
@@ -52,7 +51,6 @@ int main()
     snapshot->windows_system_theme = REACH_CONFIG_THEME_LIGHT;
     snapshot->windows_app_theme = REACH_CONFIG_THEME_DARK;
     snapshot->stage_animation_ms = 345;
-    snapshot->stage_motion_experiment = 1;
     snapshot->pinned_app_count = 2;
     snapshot->pinned_apps[0].id = 4;
     snapshot->pinned_apps[0].application.launch.kind = REACH_APPLICATION_LAUNCH_SHORTCUT;
@@ -74,7 +72,6 @@ int main()
     failed += expect(loaded->top_bar_mode == REACH_CONFIG_TOP_BAR_MODE_STATIC);
     failed += expect(loaded->power_sleep_minutes == 21);
     failed += expect(loaded->stage_animation_ms == 345);
-    failed += expect(loaded->stage_motion_experiment == 1);
     failed += expect(loaded->windows_system_theme == REACH_CONFIG_THEME_LIGHT);
     failed += expect(loaded->windows_app_theme == REACH_CONFIG_THEME_DARK);
     failed += expect(loaded->pinned_app_count == 2);
@@ -88,20 +85,6 @@ int main()
     std::memset(loaded.get(), 0, sizeof(*loaded));
     failed += expect(store.ops.load(store.store, loaded.get()) == REACH_OK);
     failed += expect(loaded->pinned_app_count == 1);
-
-    for (int32_t mode = 2; mode <= 3; ++mode)
-    {
-        snapshot->stage_motion_experiment = mode;
-        failed += expect(store.ops.save(store.store, snapshot.get()) == REACH_OK);
-        std::memset(loaded.get(), 0, sizeof(*loaded));
-        failed += expect(store.ops.load(store.store, loaded.get()) == REACH_OK);
-        failed += expect(loaded->stage_motion_experiment == mode);
-    }
-    snapshot->stage_motion_experiment = 4;
-    failed += expect(store.ops.save(store.store, snapshot.get()) == REACH_OK);
-    std::memset(loaded.get(), 0, sizeof(*loaded));
-    failed += expect(store.ops.load(store.store, loaded.get()) == REACH_OK);
-    failed += expect(loaded->stage_motion_experiment == 0);
 
     wchar_t shortcut_path[260] = {};
     wchar_t shortcut_target[260] = {};

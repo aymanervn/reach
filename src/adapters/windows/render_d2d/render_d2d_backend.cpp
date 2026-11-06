@@ -219,8 +219,6 @@ reach_result reach_windows_create_d2d_render_backend(reach_platform_window *wind
     out_port->ops.suspend = reach_d2d_suspend;
     out_port->ops.content_sampling_required = reach_d2d_content_sampling_required;
     out_port->ops.sample_content = reach_d2d_sample_content;
-    // Workaround: temporary Stage v3 A/B switch (stage-v3); delete with the losing path.
-    out_port->ops.solid_fills_composed = reach_d2d_solid_fills_composed;
     out_port->ops.execute = reach_d2d_execute;
     out_port->ops.release_icon = reach_d2d_release_icon_cache_entry;
     out_port->ops.set_ui_font = reach_d2d_set_ui_font;
@@ -228,24 +226,6 @@ reach_result reach_windows_create_d2d_render_backend(reach_platform_window *wind
     out_port->ops.destroy = reach_d2d_destroy;
 
     return REACH_OK;
-}
-
-void reach_windows_render_backend_force_immediate(reach_render_backend_port *port)
-{
-    // Workaround: temporary Stage A/B measurement switch; delete with the experiment.
-    if (port != nullptr && port->backend != nullptr)
-    {
-        port->backend->immediate_only = true;
-    }
-}
-
-// Workaround: temporary Stage v3 A/B switch (stage-v3); delete with the losing path.
-void reach_windows_render_backend_enable_solid_fills(reach_render_backend_port *port)
-{
-    if (port != nullptr && port->backend != nullptr)
-    {
-        port->backend->solid_fills_enabled = true;
-    }
 }
 
 reach_result reach_windows_create_dcomp_render_backend(reach_platform_window *window,
@@ -314,8 +294,6 @@ reach_result reach_windows_create_dcomp_render_backend(reach_platform_window *wi
     out_port->ops.suspend = reach_d2d_suspend;
     out_port->ops.content_sampling_required = reach_d2d_content_sampling_required;
     out_port->ops.sample_content = reach_d2d_sample_content;
-    // Workaround: temporary Stage v3 A/B switch (stage-v3); delete with the losing path.
-    out_port->ops.solid_fills_composed = reach_d2d_solid_fills_composed;
     out_port->ops.execute = reach_d2d_execute;
     out_port->ops.release_icon = reach_d2d_release_icon_cache_entry;
     out_port->ops.set_ui_font = reach_d2d_set_ui_font;
