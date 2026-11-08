@@ -306,19 +306,19 @@ namespace
 {
 HRESULT shadow_filter_context(reach_render_backend *backend)
 {
-    if (backend->shadow_fallback_context &&
-        backend->shadow_fallback_parent_device == backend->device->d2d_device)
+    if (backend->device->shadow_fallback_context &&
+        backend->device->shadow_fallback_parent_device == backend->device->d2d_device)
         return S_OK;
-    backend->shadow_fallback_context.Reset();
-    backend->shadow_fallback_parent_device = nullptr;
+    backend->device->shadow_fallback_context.Reset();
+    backend->device->shadow_fallback_parent_device = nullptr;
     if (backend->device->d2d_device)
     {
         HRESULT hr = backend->device->d2d_device->CreateDeviceContext(
-            D2D1_DEVICE_CONTEXT_OPTIONS_NONE, &backend->shadow_fallback_context);
+            D2D1_DEVICE_CONTEXT_OPTIONS_NONE, &backend->device->shadow_fallback_context);
         if (SUCCEEDED(hr))
         {
-            backend->shadow_fallback_parent_device = backend->device->d2d_device;
-            backend->shadow_fallback_context->SetDpi(96, 96);
+            backend->device->shadow_fallback_parent_device = backend->device->d2d_device;
+            backend->device->shadow_fallback_context->SetDpi(96, 96);
         }
         return hr;
     }
@@ -337,9 +337,9 @@ HRESULT shadow_filter_context(reach_render_backend *backend)
         hr = factory->CreateDevice(dxgi.Get(), &drawing);
     if (SUCCEEDED(hr))
         hr = drawing->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE,
-                                          &backend->shadow_fallback_context);
+                                          &backend->device->shadow_fallback_context);
     if (SUCCEEDED(hr))
-        backend->shadow_fallback_context->SetDpi(96, 96);
+        backend->device->shadow_fallback_context->SetDpi(96, 96);
     return hr;
 }
 
@@ -395,7 +395,8 @@ reach_result reach_d2d_draw_group_shadow(reach_render_backend *backend,
         source_group.clip_uniform_radius = 0;
         source_group.x = source_group.y = source_group.opacity = source_group.scale =
             source_group.scale_y = {};
-        auto *context = backend->shadow_fallback_context.Get();
+        auto *context = backend->device->shadow_fallback_context.Get();
+        reach_d2d_context_scope context_scope(context);
         auto format = D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED);
         ComPtr<ID2D1Bitmap1> source, output, readback;
         auto target_properties = D2D1::BitmapProperties1(D2D1_BITMAP_OPTIONS_TARGET, format);
@@ -403,7 +404,7 @@ reach_result reach_d2d_draw_group_shadow(reach_render_backend *backend,
             context->CreateBitmap({width, height}, nullptr, 0, target_properties, &source));
         winrt::check_hresult(
             context->CreateBitmap({width, height}, nullptr, 0, target_properties, &output));
-        if (!backend->shadow_fallback_parent_device)
+        if (!backend->device->shadow_fallback_parent_device)
             winrt::check_hresult(context->CreateBitmap(
                 {width, height}, nullptr, 0,
                 D2D1::BitmapProperties1(
@@ -449,7 +450,7 @@ reach_result reach_d2d_draw_group_shadow(reach_render_backend *backend,
         hr = context->EndDraw();
         context->SetTarget(nullptr);
         winrt::check_hresult(hr);
-        if (backend->shadow_fallback_parent_device)
+        if (backend->device->shadow_fallback_parent_device)
         {
             reach_workload_add(REACH_WORKLOAD_RASTER_PASSES, 1);
             reach_d2d_target(backend)->DrawBitmap(output.Get(),
@@ -477,8 +478,8 @@ reach_result reach_d2d_draw_group_shadow(reach_render_backend *backend,
     }
     catch (...)
     {
-        backend->shadow_fallback_context.Reset();
-        backend->shadow_fallback_parent_device = nullptr;
+        backend->device->shadow_fallback_context.Reset();
+        backend->device->shadow_fallback_parent_device = nullptr;
         return REACH_ERROR;
     }
 }

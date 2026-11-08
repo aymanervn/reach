@@ -201,6 +201,48 @@ struct reach_render_device
     ComPtr<ABI::Windows::UI::Composition::ICompositionGraphicsDevice> composition_graphics_device;
     uint32_t active_surfaces = 0;
     int ro_initialized = 0;
+
+    std::vector<reach_d2d_icon_cache_entry> icon_cache;
+    std::vector<reach_d2d_cover_entry> cover_cache;
+    std::vector<reach_d2d_shadow_cache_entry> shadow_cache;
+    ComPtr<ID2D1DeviceContext> shadow_bake_context;
+    ComPtr<ID2D1DeviceContext> shadow_fallback_context;
+    ComPtr<ID2D1DeviceContext> cover_bake_context;
+    ID2D1Device *shadow_fallback_parent_device = nullptr;
+    IDWriteFontCollection *bundled_font_collection = nullptr;
+    IDWriteInMemoryFontFileLoader *bundled_font_loader = nullptr;
+    bool bundled_font_attempted = false;
+};
+
+class reach_d2d_context_scope
+{
+  public:
+    explicit reach_d2d_context_scope(ID2D1DeviceContext *value) : context(value)
+    {
+        reset();
+    }
+    ~reach_d2d_context_scope()
+    {
+        reset();
+    }
+    reach_d2d_context_scope(const reach_d2d_context_scope &) = delete;
+    reach_d2d_context_scope &operator=(const reach_d2d_context_scope &) = delete;
+
+  private:
+    void reset()
+    {
+        if (context == nullptr)
+        {
+            return;
+        }
+        context->SetTarget(nullptr);
+        context->SetTransform(D2D1::Matrix3x2F::Identity());
+        context->SetAntialiasMode(D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
+        context->SetPrimitiveBlend(D2D1_PRIMITIVE_BLEND_SOURCE_OVER);
+        context->SetUnitMode(D2D1_UNIT_MODE_DIPS);
+    }
+
+    ID2D1DeviceContext *context;
 };
 
 struct reach_render_backend
@@ -232,8 +274,6 @@ struct reach_render_backend
     reach_transform_f32 scene_content_transform = {};
     bool has_scene_content_transform = false;
     double motion_sample_seconds = 0;
-    ComPtr<ID2D1DeviceContext> shadow_fallback_context;
-    ID2D1Device *shadow_fallback_parent_device = nullptr;
     uint64_t reported_retained_bytes = 0;
     bool requires_content_sampling = false;
     std::vector<reach_d2d_sampled_text> sampled_text;
@@ -261,17 +301,8 @@ struct reach_render_backend
     std::vector<reach_d2d_text_format_entry> text_formats;
     std::vector<reach_d2d_text_layout_entry> text_layouts;
     std::vector<reach_d2d_text_width_entry> text_width_layouts;
-    std::vector<reach_d2d_cover_entry> cover_cache;
     wchar_t ui_font_family[LF_FACESIZE];
-    IDWriteFontCollection *bundled_font_collection;
-    IDWriteInMemoryFontFileLoader *bundled_font_loader;
-    int32_t bundled_font_attempted;
     int32_t use_bundled_font;
-
-    std::vector<reach_d2d_icon_cache_entry> icon_cache;
-
-    ID2D1DeviceContext *shadow_bake_context;
-    std::vector<reach_d2d_shadow_cache_entry> shadow_cache;
 
     UINT target_width;
     UINT target_height;
@@ -311,6 +342,8 @@ void reach_d2d_log_hresult(const wchar_t *context, HRESULT hr);
 void reach_d2d_device_surface_activated(reach_render_backend *backend);
 void reach_d2d_device_surface_deactivated(reach_render_backend *backend);
 void reach_d2d_device_trim_if_idle(reach_render_device *device);
+void reach_d2d_device_release_device_resources(reach_render_device *device);
+void reach_d2d_device_release_fonts(reach_render_device *device);
 
 HRESULT reach_d3d11_create_device(ID3D11Device **out_device, D3D_FEATURE_LEVEL *out_level);
 
@@ -328,7 +361,6 @@ reach_result reach_d2d_begin_frame(reach_render_backend *backend);
 reach_result reach_d2d_end_frame(reach_render_backend *backend);
 reach_result reach_d2d_synchronize(reach_render_backend *backend);
 
-void reach_d2d_clear_icon_cache(reach_render_backend *backend);
 reach_result reach_d2d_image_size(reach_render_backend *backend, uint64_t id,
                                   D2D1_SIZE_F *out_size);
 reach_result reach_d2d_draw_icon(reach_render_backend *backend,
@@ -367,8 +399,6 @@ reach_result reach_d2d_draw_group_shadow(reach_render_backend *backend,
 reach_result reach_d2d_execute_fallback(reach_render_backend *backend,
                                         const reach_render_command_buffer *commands,
                                         double now_seconds);
-void reach_d2d_clear_shadow_cache(reach_render_backend *backend);
-void reach_d2d_release_shadow_bake_context(reach_render_backend *backend);
 reach_result reach_wuc_apply_content_clip(reach_render_backend *backend,
                                           reach_rect_f32 content_rect);
 reach_result reach_d2d_draw_triangle(ID2D1RenderTarget *target,

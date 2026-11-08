@@ -258,6 +258,28 @@ static void test_ungrouped_run_ids_stay_in_the_reserved_range(void)
     expect(runs.size() == 2048 && unique.size() == 2048, "2048 runs get unique ids");
 }
 
+static void test_surface_activation_counts_each_surface_once(void)
+{
+    uint32_t count = 0;
+    bool first = false;
+    bool second = false;
+    reach_d2d_surface_count_activate(&first, &count);
+    reach_d2d_surface_count_activate(&first, &count);
+    expect(count == 1, "activating one surface twice counts it once");
+    reach_d2d_surface_count_activate(&second, &count);
+    expect(count == 2, "a second surface adds one");
+    reach_d2d_surface_count_deactivate(&first, &count);
+    reach_d2d_surface_count_deactivate(&first, &count);
+    expect(count == 1, "deactivating one surface twice removes it once");
+    bool never = false;
+    reach_d2d_surface_count_deactivate(&never, &count);
+    expect(count == 1, "deactivating an inactive surface changes nothing");
+    reach_d2d_surface_count_deactivate(&second, &count);
+    expect(count == 0, "the count returns to zero without underflow");
+    reach_d2d_surface_count_deactivate(&second, &count);
+    expect(count == 0, "the count never underflows");
+}
+
 int main(void)
 {
     test_layer_bytes();
@@ -270,5 +292,6 @@ int main(void)
     test_ungrouped_run_survives_unrelated_insertions();
     test_textbox_runs_split_and_stay_distinct();
     test_ungrouped_run_ids_stay_in_the_reserved_range();
+    test_surface_activation_counts_each_surface_once();
     return failed == 0 ? 0 : 1;
 }

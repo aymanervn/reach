@@ -182,25 +182,6 @@ reach_result reach_d2d_create_corner_geometry(ID2D1RenderTarget *target, D2D1_RE
     return SUCCEEDED(hr) ? REACH_OK : REACH_ERROR;
 }
 
-void reach_d2d_clear_icon_cache(reach_render_backend *backend)
-{
-    if (backend == nullptr)
-    {
-        return;
-    }
-
-    for (reach_d2d_icon_cache_entry &entry : backend->icon_cache)
-    {
-        if (entry.bitmap != nullptr)
-        {
-            entry.bitmap->Release();
-        }
-    }
-
-    backend->icon_cache.clear();
-    backend->cover_cache.clear();
-}
-
 void reach_d2d_release_icon_cache_entry(reach_render_backend *backend, uint64_t icon_id)
 {
     if (backend == nullptr || icon_id == 0)
@@ -215,21 +196,21 @@ void reach_d2d_release_icon_cache_entry(reach_render_backend *backend, uint64_t 
                         { return command.icon_id == icon_id; }))
             layer.commands.clear();
     }
-    backend->cover_cache.erase(std::remove_if(backend->cover_cache.begin(),
-                                              backend->cover_cache.end(),
-                                              [icon_id](const reach_d2d_cover_entry &entry)
-                                              { return entry.icon_id == icon_id; }),
-                               backend->cover_cache.end());
-    for (size_t index = 0; index < backend->icon_cache.size(); ++index)
+    backend->device->cover_cache.erase(std::remove_if(backend->device->cover_cache.begin(),
+                                                      backend->device->cover_cache.end(),
+                                                      [icon_id](const reach_d2d_cover_entry &entry)
+                                                      { return entry.icon_id == icon_id; }),
+                                       backend->device->cover_cache.end());
+    for (size_t index = 0; index < backend->device->icon_cache.size(); ++index)
     {
-        if (backend->icon_cache[index].icon_id == icon_id)
+        if (backend->device->icon_cache[index].icon_id == icon_id)
         {
-            if (backend->icon_cache[index].bitmap != nullptr)
+            if (backend->device->icon_cache[index].bitmap != nullptr)
             {
-                backend->icon_cache[index].bitmap->Release();
+                backend->device->icon_cache[index].bitmap->Release();
             }
 
-            backend->icon_cache.erase(backend->icon_cache.begin() + index);
+            backend->device->icon_cache.erase(backend->device->icon_cache.begin() + index);
             return;
         }
     }
@@ -376,7 +357,7 @@ static reach_result reach_d2d_get_icon_bitmap(reach_render_backend *backend, uin
         return REACH_INVALID_ARGUMENT;
     }
 
-    for (reach_d2d_icon_cache_entry &entry : backend->icon_cache)
+    for (reach_d2d_icon_cache_entry &entry : backend->device->icon_cache)
     {
         if (entry.icon_id == icon_id && entry.bitmap != nullptr)
         {
@@ -395,7 +376,7 @@ static reach_result reach_d2d_get_icon_bitmap(reach_render_backend *backend, uin
 
     try
     {
-        backend->icon_cache.push_back({icon_id, bitmap});
+        backend->device->icon_cache.push_back({icon_id, bitmap});
     }
     catch (...)
     {
@@ -805,24 +786,23 @@ reach_result reach_d2d_draw_blurred_image(reach_render_backend *backend,
     float margin = ceilf(command->blur_radius * 3.0f) + 2.0f;
     UINT width = (UINT)image_width;
     UINT height = (UINT)image_height;
-    for (size_t index = 0; index < backend->cover_cache.size(); ++index)
+    for (size_t index = 0; index < backend->device->cover_cache.size(); ++index)
     {
-        const auto &entry = backend->cover_cache[index];
+        const auto &entry = backend->device->cover_cache[index];
         if (entry.icon_id == command->icon_id && entry.width == width && entry.height == height &&
             entry.crop == command->icon_crop_to_fill && entry.blur == command->blur_radius &&
             entry.contrast == actual_contrast)
         {
-            auto hit = std::move(backend->cover_cache[index]);
+            auto hit = std::move(backend->device->cover_cache[index]);
             processed = hit.bitmap;
-            backend->cover_cache.erase(backend->cover_cache.begin() + index);
-            backend->cover_cache.push_back(std::move(hit));
+            backend->device->cover_cache.erase(backend->device->cover_cache.begin() + index);
+            backend->device->cover_cache.push_back(std::move(hit));
             break;
         }
     }
     ID2D1Effect *color_mat = nullptr;
     ID2D1Effect *transform = nullptr;
     ID2D1Effect *blur = nullptr;
-    ComPtr<ID2D1DeviceContext> bake;
     if (processed == nullptr)
     {
         UINT bake_width = width + (UINT)(margin * 2.0f);
@@ -830,8 +810,15 @@ reach_result reach_d2d_draw_blurred_image(reach_render_backend *backend,
         if (bake_width > 4096 || bake_height > 4096 ||
             (uint64_t)bake_width * bake_height * 4 > 16 * 1024 * 1024)
             return REACH_ERROR;
-        hr = backend->device->d2d_device->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE,
-                                                              &bake);
+        reach_render_device *device = backend->device;
+        hr = S_OK;
+        if (device->cover_bake_context == nullptr)
+            hr = device->d2d_device->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE,
+                                                         &device->cover_bake_context);
+        if (FAILED(hr))
+            return REACH_ERROR;
+        ID2D1DeviceContext *bake = device->cover_bake_context.Get();
+        reach_d2d_context_scope bake_scope(bake);
         D2D1_BITMAP_PROPERTIES1 properties = D2D1::BitmapProperties1(
             D2D1_BITMAP_OPTIONS_TARGET,
             D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED));
@@ -840,7 +827,7 @@ reach_result reach_d2d_draw_blurred_image(reach_render_backend *backend,
                                     &processed);
         if (FAILED(hr))
             return REACH_ERROR;
-        context = bake.Get();
+        context = bake;
         if (actual_contrast != 1.0f)
         {
             hr = context->CreateEffect(CLSID_D2D1ColorMatrix, &color_mat);
@@ -921,21 +908,21 @@ reach_result reach_d2d_draw_blurred_image(reach_render_backend *backend,
         if (SUCCEEDED(hr))
         {
             uint64_t bytes = (uint64_t)bake_width * bake_height * 4;
-            for (const auto &entry : backend->cover_cache)
+            for (const auto &entry : backend->device->cover_cache)
             {
                 D2D1_SIZE_U size = entry.bitmap->GetPixelSize();
                 bytes += (uint64_t)size.width * size.height * 4;
             }
-            while (!backend->cover_cache.empty() &&
-                   (bytes > 16 * 1024 * 1024 || backend->cover_cache.size() >= 24))
+            while (!backend->device->cover_cache.empty() &&
+                   (bytes > 16 * 1024 * 1024 || backend->device->cover_cache.size() >= 24))
             {
-                D2D1_SIZE_U size = backend->cover_cache.front().bitmap->GetPixelSize();
+                D2D1_SIZE_U size = backend->device->cover_cache.front().bitmap->GetPixelSize();
                 bytes -= (uint64_t)size.width * size.height * 4;
-                backend->cover_cache.erase(backend->cover_cache.begin());
+                backend->device->cover_cache.erase(backend->device->cover_cache.begin());
             }
-            backend->cover_cache.push_back({command->icon_id, width, height,
-                                            command->icon_crop_to_fill, command->blur_radius,
-                                            actual_contrast, processed});
+            backend->device->cover_cache.push_back(
+                {command->icon_id, width, height, command->icon_crop_to_fill, command->blur_radius,
+                 actual_contrast, processed});
         }
     }
     context = backend->d2d_context;

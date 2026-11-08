@@ -108,9 +108,7 @@ reach_result reach_d2d_end_frame(reach_render_backend *backend)
 
     if (hr == D2DERR_RECREATE_TARGET)
     {
-        reach_d2d_clear_icon_cache(backend);
-        reach_d2d_clear_shadow_cache(backend);
-        reach_d2d_release_shadow_bake_context(backend);
+        reach_d2d_device_release_device_resources(backend->device);
 
         return REACH_ERROR;
     }

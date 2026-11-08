@@ -10,6 +10,26 @@ static const uint32_t REACH_D2D_SURFACE_MAX_EXTENT = 16384;
 static const uint64_t REACH_D2D_UNGROUPED_RUN_BASE = UINT64_C(0x8000000000000000);
 static const uint64_t REACH_D2D_UNGROUPED_RUN_MASK = UINT64_C(0x3fffffffffffffff);
 
+void reach_d2d_surface_count_activate(bool *surface_active, uint32_t *active_surfaces)
+{
+    if (*surface_active)
+    {
+        return;
+    }
+    *surface_active = true;
+    ++*active_surfaces;
+}
+
+void reach_d2d_surface_count_deactivate(bool *surface_active, uint32_t *active_surfaces)
+{
+    if (!*surface_active)
+    {
+        return;
+    }
+    *surface_active = false;
+    --*active_surfaces;
+}
+
 static uint64_t reach_d2d_splitmix64(uint64_t value)
 {
     value += UINT64_C(0x9e3779b97f4a7c15);
