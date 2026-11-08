@@ -103,20 +103,6 @@ static reach_result reach_windows_activate_application(const reach_app_launch_re
     return SUCCEEDED(hr) ? REACH_OK : REACH_ERROR;
 }
 
-struct reach_default_error_mode_scope
-{
-    UINT previous;
-    reach_default_error_mode_scope() : previous(SetErrorMode(0))
-    {
-    }
-    ~reach_default_error_mode_scope()
-    {
-        SetErrorMode(previous);
-    }
-    reach_default_error_mode_scope(const reach_default_error_mode_scope &) = delete;
-    reach_default_error_mode_scope &operator=(const reach_default_error_mode_scope &) = delete;
-};
-
 static reach_result reach_windows_shell_launch(const wchar_t *verb, const wchar_t *path,
                                                const wchar_t *arguments,
                                                const wchar_t *working_directory,
@@ -138,11 +124,7 @@ static reach_result reach_windows_shell_launch(const wchar_t *verb, const wchar_
     (void)AllowSetForegroundWindow(ASFW_ANY);
 
     HRESULT com_result = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
-    BOOL launched = FALSE;
-    {
-        reach_default_error_mode_scope default_error_mode;
-        launched = ShellExecuteExW(&execute);
-    }
+    BOOL launched = ShellExecuteExW(&execute);
     DWORD error = launched ? ERROR_SUCCESS : GetLastError();
     if (SUCCEEDED(com_result))
     {

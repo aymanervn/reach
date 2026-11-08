@@ -207,7 +207,7 @@ static void reach_crash_dump_resolve_directory(void)
 
 void reach_crash_dump_install(const char *process_name)
 {
-    SetErrorMode(SEM_NOGPFAULTERRORBOX | SEM_FAILCRITICALERRORS);
+    SetThreadErrorMode(SEM_FAILCRITICALERRORS, nullptr);
     WerSetFlags(WER_FAULT_REPORTING_NO_UI);
 
     if (process_name != nullptr && process_name[0] != 0)

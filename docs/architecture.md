@@ -1630,8 +1630,8 @@ Device loss, recovery, adapter switches, watchdog exits and fallback decisions a
 fields needed to correlate them.
 
 `reach_crash_dump_install` runs in `reach.exe` and `reachSetting.exe`. It suppresses the Windows
-error-reporting dialog (`SetErrorMode`, `WerSetFlags`) and installs the unhandled-exception filter,
-the CRT invalid-parameter and pure-call handlers, `std::set_terminate` and a `SIGABRT` handler.
+error-reporting dialog with `WerSetFlags(WER_FAULT_REPORTING_NO_UI)`, which is process-local, so
+launched apps keep the default error mode, and installs the unhandled-exception filter, the CRT invalid-parameter and pure-call handlers, `std::set_terminate` and a `SIGABRT` handler.
 Each handler signals a dump thread created at startup, so a stack overflow is covered because the
 dump is written on the thread's own stack. That thread calls `MiniDumpWriteDump`, logs a `crash`
 line and ends the process with the exception code, which the watchdog treats as an unexpected exit.
