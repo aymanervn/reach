@@ -511,6 +511,7 @@ target_link_libraries(reachctl PRIVATE
 
 add_executable(reachWatchdog WIN32
     src/tools/reach_watchdog/reach_watchdog.cpp
+    src/tools/reach_watchdog/fallback_notice.cpp
     src/adapters/windows/diagnostics_log_win32.cpp
     src/support/diagnostics_log.cpp
     src/support/crash_loop.cpp

@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <cwchar>
 
+#include "fallback_notice.h"
 #include "reach/adapters/windows/diagnostics_log.h"
 #include "reach/support/crash_loop.h"
 #include "reach/support/util.h"
@@ -278,6 +279,17 @@ static void reach_watchdog_log(const char *format, ...)
     reach_log_info(message);
 }
 
+static void reach_watchdog_fall_back(void)
+{
+    int notice_ready = reach_fallback_notice_prepare();
+    reach_watchdog_reset_direct_fallback();
+    reach_watchdog_log("fallback done shell=explorer.exe");
+    if (notice_ready)
+    {
+        reach_fallback_notice_wait();
+    }
+}
+
 static unsigned long long reach_watchdog_filetime_value(const FILETIME &time)
 {
     return ((unsigned long long)time.dwHighDateTime << 32) | time.dwLowDateTime;
@@ -307,7 +319,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
     if (!reach_watchdog_sibling_path(REACH_PROCESS_NAME, reach_path, MAX_PATH))
     {
         reach_watchdog_log("fallback reason=reach_path_unresolved action=explorer");
-        reach_watchdog_reset_direct_fallback();
+        reach_watchdog_fall_back();
         return 1;
     }
 
@@ -356,7 +368,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
                 reach_watchdog_log("wait failed error=%lu action=fallback",
                                    (unsigned long)GetLastError());
                 CloseHandle(reach_process);
-                reach_watchdog_reset_direct_fallback();
+                reach_watchdog_fall_back();
                 return 1;
             }
 
@@ -402,8 +414,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
 
         if (decision.action == REACH_CRASH_LOOP_FALLBACK)
         {
-            reach_watchdog_reset_direct_fallback();
-            reach_watchdog_log("fallback done shell=explorer.exe");
+            reach_watchdog_fall_back();
             return 1;
         }
 
