@@ -92,8 +92,8 @@ static void test_success_clears_the_attempt_state(void)
     reach_render_recovery_succeeded(&recovery);
     expect(reach_render_recovery_step_at(&recovery, 200).action == REACH_RENDER_RECOVERY_IDLE,
            "success returns to idle");
-    reach_render_recovery_begin(&recovery, 10000);
-    reach_render_recovery_step step = reach_render_recovery_step_at(&recovery, 10000);
+    reach_render_recovery_begin(&recovery, 100000);
+    reach_render_recovery_step step = reach_render_recovery_step_at(&recovery, 100000);
     expect(step.action == REACH_RENDER_RECOVERY_ATTEMPT && !step.use_warp,
            "a later loss starts on hardware again");
 }
@@ -123,6 +123,51 @@ static void test_old_losses_expire(void)
            "losses older than a minute no longer count");
 }
 
+static void test_repeated_loss_backs_off_the_first_attempt(void)
+{
+    reach_render_recovery recovery = {};
+    const uint32_t expected[] = {0, 100, 500, 1000, 2000};
+    uint64_t now = 1000;
+    for (size_t index = 0; index < sizeof(expected) / sizeof(expected[0]); ++index)
+    {
+        reach_render_recovery_begin(&recovery, now);
+        reach_render_recovery_step step = reach_render_recovery_step_at(&recovery, now);
+        if (expected[index] == 0)
+        {
+            expect(step.action == REACH_RENDER_RECOVERY_ATTEMPT, "the first loss is immediate");
+        }
+        else
+        {
+            expect(step.action == REACH_RENDER_RECOVERY_WAIT && step.wait_ms == expected[index],
+                   "a re-loss waits the next backoff step before the first attempt");
+            now += expected[index];
+            step = reach_render_recovery_step_at(&recovery, now);
+            expect(step.action == REACH_RENDER_RECOVERY_ATTEMPT && !step.use_warp,
+                   "the delayed first attempt is due on hardware");
+        }
+        reach_render_recovery_succeeded(&recovery);
+    }
+}
+
+static void test_flapping_device_cannot_exhaust_the_budget_instantly(void)
+{
+    reach_render_recovery recovery = {};
+    uint64_t now = 0;
+    int32_t tolerated = 1;
+    for (uint32_t index = 0; index < REACH_RENDER_RECOVERY_LOSS_LIMIT && tolerated; ++index)
+    {
+        tolerated = reach_render_recovery_begin(&recovery, now);
+        reach_render_recovery_step step = reach_render_recovery_step_at(&recovery, now);
+        if (step.action == REACH_RENDER_RECOVERY_WAIT)
+        {
+            now += step.wait_ms;
+        }
+        reach_render_recovery_succeeded(&recovery);
+    }
+    expect(tolerated == 1, "five losses are tolerated");
+    expect(now >= 3600, "five back-to-back losses take at least their accumulated backoff");
+}
+
 static void test_begin_is_idempotent_while_recovering(void)
 {
     reach_render_recovery recovery = {};
@@ -141,6 +186,8 @@ int main(void)
     test_success_clears_the_attempt_state();
     test_loss_rate_limit();
     test_old_losses_expire();
+    test_repeated_loss_backs_off_the_first_attempt();
+    test_flapping_device_cannot_exhaust_the_budget_instantly();
     test_begin_is_idempotent_while_recovering();
     return failed == 0 ? 0 : 1;
 }
