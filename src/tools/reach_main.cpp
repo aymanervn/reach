@@ -147,6 +147,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
             if (message.message == WM_QUIT)
             {
                 running = 0;
+                exit_code = (int)message.wParam;
                 break;
             }
 
@@ -191,8 +192,6 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
             }
         }
     }
-
-    exit_code = (int)message.wParam;
 
     if (app != nullptr)
     {
