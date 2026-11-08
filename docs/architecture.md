@@ -547,9 +547,29 @@ Helpers preflight property ownership before append; validation rejects aliases, 
 and ambiguous bodies before renderer dereference.
 Explicit groups otherwise retain feature-declared ownership. Surfaces
 are bounded to 128 MiB per renderer and 16,384 pixels per dimension. Retired groups are removed
-before replacements are allocated. Processed cover artwork uses a 24-entry, 16 MiB cache, while
-ordinary text and measurement share 32 text formats and 128 layouts with bounded string lengths.
-Font changes, icon retirement, and backend destruction invalidate dependent entries.
+before replacements are allocated. Ordinary text and measurement share 32 text formats and 128
+layouts with bounded string lengths per renderer. Font changes and backend destruction invalidate
+those entries, and icon retirement invalidates dependent retained commands.
+
+Composition owns one `reach_render_device` per process and passes it to every renderer backend; the
+Settings process creates its own for its single surface. The device owns the Direct2D, DirectWrite
+and WIC factories, the D3D11, DXGI and D2D devices, the Windows.UI.Composition compositor and its
+composition graphics device. It also owns the device-bound caches and contexts: icon bitmaps, the
+24-entry, 16 MiB processed cover cache, baked shadow bitmaps, the shadow-bake, shadow-fallback and
+cover-bake device contexts, and the bundled UI font collection. Cache keys are content-based (icon
+id with cover size, crop, blur and contrast; shadow geometry and color) and never name a surface, so
+the caches are process-wide and bounded once for all surfaces. Every shared context restores its
+target, transform, antialias mode, primitive blend and unit mode after each use through
+`reach_d2d_context_scope`. Icon retirement fans out to every renderer, which clears its own retained
+commands while the shared entry is erased idempotently.
+
+Each backend keeps its own window target, visual tree, retained layers and drawing surfaces, main
+device context, swap chain, text caches and 128 MiB surface budget. A surface counts as active on
+its first frame and inactive on suspension or destruction, once each. Suspension releases only
+per-surface state; the device trims Direct2D and DXGI memory only when no surface is active, so
+hiding one surface never evicts resources another still draws with, and trimming never drops the
+shared caches. `reach_d2d_device_release_device_resources` is the single place that drops every
+device-bound cache and context, and device destruction calls it.
 
 The adapter caches ordered retained group identities and parent ownership separately from content
 and motion. Unchanged submissions, raster edits and property retargets keep the native tree intact;
