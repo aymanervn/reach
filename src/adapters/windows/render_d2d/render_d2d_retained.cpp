@@ -1133,6 +1133,7 @@ static HRESULT draw_layer(reach_render_backend *backend, reach_d2d_retained_laye
                 {(float)allocation.width, (float)allocation.height},
                 ABI::Windows::Graphics::DirectX::DirectXPixelFormat_B8G8R8A8UIntNormalized,
                 ABI::Windows::Graphics::DirectX::DirectXAlphaMode_Premultiplied, &layer.surface);
+            (void)reach_d2d_device_check(backend->device, hr, L"CreateDrawingSurface");
             ComPtr<ICompositionSurface> surface;
             ComPtr<ICompositionBrush> base;
             if (SUCCEEDED(hr))
@@ -1154,7 +1155,10 @@ static HRESULT draw_layer(reach_render_backend *backend, reach_d2d_retained_laye
         if (SUCCEEDED(hr))
             hr = layer.surface.As(&interop);
         if (SUCCEEDED(hr))
+        {
             hr = interop->BeginDraw(nullptr, IID_PPV_ARGS(&context), &offset);
+            (void)reach_d2d_device_check(backend->device, hr, L"BeginDraw");
+        }
     }
     else
     {
@@ -1166,11 +1170,15 @@ static HRESULT draw_layer(reach_render_backend *backend, reach_d2d_retained_laye
             hr = backend->dcomp_device->CreateSurface(width, height, DXGI_FORMAT_B8G8R8A8_UNORM,
                                                       DXGI_ALPHA_MODE_PREMULTIPLIED,
                                                       &layer.dcomp_surface);
+            (void)reach_d2d_device_check(backend->device, hr, L"CreateSurface");
             if (SUCCEEDED(hr))
                 hr = layer.dcomp_visual->SetContent(layer.dcomp_surface.Get());
         }
         if (SUCCEEDED(hr))
+        {
             hr = layer.dcomp_surface->BeginDraw(nullptr, IID_PPV_ARGS(&context), &offset);
+            (void)reach_d2d_device_check(backend->device, hr, L"BeginDraw");
+        }
     }
     if (FAILED(hr))
         return hr;
@@ -1182,8 +1190,11 @@ static HRESULT draw_layer(reach_render_backend *backend, reach_d2d_retained_laye
     reach_result result = reach_d2d_execute_commands(backend, commands.data(), commands.size());
     backend->d2d_context = previous;
     HRESULT end_hr = interop != nullptr ? interop->EndDraw() : layer.dcomp_surface->EndDraw();
+    reach_result end_result = reach_d2d_device_check(backend->device, end_hr, L"EndDraw");
     if (result != REACH_OK)
-        return E_FAIL;
+        return result == REACH_DEVICE_LOST || end_result == REACH_DEVICE_LOST
+                   ? DXGI_ERROR_DEVICE_REMOVED
+                   : E_FAIL;
     if (FAILED(end_hr))
         return end_hr;
     layer.width = width;
@@ -1563,7 +1574,7 @@ reach_d2d_sampled_textbox_command(const reach_d2d_sampled_textbox &source, doubl
     return command;
 }
 
-reach_result reach_d2d_sample_content(reach_render_backend *backend)
+static reach_result reach_d2d_sample_content_impl(reach_render_backend *backend)
 {
     if (backend == nullptr || !reach_d2d_retained_supported(backend))
         return REACH_INVALID_ARGUMENT;
@@ -1591,8 +1602,9 @@ reach_result reach_d2d_sample_content(reach_render_backend *backend)
         if (layer->commands.size() != 1 || layer->commands[0].rect.width != command.rect.width)
         {
             std::vector<reach_render_command> commands = {command};
-            if (FAILED(draw_layer(backend, *layer, commands, layer->width, layer->height)))
-                return REACH_ERROR;
+            HRESULT draw_hr = draw_layer(backend, *layer, commands, layer->width, layer->height);
+            if (FAILED(draw_hr))
+                return reach_d2d_device_check(backend->device, draw_hr, L"draw_layer");
         }
         active = active || reach_motion_active_at(&source.width, motion_sample_time(backend));
     }
@@ -1609,8 +1621,9 @@ reach_result reach_d2d_sample_content(reach_render_backend *backend)
             memcmp(&layer->commands[0], &command, sizeof(command)) != 0)
         {
             std::vector<reach_render_command> commands = {command};
-            if (FAILED(draw_layer(backend, *layer, commands, layer->width, layer->height)))
-                return REACH_ERROR;
+            HRESULT draw_hr = draw_layer(backend, *layer, commands, layer->width, layer->height);
+            if (FAILED(draw_hr))
+                return reach_d2d_device_check(backend->device, draw_hr, L"draw_layer");
         }
         active =
             active || reach_d2d_textbox_color_active(source.color, motion_sample_time(backend));
@@ -1628,8 +1641,9 @@ reach_result reach_d2d_sample_content(reach_render_backend *backend)
             memcmp(&layer->commands[0], &command, sizeof(command)) != 0)
         {
             std::vector<reach_render_command> commands = {command};
-            if (FAILED(draw_layer(backend, *layer, commands, layer->width, layer->height)))
-                return REACH_ERROR;
+            HRESULT draw_hr = draw_layer(backend, *layer, commands, layer->width, layer->height);
+            if (FAILED(draw_hr))
+                return reach_d2d_device_check(backend->device, draw_hr, L"draw_layer");
         }
         for (const reach_motion *motion :
              {&source.bounds.x, &source.bounds.y, &source.bounds.width, &source.bounds.height})
@@ -1647,6 +1661,14 @@ reach_result reach_d2d_sample_content(reach_render_backend *backend)
         }
     }
     return result;
+}
+
+reach_result reach_d2d_sample_content(reach_render_backend *backend)
+{
+    if (backend == nullptr)
+        return REACH_INVALID_ARGUMENT;
+    return reach_d2d_device_result(backend->device, reach_d2d_sample_content_impl(backend),
+                                   L"sample_content");
 }
 
 void reach_d2d_clear_retained_layers(reach_render_backend *backend)
@@ -1751,9 +1773,10 @@ static reach_result reach_d2d_fail_presentation(reach_render_backend *backend,
                                                 const wchar_t *operation, HRESULT hr)
 {
     reach_d2d_log_hresult(operation, hr);
-    backend->presentation_result = REACH_ERROR;
+    reach_result result = reach_d2d_device_check(backend->device, hr, operation);
+    backend->presentation_result = result;
     backend->presentation_commit.Reset();
-    return REACH_ERROR;
+    return result;
 }
 
 reach_result reach_d2d_presentation_complete(reach_render_backend *backend, uint64_t generation,
@@ -1901,10 +1924,11 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
     if (FAILED(hr))
     {
         reach_d2d_release_retained(backend);
-        return REACH_ERROR;
+        return reach_d2d_device_check(backend->device, hr, L"create_scene");
     }
-    if (reach_wuc_apply_content_clip(backend, commands->content_rect) != REACH_OK)
-        return REACH_ERROR;
+    reach_result clip_result = reach_wuc_apply_content_clip(backend, commands->content_rect);
+    if (clip_result != REACH_OK)
+        return clip_result;
     const reach_transform_f32 &transform = commands->content_transform;
     const reach_transform_f32 &previous_transform = backend->scene_content_transform;
     bool transform_changed = !backend->has_scene_content_transform ||
@@ -1944,7 +1968,7 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
         }
     }
     if (FAILED(hr))
-        return REACH_ERROR;
+        return reach_d2d_device_check(backend->device, hr, L"scene transform");
     if (transform_changed)
     {
         backend->scene_content_transform = transform;
@@ -2724,7 +2748,7 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
             hr = backend->dcomp_scene_visual->RemoveAllVisuals();
         }
         if (FAILED(hr))
-            return REACH_ERROR;
+            return reach_d2d_device_check(backend->device, hr, L"RemoveAllVisuals");
         for (auto &layer : backend->retained_layers)
         {
             if (layer.has_children)
@@ -2752,7 +2776,7 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
                     hr = (owner ? owner : layer.dcomp_visual.Get())->RemoveAllVisuals();
                 }
                 if (FAILED(hr))
-                    return REACH_ERROR;
+                    return reach_d2d_device_check(backend->device, hr, L"RemoveAllVisuals");
             }
             layer.has_children = false;
         }
@@ -2805,7 +2829,7 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
             hr = sync_layer(backend, *found, plan.group, plan.commands, plan.count, origin,
                             allow_text_snap);
         if (FAILED(hr))
-            return REACH_ERROR;
+            return reach_d2d_device_check(backend->device, hr, L"sync_layer");
     }
     if (topology_changed)
     {
@@ -2857,7 +2881,7 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
                 hr = owner->AddVisual(found->dcomp_container.Get(), FALSE, nullptr);
             }
             if (FAILED(hr))
-                return REACH_ERROR;
+                return reach_d2d_device_check(backend->device, hr, L"AddVisual");
         }
         backend->retained_topology.clear();
         backend->retained_topology.reserve(plans.size());
@@ -2923,7 +2947,7 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
                     backend->presentation_batch.Reset();
                     backend->presentation_completed.reset();
                     backend->submitted_presentation_generation = 0;
-                    return REACH_ERROR;
+                    return reach_d2d_device_check(backend->device, hr, L"presentation batch");
                 }
             }
         }
@@ -2963,5 +2987,5 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
             layer.raster_finite_translation = plan.raster_finite_translation;
         }
     record_retained_bytes(backend);
-    return SUCCEEDED(hr) ? REACH_OK : REACH_ERROR;
+    return reach_d2d_device_check(backend->device, hr, L"sync_retained");
 }

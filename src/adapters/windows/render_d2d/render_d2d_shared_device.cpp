@@ -3,6 +3,101 @@
 #include "render_d2d_internal.h"
 #include "render_d2d_retained_policy.h"
 
+#include "reach/adapters/windows/diagnostics_log.h"
+#include "reach/support/render_device_loss.h"
+
+#include <stdio.h>
+
+static void reach_d2d_device_register_removed_event(reach_render_device *device)
+{
+    device->removed_cookie = 0;
+    if (device->removed_event == nullptr)
+    {
+        device->removed_event = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+    }
+    if (device->removed_event == nullptr || device->d3d_device == nullptr)
+    {
+        return;
+    }
+
+    ComPtr<ID3D11Device4> device4;
+    if (SUCCEEDED(device->d3d_device->QueryInterface(IID_PPV_ARGS(&device4))) &&
+        FAILED(device4->RegisterDeviceRemovedEvent(device->removed_event, &device->removed_cookie)))
+    {
+        device->removed_cookie = 0;
+    }
+}
+
+static void reach_d2d_device_unregister_removed_event(reach_render_device *device)
+{
+    if (device->removed_cookie == 0 || device->d3d_device == nullptr)
+    {
+        return;
+    }
+
+    ComPtr<ID3D11Device4> device4;
+    if (SUCCEEDED(device->d3d_device->QueryInterface(IID_PPV_ARGS(&device4))))
+    {
+        device4->UnregisterDeviceRemoved(device->removed_cookie);
+    }
+    device->removed_cookie = 0;
+}
+
+void *reach_windows_render_device_removed_event(const reach_render_device *device)
+{
+    return device != nullptr ? device->removed_event : nullptr;
+}
+
+reach_result reach_d2d_device_check(reach_render_device *device, HRESULT hr,
+                                    const wchar_t *operation)
+{
+    if (SUCCEEDED(hr))
+    {
+        return REACH_OK;
+    }
+    if (device == nullptr)
+    {
+        return REACH_ERROR;
+    }
+
+    HRESULT reason =
+        device->d3d_device != nullptr ? device->d3d_device->GetDeviceRemovedReason() : S_OK;
+    bool lost = device->lost || FAILED(reason) ||
+                reach_render_classify_hresult((int32_t)hr) == REACH_RENDER_HRESULT_DEVICE_LOST;
+    if (!lost)
+    {
+        return REACH_ERROR;
+    }
+
+    if (!device->lost)
+    {
+        device->lost = true;
+        device->lost_hr = hr;
+        device->lost_reason = reason;
+        device->losses += 1;
+
+        char message[256] = {};
+        sprintf_s(message, "device_lost op=%ls hr=0x%08X reason=0x%08X",
+                  operation != nullptr ? operation : L"unknown", (unsigned)hr, (unsigned)reason);
+        reach_diagnostics_log_write("error", message);
+    }
+    return REACH_DEVICE_LOST;
+}
+
+reach_result reach_d2d_device_result(reach_render_device *device, reach_result result,
+                                     const wchar_t *operation)
+{
+    if (device != nullptr && device->lost)
+    {
+        return REACH_DEVICE_LOST;
+    }
+    if (result == REACH_ERROR)
+    {
+        return reach_d2d_device_check(device, E_FAIL, operation);
+    }
+    return result;
+}
+
 reach_result reach_windows_create_render_device(reach_render_device **out_device)
 {
     REACH_ASSERT(out_device != nullptr);
@@ -42,6 +137,10 @@ reach_result reach_windows_create_render_device(reach_render_device **out_device
     if (SUCCEEDED(hr))
     {
         hr = device->d3d_device->QueryInterface(IID_PPV_ARGS(&device->dxgi_device));
+    }
+    if (SUCCEEDED(hr))
+    {
+        reach_d2d_device_register_removed_event(device);
     }
     if (SUCCEEDED(hr))
     {
@@ -102,6 +201,7 @@ void reach_windows_destroy_render_device(reach_render_device *device)
     reach_d2d_device_release_fonts(device);
     device->composition_graphics_device.Reset();
     device->compositor.Reset();
+    reach_d2d_device_unregister_removed_event(device);
     if (device->d2d_device != nullptr)
     {
         device->d2d_device->Release();
@@ -125,6 +225,10 @@ void reach_windows_destroy_render_device(reach_render_device *device)
     if (device->factory != nullptr)
     {
         device->factory->Release();
+    }
+    if (device->removed_event != nullptr)
+    {
+        CloseHandle(device->removed_event);
     }
     if (device->ro_initialized)
     {

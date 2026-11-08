@@ -31,7 +31,7 @@ reach_result reach_dcomp_create_target_bitmap(reach_render_backend *backend)
         backend->d2d_context->SetTarget(backend->swap_chain_bitmap);
     }
 
-    return SUCCEEDED(hr) ? REACH_OK : REACH_ERROR;
+    return reach_d2d_device_check(backend->device, hr, L"CreateBitmapFromDxgiSurface");
 }
 
 reach_result reach_dcomp_create_swap_chain(reach_render_backend *backend, UINT width, UINT height)
@@ -78,7 +78,7 @@ reach_result reach_dcomp_create_swap_chain(reach_render_backend *backend, UINT w
         adapter->Release();
     }
 
-    return SUCCEEDED(hr) ? REACH_OK : REACH_ERROR;
+    return reach_d2d_device_check(backend->device, hr, L"CreateSwapChainForComposition");
 }
 
 reach_result reach_dcomp_create_target(reach_render_backend *backend)
@@ -146,7 +146,7 @@ reach_result reach_dcomp_create_target(reach_render_backend *backend)
         backend->target_height = height;
     }
 
-    return SUCCEEDED(hr) ? REACH_OK : REACH_ERROR;
+    return reach_d2d_device_check(backend->device, hr, L"dcomp create target");
 }
 
 reach_result reach_dcomp_create_blur_target(reach_render_backend *backend)
