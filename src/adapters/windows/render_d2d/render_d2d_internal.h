@@ -197,6 +197,8 @@ struct reach_render_device
     ID3D11Device *d3d_device = nullptr;
     IDXGIDevice *dxgi_device = nullptr;
     ID2D1Device *d2d_device = nullptr;
+    ComPtr<ABI::Windows::UI::Composition::ICompositor> compositor;
+    ComPtr<ABI::Windows::UI::Composition::ICompositionGraphicsDevice> composition_graphics_device;
     uint32_t active_surfaces = 0;
     int ro_initialized = 0;
 };

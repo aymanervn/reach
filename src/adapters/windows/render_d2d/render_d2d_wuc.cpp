@@ -136,13 +136,15 @@ reach_result reach_wuc_create_target(reach_render_backend *backend)
     }
     if (SUCCEEDED(hr))
     {
-        hr = reach_winrt_activate_compositor(&backend->compositor);
-        static int32_t logged_compositor_activation_failure = 0;
-        if (FAILED(hr) && !logged_compositor_activation_failure)
-        {
-            logged_compositor_activation_failure = 1;
-            reach_d2d_log_hresult(L"RoActivateInstance(Compositor)", hr);
-        }
+        hr = backend->device->compositor != nullptr &&
+                     backend->device->composition_graphics_device != nullptr
+                 ? S_OK
+                 : E_FAIL;
+    }
+    if (SUCCEEDED(hr))
+    {
+        backend->compositor = backend->device->compositor;
+        backend->composition_graphics_device = backend->device->composition_graphics_device;
     }
 
     ComPtr<ABI::Windows::UI::Composition::Desktop::ICompositorDesktopInterop> desktop_interop;
@@ -201,12 +203,6 @@ reach_result reach_wuc_create_target(reach_render_backend *backend)
     if (SUCCEEDED(hr))
     {
         hr = backend->compositor.As(&compositor_interop);
-    }
-    if (SUCCEEDED(hr))
-    {
-        hr = compositor_interop->CreateGraphicsDevice(backend->device->d2d_device,
-                                                      &backend->composition_graphics_device);
-        reach_d2d_log_hresult(L"CreateCompositionGraphicsDevice", hr);
     }
     if (SUCCEEDED(hr))
     {
