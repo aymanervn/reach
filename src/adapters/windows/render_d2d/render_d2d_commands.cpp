@@ -212,7 +212,7 @@ reach_result reach_d2d_push_group_masks(reach_render_backend *backend, ID2D1Rend
             reach_point_f32 radii = reach_render_group_clip_radii_at(group, now_seconds);
             ComPtr<ID2D1RoundedRectangleGeometry> geometry;
             ComPtr<ID2D1Layer> layer;
-            HRESULT hr = backend->factory->CreateRoundedRectangleGeometry(
+            HRESULT hr = backend->device->factory->CreateRoundedRectangleGeometry(
                 D2D1::RoundedRect(
                     D2D1::RectF(clip.x, clip.y, clip.x + clip.width, clip.y + clip.height), radii.x,
                     radii.y),

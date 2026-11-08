@@ -114,6 +114,7 @@ struct reach_settings_app
     reach_settings_app_notify_fn notify;
     void *notify_user;
     reach_platform_window_port window;
+    reach_render_device *render_device;
     reach_render_backend_port renderer;
     int32_t motion_fallback_active;
     reach_monitor_port monitors;
@@ -2764,11 +2765,15 @@ reach_result reach_settings_app_create(reach_settings_app **out_app,
     app->theme = reach_theme_default();
     reach_settings_model_init(&app->model);
 
-    reach_result result =
-        reach_windows_create_platform_window(REACH_SURFACE_SETTINGS, &app->window);
+    reach_result result = reach_windows_create_render_device(&app->render_device);
     if (result == REACH_OK)
     {
-        result = reach_windows_create_dcomp_render_backend(app->window.window, &app->renderer);
+        result = reach_windows_create_platform_window(REACH_SURFACE_SETTINGS, &app->window);
+    }
+    if (result == REACH_OK)
+    {
+        result = reach_windows_create_dcomp_render_backend(app->render_device, app->window.window,
+                                                           &app->renderer);
     }
     if (result == REACH_OK)
     {
@@ -3346,5 +3351,6 @@ void reach_settings_app_destroy(reach_settings_app *app)
     {
         app->window.ops.destroy(app->window.window);
     }
+    reach_windows_destroy_render_device(app->render_device);
     delete app;
 }

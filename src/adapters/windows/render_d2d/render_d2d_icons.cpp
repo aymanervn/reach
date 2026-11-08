@@ -238,7 +238,7 @@ void reach_d2d_release_icon_cache_entry(reach_render_backend *backend, uint64_t 
 static reach_result reach_d2d_create_bitmap_from_hbitmap(reach_render_backend *backend,
                                                          HBITMAP hbitmap, ID2D1Bitmap **out_bitmap)
 {
-    if (backend == nullptr || backend->wic_factory == nullptr || hbitmap == nullptr ||
+    if (backend == nullptr || backend->device->wic_factory == nullptr || hbitmap == nullptr ||
         out_bitmap == nullptr)
     {
         return REACH_INVALID_ARGUMENT;
@@ -253,13 +253,13 @@ static reach_result reach_d2d_create_bitmap_from_hbitmap(reach_render_backend *b
     }
 
     IWICBitmap *wic_bitmap = nullptr;
-    HRESULT hr = backend->wic_factory->CreateBitmapFromHBITMAP(hbitmap, nullptr, WICBitmapUseAlpha,
-                                                               &wic_bitmap);
+    HRESULT hr = backend->device->wic_factory->CreateBitmapFromHBITMAP(
+        hbitmap, nullptr, WICBitmapUseAlpha, &wic_bitmap);
 
     IWICFormatConverter *converter = nullptr;
     if (SUCCEEDED(hr))
     {
-        hr = backend->wic_factory->CreateFormatConverter(&converter);
+        hr = backend->device->wic_factory->CreateFormatConverter(&converter);
     }
 
     if (SUCCEEDED(hr))
@@ -299,7 +299,7 @@ static reach_result reach_d2d_create_icon_bitmap(reach_render_backend *backend, 
     REACH_ASSERT(out_bitmap != nullptr);
 
     ID2D1RenderTarget *target = reach_d2d_target(backend);
-    if (backend == nullptr || target == nullptr || backend->wic_factory == nullptr ||
+    if (backend == nullptr || target == nullptr || backend->device->wic_factory == nullptr ||
         icon_id == 0 || out_bitmap == nullptr)
     {
         return REACH_INVALID_ARGUMENT;
@@ -324,7 +324,7 @@ static reach_result reach_d2d_create_icon_bitmap(reach_render_backend *backend, 
     *out_bitmap = nullptr;
 
     IWICBitmap *wic_bitmap = nullptr;
-    HRESULT hr = backend->wic_factory->CreateBitmapFromHICON(icon->hicon, &wic_bitmap);
+    HRESULT hr = backend->device->wic_factory->CreateBitmapFromHICON(icon->hicon, &wic_bitmap);
 
     if (FAILED(hr))
     {
@@ -332,7 +332,7 @@ static reach_result reach_d2d_create_icon_bitmap(reach_render_backend *backend, 
     }
 
     IWICFormatConverter *converter = nullptr;
-    hr = backend->wic_factory->CreateFormatConverter(&converter);
+    hr = backend->device->wic_factory->CreateFormatConverter(&converter);
 
     if (SUCCEEDED(hr))
     {
