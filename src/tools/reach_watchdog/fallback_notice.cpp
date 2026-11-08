@@ -17,6 +17,7 @@ static const UINT REACH_NOTICE_CALLBACK_MESSAGE = WM_APP + 1;
 static const UINT REACH_NOTICE_ICON_ID = 1;
 static const UINT_PTR REACH_NOTICE_TIMER_ID = 1;
 static const UINT REACH_NOTICE_BOUND_MS = 120000;
+static const DWORD REACH_NOTICE_READY_WAIT_MS = 3000;
 
 static HWND reach_notice_window = nullptr;
 static UINT reach_notice_taskbar_created = 0;
@@ -116,7 +117,6 @@ static void reach_notice_show(HWND window)
         return;
     }
 
-    SetTimer(window, REACH_NOTICE_TIMER_ID, REACH_NOTICE_BOUND_MS, nullptr);
     reach_log_info("notice shown");
 }
 
@@ -160,10 +160,8 @@ static LRESULT CALLBACK reach_notice_proc(HWND window, UINT message, WPARAM wpar
     return DefWindowProcW(window, message, wparam, lparam);
 }
 
-int reach_fallback_notice_prepare(void)
+static int reach_notice_prepare(void)
 {
-    reach_notice_write_pending();
-
     reach_notice_taskbar_created = RegisterWindowMessageW(L"TaskbarCreated");
     if (reach_notice_taskbar_created == 0)
     {
@@ -195,7 +193,7 @@ int reach_fallback_notice_prepare(void)
     return 1;
 }
 
-void reach_fallback_notice_wait(void)
+static void reach_notice_wait(void)
 {
     if (reach_notice_window == nullptr)
     {
@@ -212,4 +210,57 @@ void reach_fallback_notice_wait(void)
     }
 
     reach_notice_window = nullptr;
+}
+
+int reach_fallback_notice_run(void)
+{
+    if (reach_notice_prepare())
+    {
+        reach_notice_wait();
+    }
+
+    return 0;
+}
+
+static int reach_notice_create_child(wchar_t *command_line, DWORD flags,
+                                     PROCESS_INFORMATION *process)
+{
+    STARTUPINFOW startup = {};
+    startup.cb = sizeof(startup);
+    return CreateProcessW(nullptr, command_line, nullptr, nullptr, FALSE, flags, nullptr, nullptr,
+                          &startup, process);
+}
+
+int reach_fallback_notice_launch(void)
+{
+    reach_notice_write_pending();
+
+    wchar_t path[MAX_PATH] = {};
+    DWORD length = GetModuleFileNameW(nullptr, path, MAX_PATH);
+    if (length == 0 || length >= MAX_PATH)
+    {
+        reach_log_error("notice process path unavailable");
+        return 0;
+    }
+
+    wchar_t command_line[MAX_PATH + 32] = {};
+    wsprintfW(command_line, L"\"%ls\" %ls", path, REACH_FALLBACK_NOTICE_ARGUMENT);
+
+    PROCESS_INFORMATION process = {};
+    if (!reach_notice_create_child(command_line, CREATE_BREAKAWAY_FROM_JOB | DETACHED_PROCESS,
+                                   &process))
+    {
+        reach_log_error("notice breakaway launch failed, launching in the current job");
+        wsprintfW(command_line, L"\"%ls\" %ls", path, REACH_FALLBACK_NOTICE_ARGUMENT);
+        if (!reach_notice_create_child(command_line, DETACHED_PROCESS, &process))
+        {
+            reach_log_error("notice process launch failed");
+            return 0;
+        }
+    }
+
+    CloseHandle(process.hThread);
+    WaitForInputIdle(process.hProcess, REACH_NOTICE_READY_WAIT_MS);
+    CloseHandle(process.hProcess);
+    return 1;
 }

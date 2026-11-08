@@ -286,13 +286,9 @@ static void reach_watchdog_log(const char *format, ...)
 
 static void reach_watchdog_fall_back(void)
 {
-    int notice_ready = reach_fallback_notice_prepare();
+    (void)reach_fallback_notice_launch();
     reach_watchdog_reset_direct_fallback();
     reach_watchdog_log("fallback done shell=explorer.exe");
-    if (notice_ready)
-    {
-        reach_fallback_notice_wait();
-    }
 }
 
 static unsigned long long reach_watchdog_filetime_value(const FILETIME &time)
@@ -316,8 +312,14 @@ static unsigned long long reach_watchdog_uptime_seconds(HANDLE process)
     return end > start ? (end - start) / 10000000ull : 0;
 }
 
-int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
+int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR command_line, int)
 {
+    if (command_line != nullptr && wcsstr(command_line, REACH_FALLBACK_NOTICE_ARGUMENT) != nullptr)
+    {
+        reach_diagnostics_log_install("watchdog-notice");
+        return reach_fallback_notice_run();
+    }
+
     reach_diagnostics_log_install("watchdog");
 
     wchar_t reach_path[MAX_PATH] = {};
