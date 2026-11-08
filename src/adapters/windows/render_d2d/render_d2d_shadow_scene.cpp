@@ -307,17 +307,17 @@ namespace
 HRESULT shadow_filter_context(reach_render_backend *backend)
 {
     if (backend->shadow_fallback_context &&
-        backend->shadow_fallback_parent_device == backend->d2d_device)
+        backend->shadow_fallback_parent_device == backend->device->d2d_device)
         return S_OK;
     backend->shadow_fallback_context.Reset();
     backend->shadow_fallback_parent_device = nullptr;
-    if (backend->d2d_device)
+    if (backend->device->d2d_device)
     {
-        HRESULT hr = backend->d2d_device->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE,
-                                                              &backend->shadow_fallback_context);
+        HRESULT hr = backend->device->d2d_device->CreateDeviceContext(
+            D2D1_DEVICE_CONTEXT_OPTIONS_NONE, &backend->shadow_fallback_context);
         if (SUCCEEDED(hr))
         {
-            backend->shadow_fallback_parent_device = backend->d2d_device;
+            backend->shadow_fallback_parent_device = backend->device->d2d_device;
             backend->shadow_fallback_context->SetDpi(96, 96);
         }
         return hr;

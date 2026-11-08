@@ -1729,26 +1729,6 @@ void reach_d2d_release_retained(reach_render_backend *backend)
     backend->has_scene_presentation = 0;
 }
 
-static void trim_devices(reach_render_backend *backend)
-{
-    if (backend->d2d_device != nullptr)
-        (void)backend->d2d_device->ClearResources(0);
-    if (backend->d3d_device != nullptr)
-    {
-        ComPtr<ID3D11DeviceContext> immediate;
-        backend->d3d_device->GetImmediateContext(&immediate);
-        if (immediate != nullptr)
-        {
-            immediate->ClearState();
-            immediate->Flush();
-        }
-    }
-    ComPtr<IDXGIDevice3> dxgi_device;
-    if (backend->dxgi_device != nullptr &&
-        SUCCEEDED(backend->dxgi_device->QueryInterface(IID_PPV_ARGS(&dxgi_device))))
-        dxgi_device->Trim();
-}
-
 void reach_d2d_suspend(reach_render_backend *backend)
 {
     if (backend != nullptr)
@@ -1762,8 +1742,9 @@ void reach_d2d_suspend(reach_render_backend *backend)
         reach_workload_add(REACH_WORKLOAD_DCOMP_COMMITS, 1);
         (void)backend->dcomp_device->Commit();
     }
+    reach_d2d_device_surface_deactivated(backend);
     if (retained)
-        trim_devices(backend);
+        reach_d2d_device_trim_if_idle(backend->device);
 }
 
 static reach_result reach_d2d_fail_presentation(reach_render_backend *backend,
