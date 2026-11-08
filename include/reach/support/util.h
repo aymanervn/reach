@@ -20,6 +20,9 @@ extern "C"
 
 #define REACH_ASSERT(expr) assert(expr)
 
+    typedef void (*reach_log_sink)(const char *level, const char *message);
+
+    void reach_log_set_sink(reach_log_sink sink);
     void reach_log_info(const char *message);
     void reach_log_error(const char *message);
     size_t reach_strlen_utf16(const uint16_t *text);

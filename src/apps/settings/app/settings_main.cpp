@@ -9,6 +9,7 @@
 #include "settings_app.h"
 #include "reach/core/frame_clock.h"
 #include "reach/support/workload.h"
+#include "reach/adapters/windows/diagnostics_log.h"
 #include "reach/adapters/windows/frame_wait.h"
 
 #include "reach/protocol/reach_service_protocol.h"
@@ -141,6 +142,8 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
     (void)previous_instance;
     (void)command_line;
     (void)show_command;
+
+    reach_diagnostics_log_install("settings");
 
     HANDLE shell_mutex = OpenMutexW(SYNCHRONIZE, FALSE, REACH_SHELL_INSTANCE_MUTEX);
     if (shell_mutex == nullptr)

@@ -4,6 +4,8 @@
 
 #include <cwchar>
 
+#include "reach/adapters/windows/diagnostics_log.h"
+
 static const wchar_t *REACH_PROCESS_NAME = L"reach.exe";
 static const int REACH_MAX_FAILED_STARTS = 3;
 static const DWORD REACH_STARTUP_GRACE_MS = 5000;
@@ -267,6 +269,8 @@ static void reach_watchdog_reset_direct_fallback(void)
 
 int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
 {
+    reach_diagnostics_log_install("watchdog");
+
     wchar_t reach_path[MAX_PATH] = {};
     if (!reach_watchdog_sibling_path(REACH_PROCESS_NAME, reach_path, MAX_PATH))
     {
