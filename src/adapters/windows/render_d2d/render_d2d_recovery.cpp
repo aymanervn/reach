@@ -12,6 +12,28 @@ static const char *reach_d2d_adapter_name(bool warp)
     return warp ? "warp" : "hardware";
 }
 
+static void reach_d2d_adapter_description(ID3D11Device *d3d_device, char *out, size_t capacity)
+{
+    out[0] = 0;
+    IDXGIDevice *dxgi_device = nullptr;
+    IDXGIAdapter *adapter = nullptr;
+    if (d3d_device != nullptr && SUCCEEDED(d3d_device->QueryInterface(IID_PPV_ARGS(&dxgi_device))))
+    {
+        if (SUCCEEDED(dxgi_device->GetAdapter(&adapter)))
+        {
+            DXGI_ADAPTER_DESC desc = {};
+            if (SUCCEEDED(adapter->GetDesc(&desc)))
+            {
+                WideCharToMultiByte(CP_UTF8, 0, desc.Description, -1, out, (int)capacity, nullptr,
+                                    nullptr);
+                out[capacity - 1] = 0;
+            }
+            adapter->Release();
+        }
+        dxgi_device->Release();
+    }
+}
+
 static reach_result reach_d2d_device_rebuild(reach_render_device *device, bool warp,
                                              HRESULT *out_hr)
 {
@@ -140,11 +162,16 @@ static reach_result reach_d2d_port_recover(reach_render_device *device)
                 uint64_t switch_start = GetTickCount64();
                 HRESULT switch_hr = S_OK;
                 bool switched = reach_d2d_device_rebuild(device, false, &switch_hr) == REACH_OK;
-                char message[128] = {};
+                char adapter_description[128] = {};
+                reach_d2d_adapter_description(device->d3d_device, adapter_description,
+                                              sizeof(adapter_description));
+                char message[256] = {};
                 sprintf_s(message,
-                          "device_adapter_switch from=warp to=hardware reason=%s ok=%d ms=%llu",
+                          "device_adapter_switch from=warp to=hardware reason=%s ok=%d ms=%llu "
+                          "adapter_description=\"%s\"",
                           reach_d2d_hint_name(hint), switched ? 1 : 0,
-                          (unsigned long long)(GetTickCount64() - switch_start));
+                          (unsigned long long)(GetTickCount64() - switch_start),
+                          adapter_description);
                 reach_diagnostics_log_write("info", message);
             }
             return REACH_OK;
