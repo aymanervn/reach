@@ -115,6 +115,7 @@ static void reach_platform_window_unregister_taskman(reach_platform_window *wind
 static void reach_platform_window_register_session_notification(reach_platform_window *window)
 {
     if (window != nullptr && window->hwnd != nullptr &&
+        (window->role == REACH_SURFACE_DOCK || window->role == REACH_SURFACE_SETTINGS) &&
         WTSRegisterSessionNotification(window->hwnd, NOTIFY_FOR_THIS_SESSION))
     {
         window->session_notification_registered = 1;
