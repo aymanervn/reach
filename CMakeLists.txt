@@ -44,6 +44,7 @@ add_library(reach_support STATIC
     src/support/util.cpp
     src/support/diagnostics_log.cpp
     src/support/crash_loop.cpp
+    src/support/crash_dump_prune.cpp
     src/support/render_device_loss.cpp
     src/support/render_recovery.cpp
     src/support/animation.cpp
@@ -198,6 +199,8 @@ target_link_libraries(reach_features PUBLIC
 
 add_library(reach_windows_adapters STATIC
     src/adapters/windows/clipboard_win32.cpp
+    src/adapters/windows/crash_dump_prune_win32.cpp
+    src/adapters/windows/crash_dump_win32.cpp
     src/adapters/windows/diagnostics_log_win32.cpp
     src/adapters/windows/install_check_win32.cpp
     src/adapters/windows/window_win32.cpp
@@ -308,6 +311,7 @@ target_link_libraries(reach_windows_adapters PRIVATE
     wbemuuid
     Wuguid
     winhttp
+    wer
 )
 
 add_library(reach_composition STATIC
@@ -516,7 +520,9 @@ target_link_libraries(reachctl PRIVATE
 add_executable(reachWatchdog WIN32
     src/tools/reach_watchdog/reach_watchdog.cpp
     src/tools/reach_watchdog/fallback_notice.cpp
+    src/adapters/windows/crash_dump_prune_win32.cpp
     src/adapters/windows/diagnostics_log_win32.cpp
+    src/support/crash_dump_prune.cpp
     src/support/diagnostics_log.cpp
     src/support/crash_loop.cpp
     src/support/util.cpp
@@ -776,6 +782,18 @@ target_compile_features(reach_crash_loop_tests PRIVATE
     cxx_std_17
 )
 target_link_libraries(reach_crash_loop_tests PRIVATE
+    reach_support
+)
+
+add_executable(reach_crash_dump_prune_tests
+    tests/crash_dump_prune_tests.cpp
+)
+
+reach_configure_common(reach_crash_dump_prune_tests)
+target_compile_features(reach_crash_dump_prune_tests PRIVATE
+    cxx_std_17
+)
+target_link_libraries(reach_crash_dump_prune_tests PRIVATE
     reach_support
 )
 
@@ -1215,6 +1233,7 @@ target_compile_features(reach_system_controls_network_tests PRIVATE
     add_test(NAME reach_util_tests COMMAND reach_util_tests)
     add_test(NAME reach_diagnostics_log_tests COMMAND reach_diagnostics_log_tests)
     add_test(NAME reach_crash_loop_tests COMMAND reach_crash_loop_tests)
+    add_test(NAME reach_crash_dump_prune_tests COMMAND reach_crash_dump_prune_tests)
     add_test(NAME reach_render_device_loss_tests COMMAND reach_render_device_loss_tests)
     add_test(NAME reach_render_recovery_tests COMMAND reach_render_recovery_tests)
     add_test(NAME reach_shell_registration_tests COMMAND reach_shell_registration_tests)

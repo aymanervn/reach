@@ -5,6 +5,7 @@
 #include "reach/composition/composition_root.h"
 #include "reach/core/frame_clock.h"
 #include "reach/support/workload.h"
+#include "reach/adapters/windows/crash_dump.h"
 #include "reach/adapters/windows/diagnostics_log.h"
 #include "reach/adapters/windows/frame_wait.h"
 #include "reach/adapters/windows/install_check.h"
@@ -58,6 +59,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
     (void)show_command;
 
     reach_diagnostics_log_install("reach");
+    reach_crash_dump_install("reach");
 
     int argc = 0;
     wchar_t **argv = CommandLineToArgvW(GetCommandLineW(), &argc);

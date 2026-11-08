@@ -7,6 +7,7 @@
 #include <cwchar>
 
 #include "fallback_notice.h"
+#include "reach/adapters/windows/crash_dump.h"
 #include "reach/adapters/windows/diagnostics_log.h"
 #include "reach/support/crash_loop.h"
 #include "reach/support/util.h"
@@ -321,6 +322,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR command_line, int)
     }
 
     reach_diagnostics_log_install("watchdog");
+    reach_crash_dump_prune();
 
     wchar_t reach_path[MAX_PATH] = {};
     if (!reach_watchdog_sibling_path(REACH_PROCESS_NAME, reach_path, MAX_PATH))
