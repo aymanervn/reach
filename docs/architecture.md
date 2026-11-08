@@ -592,9 +592,9 @@ such as the Microsoft Basic Render Driver) or after the full 30 s hardware windo
 exits with code 3 (`REACH_EXIT_DEVICE_LOST`), which the watchdog treats as an unexpected exit, only
 when WARP also fails or more than five losses occur within 60 s. While WARP is active, `recover`
 rebuilds back on the hardware adapter at the first adapters-changed, display-change, resume or
-session-unlock event once the device is healthy; nothing polls. Windows that receive these
-messages register for session notifications with `WTSRegisterSessionNotification`, and the switch
-reason and timing are logged as `device_adapter_switch`.
+session-unlock event once the device is healthy; nothing polls. Only the dock window and the
+Settings window register for session notifications with `WTSRegisterSessionNotification`, and the
+switch reason, timing and `adapter_description` are logged as `device_adapter_switch`.
 
 The adapter caches ordered retained group identities and parent ownership separately from content
 and motion. Unchanged submissions, raster edits and property retargets keep the native tree intact;
@@ -1629,9 +1629,14 @@ are serialized by a named mutex, the log rotates at 512 KB and keeps two generat
 Device loss, recovery, adapter switches, watchdog exits and fallback decisions are logged with the
 fields needed to correlate them.
 
-`reach_crash_dump_install` runs in `reach.exe` and `reachSetting.exe`. It suppresses the Windows
-error-reporting dialog with `WerSetFlags(WER_FAULT_REPORTING_NO_UI)`, which is process-local, so
-launched apps keep the default error mode, and installs the unhandled-exception filter, the CRT invalid-parameter and pure-call handlers, `std::set_terminate` and a `SIGABRT` handler.
+`reach_crash_dump_install` runs in `reach.exe` and `reachSetting.exe`. It sets the process-wide
+error mode once at startup to `SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX`, so no thread shows
+a critical-error or error-reporting box; `ShellExecuteEx` launches do not inherit it. It also
+suppresses the Windows error-reporting dialog with `WerSetFlags(WER_FAULT_REPORTING_NO_UI)`, sets
+`_set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT)` so `abort` shows no message box, and
+in Debug builds routes CRT assert and error reports to the debugger. It installs the
+unhandled-exception filter, the CRT invalid-parameter and pure-call handlers, `std::set_terminate`
+and a `SIGABRT` handler.
 Each handler signals a dump thread created at startup, so a stack overflow is covered because the
 dump is written on the thread's own stack. That thread calls `MiniDumpWriteDump`, logs a `crash`
 line and ends the process with the exception code, which the watchdog treats as an unexpected exit.
