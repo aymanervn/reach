@@ -571,6 +571,23 @@ hiding one surface never evicts resources another still draws with, and trimming
 shared caches. `reach_d2d_device_release_device_resources` is the single place that drops every
 device-bound cache and context, and device destruction calls it.
 
+Device loss is recovered in process. Every failing Direct2D, DXGI or composition call is classified
+(`reach_render_classify_hresult`) and a device-loss failure surfaces as `REACH_DEVICE_LOST` instead
+of a generic error; the shared device also registers a device-removed event. The
+`reach_render_device_port` in `include/reach/ports/render_device.h` exposes `status`, `recover`, the
+event `wait_handle` and `diagnostics`. While the device is lost the Reach and Settings message loops
+skip frames, wait on that handle and the retry deadline, and call `recover`, which rebuilds the
+D3D11, DXGI and D2D devices, the compositor graphics device and every device-bound cache. Each
+renderer backend compares its device generation with the device's before drawing and resets its
+per-surface state when it changed, and retained content is invalidated so the next frame redraws
+everything. Retry timing is the pure policy
+in `include/reach/support/render_recovery.h`: backoff of 0, 100, 500, 1000, 2000 and 4000 ms, a
+switch to the WARP software adapter after two failed hardware attempts, a 30 s recovery deadline,
+and a limit of five losses per 60 s. Recovery that exceeds the deadline or the loss rate returns a
+hard failure and the process exits with code 3 (`REACH_EXIT_DEVICE_LOST`), which the watchdog
+treats as an unexpected exit. While WARP is active, `recover` rebuilds back on the
+hardware adapter once the device is healthy and the adapter becomes available again.
+
 The adapter caches ordered retained group identities and parent ownership separately from content
 and motion. Unchanged submissions, raster edits and property retargets keep the native tree intact;
 membership, painter order, parent ownership or font-source replacement rebuild it. A rebuild is
@@ -1579,6 +1596,47 @@ PackageDeploymentManager and Reach does not deploy that runtime.
 
 The executables — reach shell, Reach Service, watchdog, reachctl, update helper,
 elevation helper, probes. Each includes what it needs.
+
+### Watchdog and crash-loop policy
+
+`reachWatchdog.exe` starts `reach.exe --launch` and waits on it. Exit code 0 is intentional and is
+never restarted (an exit-0 loser of the single-instance mutex re-attaches to the surviving Reach).
+Any other exit, including a failed start, is an unexpected exit and goes through one policy in
+`include/reach/support/crash_loop.h` regardless of uptime: the first is restarted immediately, the
+second after one second, and a third within a three-minute window triggers the permanent fallback.
+The fallback launches a detached notice child, sets the HKCU Winlogon shell to `explorer.exe`,
+terminates Reach and starts Explorer. The notice child waits for Explorer's taskbar, shows a
+tray balloon that Reach failed and was replaced by Windows Explorer, and records
+`diagnostics/notice.pending`. The fallback is permanent: a crash loop means the system is not
+compatible with the installed build. `reach.exe --launch` run directly while Reach is not
+installed as the shell (`reach_windows_reach_is_installed`) shows a dialog asking the user to
+install Reach first and exits 0, which is not a crash.
+
+### Diagnostics
+
+Every Reach process writes one-line UTF-8 events to `%LOCALAPPDATA%/Reach/diagnostics/events.log`
+through the sink installed by `reach_diagnostics_log_install`; `reach_log_*` routes to it. Appends
+are serialized by a named mutex, the log rotates at 512 KB and keeps two generations
+(`reach_log_rotation_steps`), and Reach, Settings and the watchdog all write to the same file.
+Device loss, recovery, adapter switches, watchdog exits and fallback decisions are logged with the
+fields needed to correlate them.
+
+`reach_crash_dump_install` runs in `reach.exe` and `reachSetting.exe`. It suppresses the Windows
+error-reporting dialog (`SetErrorMode`, `WerSetFlags`) and installs the unhandled-exception filter,
+the CRT invalid-parameter and pure-call handlers, `std::set_terminate` and a `SIGABRT` handler.
+Each handler signals a dump thread created at startup, so a stack overflow is covered because the
+dump is written on the thread's own stack. That thread calls `MiniDumpWriteDump`, logs a `crash`
+line and ends the process with the exception code, which the watchdog treats as an unexpected exit.
+Dumps are `diagnostics/dumps/<process>-YYYYMMDD-HHMMSS-<pid>.dmp`. The watchdog prunes them when it
+starts (`reach_crash_dump_prune_select`): the newest five, within 50 MB in total. Fail-fast
+terminations (`0xC0000409` raised directly) and heap corruption bypass these handlers and leave only
+the watchdog's exit line. No registry state is involved.
+
+The Update page of the Settings app shows a quiet Diagnostics row: the event count and first date,
+the last device recovery, and an action that opens the diagnostics folder. The log is read once when
+the page is entered (`reach_diagnostics_read_log`, bounded to the log's size limit and summarized by
+`reach_diagnostics_summarize`). If `notice.pending` exists, the page also shows that Reach fell back
+to Windows Explorer and deletes the file after the first frame that displayed it.
 
 ## apps
 
