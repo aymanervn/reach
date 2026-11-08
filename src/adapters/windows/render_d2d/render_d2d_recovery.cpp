@@ -3,6 +3,7 @@
 #include "render_d2d_internal.h"
 
 #include "reach/adapters/windows/diagnostics_log.h"
+#include "reach/support/render_device_loss.h"
 
 #include <stdio.h>
 
@@ -19,8 +20,7 @@ static reach_result reach_d2d_device_rebuild(reach_render_device *device, bool w
     ID2D1Device *d2d_device = nullptr;
     D3D_FEATURE_LEVEL level = D3D_FEATURE_LEVEL_11_0;
 
-    HRESULT hr = reach_d3d11_create_device(warp ? D3D_DRIVER_TYPE_WARP : D3D_DRIVER_TYPE_HARDWARE,
-                                           &d3d_device, &level);
+    HRESULT hr = reach_d3d11_create_adapter_device(warp, &d3d_device, &level);
     if (SUCCEEDED(hr))
     {
         hr = d3d_device->QueryInterface(IID_PPV_ARGS(&dxgi_device));
@@ -78,11 +78,26 @@ static void reach_d2d_recovery_log(const char *level, const char *event,
                                    bool warp)
 {
     char message[256] = {};
-    sprintf_s(message, "%s losses=%u recoveries=%u ms=%llu adapter=%s gen=%llu", event,
+    sprintf_s(message, "%s losses=%u recoveries=%u attempts=%u ms=%llu adapter=%s gen=%llu", event,
               (unsigned)device->losses, (unsigned)device->recoveries,
-              (unsigned long long)elapsed_ms, reach_d2d_adapter_name(warp),
-              (unsigned long long)device->generation);
+              (unsigned)device->recovery.failed_attempts, (unsigned long long)elapsed_ms,
+              reach_d2d_adapter_name(warp), (unsigned long long)device->generation);
     reach_diagnostics_log_write(level, message);
+}
+
+static const char *reach_d2d_hint_name(reach_render_device_hint hint)
+{
+    switch (hint)
+    {
+    case REACH_RENDER_DEVICE_HINT_DISPLAY:
+        return "display";
+    case REACH_RENDER_DEVICE_HINT_RESUME:
+        return "resume";
+    case REACH_RENDER_DEVICE_HINT_UNLOCK:
+        return "unlock";
+    default:
+        return "adapters";
+    }
 }
 
 static reach_render_device_status reach_d2d_port_status(reach_render_device *device)
@@ -112,6 +127,7 @@ static reach_result reach_d2d_port_recover(reach_render_device *device)
         return REACH_INVALID_ARGUMENT;
     }
 
+    reach_render_device_hint hint = reach_d2d_device_take_hint();
     if (!device->lost)
     {
         HRESULT reason =
@@ -121,11 +137,14 @@ static reach_result reach_d2d_port_recover(reach_render_device *device)
             if (reach_render_recovery_should_leave_warp(device->warp_active, device->lost,
                                                         device->recovery.recovering))
             {
+                uint64_t switch_start = GetTickCount64();
                 HRESULT switch_hr = S_OK;
                 bool switched = reach_d2d_device_rebuild(device, false, &switch_hr) == REACH_OK;
-                char message[96] = {};
-                sprintf_s(message, "device_adapter_switch from=warp to=hardware ok=%d",
-                          switched ? 1 : 0);
+                char message[128] = {};
+                sprintf_s(message,
+                          "device_adapter_switch from=warp to=hardware reason=%s ok=%d ms=%llu",
+                          reach_d2d_hint_name(hint), switched ? 1 : 0,
+                          (unsigned long long)(GetTickCount64() - switch_start));
                 reach_diagnostics_log_write("info", message);
             }
             return REACH_OK;
@@ -140,12 +159,16 @@ static reach_result reach_d2d_port_recover(reach_render_device *device)
                                device->warp_active);
         return REACH_ERROR;
     }
+    if (hint != REACH_RENDER_DEVICE_HINT_NONE)
+    {
+        reach_render_recovery_attempt_now(&device->recovery, now);
+    }
 
     reach_render_recovery_step step = reach_render_recovery_step_at(&device->recovery, now);
     if (step.action == REACH_RENDER_RECOVERY_GIVE_UP)
     {
-        reach_d2d_recovery_log("error", "device_recovery_gave_up reason=timeout", device,
-                               now - device->recovery.started_ms, device->warp_active);
+        reach_d2d_recovery_log("error", "device_recovery_gave_up reason=warp_failed", device,
+                               now - device->recovery.started_ms, true);
         return REACH_ERROR;
     }
     if (step.action != REACH_RENDER_RECOVERY_ATTEMPT)
@@ -155,9 +178,22 @@ static reach_result reach_d2d_port_recover(reach_render_device *device)
 
     HRESULT hr = S_OK;
     bool warp = step.use_warp != 0;
+    if (warp)
+    {
+        char message[128] = {};
+        sprintf_s(message, "device_warp_selected reason=%s attempts=%u ms=%llu",
+                  device->recovery.hardware_unusable ? "no_hardware" : "hardware_timeout",
+                  (unsigned)device->recovery.failed_attempts,
+                  (unsigned long long)(now - device->recovery.started_ms));
+        reach_diagnostics_log_write("warn", message);
+    }
     if (reach_d2d_device_rebuild(device, warp, &hr) != REACH_OK)
     {
         reach_render_recovery_attempt_failed(&device->recovery, now, warp);
+        if (!warp && reach_render_hardware_unavailable_hresult((int32_t)hr))
+        {
+            reach_render_recovery_hardware_unusable(&device->recovery, now);
+        }
         char message[128] = {};
         sprintf_s(message, "device_recovery_failed attempt=%u hr=0x%08X adapter=%s",
                   (unsigned)device->recovery.failed_attempts, (unsigned)hr,

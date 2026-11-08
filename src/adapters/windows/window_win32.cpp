@@ -6,6 +6,7 @@
 #include <dbt.h>
 #include <windows.h>
 #include <windowsx.h>
+#include <wtsapi32.h>
 
 #include <new>
 #include <wchar.h>
@@ -27,6 +28,7 @@ struct reach_platform_window
     int pointer_move_enabled;
     int suppress_capture_changed;
     int shell_hook_registered;
+    int session_notification_registered;
     reach_rect_f32 input_regions[REACH_PLATFORM_WINDOW_MAX_INPUT_REGIONS];
     size_t input_region_count;
     int input_regions_active;
@@ -108,6 +110,26 @@ static void reach_platform_window_unregister_taskman(reach_platform_window *wind
 
     (void)DeregisterShellHookWindow(window->hwnd);
     window->shell_hook_registered = 0;
+}
+
+static void reach_platform_window_register_session_notification(reach_platform_window *window)
+{
+    if (window != nullptr && window->hwnd != nullptr &&
+        WTSRegisterSessionNotification(window->hwnd, NOTIFY_FOR_THIS_SESSION))
+    {
+        window->session_notification_registered = 1;
+    }
+}
+
+static void reach_platform_window_unregister_session_notification(reach_platform_window *window)
+{
+    if (window == nullptr || window->hwnd == nullptr || !window->session_notification_registered)
+    {
+        return;
+    }
+
+    (void)WTSUnRegisterSessionNotification(window->hwnd);
+    window->session_notification_registered = 0;
 }
 
 static int32_t reach_platform_window_queue_event(reach_platform_window *window,
@@ -331,6 +353,7 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
         }
         return 0;
     case WM_DISPLAYCHANGE:
+        reach_windows_render_device_hint(REACH_RENDER_DEVICE_HINT_DISPLAY);
         reach_windows_request_desktop_environment_sync();
 
         if (window != nullptr)
@@ -357,7 +380,18 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
         }
         return 0;
     }
+    case WM_WTSSESSION_CHANGE:
+        if (wparam == WTS_SESSION_UNLOCK)
+        {
+            reach_windows_render_device_hint(REACH_RENDER_DEVICE_HINT_UNLOCK);
+        }
+        return 0;
     case WM_POWERBROADCAST:
+        if (wparam == PBT_APMRESUMEAUTOMATIC || wparam == PBT_APMRESUMESUSPEND ||
+            wparam == PBT_APMRESUMECRITICAL)
+        {
+            reach_windows_render_device_hint(REACH_RENDER_DEVICE_HINT_RESUME);
+        }
         reach_windows_request_desktop_environment_sync();
         if (window != nullptr &&
             (wparam == PBT_APMRESUMEAUTOMATIC || wparam == PBT_APMRESUMESUSPEND ||
@@ -1222,6 +1256,7 @@ static void reach_platform_window_destroy(reach_platform_window *window)
     if (window->hwnd != nullptr)
     {
         reach_platform_window_unregister_taskman(window);
+        reach_platform_window_unregister_session_notification(window);
         reach_platform_window_release_capture(window->hwnd);
         DestroyWindow(window->hwnd);
         window->hwnd = nullptr;
@@ -1273,6 +1308,7 @@ reach_result reach_windows_create_platform_window(reach_surface_role role,
         SendMessageW(window->hwnd, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(small_icon));
     }
     SetWindowLongPtrW(window->hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(window));
+    reach_platform_window_register_session_notification(window);
     if (role == REACH_SURFACE_DOCK)
     {
         reach_platform_window_register_taskman(window);

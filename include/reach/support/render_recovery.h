@@ -9,8 +9,12 @@ extern "C"
 #endif
 
 #define REACH_RENDER_RECOVERY_BACKOFF_COUNT 6u
-#define REACH_RENDER_RECOVERY_WARP_AFTER_FAILURES 2u
-#define REACH_RENDER_RECOVERY_GIVE_UP_MS 30000ull
+#define REACH_RENDER_RECOVERY_DENSE_WINDOW_MS 5000ull
+#define REACH_RENDER_RECOVERY_DENSE_INTERVAL_MS 250u
+#define REACH_RENDER_RECOVERY_SLOW_WINDOW_MS 15000ull
+#define REACH_RENDER_RECOVERY_SLOW_INTERVAL_MS 2000u
+#define REACH_RENDER_RECOVERY_LATE_INTERVAL_MS 4000u
+#define REACH_RENDER_RECOVERY_HARDWARE_WINDOW_MS 30000ull
 #define REACH_RENDER_RECOVERY_LOSS_LIMIT 5u
 #define REACH_RENDER_RECOVERY_LOSS_WINDOW_MS 60000ull
 
@@ -30,7 +34,8 @@ extern "C"
         uint64_t started_ms;
         uint64_t next_attempt_ms;
         uint32_t failed_attempts;
-        uint32_t hardware_failures;
+        uint32_t warp_failures;
+        int32_t hardware_unusable;
     } reach_render_recovery;
 
     typedef struct reach_render_recovery_step
@@ -45,6 +50,8 @@ extern "C"
                                                              uint64_t now_ms);
     void reach_render_recovery_attempt_failed(reach_render_recovery *recovery, uint64_t now_ms,
                                               int32_t used_warp);
+    void reach_render_recovery_hardware_unusable(reach_render_recovery *recovery, uint64_t now_ms);
+    void reach_render_recovery_attempt_now(reach_render_recovery *recovery, uint64_t now_ms);
     void reach_render_recovery_succeeded(reach_render_recovery *recovery);
     int32_t reach_render_recovery_should_leave_warp(int32_t warp_active, int32_t lost,
                                                     int32_t recovering);

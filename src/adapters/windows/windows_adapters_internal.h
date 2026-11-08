@@ -134,6 +134,16 @@ extern "C"
     void reach_windows_destroy_explorer_desktop_compat_host(void);
     void reach_windows_notify_desktop_environment_changed(void);
     void reach_windows_request_desktop_environment_sync(void);
+
+    typedef enum reach_render_device_hint
+    {
+        REACH_RENDER_DEVICE_HINT_NONE = 0,
+        REACH_RENDER_DEVICE_HINT_DISPLAY = 1,
+        REACH_RENDER_DEVICE_HINT_RESUME = 2,
+        REACH_RENDER_DEVICE_HINT_UNLOCK = 3
+    } reach_render_device_hint;
+
+    void reach_windows_render_device_hint(reach_render_device_hint hint);
     reach_result reach_windows_create_monitor_list(reach_monitor_port *out_port);
     reach_result reach_windows_create_user_account(reach_user_account_port *out_port);
     reach_result reach_windows_default_config_path(uint16_t *path, uint32_t path_count);

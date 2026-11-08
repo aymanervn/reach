@@ -47,10 +47,23 @@ static void test_other_failures(void)
            "DXGI_ERROR_UNSUPPORTED is a failure");
 }
 
+static void test_hardware_unavailable_codes(void)
+{
+    expect(reach_render_hardware_unavailable_hresult((int32_t)0x887A0004u),
+           "DXGI_ERROR_UNSUPPORTED means no usable hardware");
+    expect(reach_render_hardware_unavailable_hresult((int32_t)0x887A0002u),
+           "DXGI_ERROR_NOT_FOUND means no usable hardware");
+    expect(!reach_render_hardware_unavailable_hresult((int32_t)0x887A0005u),
+           "a removed device is not a missing adapter");
+    expect(!reach_render_hardware_unavailable_hresult((int32_t)0x80004005u),
+           "E_FAIL alone is not a missing adapter");
+}
+
 int main(void)
 {
     test_success_codes_are_ok();
     test_device_loss_codes();
     test_other_failures();
+    test_hardware_unavailable_codes();
     return failed == 0 ? 0 : 1;
 }
