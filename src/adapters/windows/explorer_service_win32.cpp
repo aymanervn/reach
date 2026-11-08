@@ -13,6 +13,20 @@ struct reach_explorer_service
 {
 };
 
+struct reach_default_error_mode_scope
+{
+    UINT previous;
+    reach_default_error_mode_scope() : previous(SetErrorMode(0))
+    {
+    }
+    ~reach_default_error_mode_scope()
+    {
+        SetErrorMode(previous);
+    }
+    reach_default_error_mode_scope(const reach_default_error_mode_scope &) = delete;
+    reach_default_error_mode_scope &operator=(const reach_default_error_mode_scope &) = delete;
+};
+
 static reach_result reach_explorer_execute(const wchar_t *target,
                                            const wchar_t *arguments = nullptr)
 {
@@ -33,7 +47,11 @@ static reach_result reach_explorer_execute(const wchar_t *target,
     // reveal_path runs on app-control worker threads, which have no COM
     // apartment; initialize per call like app_launcher_win32.cpp does.
     HRESULT com_result = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
-    BOOL executed = ShellExecuteExW(&info);
+    BOOL executed = FALSE;
+    {
+        reach_default_error_mode_scope default_error_mode;
+        executed = ShellExecuteExW(&info);
+    }
     if (SUCCEEDED(com_result))
     {
         CoUninitialize();
