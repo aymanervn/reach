@@ -44,3 +44,19 @@ reach_crash_loop_decision reach_crash_loop_record_exit(reach_crash_loop *loop, u
     decision.delay_ms = loop->count >= 2 ? REACH_CRASH_LOOP_SECOND_RESTART_DELAY_MS : 0;
     return decision;
 }
+
+reach_exit_disposition reach_crash_loop_classify_exit(uint32_t exit_code, int32_t shutting_down,
+                                                      int32_t other_reach_alive)
+{
+    if (shutting_down)
+    {
+        return REACH_EXIT_DISPOSITION_RETURN;
+    }
+
+    if (exit_code != 0)
+    {
+        return REACH_EXIT_DISPOSITION_RECORD;
+    }
+
+    return other_reach_alive ? REACH_EXIT_DISPOSITION_ATTACH : REACH_EXIT_DISPOSITION_RETURN;
+}

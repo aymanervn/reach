@@ -31,6 +31,16 @@ extern "C"
         uint32_t window_count;
     } reach_crash_loop_decision;
 
+    typedef enum reach_exit_disposition
+    {
+        REACH_EXIT_DISPOSITION_RECORD = 0,
+        REACH_EXIT_DISPOSITION_ATTACH = 1,
+        REACH_EXIT_DISPOSITION_RETURN = 2
+    } reach_exit_disposition;
+
+    reach_exit_disposition reach_crash_loop_classify_exit(uint32_t exit_code, int32_t shutting_down,
+                                                          int32_t other_reach_alive);
+
     reach_crash_loop_decision reach_crash_loop_record_exit(reach_crash_loop *loop, uint64_t now_ms);
 
 #ifdef __cplusplus

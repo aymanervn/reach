@@ -176,9 +176,14 @@ static int reach_watchdog_open_process_by_name(const wchar_t *process_name, HAND
 
             if (process != nullptr)
             {
-                *out_process = process;
-                found = 1;
-                break;
+                if (WaitForSingleObject(process, 0) == WAIT_TIMEOUT)
+                {
+                    *out_process = process;
+                    found = 1;
+                    break;
+                }
+
+                CloseHandle(process);
             }
         } while (Process32NextW(snapshot, &entry));
     }
@@ -361,6 +366,9 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
             start_error = GetLastError();
         }
 
+        HANDLE survivor = nullptr;
+        int survivor_alive = 0;
+
         if (!start_failed)
         {
             if (WaitForSingleObject(reach_process, INFINITE) != WAIT_OBJECT_0)
@@ -379,16 +387,40 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
 
             if (exit_code == 0)
             {
-                reach_watchdog_log("exit code=0x00000000 uptime=%llus action=stop intentional=1",
-                                   uptime_seconds);
-                return 0;
+                survivor_alive = reach_watchdog_open_process_by_name(REACH_PROCESS_NAME, &survivor);
             }
         }
 
-        if (GetSystemMetrics(SM_SHUTTINGDOWN) != 0)
+        int shutting_down = GetSystemMetrics(SM_SHUTTINGDOWN) != 0;
+        reach_exit_disposition disposition = reach_crash_loop_classify_exit(
+            start_failed ? 1 : exit_code, shutting_down, survivor_alive);
+
+        if (disposition == REACH_EXIT_DISPOSITION_ATTACH)
         {
-            reach_watchdog_log("exit code=0x%08lX uptime=%llus action=stop reason=session_ending",
-                               (unsigned long)exit_code, uptime_seconds);
+            reach_watchdog_log("attach after exit 0 pid=%lu",
+                               (unsigned long)GetProcessId(survivor));
+            CloseHandle(survivor);
+            continue;
+        }
+
+        if (survivor != nullptr)
+        {
+            CloseHandle(survivor);
+        }
+
+        if (disposition == REACH_EXIT_DISPOSITION_RETURN)
+        {
+            if (shutting_down)
+            {
+                reach_watchdog_log(
+                    "exit code=0x%08lX uptime=%llus action=stop reason=session_ending",
+                    (unsigned long)exit_code, uptime_seconds);
+            }
+            else
+            {
+                reach_watchdog_log("exit code=0x00000000 uptime=%llus action=stop intentional=1",
+                                   uptime_seconds);
+            }
             return 0;
         }
 
