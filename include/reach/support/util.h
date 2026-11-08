@@ -15,7 +15,8 @@ extern "C"
         REACH_OK = 0,
         REACH_ERROR = 1,
         REACH_INVALID_ARGUMENT = 2,
-        REACH_NOT_IMPLEMENTED = 3
+        REACH_NOT_IMPLEMENTED = 3,
+        REACH_DEVICE_LOST = 4
     } reach_result;
 
 #define REACH_ASSERT(expr) assert(expr)

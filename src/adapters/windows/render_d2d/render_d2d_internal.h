@@ -7,6 +7,7 @@
 #include <d2d1_1.h>
 #include <dcomp.h>
 #include <d3d11.h>
+#include <d3d11_4.h>
 #include <dwmapi.h>
 #include <dwrite_3.h>
 #include <dxgi1_2.h>
@@ -202,6 +203,13 @@ struct reach_render_device
     uint32_t active_surfaces = 0;
     int ro_initialized = 0;
 
+    HANDLE removed_event = nullptr;
+    DWORD removed_cookie = 0;
+    bool lost = false;
+    HRESULT lost_hr = S_OK;
+    HRESULT lost_reason = S_OK;
+    uint32_t losses = 0;
+
     std::vector<reach_d2d_icon_cache_entry> icon_cache;
     std::vector<reach_d2d_cover_entry> cover_cache;
     std::vector<reach_d2d_shadow_cache_entry> shadow_cache;
@@ -344,6 +352,10 @@ void reach_d2d_device_surface_deactivated(reach_render_backend *backend);
 void reach_d2d_device_trim_if_idle(reach_render_device *device);
 void reach_d2d_device_release_device_resources(reach_render_device *device);
 void reach_d2d_device_release_fonts(reach_render_device *device);
+reach_result reach_d2d_device_check(reach_render_device *device, HRESULT hr,
+                                    const wchar_t *operation);
+reach_result reach_d2d_device_result(reach_render_device *device, reach_result result,
+                                     const wchar_t *operation);
 
 HRESULT reach_d3d11_create_device(ID3D11Device **out_device, D3D_FEATURE_LEVEL *out_level);
 

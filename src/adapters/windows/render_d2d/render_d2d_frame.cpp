@@ -3,7 +3,7 @@
 
 #include <dwmapi.h>
 
-reach_result reach_d2d_begin_frame(reach_render_backend *backend)
+static reach_result reach_d2d_begin_frame_impl(reach_render_backend *backend)
 {
     REACH_ASSERT(backend != nullptr);
 
@@ -45,9 +45,13 @@ reach_result reach_d2d_begin_frame(reach_render_backend *backend)
             HRESULT resize_hr =
                 backend->swap_chain->ResizeBuffers(0, width, height, DXGI_FORMAT_UNKNOWN, 0);
 
-            if (FAILED(resize_hr) || reach_dcomp_create_target_bitmap(backend) != REACH_OK)
+            reach_result resize_result =
+                FAILED(resize_hr)
+                    ? reach_d2d_device_check(backend->device, resize_hr, L"ResizeBuffers")
+                    : reach_dcomp_create_target_bitmap(backend);
+            if (resize_result != REACH_OK)
             {
-                return REACH_ERROR;
+                return resize_result;
             }
 
             if (backend->root_visual != nullptr)
@@ -94,7 +98,18 @@ reach_result reach_d2d_begin_frame(reach_render_backend *backend)
     return REACH_OK;
 }
 
-reach_result reach_d2d_end_frame(reach_render_backend *backend)
+reach_result reach_d2d_begin_frame(reach_render_backend *backend)
+{
+    REACH_ASSERT(backend != nullptr);
+    if (backend == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    return reach_d2d_device_result(backend->device, reach_d2d_begin_frame_impl(backend),
+                                   L"begin_frame");
+}
+
+static reach_result reach_d2d_end_frame_impl(reach_render_backend *backend)
 {
     REACH_ASSERT(backend != nullptr);
 
@@ -105,27 +120,43 @@ reach_result reach_d2d_end_frame(reach_render_backend *backend)
     }
 
     HRESULT hr = reach_d2d_retained_supported(backend) ? S_OK : target->EndDraw();
-
-    if (hr == D2DERR_RECREATE_TARGET)
+    if (FAILED(hr))
     {
-        reach_d2d_device_release_device_resources(backend->device);
-
-        return REACH_ERROR;
+        return reach_d2d_device_check(backend->device, hr, L"EndDraw");
     }
 
-    if (SUCCEEDED(hr) && backend->swap_chain != nullptr && !reach_d2d_retained_supported(backend))
+    if (backend->swap_chain != nullptr && !reach_d2d_retained_supported(backend))
     {
         hr = backend->swap_chain->Present(1, 0);
         reach_workload_add(REACH_WORKLOAD_SWAP_CHAIN_PRESENTS, 1);
+        if (FAILED(hr))
+        {
+            return reach_d2d_device_check(backend->device, hr, L"Present");
+        }
     }
 
-    if (SUCCEEDED(hr) && backend->dcomp_device != nullptr)
+    if (backend->dcomp_device != nullptr)
     {
         hr = backend->dcomp_device->Commit();
         reach_workload_add(REACH_WORKLOAD_DCOMP_COMMITS, 1);
+        if (FAILED(hr))
+        {
+            return reach_d2d_device_check(backend->device, hr, L"DCompCommit");
+        }
     }
 
-    return SUCCEEDED(hr) ? REACH_OK : REACH_ERROR;
+    return REACH_OK;
+}
+
+reach_result reach_d2d_end_frame(reach_render_backend *backend)
+{
+    REACH_ASSERT(backend != nullptr);
+    if (backend == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    return reach_d2d_device_result(backend->device, reach_d2d_end_frame_impl(backend),
+                                   L"end_frame");
 }
 
 reach_result reach_d2d_synchronize(reach_render_backend *backend)
@@ -134,10 +165,13 @@ reach_result reach_d2d_synchronize(reach_render_backend *backend)
     {
         return REACH_INVALID_ARGUMENT;
     }
-    if (backend->dcomp_device != nullptr &&
-        FAILED(backend->dcomp_device->WaitForCommitCompletion()))
+    if (backend->dcomp_device != nullptr)
     {
-        return REACH_ERROR;
+        HRESULT hr = backend->dcomp_device->WaitForCommitCompletion();
+        if (FAILED(hr))
+        {
+            return reach_d2d_device_check(backend->device, hr, L"WaitForCommitCompletion");
+        }
     }
     return SUCCEEDED(DwmFlush()) ? REACH_OK : REACH_ERROR;
 }

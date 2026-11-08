@@ -135,6 +135,7 @@ static ID2D1DeviceContext *reach_d2d_shadow_bake_context(reach_render_backend *b
     if (FAILED(hr))
     {
         reach_d2d_log_hresult(L"CreateDeviceContext(shadow bake)", hr);
+        (void)reach_d2d_device_check(device, hr, L"CreateDeviceContext(shadow bake)");
         device->shadow_bake_context.Reset();
         return nullptr;
     }
@@ -293,7 +294,7 @@ static reach_result reach_d2d_shadow_bake(reach_render_backend *backend,
     if (FAILED(hr))
     {
         reach_d2d_log_hresult(L"shadow bake", hr);
-        return REACH_ERROR;
+        return reach_d2d_device_check(backend->device, hr, L"shadow bake");
     }
 
     *out_bitmap = bitmap.Detach();
@@ -410,7 +411,7 @@ reach_result reach_d2d_draw_shadow(reach_render_backend *backend,
     ID2D1Bitmap1 *bitmap = reach_d2d_shadow_acquire(backend, &key);
     if (bitmap == nullptr)
     {
-        return REACH_ERROR;
+        return backend->device->lost ? REACH_DEVICE_LOST : REACH_ERROR;
     }
 
     reach_shadow shadow = reach_d2d_shadow_from_command(command);

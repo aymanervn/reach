@@ -11,6 +11,8 @@
 #include "reach/protocol/reach_service_protocol.h"
 
 static const wchar_t *REACH_LAUNCH_ARG = L"--launch";
+static const int REACH_EXIT_FAILURE = 1;
+static const int REACH_EXIT_DEVICE_LOST = 3;
 
 static int32_t reach_arg_present(int argc, wchar_t **argv, const wchar_t *arg)
 {
@@ -92,7 +94,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
     if (FAILED(hr))
     {
         CloseHandle(instance_mutex);
-        return 1;
+        return REACH_EXIT_FAILURE;
     }
 
     int exit_code = 0;
@@ -117,7 +119,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
         }
         CoUninitialize();
         CloseHandle(instance_mutex);
-        return 1;
+        return result == REACH_DEVICE_LOST ? REACH_EXIT_DEVICE_LOST : REACH_EXIT_FAILURE;
     }
 
     MSG message = {};
@@ -193,7 +195,12 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
                 if (update_result != REACH_OK)
                 {
                     running = 0;
-                    exit_code = 1;
+                    exit_code = update_result == REACH_DEVICE_LOST ? REACH_EXIT_DEVICE_LOST
+                                                                   : REACH_EXIT_FAILURE;
+                    if (update_result == REACH_DEVICE_LOST)
+                    {
+                        reach_log_error("render device lost exit=3");
+                    }
                     break;
                 }
             }

@@ -167,7 +167,7 @@ static reach_result reach_d2d_execute_tinted_group(reach_render_backend *backend
     HRESULT hr = target->CreateCompatibleRenderTarget(
         &size, &pixels, &format, D2D1_COMPATIBLE_RENDER_TARGET_OPTIONS_NONE, &coverage);
     if (FAILED(hr))
-        return REACH_ERROR;
+        return reach_d2d_device_check(backend->device, hr, L"CreateCompatibleRenderTarget");
     coverage->BeginDraw();
     coverage->Clear(D2D1::ColorF(0, 0, 0, 0));
     coverage->SetTransform(D2D1::Matrix3x2F::Translation(-group.bounds.x, -group.bounds.y));
@@ -179,14 +179,14 @@ static reach_result reach_d2d_execute_tinted_group(reach_render_backend *backend
     if (result != REACH_OK)
         return result;
     if (FAILED(hr))
-        return REACH_ERROR;
+        return reach_d2d_device_check(backend->device, hr, L"EndDraw");
     ComPtr<ID2D1Bitmap> bitmap;
     ComPtr<ID2D1SolidColorBrush> brush;
     hr = coverage->GetBitmap(&bitmap);
     if (SUCCEEDED(hr))
         hr = target->CreateSolidColorBrush(reach_d2d_color(tint), &brush);
     if (FAILED(hr))
-        return REACH_ERROR;
+        return reach_d2d_device_check(backend->device, hr, L"CreateSolidColorBrush");
     D2D1_ANTIALIAS_MODE antialias = target->GetAntialiasMode();
     target->SetAntialiasMode(D2D1_ANTIALIAS_MODE_ALIASED);
     D2D1_RECT_F destination =
@@ -220,7 +220,7 @@ reach_result reach_d2d_push_group_masks(reach_render_backend *backend, ID2D1Rend
             if (SUCCEEDED(hr))
                 hr = target->CreateLayer(&layer);
             if (FAILED(hr))
-                return REACH_ERROR;
+                return reach_d2d_device_check(backend->device, hr, L"CreateLayer");
             reach_transform_f32 parent = reach_render_command_buffer_group_transform_at(
                 commands, group->parent_id, now_seconds);
             auto transform = D2D1::Matrix3x2F::Scale(parent.scale_x, parent.scale_y) *
@@ -235,8 +235,8 @@ reach_result reach_d2d_push_group_masks(reach_render_backend *backend, ID2D1Rend
     return REACH_OK;
 }
 
-reach_result reach_d2d_execute(reach_render_backend *backend,
-                               const reach_render_command_buffer *commands)
+static reach_result reach_d2d_execute_impl(reach_render_backend *backend,
+                                           const reach_render_command_buffer *commands)
 {
     REACH_ASSERT(backend != nullptr);
     REACH_ASSERT(commands != nullptr);
@@ -262,6 +262,18 @@ reach_result reach_d2d_execute(reach_render_backend *backend,
     reach_workload_add(REACH_WORKLOAD_RENDER_EXECUTIONS, 1);
     reach_workload_add(REACH_WORKLOAD_FALLBACK_EXECUTIONS, 1);
     return reach_d2d_execute_fallback(backend, commands, reach_motion_now_seconds());
+}
+
+reach_result reach_d2d_execute(reach_render_backend *backend,
+                               const reach_render_command_buffer *commands)
+{
+    REACH_ASSERT(backend != nullptr);
+    if (backend == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    return reach_d2d_device_result(backend->device, reach_d2d_execute_impl(backend, commands),
+                                   L"execute");
 }
 
 reach_result reach_d2d_execute_fallback(reach_render_backend *backend,

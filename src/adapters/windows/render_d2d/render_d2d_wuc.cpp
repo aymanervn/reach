@@ -93,7 +93,7 @@ reach_result reach_wuc_apply_content_clip(reach_render_backend *backend,
     if (FAILED(hr))
     {
         reach_d2d_log_hresult(L"backdrop content clip", hr);
-        return REACH_ERROR;
+        return reach_d2d_device_check(backend->device, hr, L"backdrop content clip");
     }
 
     backend->backdrop_content_rect = content_rect;
@@ -294,5 +294,5 @@ reach_result reach_wuc_create_target(reach_render_backend *backend)
         backend->target_height = height;
     }
 
-    return SUCCEEDED(hr) ? REACH_OK : REACH_ERROR;
+    return reach_d2d_device_check(backend->device, hr, L"wuc create target");
 }

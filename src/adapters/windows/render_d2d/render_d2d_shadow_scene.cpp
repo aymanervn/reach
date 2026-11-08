@@ -375,8 +375,9 @@ reach_result reach_d2d_draw_group_shadow(reach_render_backend *backend,
         return REACH_ERROR;
     if (opacity <= 0 || group.shadow.color.a <= 0)
         return REACH_OK;
-    if (FAILED(shadow_filter_context(backend)))
-        return REACH_ERROR;
+    HRESULT filter_hr = shadow_filter_context(backend);
+    if (FAILED(filter_hr))
+        return reach_d2d_device_check(backend->device, filter_hr, L"shadow filter context");
     try
     {
         auto source_commands = std::make_unique<reach_render_command_buffer>(*commands);
@@ -422,7 +423,8 @@ reach_result reach_d2d_draw_group_shadow(reach_render_backend *backend,
         if (result != REACH_OK || FAILED(hr))
         {
             context->SetTarget(nullptr);
-            return REACH_ERROR;
+            reach_result end_result = reach_d2d_device_check(backend->device, hr, L"EndDraw");
+            return result != REACH_OK ? result : end_result;
         }
         ComPtr<ID2D1Effect> shift, blur, cutout;
         winrt::check_hresult(context->CreateEffect(CLSID_D2D12DAffineTransform, &shift));
@@ -478,8 +480,9 @@ reach_result reach_d2d_draw_group_shadow(reach_render_backend *backend,
     }
     catch (...)
     {
+        HRESULT failure = winrt::to_hresult();
         backend->device->shadow_fallback_context.Reset();
         backend->device->shadow_fallback_parent_device = nullptr;
-        return REACH_ERROR;
+        return reach_d2d_device_check(backend->device, failure, L"shadow filter");
     }
 }

@@ -270,7 +270,7 @@ static reach_result reach_d2d_create_bitmap_from_hbitmap(reach_render_backend *b
         wic_bitmap->Release();
     }
 
-    return SUCCEEDED(hr) ? REACH_OK : REACH_ERROR;
+    return reach_d2d_device_check(backend->device, hr, L"CreateBitmapFromWicBitmap");
 }
 
 static reach_result reach_d2d_create_icon_bitmap(reach_render_backend *backend, uint64_t icon_id,
@@ -343,7 +343,7 @@ static reach_result reach_d2d_create_icon_bitmap(reach_render_backend *backend, 
         wic_bitmap->Release();
     }
 
-    return SUCCEEDED(hr) ? REACH_OK : REACH_ERROR;
+    return reach_d2d_device_check(backend->device, hr, L"CreateBitmapFromWicBitmap");
 }
 
 static reach_result reach_d2d_get_icon_bitmap(reach_render_backend *backend, uint64_t icon_id,
@@ -816,7 +816,7 @@ reach_result reach_d2d_draw_blurred_image(reach_render_backend *backend,
             hr = device->d2d_device->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE,
                                                          &device->cover_bake_context);
         if (FAILED(hr))
-            return REACH_ERROR;
+            return reach_d2d_device_check(device, hr, L"CreateDeviceContext(cover bake)");
         ID2D1DeviceContext *bake = device->cover_bake_context.Get();
         reach_d2d_context_scope bake_scope(bake);
         D2D1_BITMAP_PROPERTIES1 properties = D2D1::BitmapProperties1(
@@ -826,7 +826,7 @@ reach_result reach_d2d_draw_blurred_image(reach_render_backend *backend,
             hr = bake->CreateBitmap(D2D1::SizeU(bake_width, bake_height), nullptr, 0, properties,
                                     &processed);
         if (FAILED(hr))
-            return REACH_ERROR;
+            return reach_d2d_device_check(device, hr, L"CreateBitmap(cover bake)");
         context = bake;
         if (actual_contrast != 1.0f)
         {
@@ -904,6 +904,7 @@ reach_result reach_d2d_draw_blurred_image(reach_render_backend *backend,
             bake->DrawImage(blur);
             hr = bake->EndDraw();
             bake->SetTarget(nullptr);
+            (void)reach_d2d_device_check(device, hr, L"EndDraw(cover bake)");
         }
         if (SUCCEEDED(hr))
         {
