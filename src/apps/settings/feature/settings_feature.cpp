@@ -856,7 +856,26 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
                             reach_row_y + (reach_row_height - reach_button_height) * 0.5f,
                             reach_button_width, reach_button_height);
 
-    float windows_title_y = reach_row_y + reach_row_height + 16.0f * scale;
+    float diagnostics_row_y = reach_row_y + reach_row_height + 8.0f * scale;
+    float diagnostics_row_height = 56.0f * scale;
+    layout.diagnostics_row = reach_settings_rect(layout.content_title.x, diagnostics_row_y,
+                                                 content_width, diagnostics_row_height);
+    layout.diagnostics_button = reach_settings_rect(
+        layout.diagnostics_row.x + layout.diagnostics_row.width - 14.0f * scale -
+            reach_button_width,
+        diagnostics_row_y + (diagnostics_row_height - reach_button_height) * 0.5f,
+        reach_button_width, reach_button_height);
+
+    float windows_title_y = diagnostics_row_y + diagnostics_row_height + 16.0f * scale;
+    if (model != nullptr && model->diagnostics_notice[0] != 0)
+    {
+        float notice_height = 14.0f * scale;
+        layout.diagnostics_notice =
+            reach_settings_rect(layout.content_title.x + 4.0f * scale,
+                                diagnostics_row_y + diagnostics_row_height + 6.0f * scale,
+                                content_width - 4.0f * scale, notice_height);
+        windows_title_y += notice_height + 6.0f * scale;
+    }
     layout.windows_section_title = reach_settings_rect(layout.content_title.x, windows_title_y,
                                                        content_width, section_header_height);
 
@@ -1013,6 +1032,12 @@ reach_settings_hit_result reach_settings_hit_test(const reach_settings_layout *l
                 return result;
             }
         }
+    }
+    if (layout->diagnostics_button.width > 0.0f &&
+        reach_settings_rect_contains(layout->diagnostics_button, x, y))
+    {
+        result.type = REACH_SETTINGS_HIT_DIAGNOSTICS_OPEN;
+        return result;
     }
     if (layout->power_apply_button.width > 0.0f &&
         reach_settings_rect_contains(layout->power_apply_button, x, y))

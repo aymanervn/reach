@@ -6,12 +6,14 @@
 #include <windows.h>
 #include <knownfolders.h>
 #include <shlobj.h>
+#include <shellapi.h>
 #include <shlwapi.h>
 
 #include <wchar.h>
 
 static const wchar_t *REACH_DIAGNOSTICS_MUTEX_NAME = L"Local\\Reach.Diagnostics.Log";
 static const DWORD REACH_DIAGNOSTICS_MUTEX_WAIT_MS = 2000;
+static const wchar_t *REACH_DIAGNOSTICS_NOTICE_FILE = L"notice.pending";
 
 static char reach_diagnostics_process[32] = "reach";
 static HANDLE reach_diagnostics_mutex = nullptr;
@@ -204,4 +206,111 @@ void reach_diagnostics_log_install(const char *process_name)
     }
 
     reach_log_set_sink(reach_diagnostics_sink);
+}
+
+static size_t reach_diagnostics_read_file(const wchar_t *path, char *out, size_t capacity)
+{
+    if (out == nullptr || capacity == 0)
+    {
+        return 0;
+    }
+
+    out[0] = 0;
+    HANDLE file =
+        CreateFileW(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                    nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (file == INVALID_HANDLE_VALUE)
+    {
+        return 0;
+    }
+
+    LARGE_INTEGER size = {};
+    size_t usable = capacity - 1;
+    size_t skip = 0;
+    if (GetFileSizeEx(file, &size) && (uint64_t)size.QuadPart > usable)
+    {
+        LARGE_INTEGER offset = {};
+        offset.QuadPart = size.QuadPart - (LONGLONG)usable;
+        SetFilePointerEx(file, offset, nullptr, FILE_BEGIN);
+        skip = 1;
+    }
+
+    DWORD read = 0;
+    BOOL ok = ReadFile(file, out, (DWORD)usable, &read, nullptr);
+    CloseHandle(file);
+    if (!ok)
+    {
+        out[0] = 0;
+        return 0;
+    }
+
+    out[read] = 0;
+    if (skip)
+    {
+        char *newline = (char *)memchr(out, '\n', read);
+        if (newline == nullptr)
+        {
+            out[0] = 0;
+            return 0;
+        }
+        size_t drop = (size_t)(newline - out) + 1;
+        memmove(out, out + drop, read - drop + 1);
+        read -= (DWORD)drop;
+    }
+    return read;
+}
+
+size_t reach_diagnostics_read_log(char *out, size_t capacity)
+{
+    wchar_t path[MAX_PATH] = {};
+    if (!reach_diagnostics_generation_path(0, path))
+    {
+        if (out != nullptr && capacity > 0)
+        {
+            out[0] = 0;
+        }
+        return 0;
+    }
+    return reach_diagnostics_read_file(path, out, capacity);
+}
+
+static int reach_diagnostics_notice_path(wchar_t *out_path)
+{
+    return reach_diagnostics_directory(out_path, MAX_PATH) &&
+           PathAppendW(out_path, REACH_DIAGNOSTICS_NOTICE_FILE);
+}
+
+size_t reach_diagnostics_read_notice(char *out, size_t capacity)
+{
+    wchar_t path[MAX_PATH] = {};
+    if (!reach_diagnostics_notice_path(path))
+    {
+        if (out != nullptr && capacity > 0)
+        {
+            out[0] = 0;
+        }
+        return 0;
+    }
+    return reach_diagnostics_read_file(path, out, capacity);
+}
+
+void reach_diagnostics_clear_notice(void)
+{
+    wchar_t path[MAX_PATH] = {};
+    if (reach_diagnostics_notice_path(path))
+    {
+        DeleteFileW(path);
+    }
+}
+
+int32_t reach_diagnostics_open_folder(void)
+{
+    wchar_t directory[MAX_PATH] = {};
+    if (!reach_diagnostics_directory(directory, MAX_PATH))
+    {
+        return 0;
+    }
+
+    return (INT_PTR)ShellExecuteW(nullptr, L"open", directory, nullptr, nullptr, SW_SHOWNORMAL) >
+           32;
 }

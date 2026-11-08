@@ -1,5 +1,7 @@
 #include "settings_app.h"
+#include "reach/support/diagnostics_log.h"
 #include "reach/support/workload.h"
+#include "reach/adapters/windows/diagnostics_log.h"
 
 #include "reach/core/theme.h"
 #include "reach/apps/settings/settings.h"
@@ -25,6 +27,8 @@
 #include <new>
 #include <string.h>
 #include <thread>
+
+static const size_t REACH_SETTINGS_DIAGNOSTICS_READ_BYTES = 640u * 1024u;
 
 enum reach_settings_update_work_type
 {
@@ -118,6 +122,7 @@ struct reach_settings_app
     reach_render_device_port render_device_port;
     reach_render_backend_port renderer;
     int32_t motion_fallback_active;
+    int32_t diagnostics_notice_pending;
     reach_monitor_port monitors;
     reach_power_session_port power_session;
     reach_windows_update_port windows_update;
@@ -409,6 +414,75 @@ static void reach_settings_refresh_layout(reach_settings_app *app)
     reach_settings_apply_caption(app);
 }
 
+static void reach_settings_log_time_to_local(reach_log_timestamp *stamp)
+{
+    SYSTEMTIME utc = {};
+    utc.wYear = stamp->year;
+    utc.wMonth = stamp->month;
+    utc.wDay = stamp->day;
+    utc.wHour = stamp->hour;
+    utc.wMinute = stamp->minute;
+    utc.wSecond = stamp->second;
+    SYSTEMTIME local = {};
+    if (!SystemTimeToTzSpecificLocalTime(nullptr, &utc, &local))
+    {
+        return;
+    }
+    stamp->year = local.wYear;
+    stamp->month = local.wMonth;
+    stamp->day = local.wDay;
+    stamp->hour = local.wHour;
+    stamp->minute = local.wMinute;
+    stamp->second = local.wSecond;
+}
+
+static void reach_settings_load_diagnostics(reach_settings_app *app)
+{
+    if (app == nullptr)
+    {
+        return;
+    }
+
+    std::unique_ptr<char[]> log(new (std::nothrow) char[REACH_SETTINGS_DIAGNOSTICS_READ_BYTES]);
+    reach_diagnostics_summary summary = {};
+    if (log != nullptr)
+    {
+        size_t length =
+            reach_diagnostics_read_log(log.get(), REACH_SETTINGS_DIAGNOSTICS_READ_BYTES);
+        reach_diagnostics_summarize(log.get(), length, &summary);
+    }
+    if (summary.has_first)
+    {
+        reach_settings_log_time_to_local(&summary.first);
+    }
+    if (summary.has_recovery)
+    {
+        reach_settings_log_time_to_local(&summary.last_recovery);
+    }
+    char text[REACH_SETTINGS_DIAGNOSTICS_TEXT_CAPACITY] = {};
+    reach_diagnostics_format_summary(text, sizeof(text), &summary);
+    reach_settings_model_set_diagnostics_summary(&app->model, text);
+
+    char notice[96] = {};
+    size_t notice_length = reach_diagnostics_read_notice(notice, sizeof(notice));
+    if (notice_length == 0)
+    {
+        return;
+    }
+    reach_log_timestamp stamp = {};
+    const char *space = (const char *)memchr(notice, ' ', notice_length);
+    int32_t has_stamp =
+        space != nullptr &&
+        reach_log_parse_timestamp(space + 1, notice_length - (size_t)(space + 1 - notice), &stamp);
+    if (has_stamp)
+    {
+        reach_settings_log_time_to_local(&stamp);
+    }
+    reach_diagnostics_format_notice(text, sizeof(text), has_stamp ? &stamp : nullptr);
+    reach_settings_model_set_diagnostics_notice(&app->model, text);
+    app->diagnostics_notice_pending = 1;
+}
+
 static reach_result reach_settings_render(reach_settings_app *app)
 {
     if (app == nullptr || app->renderer.ops.begin_frame == nullptr)
@@ -450,6 +524,12 @@ static reach_result reach_settings_render(reach_settings_app *app)
     reach_result end_result = app->renderer.ops.end_frame(app->renderer.backend);
     app->motion_fallback_active =
         reach_render_backend_content_sampling_active(&app->renderer, &app->render_commands);
+    if (result == REACH_OK && end_result == REACH_OK && app->diagnostics_notice_pending &&
+        app->model.selected_page == REACH_SETTINGS_PAGE_UPDATE)
+    {
+        reach_diagnostics_clear_notice();
+        app->diagnostics_notice_pending = 0;
+    }
     return result != REACH_OK ? result : end_result;
 }
 
@@ -1741,7 +1821,8 @@ static int32_t reach_settings_hit_is_button(reach_settings_hit_type type)
 {
     return type == REACH_SETTINGS_HIT_UPDATE_REFRESH || type == REACH_SETTINGS_HIT_UPDATE_INSTALL ||
            type == REACH_SETTINGS_HIT_UPDATE_RESTART || type == REACH_SETTINGS_HIT_REACH_UPDATE ||
-           type == REACH_SETTINGS_HIT_POWER_APPLY || type == REACH_SETTINGS_HIT_ACCOUNT_PASSWORD ||
+           type == REACH_SETTINGS_HIT_DIAGNOSTICS_OPEN || type == REACH_SETTINGS_HIT_POWER_APPLY ||
+           type == REACH_SETTINGS_HIT_ACCOUNT_PASSWORD ||
            type == REACH_SETTINGS_HIT_APPLICATION_UNINSTALL ||
            type == REACH_SETTINGS_HIT_WIFI_SCAN || type == REACH_SETTINGS_HIT_WIFI_ADD ||
            type == REACH_SETTINGS_HIT_WIFI_KNOWN || type == REACH_SETTINGS_HIT_WIFI_BACK ||
@@ -2113,6 +2194,10 @@ static void reach_settings_handle_pointer_up(reach_settings_app *app, const reac
         {
             reach_settings_enter_applications_page(app);
         }
+        else if (hit.page == REACH_SETTINGS_PAGE_UPDATE)
+        {
+            reach_settings_load_diagnostics(app);
+        }
         app->dirty = 1;
     }
     else if (app->model.selected_page == REACH_SETTINGS_PAGE_WIFI)
@@ -2144,6 +2229,10 @@ static void reach_settings_handle_pointer_up(reach_settings_app *app, const reac
             {
                 reach_settings_schedule_reach_check(app);
             }
+        }
+        else if (hit.type == REACH_SETTINGS_HIT_DIAGNOSTICS_OPEN)
+        {
+            (void)reach_diagnostics_open_folder();
         }
         else if (hit.type == REACH_SETTINGS_HIT_UPDATE_INSTALL)
         {
@@ -2917,6 +3006,10 @@ reach_result reach_settings_app_start(reach_settings_app *app)
     if (app->model.selected_page == REACH_SETTINGS_PAGE_WIFI)
     {
         reach_settings_enter_wifi_page(app);
+    }
+    else if (app->model.selected_page == REACH_SETTINGS_PAGE_UPDATE)
+    {
+        reach_settings_load_diagnostics(app);
     }
     return REACH_OK;
 }
