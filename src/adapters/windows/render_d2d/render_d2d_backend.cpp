@@ -100,6 +100,99 @@ static void reach_d2d_release_composition_target_state(reach_render_backend *bac
     }
 }
 
+static void reach_d2d_release_dcomp_target_state(reach_render_backend *backend)
+{
+    reach_d2d_release_retained(backend);
+
+    if (backend->d2d_context != nullptr)
+    {
+        backend->d2d_context->SetTarget(nullptr);
+    }
+    if (backend->swap_chain_bitmap != nullptr)
+    {
+        backend->swap_chain_bitmap->Release();
+        backend->swap_chain_bitmap = nullptr;
+    }
+    if (backend->dcomp_visual != nullptr)
+    {
+        backend->dcomp_visual->Release();
+        backend->dcomp_visual = nullptr;
+    }
+    if (backend->dcomp_target != nullptr)
+    {
+        backend->dcomp_target->Release();
+        backend->dcomp_target = nullptr;
+    }
+    if (backend->dcomp_device != nullptr)
+    {
+        backend->dcomp_device->Release();
+        backend->dcomp_device = nullptr;
+    }
+    if (backend->swap_chain != nullptr)
+    {
+        backend->swap_chain->Release();
+        backend->swap_chain = nullptr;
+    }
+    if (backend->d2d_context != nullptr)
+    {
+        backend->d2d_context->Release();
+        backend->d2d_context = nullptr;
+    }
+}
+
+static reach_result reach_d2d_backend_reset_for_device(reach_render_backend *backend)
+{
+    reach_render_device *device = backend->device;
+    if (backend->presentation_result == REACH_DEVICE_LOST)
+    {
+        backend->presentation_result = REACH_OK;
+    }
+
+    if (backend->dcomp_device != nullptr)
+    {
+        reach_d2d_release_dcomp_target_state(backend);
+        return reach_dcomp_create_target(backend);
+    }
+
+    reach_d2d_release_swap_chain(backend);
+    if (backend->d2d_context != nullptr)
+    {
+        backend->d2d_context->SetTarget(nullptr);
+        backend->d2d_context->Release();
+        backend->d2d_context = nullptr;
+    }
+
+    HRESULT hr = device->d2d_device->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE,
+                                                         &backend->d2d_context);
+    if (FAILED(hr))
+    {
+        return reach_d2d_device_check(device, hr, L"CreateDeviceContext");
+    }
+
+    reach_d2d_invalidate_retained_content(backend);
+    return REACH_OK;
+}
+
+reach_result reach_d2d_backend_sync_device(reach_render_backend *backend)
+{
+    reach_render_device *device = backend->device;
+    if (backend->device_generation == device->generation)
+    {
+        return REACH_OK;
+    }
+    if (device->lost)
+    {
+        return REACH_DEVICE_LOST;
+    }
+
+    reach_result result = reach_d2d_backend_reset_for_device(backend);
+    if (result == REACH_OK)
+    {
+        backend->device_generation = device->generation;
+    }
+    return result;
+}
+
 reach_result reach_windows_create_dcomp_render_backend(reach_render_device *device,
                                                        reach_platform_window *window,
                                                        reach_render_backend_port *out_port)
@@ -128,6 +221,7 @@ reach_result reach_windows_create_dcomp_render_backend(reach_render_device *devi
 
     backend->hwnd = static_cast<HWND>(native_window);
     backend->device = device;
+    backend->device_generation = device->generation;
 
     HRESULT hr = reach_wuc_create_target(backend) == REACH_OK ? S_OK : E_FAIL;
 

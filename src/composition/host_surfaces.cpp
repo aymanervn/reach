@@ -681,6 +681,21 @@ void reach_host_mark_all_surfaces_dirty(reach_host *host)
     }
 }
 
+void reach_host_render_device_recovered(reach_host *host)
+{
+    if (host == nullptr)
+    {
+        return;
+    }
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    {
+        host->feature_runtimes[index].frame_context_valid = 0;
+    }
+    host->dirty.render = 1;
+    reach_host_mark_all_surfaces_dirty(host);
+    reach_host_request_update(host);
+}
+
 void reach_host_invalidate_display_geometry(reach_host *host)
 {
     if (host == nullptr)

@@ -236,23 +236,29 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
     QueryPerformanceFrequency(&frequency);
     QueryPerformanceCounter(&previous_counter);
 
-    HANDLE waits[] = {shell_process, activate_event, wake_event};
+    const reach_render_device_port *device_port = reach_settings_app_render_device(app);
+    HANDLE waits[] = {shell_process, activate_event, wake_event,
+                      (HANDLE)device_port->ops.wait_handle(device_port->device)};
+    uint32_t wait_count = waits[3] != nullptr ? 4 : 3;
     MSG message = {};
     reach_frame_clock frame_clock = {};
     void *frame_timer = reach_windows_frame_timer_create();
     int exit_code = 0;
     while (reach_settings_app_running(app))
     {
-        int32_t needed_frame_before_wait = reach_settings_app_needs_frame(app);
+        reach_render_device_status device_status = device_port->ops.status(device_port->device);
+        int32_t device_lost = device_status.state != REACH_RENDER_DEVICE_READY;
+        int32_t needed_frame_before_wait = !device_lost && reach_settings_app_needs_frame(app);
         LARGE_INTEGER wait_counter = {};
         QueryPerformanceCounter(&wait_counter);
         uint32_t frame_wait_ms = reach_frame_clock_wait_ms(
             &frame_clock, (double)wait_counter.QuadPart / (double)frequency.QuadPart,
             reach_settings_app_frame_rate_hz(app), needed_frame_before_wait);
-        DWORD wait_ms =
-            needed_frame_before_wait ? frame_wait_ms : (DWORD)reach_settings_app_idle_wait_ms(app);
+        DWORD wait_ms = device_lost                ? device_status.retry_wait_ms
+                        : needed_frame_before_wait ? frame_wait_ms
+                                                   : (DWORD)reach_settings_app_idle_wait_ms(app);
         DWORD wait_result = reach_windows_frame_wait(
-            frame_timer, waits, 3, wait_ms,
+            frame_timer, waits, wait_count, wait_ms,
             needed_frame_before_wait ? frame_clock.next_frame_seconds : -1.0);
         reach_workload_add(REACH_WORKLOAD_WAKEUPS, 1);
         if (wait_result == WAIT_OBJECT_0)
@@ -280,7 +286,17 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
         {
             (void)reach_settings_app_dispatch_events(app);
         }
-        if (reach_settings_app_needs_frame(app))
+        if ((wait_count == 4 && wait_result == WAIT_OBJECT_0 + 3) || device_lost)
+        {
+            if (reach_settings_app_recover_render_device(app) == REACH_ERROR)
+            {
+                exit_code = 1;
+                break;
+            }
+            device_lost =
+                device_port->ops.status(device_port->device).state != REACH_RENDER_DEVICE_READY;
+        }
+        if (!device_lost && reach_settings_app_needs_frame(app))
         {
             LARGE_INTEGER current_counter = {};
             QueryPerformanceCounter(&current_counter);
@@ -295,7 +311,8 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
                           (double)frequency.QuadPart
                     : 0.0;
             previous_counter = current_counter;
-            if (reach_settings_app_update(app, delta_seconds) != REACH_OK)
+            reach_result update_result = reach_settings_app_update(app, delta_seconds);
+            if (update_result != REACH_OK && update_result != REACH_DEVICE_LOST)
             {
                 exit_code = 1;
                 break;

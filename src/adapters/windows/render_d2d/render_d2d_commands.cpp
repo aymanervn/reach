@@ -241,6 +241,12 @@ static reach_result reach_d2d_execute_impl(reach_render_backend *backend,
     REACH_ASSERT(backend != nullptr);
     REACH_ASSERT(commands != nullptr);
 
+    reach_result sync_result = reach_d2d_backend_sync_device(backend);
+    if (sync_result != REACH_OK)
+    {
+        return sync_result;
+    }
+
     ID2D1RenderTarget *target = reach_d2d_target(backend);
     if (backend == nullptr || target == nullptr || commands == nullptr)
     {

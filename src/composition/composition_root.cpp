@@ -31,6 +31,7 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
 
     reach_host_dependencies dependencies = {};
     reach_result result = reach_windows_create_render_device(&app->render_device);
+    reach_windows_render_device_port(app->render_device, &app->render_device_port);
 
     if (result == REACH_OK)
     {
@@ -515,6 +516,29 @@ reach_result reach_app_update(reach_app *app, double delta_seconds)
     }
 
     return reach_host_update(app->host, delta_seconds);
+}
+
+const reach_render_device_port *reach_app_render_device(const reach_app *app)
+{
+    return app != nullptr ? &app->render_device_port : nullptr;
+}
+
+reach_result reach_app_recover_render_device(reach_app *app)
+{
+    REACH_ASSERT(app != nullptr);
+    if (app == nullptr || app->host == nullptr || app->render_device_port.ops.recover == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    const reach_render_device_port &port = app->render_device_port;
+    uint64_t generation = port.ops.status(port.device).generation;
+    reach_result result = port.ops.recover(port.device);
+    if (result == REACH_OK && port.ops.status(port.device).generation != generation)
+    {
+        reach_host_render_device_recovered(app->host);
+    }
+    return result;
 }
 
 reach_result reach_app_dispatch_events(reach_app *app)

@@ -1500,6 +1500,17 @@ static HRESULT sync_layer(reach_render_backend *backend, reach_d2d_retained_laye
 }
 } // namespace
 
+void reach_d2d_release_swap_chain(reach_render_backend *backend)
+{
+    release_swap_chain(backend);
+}
+
+void reach_d2d_invalidate_retained_content(reach_render_backend *backend)
+{
+    for (auto &layer : backend->retained_layers)
+        layer.commands.clear();
+}
+
 int32_t reach_d2d_retained_supported(const reach_render_backend *backend)
 {
     return backend != nullptr &&
@@ -1578,6 +1589,9 @@ static reach_result reach_d2d_sample_content_impl(reach_render_backend *backend)
 {
     if (backend == nullptr || !reach_d2d_retained_supported(backend))
         return REACH_INVALID_ARGUMENT;
+    reach_result sync_result = reach_d2d_backend_sync_device(backend);
+    if (sync_result != REACH_OK)
+        return sync_result;
     if (backend->sampled_text.empty() && backend->sampled_images.empty() &&
         backend->sampled_textboxes.empty())
     {
@@ -1787,6 +1801,11 @@ reach_result reach_d2d_presentation_complete(reach_render_backend *backend, uint
     *out_complete = 0;
     if (backend == nullptr)
         return REACH_INVALID_ARGUMENT;
+    if (backend->device->lost)
+    {
+        *out_complete = 1;
+        return REACH_OK;
+    }
     if (!reach_d2d_retained_supported(backend) ||
         generation != backend->submitted_presentation_generation)
     {

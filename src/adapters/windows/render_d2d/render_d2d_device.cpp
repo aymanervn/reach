@@ -108,7 +108,8 @@ void reach_d2d_log_hresult(const wchar_t *context, HRESULT hr)
     reach_diagnostics_log_write("error", message);
 }
 
-HRESULT reach_d3d11_create_device(ID3D11Device **out_device, D3D_FEATURE_LEVEL *out_level)
+HRESULT reach_d3d11_create_device(D3D_DRIVER_TYPE driver_type, ID3D11Device **out_device,
+                                  D3D_FEATURE_LEVEL *out_level)
 {
     if (out_device == nullptr || out_level == nullptr)
     {
@@ -118,16 +119,15 @@ HRESULT reach_d3d11_create_device(ID3D11Device **out_device, D3D_FEATURE_LEVEL *
     D3D_FEATURE_LEVEL levels[] = {D3D_FEATURE_LEVEL_11_1, D3D_FEATURE_LEVEL_11_0,
                                   D3D_FEATURE_LEVEL_10_1, D3D_FEATURE_LEVEL_10_0};
 
-    HRESULT hr = D3D11CreateDevice(
-        nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, D3D11_CREATE_DEVICE_BGRA_SUPPORT, levels,
-        sizeof(levels) / sizeof(levels[0]), D3D11_SDK_VERSION, out_device, out_level, nullptr);
+    HRESULT hr = D3D11CreateDevice(nullptr, driver_type, nullptr, D3D11_CREATE_DEVICE_BGRA_SUPPORT,
+                                   levels, sizeof(levels) / sizeof(levels[0]), D3D11_SDK_VERSION,
+                                   out_device, out_level, nullptr);
 
     if (hr == E_INVALIDARG)
     {
-        hr = D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr,
-                               D3D11_CREATE_DEVICE_BGRA_SUPPORT, levels + 1,
-                               (sizeof(levels) / sizeof(levels[0])) - 1, D3D11_SDK_VERSION,
-                               out_device, out_level, nullptr);
+        hr = D3D11CreateDevice(nullptr, driver_type, nullptr, D3D11_CREATE_DEVICE_BGRA_SUPPORT,
+                               levels + 1, (sizeof(levels) / sizeof(levels[0])) - 1,
+                               D3D11_SDK_VERSION, out_device, out_level, nullptr);
     }
 
     return hr;

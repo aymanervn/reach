@@ -2,6 +2,7 @@
 #define REACH_APP_COMPOSITION_ROOT_H
 
 #include "reach/composition/host.h"
+#include "reach/ports/render_device.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -16,6 +17,7 @@ extern "C"
     {
         reach_host *host;
         struct reach_render_device *render_device;
+        reach_render_device_port render_device_port;
         reach_input_source_port input_source;
     } reach_app;
 
@@ -25,6 +27,8 @@ extern "C"
     int32_t reach_app_has_pending_events(const reach_app *app);
     reach_result reach_app_dispatch_events(reach_app *app);
     reach_result reach_app_update(reach_app *app, double delta_seconds);
+    const reach_render_device_port *reach_app_render_device(const reach_app *app);
+    reach_result reach_app_recover_render_device(reach_app *app);
     int32_t reach_app_needs_frame(const reach_app *app);
     int32_t reach_app_frame_rate_hz(const reach_app *app);
     uint32_t reach_app_idle_wait_ms(const reach_app *app);

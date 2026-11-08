@@ -45,6 +45,7 @@ add_library(reach_support STATIC
     src/support/diagnostics_log.cpp
     src/support/crash_loop.cpp
     src/support/render_device_loss.cpp
+    src/support/render_recovery.cpp
     src/support/animation.cpp
     src/support/motion.cpp
     src/support/motion_clock.cpp
@@ -204,6 +205,7 @@ add_library(reach_windows_adapters STATIC
     src/adapters/windows/explorer_desktop_compat_host_win32.cpp
     src/adapters/windows/render_d2d/render_d2d_backend.cpp
     src/adapters/windows/render_d2d/render_d2d_shared_device.cpp
+    src/adapters/windows/render_d2d/render_d2d_recovery.cpp
     src/adapters/windows/render_d2d/render_d2d_device.cpp
     src/adapters/windows/render_d2d/render_d2d_dcomp.cpp
     src/adapters/windows/render_d2d/render_d2d_wuc.cpp
@@ -789,6 +791,18 @@ target_link_libraries(reach_render_device_loss_tests PRIVATE
     reach_support
 )
 
+add_executable(reach_render_recovery_tests
+    tests/render_recovery_tests.cpp
+)
+
+reach_configure_common(reach_render_recovery_tests)
+target_compile_features(reach_render_recovery_tests PRIVATE
+    cxx_std_17
+)
+target_link_libraries(reach_render_recovery_tests PRIVATE
+    reach_support
+)
+
 add_executable(reach_shell_registration_tests
     tests/shell_registration_tests.cpp
     src/adapters/windows/shell_registration_win32.cpp
@@ -1202,6 +1216,7 @@ target_compile_features(reach_system_controls_network_tests PRIVATE
     add_test(NAME reach_diagnostics_log_tests COMMAND reach_diagnostics_log_tests)
     add_test(NAME reach_crash_loop_tests COMMAND reach_crash_loop_tests)
     add_test(NAME reach_render_device_loss_tests COMMAND reach_render_device_loss_tests)
+    add_test(NAME reach_render_recovery_tests COMMAND reach_render_recovery_tests)
     add_test(NAME reach_shell_registration_tests COMMAND reach_shell_registration_tests)
     add_test(NAME reach_now_playing_animation_tests COMMAND reach_now_playing_animation_tests)
     add_test(NAME reach_wifi_tests COMMAND reach_wifi_tests)

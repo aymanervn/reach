@@ -130,17 +130,26 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
 
     reach_frame_clock frame_clock = {};
     void *frame_timer = reach_windows_frame_timer_create();
+    const reach_render_device_port *device_port = reach_app_render_device(app);
+    void *device_wait_handles[1] = {device_port->ops.wait_handle(device_port->device)};
+    uint32_t device_wait_count = device_wait_handles[0] != nullptr ? 1 : 0;
     int running = 1;
     while (running)
     {
-        int32_t needed_frame_before_wait = app != nullptr && reach_app_needs_frame(app);
+        reach_render_device_status device_status = device_port->ops.status(device_port->device);
+        int32_t device_lost = device_status.state != REACH_RENDER_DEVICE_READY;
+        int32_t needed_frame_before_wait = !device_lost && reach_app_needs_frame(app);
         LARGE_INTEGER wait_counter = {};
         QueryPerformanceCounter(&wait_counter);
         double wait_seconds = (double)wait_counter.QuadPart / (double)frequency.QuadPart;
         uint32_t frame_wait_ms = reach_frame_clock_wait_ms(
             &frame_clock, wait_seconds, reach_app_frame_rate_hz(app), needed_frame_before_wait);
         DWORD wait_ms = INFINITE;
-        if (needed_frame_before_wait)
+        if (device_lost)
+        {
+            wait_ms = device_status.retry_wait_ms;
+        }
+        else if (needed_frame_before_wait)
         {
             wait_ms = frame_wait_ms;
         }
@@ -150,9 +159,9 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
             wait_ms = idle_wait == REACH_APP_WAIT_FOREVER ? INFINITE : (DWORD)idle_wait;
         }
         DWORD wait_result = reach_windows_frame_wait(
-            frame_timer, nullptr, 0, wait_ms,
+            frame_timer, device_wait_handles, device_wait_count, wait_ms,
             needed_frame_before_wait ? frame_clock.next_frame_seconds : -1.0);
-        (void)wait_result;
+        int32_t device_signalled = device_wait_count != 0 && wait_result == WAIT_OBJECT_0;
         reach_workload_add(REACH_WORKLOAD_WAKEUPS, 1);
 
         while (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE))
@@ -175,10 +184,23 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
                 (void)reach_app_dispatch_events(app);
             }
 
+            if (device_signalled || device_lost)
+            {
+                if (reach_app_recover_render_device(app) == REACH_ERROR)
+                {
+                    running = 0;
+                    exit_code = REACH_EXIT_DEVICE_LOST;
+                    reach_log_error("render device recovery failed exit=3");
+                    break;
+                }
+                device_lost =
+                    device_port->ops.status(device_port->device).state != REACH_RENDER_DEVICE_READY;
+            }
+
             LARGE_INTEGER current_counter = {};
             QueryPerformanceCounter(&current_counter);
 
-            int32_t needs_frame_after_messages = reach_app_needs_frame(app);
+            int32_t needs_frame_after_messages = !device_lost && reach_app_needs_frame(app);
             if (needs_frame_after_messages)
             {
                 double delta_seconds =
@@ -192,15 +214,10 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
                 reach_result update_result = reach_app_update(app, delta_seconds);
                 reach_frame_clock_presented(&frame_clock, (double)current_counter.QuadPart /
                                                               (double)frequency.QuadPart);
-                if (update_result != REACH_OK)
+                if (update_result != REACH_OK && update_result != REACH_DEVICE_LOST)
                 {
                     running = 0;
-                    exit_code = update_result == REACH_DEVICE_LOST ? REACH_EXIT_DEVICE_LOST
-                                                                   : REACH_EXIT_FAILURE;
-                    if (update_result == REACH_DEVICE_LOST)
-                    {
-                        reach_log_error("render device lost exit=3");
-                    }
+                    exit_code = REACH_EXIT_FAILURE;
                     break;
                 }
             }

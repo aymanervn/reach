@@ -115,6 +115,7 @@ struct reach_settings_app
     void *notify_user;
     reach_platform_window_port window;
     reach_render_device *render_device;
+    reach_render_device_port render_device_port;
     reach_render_backend_port renderer;
     int32_t motion_fallback_active;
     reach_monitor_port monitors;
@@ -440,9 +441,10 @@ static reach_result reach_settings_render(reach_settings_app *app)
     {
         return result;
     }
-    if (app->renderer.ops.begin_frame(app->renderer.backend) != REACH_OK)
+    result = app->renderer.ops.begin_frame(app->renderer.backend);
+    if (result != REACH_OK)
     {
-        return REACH_ERROR;
+        return result;
     }
     result = app->renderer.ops.execute(app->renderer.backend, &app->render_commands);
     reach_result end_result = app->renderer.ops.end_frame(app->renderer.backend);
@@ -2766,6 +2768,7 @@ reach_result reach_settings_app_create(reach_settings_app **out_app,
     reach_settings_model_init(&app->model);
 
     reach_result result = reach_windows_create_render_device(&app->render_device);
+    reach_windows_render_device_port(app->render_device, &app->render_device_port);
     if (result == REACH_OK)
     {
         result = reach_windows_create_platform_window(REACH_SURFACE_SETTINGS, &app->window);
@@ -3098,6 +3101,28 @@ reach_result reach_settings_app_dispatch_events(reach_settings_app *app)
         return REACH_INVALID_ARGUMENT;
     }
     return app->window.ops.dispatch_events(app->window.window);
+}
+
+const reach_render_device_port *reach_settings_app_render_device(const reach_settings_app *app)
+{
+    return app != nullptr ? &app->render_device_port : nullptr;
+}
+
+reach_result reach_settings_app_recover_render_device(reach_settings_app *app)
+{
+    if (app == nullptr || app->render_device_port.ops.recover == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    const reach_render_device_port &port = app->render_device_port;
+    uint64_t generation = port.ops.status(port.device).generation;
+    reach_result result = port.ops.recover(port.device);
+    if (result == REACH_OK && port.ops.status(port.device).generation != generation)
+    {
+        app->dirty = 1;
+    }
+    return result;
 }
 
 int32_t reach_settings_app_has_pending_events(const reach_settings_app *app)
