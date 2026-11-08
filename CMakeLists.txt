@@ -43,6 +43,7 @@ endfunction()
 add_library(reach_support STATIC
     src/support/util.cpp
     src/support/diagnostics_log.cpp
+    src/support/crash_loop.cpp
     src/support/animation.cpp
     src/support/motion.cpp
     src/support/motion_clock.cpp
@@ -512,6 +513,7 @@ add_executable(reachWatchdog WIN32
     src/tools/reach_watchdog/reach_watchdog.cpp
     src/adapters/windows/diagnostics_log_win32.cpp
     src/support/diagnostics_log.cpp
+    src/support/crash_loop.cpp
     src/support/util.cpp
 )
 
@@ -757,6 +759,18 @@ target_compile_features(reach_diagnostics_log_tests PRIVATE
     cxx_std_17
 )
 target_link_libraries(reach_diagnostics_log_tests PRIVATE
+    reach_support
+)
+
+add_executable(reach_crash_loop_tests
+    tests/crash_loop_tests.cpp
+)
+
+reach_configure_common(reach_crash_loop_tests)
+target_compile_features(reach_crash_loop_tests PRIVATE
+    cxx_std_17
+)
+target_link_libraries(reach_crash_loop_tests PRIVATE
     reach_support
 )
 
@@ -1153,6 +1167,7 @@ target_compile_features(reach_system_controls_network_tests PRIVATE
     add_test(NAME reach_render_d2d_retained_tests COMMAND reach_render_d2d_retained_tests)
     add_test(NAME reach_util_tests COMMAND reach_util_tests)
     add_test(NAME reach_diagnostics_log_tests COMMAND reach_diagnostics_log_tests)
+    add_test(NAME reach_crash_loop_tests COMMAND reach_crash_loop_tests)
     add_test(NAME reach_now_playing_animation_tests COMMAND reach_now_playing_animation_tests)
     add_test(NAME reach_wifi_tests COMMAND reach_wifi_tests)
     add_test(NAME reach_wifi_service_tests COMMAND reach_wifi_service_tests)

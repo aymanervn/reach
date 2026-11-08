@@ -2,14 +2,15 @@
 #include <shlwapi.h>
 #include <tlhelp32.h>
 
+#include <cstdarg>
+#include <cstdio>
 #include <cwchar>
 
 #include "reach/adapters/windows/diagnostics_log.h"
+#include "reach/support/crash_loop.h"
+#include "reach/support/util.h"
 
 static const wchar_t *REACH_PROCESS_NAME = L"reach.exe";
-static const int REACH_MAX_FAILED_STARTS = 3;
-static const DWORD REACH_STARTUP_GRACE_MS = 5000;
-static const DWORD REACH_RESTART_DELAY_MS = 250;
 
 static int reach_watchdog_sibling_path(const wchar_t *file_name, wchar_t *out_path, DWORD out_count)
 {
@@ -267,6 +268,37 @@ static void reach_watchdog_reset_direct_fallback(void)
     }
 }
 
+static void reach_watchdog_log(const char *format, ...)
+{
+    char message[256] = {};
+    va_list arguments;
+    va_start(arguments, format);
+    vsnprintf(message, sizeof(message), format, arguments);
+    va_end(arguments);
+    reach_log_info(message);
+}
+
+static unsigned long long reach_watchdog_filetime_value(const FILETIME &time)
+{
+    return ((unsigned long long)time.dwHighDateTime << 32) | time.dwLowDateTime;
+}
+
+static unsigned long long reach_watchdog_uptime_seconds(HANDLE process)
+{
+    FILETIME created = {};
+    FILETIME exited = {};
+    FILETIME kernel = {};
+    FILETIME user = {};
+    if (!GetProcessTimes(process, &created, &exited, &kernel, &user))
+    {
+        return 0;
+    }
+
+    unsigned long long start = reach_watchdog_filetime_value(created);
+    unsigned long long end = reach_watchdog_filetime_value(exited);
+    return end > start ? (end - start) / 10000000ull : 0;
+}
+
 int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
 {
     reach_diagnostics_log_install("watchdog");
@@ -274,6 +306,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
     wchar_t reach_path[MAX_PATH] = {};
     if (!reach_watchdog_sibling_path(REACH_PROCESS_NAME, reach_path, MAX_PATH))
     {
+        reach_watchdog_log("fallback reason=reach_path_unresolved action=explorer");
         reach_watchdog_reset_direct_fallback();
         return 1;
     }
@@ -284,79 +317,99 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
         working_directory[0] = 0;
     }
 
-    int failed_starts = 0;
+    reach_crash_loop crash_loop = {};
 
     for (;;)
     {
-        HANDLE reach_process = nullptr;
-        if (!reach_watchdog_open_process_by_name(REACH_PROCESS_NAME, &reach_process))
+        if (GetSystemMetrics(SM_SHUTTINGDOWN) != 0)
         {
-            if (!reach_watchdog_start_process_with_handle(
-                    reach_path, L"--launch",
-                    working_directory[0] != 0 ? working_directory : nullptr, &reach_process))
-            {
-                ++failed_starts;
-                if (failed_starts >= REACH_MAX_FAILED_STARTS)
-                {
-                    reach_watchdog_reset_direct_fallback();
-                    return 1;
-                }
-
-                Sleep(REACH_RESTART_DELAY_MS);
-                continue;
-            }
+            reach_watchdog_log("stop reason=session_ending");
+            return 0;
         }
 
-        DWORD startup_wait = WaitForSingleObject(reach_process, REACH_STARTUP_GRACE_MS);
+        HANDLE reach_process = nullptr;
+        int start_failed = 0;
+        DWORD start_error = 0;
+        DWORD exit_code = 0;
+        unsigned long long uptime_seconds = 0;
 
-        if (startup_wait == WAIT_TIMEOUT)
+        if (reach_watchdog_open_process_by_name(REACH_PROCESS_NAME, &reach_process))
         {
-            failed_starts = 0;
-            DWORD runtime_wait = WaitForSingleObject(reach_process, INFINITE);
+            reach_watchdog_log("attach pid=%lu", (unsigned long)GetProcessId(reach_process));
+        }
+        else if (reach_watchdog_start_process_with_handle(
+                     reach_path, L"--launch",
+                     working_directory[0] != 0 ? working_directory : nullptr, &reach_process))
+        {
+            reach_watchdog_log("start pid=%lu", (unsigned long)GetProcessId(reach_process));
+        }
+        else
+        {
+            start_failed = 1;
+            start_error = GetLastError();
+        }
 
-            if (runtime_wait == WAIT_OBJECT_0)
+        if (!start_failed)
+        {
+            if (WaitForSingleObject(reach_process, INFINITE) != WAIT_OBJECT_0)
             {
-                DWORD exit_code = 1;
-                (void)GetExitCodeProcess(reach_process, &exit_code);
+                reach_watchdog_log("wait failed error=%lu action=fallback",
+                                   (unsigned long)GetLastError());
                 CloseHandle(reach_process);
-
-                if (exit_code == 0)
-                {
-                    return 0;
-                }
-
-                int choice = MessageBoxW(nullptr,
-                                         L"Reach exited unexpectedly.\n\n"
-                                         L"Yes: restart reach\n"
-                                         L"No: restart explorer",
-                                         L"Reach Watchdog",
-                                         MB_ICONWARNING | MB_YESNO | MB_SETFOREGROUND | MB_TOPMOST);
-
-                if (choice == IDYES)
-                {
-                    Sleep(REACH_RESTART_DELAY_MS);
-                    continue;
-                }
-
                 reach_watchdog_reset_direct_fallback();
                 return 1;
             }
 
+            exit_code = 1;
+            (void)GetExitCodeProcess(reach_process, &exit_code);
+            uptime_seconds = reach_watchdog_uptime_seconds(reach_process);
             CloseHandle(reach_process);
-            reach_watchdog_reset_direct_fallback();
-            return 1;
+
+            if (exit_code == 0)
+            {
+                reach_watchdog_log("exit code=0x00000000 uptime=%llus action=stop intentional=1",
+                                   uptime_seconds);
+                return 0;
+            }
         }
 
-        ++failed_starts;
-        CloseHandle(reach_process);
-
-        if (failed_starts >= REACH_MAX_FAILED_STARTS)
+        if (GetSystemMetrics(SM_SHUTTINGDOWN) != 0)
         {
-            reach_watchdog_terminate_processes_by_name(REACH_PROCESS_NAME);
+            reach_watchdog_log("exit code=0x%08lX uptime=%llus action=stop reason=session_ending",
+                               (unsigned long)exit_code, uptime_seconds);
+            return 0;
+        }
+
+        reach_crash_loop_decision decision =
+            reach_crash_loop_record_exit(&crash_loop, GetTickCount64());
+        const char *action =
+            decision.action == REACH_CRASH_LOOP_FALLBACK ? "fallback_explorer" : "restart";
+
+        if (start_failed)
+        {
+            reach_watchdog_log("start_failed error=%lu window=%u/%u action=%s delay_ms=%u",
+                               (unsigned long)start_error, (unsigned)decision.window_count,
+                               (unsigned)REACH_CRASH_LOOP_FALLBACK_COUNT, action,
+                               (unsigned)decision.delay_ms);
+        }
+        else
+        {
+            reach_watchdog_log(
+                "exit code=0x%08lX uptime=%llus window=%u/%u action=%s delay_ms=%u",
+                (unsigned long)exit_code, uptime_seconds, (unsigned)decision.window_count,
+                (unsigned)REACH_CRASH_LOOP_FALLBACK_COUNT, action, (unsigned)decision.delay_ms);
+        }
+
+        if (decision.action == REACH_CRASH_LOOP_FALLBACK)
+        {
             reach_watchdog_reset_direct_fallback();
+            reach_watchdog_log("fallback done shell=explorer.exe");
             return 1;
         }
 
-        Sleep(REACH_RESTART_DELAY_MS);
+        if (decision.delay_ms > 0)
+        {
+            Sleep(decision.delay_ms);
+        }
     }
 }
