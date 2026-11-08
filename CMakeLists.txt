@@ -33,6 +33,20 @@ function(reach_configure_common target)
     )
 endfunction()
 
+if(MSVC)
+    add_compile_options("$<$<CONFIG:Release>:/Zi>")
+endif()
+
+function(reach_release_symbols target)
+    if(MSVC)
+        target_link_options(${target} PRIVATE
+            "$<$<CONFIG:Release>:/DEBUG>"
+            "$<$<CONFIG:Release>:/OPT:REF>"
+            "$<$<CONFIG:Release>:/OPT:ICF>"
+        )
+    endif()
+endfunction()
+
 function(reach_configure_windows target)
     target_compile_definitions(${target} PUBLIC
         WIN32_LEAN_AND_MEAN
@@ -367,6 +381,7 @@ if (MSVC)
 endif()
 
 reach_configure_common(reach)
+reach_release_symbols(reach)
 reach_configure_windows(reach)
 target_compile_features(reach PRIVATE
     c_std_11
@@ -445,6 +460,7 @@ if (MSVC)
 endif()
 
 reach_configure_common(reach_settings)
+reach_release_symbols(reach_settings)
 reach_configure_windows(reach_settings)
 target_compile_features(reach_settings PRIVATE cxx_std_17)
 target_link_libraries(reach_settings PRIVATE
@@ -532,6 +548,7 @@ add_executable(reachWatchdog WIN32
 set_target_properties(reachWatchdog PROPERTIES OUTPUT_NAME "reachWatchdog")
 
 reach_configure_common(reachWatchdog)
+reach_release_symbols(reachWatchdog)
 reach_configure_windows(reachWatchdog)
 target_compile_features(reachWatchdog PRIVATE
     cxx_std_17
