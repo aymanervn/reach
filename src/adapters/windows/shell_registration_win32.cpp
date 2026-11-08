@@ -103,6 +103,12 @@ static int32_t reach_shell_is_reach_command(const wchar_t *shell, const wchar_t 
     return reach_shell_equals(shell, expected);
 }
 
+int32_t reach_windows_shell_value_is_reach(const uint16_t *shell, const uint16_t *exe_path)
+{
+    return reach_shell_is_reach_command(reinterpret_cast<const wchar_t *>(shell),
+                                        reinterpret_cast<const wchar_t *>(exe_path));
+}
+
 reach_result reach_windows_shell_install_command_current_user(const uint16_t *identity_exe_path,
                                                               const uint16_t *shell_command)
 {

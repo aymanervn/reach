@@ -197,6 +197,7 @@ target_link_libraries(reach_features PUBLIC
 add_library(reach_windows_adapters STATIC
     src/adapters/windows/clipboard_win32.cpp
     src/adapters/windows/diagnostics_log_win32.cpp
+    src/adapters/windows/install_check_win32.cpp
     src/adapters/windows/window_win32.cpp
     src/adapters/windows/frame_wait_win32.cpp
     src/adapters/windows/explorer_desktop_compat_host_win32.cpp
@@ -775,6 +776,24 @@ target_link_libraries(reach_crash_loop_tests PRIVATE
     reach_support
 )
 
+add_executable(reach_shell_registration_tests
+    tests/shell_registration_tests.cpp
+    src/adapters/windows/shell_registration_win32.cpp
+)
+
+reach_configure_common(reach_shell_registration_tests)
+target_compile_features(reach_shell_registration_tests PRIVATE
+    cxx_std_17
+)
+target_include_directories(reach_shell_registration_tests PRIVATE
+    src/adapters/windows
+)
+target_link_libraries(reach_shell_registration_tests PRIVATE
+    reach_support
+    advapi32
+    shell32
+)
+
 add_executable(reach_now_playing_animation_tests
     tests/now_playing_animation_tests.cpp
 )
@@ -1169,6 +1188,7 @@ target_compile_features(reach_system_controls_network_tests PRIVATE
     add_test(NAME reach_util_tests COMMAND reach_util_tests)
     add_test(NAME reach_diagnostics_log_tests COMMAND reach_diagnostics_log_tests)
     add_test(NAME reach_crash_loop_tests COMMAND reach_crash_loop_tests)
+    add_test(NAME reach_shell_registration_tests COMMAND reach_shell_registration_tests)
     add_test(NAME reach_now_playing_animation_tests COMMAND reach_now_playing_animation_tests)
     add_test(NAME reach_wifi_tests COMMAND reach_wifi_tests)
     add_test(NAME reach_wifi_service_tests COMMAND reach_wifi_service_tests)
