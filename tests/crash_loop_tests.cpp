@@ -80,6 +80,22 @@ static void test_null_loop_is_refused(void)
            "a missing policy state never loops forever");
 }
 
+static void test_exit_disposition(void)
+{
+    expect(reach_crash_loop_classify_exit(0, 0, 1) == REACH_EXIT_DISPOSITION_ATTACH,
+           "a clean exit with a surviving reach attaches to it");
+    expect(reach_crash_loop_classify_exit(0, 0, 0) == REACH_EXIT_DISPOSITION_RETURN,
+           "a clean exit with no other reach stops the watchdog");
+    expect(reach_crash_loop_classify_exit(1, 0, 1) == REACH_EXIT_DISPOSITION_RECORD,
+           "a crash is recorded even when another reach exists");
+    expect(reach_crash_loop_classify_exit(0xC0000005u, 0, 0) == REACH_EXIT_DISPOSITION_RECORD,
+           "a crash without another reach is recorded");
+    expect(reach_crash_loop_classify_exit(1, 1, 0) == REACH_EXIT_DISPOSITION_RETURN,
+           "a crash during shutdown stops the watchdog");
+    expect(reach_crash_loop_classify_exit(0, 1, 1) == REACH_EXIT_DISPOSITION_RETURN,
+           "a clean exit during shutdown stops the watchdog");
+}
+
 int main(void)
 {
     test_restart_delays_then_fallback_on_the_third_exit();
@@ -87,5 +103,6 @@ int main(void)
     test_window_boundary_is_inclusive();
     test_fast_startup_failures_share_the_window();
     test_null_loop_is_refused();
+    test_exit_disposition();
     return failed == 0 ? 0 : 1;
 }
