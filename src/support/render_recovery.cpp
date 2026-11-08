@@ -40,7 +40,7 @@ int32_t reach_render_recovery_begin(reach_render_recovery *recovery, uint64_t no
     recovery->loss_ms[recovery->loss_count++] = now_ms;
     recovery->recovering = 1;
     recovery->started_ms = now_ms;
-    recovery->next_attempt_ms = now_ms;
+    recovery->next_attempt_ms = now_ms + reach_render_recovery_backoff_ms(recovery->loss_count - 1);
     recovery->failed_attempts = 0;
     recovery->hardware_failures = 0;
     return recovery->loss_count <= REACH_RENDER_RECOVERY_LOSS_LIMIT;
