@@ -118,6 +118,16 @@ static reach_result reach_d2d_port_recover(reach_render_device *device)
             device->d3d_device != nullptr ? device->d3d_device->GetDeviceRemovedReason() : S_OK;
         if (SUCCEEDED(reason))
         {
+            if (reach_render_recovery_should_leave_warp(device->warp_active, device->lost,
+                                                        device->recovery.recovering))
+            {
+                HRESULT switch_hr = S_OK;
+                bool switched = reach_d2d_device_rebuild(device, false, &switch_hr) == REACH_OK;
+                char message[96] = {};
+                sprintf_s(message, "device_adapter_switch from=warp to=hardware ok=%d",
+                          switched ? 1 : 0);
+                reach_diagnostics_log_write("info", message);
+            }
             return REACH_OK;
         }
         (void)reach_d2d_device_check(device, reason, L"DeviceRemovedEvent");

@@ -43,6 +43,41 @@ void reach_d2d_device_unregister_removed_event(reach_render_device *device)
     device->removed_cookie = 0;
 }
 
+void reach_d2d_device_register_adapters_event(reach_render_device *device)
+{
+    if (device->removed_event == nullptr || device->adapters_factory != nullptr)
+    {
+        return;
+    }
+
+    IDXGIFactory7 *factory = nullptr;
+    if (FAILED(CreateDXGIFactory1(IID_PPV_ARGS(&factory))))
+    {
+        return;
+    }
+    if (FAILED(
+            factory->RegisterAdaptersChangedEvent(device->removed_event, &device->adapters_cookie)))
+    {
+        factory->Release();
+        device->adapters_cookie = 0;
+        return;
+    }
+    device->adapters_factory = factory;
+}
+
+void reach_d2d_device_unregister_adapters_event(reach_render_device *device)
+{
+    if (device->adapters_factory == nullptr)
+    {
+        return;
+    }
+
+    device->adapters_factory->UnregisterAdaptersChangedEvent(device->adapters_cookie);
+    device->adapters_factory->Release();
+    device->adapters_factory = nullptr;
+    device->adapters_cookie = 0;
+}
+
 reach_result reach_d2d_device_check(reach_render_device *device, HRESULT hr,
                                     const wchar_t *operation)
 {
@@ -136,6 +171,7 @@ reach_result reach_windows_create_render_device(reach_render_device **out_device
     if (SUCCEEDED(hr))
     {
         reach_d2d_device_register_removed_event(device);
+        reach_d2d_device_register_adapters_event(device);
     }
     if (SUCCEEDED(hr))
     {
@@ -197,6 +233,7 @@ void reach_windows_destroy_render_device(reach_render_device *device)
     device->composition_graphics_device.Reset();
     device->compositor.Reset();
     reach_d2d_device_unregister_removed_event(device);
+    reach_d2d_device_unregister_adapters_event(device);
     if (device->d2d_device != nullptr)
     {
         device->d2d_device->Release();
