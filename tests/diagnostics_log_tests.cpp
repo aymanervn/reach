@@ -56,10 +56,58 @@ static void test_line_format_is_one_sanitized_line(void)
            "a long message is truncated inside the buffer");
 }
 
+static void test_summary_counts_events_and_finds_the_last_recovery(void)
+{
+    const char *log =
+        "2026-11-08T10:00:00.001Z reach pid=1 info start\n"
+        "2026-11-08T10:05:00.002Z reach pid=1 error device_lost op=EndDraw hr=0x887A0005\n"
+        "2026-11-08T10:05:01.003Z reach pid=1 info device_recovered losses=1 recoveries=1\n"
+        "garbage line\n"
+        "2026-11-09T07:30:15.004Z reach pid=1 info device_recovered losses=2 recoveries=2\n"
+        "2026-11-09T07:31:00.005Z reach pid=1 info tail";
+    reach_diagnostics_summary summary = {};
+    reach_diagnostics_summarize(log, strlen(log), &summary);
+    expect(summary.event_count == 5, "only timestamped lines count as events");
+    expect(summary.has_first && summary.first.day == 8 && summary.first.hour == 10,
+           "the first event timestamp is kept");
+    expect(summary.has_recovery && summary.last_recovery.day == 9 &&
+               summary.last_recovery.hour == 7 && summary.last_recovery.minute == 30,
+           "the latest recovery timestamp is kept");
+
+    char text[160] = {};
+    reach_diagnostics_format_summary(text, sizeof(text), &summary);
+    expect(strcmp(text, "5 events since 2026-11-08, last device recovery 2026-11-09 07:30") == 0,
+           "summary text names count, first date and last recovery");
+
+    reach_diagnostics_summary empty = {};
+    reach_diagnostics_summarize("", 0, &empty);
+    reach_diagnostics_format_summary(text, sizeof(text), &empty);
+    expect(strcmp(text, "No events recorded") == 0, "an empty log reads as no events");
+}
+
+static void test_notice_text_uses_the_pending_timestamp(void)
+{
+    reach_log_timestamp stamp = {};
+    const char *pending = "2026-11-08T12:34:56Z";
+    expect(reach_log_parse_timestamp(pending, strlen(pending), &stamp) && stamp.day == 8 &&
+               stamp.second == 56 && stamp.millisecond == 0,
+           "a timestamp without milliseconds parses");
+
+    char text[160] = {};
+    reach_diagnostics_format_notice(text, sizeof(text), &stamp);
+    expect(strcmp(text, "Reach fell back to Windows Explorer on 2026-11-08; crash log saved") == 0,
+           "notice names the fallback date");
+    reach_diagnostics_format_notice(text, sizeof(text), nullptr);
+    expect(strcmp(text, "Reach fell back to Windows Explorer; crash log saved") == 0,
+           "notice without a date stays readable");
+}
+
 int main(void)
 {
     test_rotation_triggers_only_when_the_limit_would_be_exceeded();
     test_rotation_steps_delete_oldest_then_shift();
     test_line_format_is_one_sanitized_line();
+    test_summary_counts_events_and_finds_the_last_recovery();
+    test_notice_text_uses_the_pending_timestamp();
     return failed == 0 ? 0 : 1;
 }

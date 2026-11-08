@@ -30,6 +30,15 @@ extern "C"
         int32_t to;
     } reach_log_rotation_step;
 
+    typedef struct reach_diagnostics_summary
+    {
+        uint32_t event_count;
+        int32_t has_first;
+        reach_log_timestamp first;
+        int32_t has_recovery;
+        reach_log_timestamp last_recovery;
+    } reach_diagnostics_summary;
+
     int32_t reach_log_rotation_needed(uint64_t current_size, uint64_t incoming_size,
                                       uint64_t limit);
     uint32_t reach_log_rotation_steps(uint32_t keep, reach_log_rotation_step *out_steps,
@@ -37,6 +46,14 @@ extern "C"
     size_t reach_log_format_line(char *out, size_t capacity, const reach_log_timestamp *time,
                                  const char *process, uint32_t process_id, const char *level,
                                  const char *message);
+
+    int32_t reach_log_parse_timestamp(const char *text, size_t length, reach_log_timestamp *out);
+    void reach_diagnostics_summarize(const char *text, size_t length,
+                                     reach_diagnostics_summary *out);
+    size_t reach_diagnostics_format_summary(char *out, size_t capacity,
+                                            const reach_diagnostics_summary *summary);
+    size_t reach_diagnostics_format_notice(char *out, size_t capacity,
+                                           const reach_log_timestamp *stamp);
 
 #ifdef __cplusplus
 }

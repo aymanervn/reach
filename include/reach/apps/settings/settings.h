@@ -123,7 +123,8 @@ extern "C"
         REACH_SETTINGS_HIT_BLUETOOTH_PIN_ACCEPT,
         REACH_SETTINGS_HIT_BLUETOOTH_PIN_REJECT,
         REACH_SETTINGS_HIT_BLUETOOTH_SCROLLBAR_TRACK,
-        REACH_SETTINGS_HIT_BLUETOOTH_SCROLLBAR_THUMB
+        REACH_SETTINGS_HIT_BLUETOOTH_SCROLLBAR_THUMB,
+        REACH_SETTINGS_HIT_DIAGNOSTICS_OPEN
     } reach_settings_hit_type;
 
     typedef enum reach_settings_startup_status
@@ -173,6 +174,8 @@ extern "C"
         REACH_SETTINGS_UPDATE_COMPLETE,
         REACH_SETTINGS_UPDATE_ERROR
     } reach_settings_update_page_state;
+
+#define REACH_SETTINGS_DIAGNOSTICS_TEXT_CAPACITY 160
 
     typedef enum reach_settings_reach_update_state
     {
@@ -228,6 +231,8 @@ extern "C"
         uint16_t reach_current_version[REACH_APP_UPDATE_VERSION_CAPACITY];
         uint64_t reach_download_received;
         uint64_t reach_download_total;
+        uint16_t diagnostics_summary[REACH_SETTINGS_DIAGNOSTICS_TEXT_CAPACITY];
+        uint16_t diagnostics_notice[REACH_SETTINGS_DIAGNOSTICS_TEXT_CAPACITY];
         int32_t power_minutes[REACH_SETTINGS_POWER_TIMER_COUNT];
         int32_t power_applied_minutes[REACH_SETTINGS_POWER_TIMER_COUNT];
         int32_t power_wait_apps[REACH_SETTINGS_POWER_TIMER_COUNT];
@@ -346,6 +351,9 @@ extern "C"
         reach_rect_f32 reach_section_title;
         reach_rect_f32 reach_update_row;
         reach_rect_f32 reach_update_button;
+        reach_rect_f32 diagnostics_row;
+        reach_rect_f32 diagnostics_button;
+        reach_rect_f32 diagnostics_notice;
         reach_rect_f32 windows_section_title;
         reach_rect_f32 update_viewport;
         reach_rect_f32 update_scrollbar_track;
@@ -551,6 +559,9 @@ extern "C"
     const uint16_t *reach_settings_model_reach_update_status(const reach_settings_model *model);
     const uint16_t *
     reach_settings_model_reach_update_button_label(const reach_settings_model *model);
+    void reach_settings_model_set_diagnostics_summary(reach_settings_model *model,
+                                                      const char *text);
+    void reach_settings_model_set_diagnostics_notice(reach_settings_model *model, const char *text);
 
     int32_t reach_settings_power_option_minutes(size_t timer, size_t option);
     const uint16_t *reach_settings_power_option_label(size_t timer, size_t option);

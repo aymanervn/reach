@@ -28,6 +28,31 @@ void reach_settings_model_set_current_version(reach_settings_model *model, const
     reach_copy_utf16(model->reach_current_version, REACH_APP_UPDATE_VERSION_CAPACITY, version);
 }
 
+static void reach_settings_widen_ascii(const char *text, uint16_t *out, size_t capacity)
+{
+    size_t index = 0;
+    while (text != nullptr && text[index] != 0 && index + 1 < capacity)
+    {
+        out[index] = (unsigned char)text[index] < 128 ? (uint16_t)text[index] : (uint16_t)'?';
+        ++index;
+    }
+    out[index] = 0;
+}
+
+void reach_settings_model_set_diagnostics_summary(reach_settings_model *model, const char *text)
+{
+    if (model != nullptr)
+        reach_settings_widen_ascii(text, model->diagnostics_summary,
+                                   REACH_SETTINGS_DIAGNOSTICS_TEXT_CAPACITY);
+}
+
+void reach_settings_model_set_diagnostics_notice(reach_settings_model *model, const char *text)
+{
+    if (model != nullptr)
+        reach_settings_widen_ascii(text, model->diagnostics_notice,
+                                   REACH_SETTINGS_DIAGNOSTICS_TEXT_CAPACITY);
+}
+
 void reach_settings_model_begin_reach_check(reach_settings_model *model)
 {
     if (model == nullptr || model->reach_update_state == REACH_SETTINGS_REACH_UPDATE_CHECKING ||

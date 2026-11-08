@@ -960,6 +960,57 @@ static void render_reach_section(const reach_settings_render_input *input,
         reach_settings_model_button_press_motion(model, REACH_SETTINGS_HIT_REACH_UPDATE));
 }
 
+static void render_diagnostics_row(const reach_settings_render_input *input,
+                                   reach_render_command_buffer *commands)
+{
+    const reach_settings_model *model = input->model;
+    const reach_settings_layout *layout = input->layout;
+
+    const reach_rect_f32 row = layout->diagnostics_row;
+    reach_settings_push_rect(commands, row, reach_settings_scale(input, input->theme->radius_small),
+                             input->theme->settings_card_background);
+
+    reach_rect_f32 icon_box = {row.x + reach_settings_scale(input, 12.0f),
+                               row.y + (row.height - reach_settings_scale(input, 34.0f)) * 0.5f,
+                               reach_settings_scale(input, 34.0f),
+                               reach_settings_scale(input, 34.0f)};
+    reach_settings_push_rect(commands, icon_box,
+                             reach_settings_scale(input, input->theme->radius_small),
+                             input->theme->settings_icon_box_background);
+    reach_settings_push_icon(commands, icon_box, input->theme->settings_secondary_text,
+                             REACH_VECTOR_ICON_DOCUMENT, 0.22f);
+
+    float left = icon_box.x + icon_box.width + reach_settings_scale(input, 12.0f);
+    float width = layout->diagnostics_button.x - left - reach_settings_scale(input, 12.0f);
+    reach_settings_push_text(
+        commands,
+        {left, row.y + reach_settings_scale(input, 8.0f), width,
+         reach_settings_scale(input, 18.0f)},
+        (const uint16_t *)u"Diagnostics", reach_settings_scale(input, REACH_TEXT_SIZE_MEDIUM),
+        REACH_TEXT_WEIGHT_SEMIBOLD, input->text_alignment_leading, input->theme->settings_text, 1);
+    reach_settings_push_text(commands,
+                             {left, row.y + reach_settings_scale(input, 30.0f), width,
+                              reach_settings_scale(input, 14.0f)},
+                             model->diagnostics_summary,
+                             reach_settings_scale(input, REACH_TEXT_SIZE_XSMALL),
+                             REACH_TEXT_WEIGHT_NORMAL, input->text_alignment_leading,
+                             input->theme->settings_secondary_text, 1);
+
+    reach_ui_button_style style =
+        reach_settings_button_style(input, input->theme->settings_card_background);
+    reach_ui_button_render(
+        commands, layout->diagnostics_button, (const uint16_t *)u"Open folder", &style, 1, 2,
+        reach_settings_model_button_press_motion(model, REACH_SETTINGS_HIT_DIAGNOSTICS_OPEN));
+
+    if (model->diagnostics_notice[0] != 0)
+    {
+        reach_settings_push_text(commands, layout->diagnostics_notice, model->diagnostics_notice,
+                                 reach_settings_scale(input, REACH_TEXT_SIZE_XSMALL),
+                                 REACH_TEXT_WEIGHT_NORMAL, input->text_alignment_leading,
+                                 input->theme->settings_secondary_text, 1);
+    }
+}
+
 static void render_update_page(const reach_settings_render_input *input,
                                reach_render_command_buffer *commands)
 {
@@ -994,6 +1045,7 @@ static void render_update_page(const reach_settings_render_input *input,
         reach_settings_model_button_press_motion(model, REACH_SETTINGS_HIT_UPDATE_RESTART));
 
     render_reach_section(input, commands);
+    render_diagnostics_row(input, commands);
 
     reach_settings_push_text(
         commands, layout->windows_section_title, (const uint16_t *)u"Windows updates",
