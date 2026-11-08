@@ -7,6 +7,7 @@
 #include "reach/support/workload.h"
 #include "reach/adapters/windows/diagnostics_log.h"
 #include "reach/adapters/windows/frame_wait.h"
+#include "reach/adapters/windows/install_check.h"
 #include "reach/protocol/reach_service_protocol.h"
 
 static const wchar_t *REACH_LAUNCH_ARG = L"--launch";
@@ -70,6 +71,13 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
                     L"Reach cannot be launched directly. Run reachctl --start, or run "
                     L"reachctl --install first if Reach is not installed.",
                     L"Reach", MB_OK | MB_ICONINFORMATION);
+        return 0;
+    }
+
+    if (!reach_windows_reach_is_installed())
+    {
+        reach_log_info("launch refused reason=not_installed exit=0");
+        MessageBoxW(nullptr, L"Please install Reach first.", L"Reach", MB_OK | MB_ICONINFORMATION);
         return 0;
     }
 

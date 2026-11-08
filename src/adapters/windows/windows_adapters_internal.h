@@ -149,6 +149,7 @@ extern "C"
     reach_result
     reach_windows_shell_query_current_user(const uint16_t *exe_path,
                                            reach_shell_registration_status *out_status);
+    int32_t reach_windows_shell_value_is_reach(const uint16_t *shell, const uint16_t *exe_path);
     reach_result reach_windows_shell_launch_explorer(void);
 
 #ifdef __cplusplus
