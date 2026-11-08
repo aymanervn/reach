@@ -73,15 +73,6 @@ static void reach_notice_finish(HWND window)
     DestroyWindow(window);
 }
 
-static void reach_notice_open_diagnostics(void)
-{
-    wchar_t directory[MAX_PATH] = {};
-    if (reach_diagnostics_directory(directory, MAX_PATH))
-    {
-        ShellExecuteW(nullptr, L"open", directory, nullptr, nullptr, SW_SHOWNORMAL);
-    }
-}
-
 static void reach_notice_show(HWND window)
 {
     if (reach_notice_icon_added)
@@ -135,7 +126,7 @@ static LRESULT CALLBACK reach_notice_proc(HWND window, UINT message, WPARAM wpar
         {
         case NIN_BALLOONUSERCLICK:
             reach_log_info("notice clicked");
-            reach_notice_open_diagnostics();
+            (void)reach_diagnostics_open_folder();
             reach_notice_finish(window);
             break;
         case NIN_BALLOONTIMEOUT:
