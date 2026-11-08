@@ -7,40 +7,10 @@
 
 #include <wchar.h>
 
-static const DWORD REACH_INSTALL_QUERY_WAIT_MS = 15000;
-
 static int32_t reach_install_file_exists(const wchar_t *path)
 {
     DWORD attributes = GetFileAttributesW(path);
     return attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) == 0;
-}
-
-static int32_t reach_install_watchdog_task_registered(void)
-{
-    wchar_t command_line[] =
-        L"\"C:\\Windows\\System32\\schtasks.exe\" /Query /TN \"ReachWatchdog\"";
-
-    STARTUPINFOW startup = {};
-    startup.cb = sizeof(startup);
-
-    PROCESS_INFORMATION process = {};
-    if (!CreateProcessW(nullptr, command_line, nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr,
-                        nullptr, &startup, &process))
-    {
-        return 0;
-    }
-
-    CloseHandle(process.hThread);
-
-    DWORD wait_result = WaitForSingleObject(process.hProcess, REACH_INSTALL_QUERY_WAIT_MS);
-    DWORD exit_code = 1;
-    if (wait_result == WAIT_OBJECT_0)
-    {
-        (void)GetExitCodeProcess(process.hProcess, &exit_code);
-    }
-
-    CloseHandle(process.hProcess);
-    return wait_result == WAIT_OBJECT_0 && exit_code == 0;
 }
 
 int32_t reach_windows_reach_is_installed(void)
@@ -68,5 +38,5 @@ int32_t reach_windows_reach_is_installed(void)
         return 0;
     }
 
-    return reach_install_watchdog_task_registered();
+    return 1;
 }
