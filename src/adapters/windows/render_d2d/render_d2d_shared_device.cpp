@@ -1,6 +1,7 @@
 #include "../windows_adapters_internal.h"
 
 #include "render_d2d_internal.h"
+#include "render_d2d_retained_policy.h"
 
 reach_result reach_windows_create_render_device(reach_render_device **out_device)
 {
@@ -58,12 +59,22 @@ reach_result reach_windows_create_render_device(reach_render_device **out_device
                               IID_PPV_ARGS(&device->wic_factory));
     }
 
-    if (SUCCEEDED(hr) && SUCCEEDED(reach_winrt_activate_compositor(&device->compositor)))
+    if (SUCCEEDED(hr))
     {
-        ComPtr<ABI::Windows::UI::Composition::ICompositorInterop> interop;
-        if (FAILED(device->compositor.As(&interop)) ||
-            FAILED(interop->CreateGraphicsDevice(device->d2d_device,
-                                                 &device->composition_graphics_device)))
+        HRESULT compositor_hr = reach_winrt_activate_compositor(&device->compositor);
+        reach_d2d_log_hresult(L"RoActivateInstance(Compositor)", compositor_hr);
+        if (SUCCEEDED(compositor_hr))
+        {
+            ComPtr<ABI::Windows::UI::Composition::ICompositorInterop> interop;
+            compositor_hr = device->compositor.As(&interop);
+            if (SUCCEEDED(compositor_hr))
+            {
+                compositor_hr = interop->CreateGraphicsDevice(device->d2d_device,
+                                                              &device->composition_graphics_device);
+                reach_d2d_log_hresult(L"ICompositorInterop::CreateGraphicsDevice", compositor_hr);
+            }
+        }
+        if (FAILED(compositor_hr))
         {
             device->composition_graphics_device.Reset();
             device->compositor.Reset();
@@ -87,6 +98,8 @@ void reach_windows_destroy_render_device(reach_render_device *device)
         return;
     }
 
+    reach_d2d_device_release_device_resources(device);
+    reach_d2d_device_release_fonts(device);
     device->composition_graphics_device.Reset();
     device->compositor.Reset();
     if (device->d2d_device != nullptr)
@@ -123,24 +136,64 @@ void reach_windows_destroy_render_device(reach_render_device *device)
 
 void reach_d2d_device_surface_activated(reach_render_backend *backend)
 {
-    if (backend == nullptr || backend->device == nullptr || backend->surface_active)
+    if (backend == nullptr || backend->device == nullptr)
     {
         return;
     }
 
-    backend->surface_active = true;
-    ++backend->device->active_surfaces;
+    reach_d2d_surface_count_activate(&backend->surface_active, &backend->device->active_surfaces);
 }
 
 void reach_d2d_device_surface_deactivated(reach_render_backend *backend)
 {
-    if (backend == nullptr || backend->device == nullptr || !backend->surface_active)
+    if (backend == nullptr || backend->device == nullptr)
     {
         return;
     }
 
-    backend->surface_active = false;
-    --backend->device->active_surfaces;
+    reach_d2d_surface_count_deactivate(&backend->surface_active, &backend->device->active_surfaces);
+}
+
+void reach_d2d_device_release_device_resources(reach_render_device *device)
+{
+    if (device == nullptr)
+    {
+        return;
+    }
+
+    for (reach_d2d_icon_cache_entry &entry : device->icon_cache)
+    {
+        if (entry.bitmap != nullptr)
+        {
+            entry.bitmap->Release();
+        }
+    }
+    device->icon_cache.clear();
+    device->cover_cache.clear();
+
+    for (reach_d2d_shadow_cache_entry &entry : device->shadow_cache)
+    {
+        if (entry.bitmap != nullptr)
+        {
+            entry.bitmap->Release();
+        }
+    }
+    device->shadow_cache.clear();
+
+    ComPtr<ID2D1DeviceContext> &shadow_bake = device->shadow_bake_context;
+    ComPtr<ID2D1DeviceContext> &shadow_fallback = device->shadow_fallback_context;
+    ComPtr<ID2D1DeviceContext> &cover_bake = device->cover_bake_context;
+    for (ID2D1DeviceContext *context : {shadow_bake.Get(), shadow_fallback.Get(), cover_bake.Get()})
+    {
+        if (context != nullptr)
+        {
+            context->SetTarget(nullptr);
+        }
+    }
+    shadow_bake.Reset();
+    shadow_fallback.Reset();
+    cover_bake.Reset();
+    device->shadow_fallback_parent_device = nullptr;
 }
 
 void reach_d2d_device_trim_if_idle(reach_render_device *device)

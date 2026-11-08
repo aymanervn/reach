@@ -30,12 +30,12 @@ static int32_t reach_d2d_load_font_resource(UINT resource_id, const void **out_d
     return 1;
 }
 
-static IDWriteFontCollection *reach_d2d_build_bundled_collection(reach_render_backend *backend)
+static IDWriteFontCollection *reach_d2d_build_bundled_collection(reach_render_device *device)
 {
     IDWriteFactory5 *factory5 = nullptr;
-    if (backend->device->text_factory == nullptr ||
-        FAILED(backend->device->text_factory->QueryInterface(
-            __uuidof(IDWriteFactory5), reinterpret_cast<void **>(&factory5))) ||
+    if (device->text_factory == nullptr ||
+        FAILED(device->text_factory->QueryInterface(__uuidof(IDWriteFactory5),
+                                                    reinterpret_cast<void **>(&factory5))) ||
         factory5 == nullptr)
     {
         return nullptr;
@@ -117,7 +117,7 @@ static IDWriteFontCollection *reach_d2d_build_bundled_collection(reach_render_ba
         return nullptr;
     }
 
-    backend->bundled_font_loader = loader;
+    device->bundled_font_loader = loader;
     factory5->Release();
     return collection;
 }
@@ -128,12 +128,13 @@ static IDWriteFontCollection *reach_d2d_ui_font_collection(reach_render_backend 
     {
         return nullptr;
     }
-    if (!backend->bundled_font_attempted)
+    reach_render_device *device = backend->device;
+    if (!device->bundled_font_attempted)
     {
-        backend->bundled_font_attempted = 1;
-        backend->bundled_font_collection = reach_d2d_build_bundled_collection(backend);
+        device->bundled_font_attempted = true;
+        device->bundled_font_collection = reach_d2d_build_bundled_collection(device);
     }
-    return backend->bundled_font_collection;
+    return device->bundled_font_collection;
 }
 
 void reach_d2d_set_ui_font(reach_render_backend *backend, int32_t use_bundled_font)
@@ -264,35 +265,41 @@ reach_result reach_d2d_measure_text(void *context, const uint16_t *text, float t
 
 void reach_d2d_release_fonts(reach_render_backend *backend)
 {
-    if (backend != nullptr)
-    {
-        backend->text_layouts.clear();
-        backend->text_width_layouts.clear();
-        backend->text_formats.clear();
-    }
     if (backend == nullptr)
     {
         return;
     }
-    if (backend->bundled_font_collection != nullptr)
+    backend->text_layouts.clear();
+    backend->text_width_layouts.clear();
+    backend->text_formats.clear();
+}
+
+void reach_d2d_device_release_fonts(reach_render_device *device)
+{
+    if (device == nullptr)
     {
-        backend->bundled_font_collection->Release();
-        backend->bundled_font_collection = nullptr;
+        return;
     }
-    if (backend->bundled_font_loader != nullptr)
+    if (device->bundled_font_collection != nullptr)
+    {
+        device->bundled_font_collection->Release();
+        device->bundled_font_collection = nullptr;
+    }
+    if (device->bundled_font_loader != nullptr)
     {
         IDWriteFactory5 *factory5 = nullptr;
-        if (backend->device->text_factory != nullptr &&
-            SUCCEEDED(backend->device->text_factory->QueryInterface(
-                __uuidof(IDWriteFactory5), reinterpret_cast<void **>(&factory5))) &&
+        if (device->text_factory != nullptr &&
+            SUCCEEDED(device->text_factory->QueryInterface(__uuidof(IDWriteFactory5),
+                                                           reinterpret_cast<void **>(&factory5))) &&
             factory5 != nullptr)
         {
-            (void)factory5->UnregisterFontFileLoader(backend->bundled_font_loader);
+            (void)factory5->UnregisterFontFileLoader(device->bundled_font_loader);
             factory5->Release();
         }
-        backend->bundled_font_loader->Release();
-        backend->bundled_font_loader = nullptr;
+        device->bundled_font_loader->Release();
+        device->bundled_font_loader = nullptr;
     }
+    device->bundled_font_attempted = false;
 }
 
 static int32_t reach_d2d_font_family_exists(IDWriteFactory *factory, const wchar_t *family)

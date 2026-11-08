@@ -120,26 +120,27 @@ static int32_t reach_d2d_shadow_key_equal(const reach_d2d_shadow_key *a,
 
 static ID2D1DeviceContext *reach_d2d_shadow_bake_context(reach_render_backend *backend)
 {
-    if (backend->shadow_bake_context != nullptr)
+    reach_render_device *device = backend->device;
+    if (device->shadow_bake_context != nullptr)
     {
-        return backend->shadow_bake_context;
+        return device->shadow_bake_context.Get();
     }
-    if (backend->device->d2d_device == nullptr)
+    if (device->d2d_device == nullptr)
     {
         return nullptr;
     }
 
-    HRESULT hr = backend->device->d2d_device->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE,
-                                                                  &backend->shadow_bake_context);
+    HRESULT hr = device->d2d_device->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE,
+                                                         &device->shadow_bake_context);
     if (FAILED(hr))
     {
         reach_d2d_log_hresult(L"CreateDeviceContext(shadow bake)", hr);
-        backend->shadow_bake_context = nullptr;
+        device->shadow_bake_context.Reset();
         return nullptr;
     }
 
-    backend->shadow_bake_context->SetDpi(96.0f, 96.0f);
-    return backend->shadow_bake_context;
+    device->shadow_bake_context->SetDpi(96.0f, 96.0f);
+    return device->shadow_bake_context.Get();
 }
 
 static HRESULT reach_d2d_shadow_fill_list(ID2D1DeviceContext *context, ID2D1Geometry *geometry,
@@ -183,6 +184,7 @@ static reach_result reach_d2d_shadow_bake(reach_render_backend *backend,
     {
         return REACH_ERROR;
     }
+    reach_d2d_context_scope context_scope(context);
 
     reach_shadow shadow = reach_d2d_shadow_from_key(key);
     reach_shadow_pad pad = reach_theme_shadow_pad(&shadow, 1.0f);
@@ -306,7 +308,7 @@ static int32_t reach_d2d_shadow_key_is_sized(const reach_d2d_shadow_key *key)
 static void reach_d2d_shadow_retire_oldest_sized(reach_render_backend *backend)
 {
     size_t sized = 0;
-    for (const reach_d2d_shadow_cache_entry &entry : backend->shadow_cache)
+    for (const reach_d2d_shadow_cache_entry &entry : backend->device->shadow_cache)
     {
         if (reach_d2d_shadow_key_is_sized(&entry.key))
         {
@@ -318,17 +320,18 @@ static void reach_d2d_shadow_retire_oldest_sized(reach_render_backend *backend)
         return;
     }
 
-    for (size_t index = 0; index < backend->shadow_cache.size(); ++index)
+    for (size_t index = 0; index < backend->device->shadow_cache.size(); ++index)
     {
-        if (!reach_d2d_shadow_key_is_sized(&backend->shadow_cache[index].key))
+        if (!reach_d2d_shadow_key_is_sized(&backend->device->shadow_cache[index].key))
         {
             continue;
         }
-        if (backend->shadow_cache[index].bitmap != nullptr)
+        if (backend->device->shadow_cache[index].bitmap != nullptr)
         {
-            backend->shadow_cache[index].bitmap->Release();
+            backend->device->shadow_cache[index].bitmap->Release();
         }
-        backend->shadow_cache.erase(backend->shadow_cache.begin() + (ptrdiff_t)index);
+        backend->device->shadow_cache.erase(backend->device->shadow_cache.begin() +
+                                            (ptrdiff_t)index);
         return;
     }
 }
@@ -336,7 +339,7 @@ static void reach_d2d_shadow_retire_oldest_sized(reach_render_backend *backend)
 static ID2D1Bitmap1 *reach_d2d_shadow_acquire(reach_render_backend *backend,
                                               const reach_d2d_shadow_key *key)
 {
-    for (const reach_d2d_shadow_cache_entry &entry : backend->shadow_cache)
+    for (const reach_d2d_shadow_cache_entry &entry : backend->device->shadow_cache)
     {
         if (reach_d2d_shadow_key_equal(&entry.key, key))
         {
@@ -358,7 +361,7 @@ static ID2D1Bitmap1 *reach_d2d_shadow_acquire(reach_render_backend *backend,
     reach_d2d_shadow_cache_entry entry = {};
     entry.key = *key;
     entry.bitmap = bitmap;
-    backend->shadow_cache.push_back(entry);
+    backend->device->shadow_cache.push_back(entry);
     return bitmap;
 }
 
@@ -454,34 +457,4 @@ reach_result reach_d2d_draw_shadow(reach_render_backend *backend,
     }
 
     return REACH_OK;
-}
-
-void reach_d2d_clear_shadow_cache(reach_render_backend *backend)
-{
-    if (backend == nullptr)
-    {
-        return;
-    }
-
-    for (reach_d2d_shadow_cache_entry &entry : backend->shadow_cache)
-    {
-        if (entry.bitmap != nullptr)
-        {
-            entry.bitmap->Release();
-        }
-    }
-
-    backend->shadow_cache.clear();
-}
-
-void reach_d2d_release_shadow_bake_context(reach_render_backend *backend)
-{
-    if (backend == nullptr || backend->shadow_bake_context == nullptr)
-    {
-        return;
-    }
-
-    backend->shadow_bake_context->SetTarget(nullptr);
-    backend->shadow_bake_context->Release();
-    backend->shadow_bake_context = nullptr;
 }
