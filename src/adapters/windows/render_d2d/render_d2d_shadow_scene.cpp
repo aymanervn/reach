@@ -332,7 +332,7 @@ HRESULT shadow_filter_context(reach_render_backend *backend)
     if (SUCCEEDED(hr))
         hr = device.As(&dxgi);
     if (SUCCEEDED(hr))
-        hr = backend->factory->QueryInterface(IID_PPV_ARGS(&factory));
+        hr = backend->device->factory->QueryInterface(IID_PPV_ARGS(&factory));
     if (SUCCEEDED(hr))
         hr = factory->CreateDevice(dxgi.Get(), &drawing);
     if (SUCCEEDED(hr))

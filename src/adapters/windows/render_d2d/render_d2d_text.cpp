@@ -33,9 +33,9 @@ static int32_t reach_d2d_load_font_resource(UINT resource_id, const void **out_d
 static IDWriteFontCollection *reach_d2d_build_bundled_collection(reach_render_backend *backend)
 {
     IDWriteFactory5 *factory5 = nullptr;
-    if (backend->text_factory == nullptr ||
-        FAILED(backend->text_factory->QueryInterface(__uuidof(IDWriteFactory5),
-                                                     reinterpret_cast<void **>(&factory5))) ||
+    if (backend->device->text_factory == nullptr ||
+        FAILED(backend->device->text_factory->QueryInterface(
+            __uuidof(IDWriteFactory5), reinterpret_cast<void **>(&factory5))) ||
         factory5 == nullptr)
     {
         return nullptr;
@@ -178,7 +178,7 @@ static HRESULT reach_d2d_cached_layout(reach_render_backend *backend, const wcha
     HRESULT hr = S_OK;
     if (format == nullptr)
     {
-        hr = backend->text_factory->CreateTextFormat(
+        hr = backend->device->text_factory->CreateTextFormat(
             reach_d2d_ui_font_family(backend), reach_d2d_ui_font_collection(backend),
             (DWRITE_FONT_WEIGHT)weight, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, size,
             L"", &format);
@@ -191,7 +191,7 @@ static HRESULT reach_d2d_cached_layout(reach_render_backend *backend, const wcha
         if (SUCCEEDED(hr) && ellipsis)
         {
             ComPtr<IDWriteInlineObject> sign;
-            hr = backend->text_factory->CreateEllipsisTrimmingSign(format.Get(), &sign);
+            hr = backend->device->text_factory->CreateEllipsisTrimmingSign(format.Get(), &sign);
             DWRITE_TRIMMING trimming = {DWRITE_TRIMMING_GRANULARITY_CHARACTER, 0, 0};
             if (SUCCEEDED(hr))
                 hr = format->SetTrimming(&trimming, sign.Get());
@@ -205,8 +205,8 @@ static HRESULT reach_d2d_cached_layout(reach_render_backend *backend, const wcha
     }
     ComPtr<IDWriteTextLayout> layout;
     if (SUCCEEDED(hr))
-        hr = backend->text_factory->CreateTextLayout(text, (UINT32)wcslen(text), format.Get(),
-                                                     width, height, &layout);
+        hr = backend->device->text_factory->CreateTextLayout(text, (UINT32)wcslen(text),
+                                                             format.Get(), width, height, &layout);
     if (SUCCEEDED(hr))
     {
         if (wcslen(text) <= 1024)
@@ -226,7 +226,7 @@ reach_result reach_d2d_measure_text(void *context, const uint16_t *text, float t
 {
     reach_render_backend *backend = static_cast<reach_render_backend *>(context);
     if (backend == nullptr || text == nullptr || out_width == nullptr || text_size <= 0.0f ||
-        backend->text_factory == nullptr)
+        backend->device->text_factory == nullptr)
     {
         return REACH_INVALID_ARGUMENT;
     }
@@ -282,8 +282,8 @@ void reach_d2d_release_fonts(reach_render_backend *backend)
     if (backend->bundled_font_loader != nullptr)
     {
         IDWriteFactory5 *factory5 = nullptr;
-        if (backend->text_factory != nullptr &&
-            SUCCEEDED(backend->text_factory->QueryInterface(
+        if (backend->device->text_factory != nullptr &&
+            SUCCEEDED(backend->device->text_factory->QueryInterface(
                 __uuidof(IDWriteFactory5), reinterpret_cast<void **>(&factory5))) &&
             factory5 != nullptr)
         {
@@ -362,11 +362,11 @@ static const wchar_t *reach_d2d_ui_font_family(reach_render_backend *backend)
 
     wchar_t substitute[LF_FACESIZE] = {};
     reach_d2d_query_font_substitute(family, substitute, LF_FACESIZE);
-    if (reach_d2d_font_family_exists(backend->text_factory, substitute))
+    if (reach_d2d_font_family_exists(backend->device->text_factory, substitute))
     {
         wcsncpy_s(family, substitute, _TRUNCATE);
     }
-    else if (!reach_d2d_font_family_exists(backend->text_factory, family))
+    else if (!reach_d2d_font_family_exists(backend->device->text_factory, family))
     {
         wcsncpy_s(family, reach_d2d_font_fallback, _TRUNCATE);
     }
@@ -502,7 +502,7 @@ reach_result reach_d2d_draw_text_to_target(reach_render_backend *backend, ID2D1R
         return REACH_INVALID_ARGUMENT;
     }
 
-    if (target == nullptr || backend->text_factory == nullptr)
+    if (target == nullptr || backend->device->text_factory == nullptr)
     {
         return REACH_ERROR;
     }
@@ -608,7 +608,7 @@ reach_result reach_d2d_textbox_caret_line(reach_render_backend *backend,
                                           const reach_render_command *command,
                                           reach_render_command *out)
 {
-    if (backend == nullptr || backend->text_factory == nullptr || command == nullptr ||
+    if (backend == nullptr || backend->device->text_factory == nullptr || command == nullptr ||
         out == nullptr)
         return REACH_INVALID_ARGUMENT;
     *out = {};
@@ -628,7 +628,7 @@ reach_result reach_d2d_draw_textbox(reach_render_backend *backend,
     }
 
     ID2D1RenderTarget *target = reach_d2d_target(backend);
-    if (target == nullptr || backend->text_factory == nullptr)
+    if (target == nullptr || backend->device->text_factory == nullptr)
     {
         return REACH_ERROR;
     }

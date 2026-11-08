@@ -102,7 +102,7 @@ reach_result reach_wuc_apply_content_clip(reach_render_backend *backend,
 
 reach_result reach_wuc_create_target(reach_render_backend *backend)
 {
-    if (backend == nullptr || backend->hwnd == nullptr || backend->factory == nullptr)
+    if (backend == nullptr || backend->hwnd == nullptr || backend->device->factory == nullptr)
     {
         return REACH_INVALID_ARGUMENT;
     }
@@ -126,25 +126,10 @@ reach_result reach_wuc_create_target(reach_render_backend *backend)
         height = 1;
     }
 
-    HRESULT hr = RoInitialize(RO_INIT_SINGLETHREADED);
-    reach_d2d_log_hresult(L"RoInitialize", hr);
-
-    if (SUCCEEDED(hr))
-    {
-        backend->ro_initialized = 1;
-    }
-    else if (hr == RPC_E_CHANGED_MODE)
-    {
-        hr = S_OK;
-    }
-
     D3D_FEATURE_LEVEL actual_level = D3D_FEATURE_LEVEL_11_0;
 
-    if (SUCCEEDED(hr))
-    {
-        hr = reach_d3d11_create_device(&backend->d3d_device, &actual_level);
-        reach_d2d_log_hresult(L"D3D11CreateDevice", hr);
-    }
+    HRESULT hr = reach_d3d11_create_device(&backend->d3d_device, &actual_level);
+    reach_d2d_log_hresult(L"D3D11CreateDevice", hr);
     if (SUCCEEDED(hr))
     {
         hr = backend->d3d_device->QueryInterface(IID_PPV_ARGS(&backend->dxgi_device));
@@ -152,7 +137,7 @@ reach_result reach_wuc_create_target(reach_render_backend *backend)
     }
     if (SUCCEEDED(hr))
     {
-        hr = backend->factory->CreateDevice(backend->dxgi_device, &backend->d2d_device);
+        hr = backend->device->factory->CreateDevice(backend->dxgi_device, &backend->d2d_device);
         reach_d2d_log_hresult(L"ID2D1Factory1::CreateDevice", hr);
     }
     if (SUCCEEDED(hr))

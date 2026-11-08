@@ -14,7 +14,7 @@ ID2D1RenderTarget *reach_d2d_target(reach_render_backend *backend)
     {
         return backend->d2d_context;
     }
-    return backend->target;
+    return nullptr;
 }
 
 D2D1_COLOR_F reach_d2d_color(reach_color color)
@@ -51,42 +51,4 @@ HRESULT reach_d3d11_create_device(ID3D11Device **out_device, D3D_FEATURE_LEVEL *
     }
 
     return hr;
-}
-
-reach_result reach_d2d_create_target(reach_render_backend *backend)
-{
-    REACH_ASSERT(backend != nullptr);
-    if (backend == nullptr || backend->hwnd == nullptr || backend->factory == nullptr)
-    {
-        return REACH_INVALID_ARGUMENT;
-    }
-
-    RECT client = {};
-    GetClientRect(backend->hwnd, &client);
-
-    UINT width = static_cast<UINT>(client.right - client.left);
-    UINT height = static_cast<UINT>(client.bottom - client.top);
-
-    if (width == 0)
-    {
-        width = 1;
-    }
-    if (height == 0)
-    {
-        height = 1;
-    }
-
-    HRESULT hr = backend->factory->CreateHwndRenderTarget(
-        D2D1::RenderTargetProperties(),
-        D2D1::HwndRenderTargetProperties(backend->hwnd, D2D1::SizeU(width, height)),
-        &backend->target);
-
-    if (SUCCEEDED(hr))
-    {
-        backend->target->SetDpi(96, 96);
-        backend->target_width = width;
-        backend->target_height = height;
-    }
-
-    return SUCCEEDED(hr) ? REACH_OK : REACH_ERROR;
 }

@@ -83,7 +83,7 @@ reach_result reach_dcomp_create_swap_chain(reach_render_backend *backend, UINT w
 
 reach_result reach_dcomp_create_target(reach_render_backend *backend)
 {
-    if (backend == nullptr || backend->hwnd == nullptr || backend->factory == nullptr)
+    if (backend == nullptr || backend->hwnd == nullptr || backend->device->factory == nullptr)
     {
         return REACH_INVALID_ARGUMENT;
     }
@@ -112,7 +112,7 @@ reach_result reach_dcomp_create_target(reach_render_backend *backend)
     }
     if (SUCCEEDED(hr))
     {
-        hr = backend->factory->CreateDevice(backend->dxgi_device, &backend->d2d_device);
+        hr = backend->device->factory->CreateDevice(backend->dxgi_device, &backend->d2d_device);
     }
     if (SUCCEEDED(hr))
     {

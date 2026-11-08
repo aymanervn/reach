@@ -189,12 +189,19 @@ struct reach_d2d_retained_attachment
     int32_t has_shadow;
 };
 
+struct reach_render_device
+{
+    ID2D1Factory1 *factory = nullptr;
+    IDWriteFactory *text_factory = nullptr;
+    IWICImagingFactory *wic_factory = nullptr;
+    int ro_initialized = 0;
+};
+
 struct reach_render_backend
 {
     HWND hwnd;
 
-    ID2D1Factory1 *factory;
-    ID2D1HwndRenderTarget *target;
+    reach_render_device *device;
     ID2D1RenderTarget *command_target = nullptr;
 
     ID3D11Device *d3d_device;
@@ -208,7 +215,6 @@ struct reach_render_backend
     IDCompositionTarget *dcomp_target;
     IDCompositionVisual2 *dcomp_visual;
 
-    int ro_initialized;
     ComPtr<ABI::Windows::UI::Composition::ICompositor> compositor;
     ComPtr<ABI::Windows::UI::Composition::ICompositionTarget> composition_target;
     ComPtr<ABI::Windows::UI::Composition::IContainerVisual> root_visual;
@@ -252,9 +258,6 @@ struct reach_render_backend
     std::vector<reach_d2d_text_layout_entry> text_layouts;
     std::vector<reach_d2d_text_width_entry> text_width_layouts;
     std::vector<reach_d2d_cover_entry> cover_cache;
-    IDWriteFactory *text_factory;
-    IWICImagingFactory *wic_factory;
-
     wchar_t ui_font_family[LF_FACESIZE];
     IDWriteFontCollection *bundled_font_collection;
     IDWriteInMemoryFontFileLoader *bundled_font_loader;
@@ -302,7 +305,6 @@ D2D1_COLOR_F reach_d2d_color(reach_color color);
 void reach_d2d_log_hresult(const wchar_t *context, HRESULT hr);
 
 HRESULT reach_d3d11_create_device(ID3D11Device **out_device, D3D_FEATURE_LEVEL *out_level);
-reach_result reach_d2d_create_target(reach_render_backend *backend);
 
 reach_result reach_dcomp_create_swap_chain(reach_render_backend *backend, UINT width, UINT height);
 reach_result reach_dcomp_create_target_bitmap(reach_render_backend *backend);

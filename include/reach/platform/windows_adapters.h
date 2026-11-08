@@ -46,9 +46,12 @@ extern "C"
 
     reach_result reach_windows_create_platform_window(reach_surface_role role,
                                                       reach_platform_window_port *out_port);
-    reach_result reach_windows_create_d2d_render_backend(reach_platform_window *window,
-                                                         reach_render_backend_port *out_port);
-    reach_result reach_windows_create_dcomp_render_backend(reach_platform_window *window,
+    typedef struct reach_render_device reach_render_device;
+
+    reach_result reach_windows_create_render_device(reach_render_device **out_device);
+    void reach_windows_destroy_render_device(reach_render_device *device);
+    reach_result reach_windows_create_dcomp_render_backend(reach_render_device *device,
+                                                           reach_platform_window *window,
                                                            reach_render_backend_port *out_port);
     reach_result reach_windows_create_search_provider(reach_search_provider_port *out_port);
     reach_result reach_windows_create_settings_launcher(reach_settings_launcher_port *out_port);

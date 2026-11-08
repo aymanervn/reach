@@ -869,7 +869,7 @@ static reach_result reach_d2d_draw_svg_path_tag(reach_render_backend *backend,
 
     ID2D1PathGeometry *geometry = nullptr;
     reach_result result =
-        reach_svg_path_to_geometry(backend->factory, path_data, style.fill_mode, &geometry);
+        reach_svg_path_to_geometry(backend->device->factory, path_data, style.fill_mode, &geometry);
 
     if (result != REACH_OK || geometry == nullptr)
     {
@@ -877,7 +877,8 @@ static reach_result reach_d2d_draw_svg_path_tag(reach_render_backend *backend,
     }
 
     ID2D1TransformedGeometry *transformed = nullptr;
-    HRESULT hr = backend->factory->CreateTransformedGeometry(geometry, transform, &transformed);
+    HRESULT hr =
+        backend->device->factory->CreateTransformedGeometry(geometry, transform, &transformed);
     geometry->Release();
 
     if (FAILED(hr) || transformed == nullptr)
@@ -888,7 +889,7 @@ static reach_result reach_d2d_draw_svg_path_tag(reach_render_backend *backend,
     ID2D1StrokeStyle *stroke_style = nullptr;
     if (style.stroke)
     {
-        result = reach_d2d_create_stroke_style(backend->factory, style, &stroke_style);
+        result = reach_d2d_create_stroke_style(backend->device->factory, style, &stroke_style);
         if (result != REACH_OK)
         {
             transformed->Release();
@@ -931,8 +932,8 @@ reach_d2d_draw_svg_circle_tag(reach_render_backend *backend, ID2D1RenderTarget *
     }
 
     ID2D1EllipseGeometry *geometry = nullptr;
-    HRESULT hr = backend->factory->CreateEllipseGeometry(D2D1::Ellipse(D2D1::Point2F(cx, cy), r, r),
-                                                         &geometry);
+    HRESULT hr = backend->device->factory->CreateEllipseGeometry(
+        D2D1::Ellipse(D2D1::Point2F(cx, cy), r, r), &geometry);
 
     if (FAILED(hr) || geometry == nullptr)
     {
@@ -940,7 +941,7 @@ reach_d2d_draw_svg_circle_tag(reach_render_backend *backend, ID2D1RenderTarget *
     }
 
     ID2D1TransformedGeometry *transformed = nullptr;
-    hr = backend->factory->CreateTransformedGeometry(geometry, transform, &transformed);
+    hr = backend->device->factory->CreateTransformedGeometry(geometry, transform, &transformed);
     geometry->Release();
 
     if (FAILED(hr) || transformed == nullptr)
@@ -953,7 +954,7 @@ reach_d2d_draw_svg_circle_tag(reach_render_backend *backend, ID2D1RenderTarget *
 
     if (style.stroke)
     {
-        result = reach_d2d_create_stroke_style(backend->factory, style, &stroke_style);
+        result = reach_d2d_create_stroke_style(backend->device->factory, style, &stroke_style);
         if (result != REACH_OK)
         {
             transformed->Release();
@@ -976,7 +977,7 @@ static reach_result reach_d2d_draw_svg_resource(reach_render_backend *backend,
                                                 const reach_render_command *command,
                                                 const std::string &svg)
 {
-    if (backend == nullptr || backend->factory == nullptr || command == nullptr)
+    if (backend == nullptr || backend->device->factory == nullptr || command == nullptr)
     {
         return REACH_INVALID_ARGUMENT;
     }

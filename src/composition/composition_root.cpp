@@ -30,7 +30,12 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
     }
 
     reach_host_dependencies dependencies = {};
-    reach_result result = reach_windows_create_tray_provider(&dependencies.tray_provider);
+    reach_result result = reach_windows_create_render_device(&app->render_device);
+
+    if (result == REACH_OK)
+    {
+        result = reach_windows_create_tray_provider(&dependencies.tray_provider);
+    }
 
     if (result == REACH_OK)
     {
@@ -54,7 +59,8 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
     }
     if (result == REACH_OK)
     {
-        result = reach_windows_create_dcomp_render_backend(dependencies.launcher_window.window,
+        result = reach_windows_create_dcomp_render_backend(app->render_device,
+                                                           dependencies.launcher_window.window,
                                                            &dependencies.launcher_renderer);
     }
     if (result == REACH_OK)
@@ -64,8 +70,8 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
     }
     if (result == REACH_OK)
     {
-        result = reach_windows_create_dcomp_render_backend(dependencies.dock_window.window,
-                                                           &dependencies.dock_renderer);
+        result = reach_windows_create_dcomp_render_backend(
+            app->render_device, dependencies.dock_window.window, &dependencies.dock_renderer);
     }
     if (result == REACH_OK)
     {
@@ -74,8 +80,8 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
     }
     if (result == REACH_OK)
     {
-        result = reach_windows_create_dcomp_render_backend(dependencies.top_bar_window.window,
-                                                           &dependencies.top_bar_renderer);
+        result = reach_windows_create_dcomp_render_backend(
+            app->render_device, dependencies.top_bar_window.window, &dependencies.top_bar_renderer);
     }
     if (result == REACH_OK)
     {
@@ -84,8 +90,8 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
     }
     if (result == REACH_OK)
     {
-        result = reach_windows_create_dcomp_render_backend(dependencies.tray_window.window,
-                                                           &dependencies.tray_renderer);
+        result = reach_windows_create_dcomp_render_backend(
+            app->render_device, dependencies.tray_window.window, &dependencies.tray_renderer);
     }
     if (result == REACH_OK)
     {
@@ -94,7 +100,8 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
     }
     if (result == REACH_OK)
     {
-        result = reach_windows_create_dcomp_render_backend(dependencies.switcher_window.window,
+        result = reach_windows_create_dcomp_render_backend(app->render_device,
+                                                           dependencies.switcher_window.window,
                                                            &dependencies.switcher_renderer);
     }
     if (result == REACH_OK)
@@ -104,8 +111,8 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
     }
     if (result == REACH_OK)
     {
-        result = reach_windows_create_dcomp_render_backend(dependencies.stage_window.window,
-                                                           &dependencies.stage_renderer);
+        result = reach_windows_create_dcomp_render_backend(
+            app->render_device, dependencies.stage_window.window, &dependencies.stage_renderer);
     }
     if (result == REACH_OK)
     {
@@ -134,7 +141,8 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
     }
     if (result == REACH_OK)
     {
-        result = reach_windows_create_dcomp_render_backend(dependencies.context_menu_window.window,
+        result = reach_windows_create_dcomp_render_backend(app->render_device,
+                                                           dependencies.context_menu_window.window,
                                                            &dependencies.context_menu_renderer);
     }
     if (result == REACH_OK)
@@ -145,7 +153,8 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
     if (result == REACH_OK)
     {
         result = reach_windows_create_dcomp_render_backend(
-            dependencies.quick_settings_window.window, &dependencies.quick_settings_renderer);
+            app->render_device, dependencies.quick_settings_window.window,
+            &dependencies.quick_settings_renderer);
     }
     if (result == REACH_OK)
     {
@@ -154,8 +163,8 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
     }
     if (result == REACH_OK)
     {
-        result = reach_windows_create_dcomp_render_backend(dependencies.battery_window.window,
-                                                           &dependencies.battery_renderer);
+        result = reach_windows_create_dcomp_render_backend(
+            app->render_device, dependencies.battery_window.window, &dependencies.battery_renderer);
     }
     if (result == REACH_OK)
     {
@@ -164,7 +173,8 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
     }
     if (result == REACH_OK)
     {
-        result = reach_windows_create_dcomp_render_backend(dependencies.system_hud_window.window,
+        result = reach_windows_create_dcomp_render_backend(app->render_device,
+                                                           dependencies.system_hud_window.window,
                                                            &dependencies.system_hud_renderer);
     }
     if (result == REACH_OK)
@@ -174,7 +184,8 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
     }
     if (result == REACH_OK)
     {
-        result = reach_windows_create_dcomp_render_backend(dependencies.clipboard_window.window,
+        result = reach_windows_create_dcomp_render_backend(app->render_device,
+                                                           dependencies.clipboard_window.window,
                                                            &dependencies.clipboard_renderer);
     }
     if (result == REACH_OK)
@@ -444,6 +455,7 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
             dependencies.media_controls.destroy(dependencies.media_controls.userdata);
         }
         reach_windows_destroy_explorer_desktop_compat_host();
+        reach_windows_destroy_render_device(app->render_device);
         delete app;
         return result;
     }
@@ -551,5 +563,6 @@ void reach_app_destroy(reach_app *app)
 
     reach_host_destroy(app->host);
     reach_windows_destroy_explorer_desktop_compat_host();
+    reach_windows_destroy_render_device(app->render_device);
     delete app;
 }

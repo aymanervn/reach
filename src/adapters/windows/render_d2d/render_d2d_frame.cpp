@@ -64,15 +64,6 @@ reach_result reach_d2d_begin_frame(reach_render_backend *backend)
                                             static_cast<float>(width), static_cast<float>(height));
             }
         }
-        else if (backend->target != nullptr)
-        {
-            reach_d2d_clear_icon_cache(backend);
-            HRESULT resize_hr = backend->target->Resize(D2D1::SizeU(width, height));
-            if (FAILED(resize_hr))
-            {
-                return REACH_ERROR;
-            }
-        }
 
         if (backend->root_visual != nullptr)
             (void)reach_visual_set_size(backend->root_visual.Get(), (float)width, (float)height);
@@ -118,13 +109,6 @@ reach_result reach_d2d_end_frame(reach_render_backend *backend)
         reach_d2d_clear_icon_cache(backend);
         reach_d2d_clear_shadow_cache(backend);
         reach_d2d_release_shadow_bake_context(backend);
-
-        if (backend->target != nullptr)
-        {
-            backend->target->Release();
-            backend->target = nullptr;
-            return reach_d2d_create_target(backend);
-        }
 
         return REACH_ERROR;
     }

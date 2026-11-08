@@ -10,9 +10,12 @@ extern "C"
 
 #define REACH_APP_WAIT_FOREVER 0xFFFFFFFFu
 
+    struct reach_render_device;
+
     typedef struct reach_app
     {
         reach_host *host;
+        struct reach_render_device *render_device;
         reach_input_source_port input_source;
     } reach_app;
 

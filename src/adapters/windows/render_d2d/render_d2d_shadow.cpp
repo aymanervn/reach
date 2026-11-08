@@ -179,7 +179,7 @@ static reach_result reach_d2d_shadow_bake(reach_render_backend *backend,
                                           ID2D1Bitmap1 **out_bitmap)
 {
     ID2D1DeviceContext *context = reach_d2d_shadow_bake_context(backend);
-    if (context == nullptr || backend->factory == nullptr)
+    if (context == nullptr || backend->device->factory == nullptr)
     {
         return REACH_ERROR;
     }
@@ -202,8 +202,8 @@ static reach_result reach_d2d_shadow_bake(reach_render_backend *backend,
         key->has_notch ? pad.left + key->notch_offset_x : pad.left + content_width * 0.5f;
 
     ID2D1PathGeometry *geometry = nullptr;
-    if (reach_d2d_create_notched_rounded_rect_geometry(backend->factory, &shape, &geometry) !=
-        REACH_OK)
+    if (reach_d2d_create_notched_rounded_rect_geometry(backend->device->factory, &shape,
+                                                       &geometry) != REACH_OK)
     {
         return REACH_ERROR;
     }

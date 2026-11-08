@@ -51,12 +51,6 @@ void reach_d2d_destroy(reach_render_backend *backend)
     backend->composition_target.Reset();
     backend->compositor.Reset();
 
-    if (backend->ro_initialized)
-    {
-        RoUninitialize();
-        backend->ro_initialized = 0;
-    }
-
     if (backend->swap_chain != nullptr)
     {
         backend->swap_chain->Release();
@@ -77,23 +71,7 @@ void reach_d2d_destroy(reach_render_backend *backend)
     {
         backend->d3d_device->Release();
     }
-    if (backend->target != nullptr)
-    {
-        backend->target->Release();
-    }
     reach_d2d_release_fonts(backend);
-    if (backend->text_factory != nullptr)
-    {
-        backend->text_factory->Release();
-    }
-    if (backend->wic_factory != nullptr)
-    {
-        backend->wic_factory->Release();
-    }
-    if (backend->factory != nullptr)
-    {
-        backend->factory->Release();
-    }
 
     delete backend;
 }
@@ -120,12 +98,6 @@ static void reach_d2d_release_composition_target_state(reach_render_backend *bac
 
     backend->composition_target.Reset();
     backend->compositor.Reset();
-
-    if (backend->ro_initialized)
-    {
-        RoUninitialize();
-        backend->ro_initialized = 0;
-    }
 
     if (backend->swap_chain_bitmap != nullptr)
     {
@@ -159,13 +131,15 @@ static void reach_d2d_release_composition_target_state(reach_render_backend *bac
     }
 }
 
-reach_result reach_windows_create_d2d_render_backend(reach_platform_window *window,
-                                                     reach_render_backend_port *out_port)
+reach_result reach_windows_create_dcomp_render_backend(reach_render_device *device,
+                                                       reach_platform_window *window,
+                                                       reach_render_backend_port *out_port)
 {
+    REACH_ASSERT(device != nullptr);
     REACH_ASSERT(window != nullptr);
     REACH_ASSERT(out_port != nullptr);
 
-    if (window == nullptr || out_port == nullptr)
+    if (device == nullptr || window == nullptr || out_port == nullptr)
     {
         return REACH_INVALID_ARGUMENT;
     }
@@ -184,99 +158,14 @@ reach_result reach_windows_create_d2d_render_backend(reach_platform_window *wind
     }
 
     backend->hwnd = static_cast<HWND>(native_window);
+    backend->device = device;
 
-    HRESULT hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, &backend->factory);
-
-    if (SUCCEEDED(hr))
-    {
-        hr = DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory),
-                                 reinterpret_cast<IUnknown **>(&backend->text_factory));
-    }
-
-    if (SUCCEEDED(hr))
-    {
-        hr = CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER,
-                              IID_PPV_ARGS(&backend->wic_factory));
-    }
-
-    if (SUCCEEDED(hr))
-    {
-        hr = reach_d2d_create_target(backend) == REACH_OK ? S_OK : E_FAIL;
-    }
+    HRESULT hr = reach_wuc_create_target(backend) == REACH_OK ? S_OK : E_FAIL;
 
     if (FAILED(hr))
     {
-        reach_d2d_destroy(backend);
-        return REACH_ERROR;
-    }
-
-    out_port->backend = backend;
-    out_port->ops.begin_frame = reach_d2d_begin_frame;
-    out_port->ops.end_frame = reach_d2d_end_frame;
-    out_port->ops.synchronize = reach_d2d_synchronize;
-    out_port->ops.retained_supported = reach_d2d_retained_supported;
-    out_port->ops.presentation_complete = reach_d2d_presentation_complete;
-    out_port->ops.suspend = reach_d2d_suspend;
-    out_port->ops.content_sampling_required = reach_d2d_content_sampling_required;
-    out_port->ops.sample_content = reach_d2d_sample_content;
-    out_port->ops.execute = reach_d2d_execute;
-    out_port->ops.release_icon = reach_d2d_release_icon_cache_entry;
-    out_port->ops.set_ui_font = reach_d2d_set_ui_font;
-    out_port->ops.measure_text = reach_d2d_measure_text;
-    out_port->ops.destroy = reach_d2d_destroy;
-
-    return REACH_OK;
-}
-
-reach_result reach_windows_create_dcomp_render_backend(reach_platform_window *window,
-                                                       reach_render_backend_port *out_port)
-{
-    REACH_ASSERT(window != nullptr);
-    REACH_ASSERT(out_port != nullptr);
-
-    if (window == nullptr || out_port == nullptr)
-    {
-        return REACH_INVALID_ARGUMENT;
-    }
-    void *native_window = reach_windows_platform_window_native_handle(window);
-    if (native_window == nullptr)
-    {
-        return REACH_INVALID_ARGUMENT;
-    }
-
-    *out_port = {};
-
-    reach_render_backend *backend = new (std::nothrow) reach_render_backend();
-    if (backend == nullptr)
-    {
-        return REACH_ERROR;
-    }
-
-    backend->hwnd = static_cast<HWND>(native_window);
-
-    HRESULT hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, &backend->factory);
-
-    if (SUCCEEDED(hr))
-    {
-        hr = DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory),
-                                 reinterpret_cast<IUnknown **>(&backend->text_factory));
-    }
-
-    if (SUCCEEDED(hr))
-    {
-        hr = CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER,
-                              IID_PPV_ARGS(&backend->wic_factory));
-    }
-
-    if (SUCCEEDED(hr))
-    {
-        hr = reach_wuc_create_target(backend) == REACH_OK ? S_OK : E_FAIL;
-
-        if (FAILED(hr))
-        {
-            reach_d2d_release_composition_target_state(backend);
-            hr = reach_dcomp_create_blur_target(backend) == REACH_OK ? S_OK : E_FAIL;
-        }
+        reach_d2d_release_composition_target_state(backend);
+        hr = reach_dcomp_create_blur_target(backend) == REACH_OK ? S_OK : E_FAIL;
     }
 
     if (FAILED(hr))
