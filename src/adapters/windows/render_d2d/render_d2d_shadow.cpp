@@ -124,13 +124,13 @@ static ID2D1DeviceContext *reach_d2d_shadow_bake_context(reach_render_backend *b
     {
         return backend->shadow_bake_context;
     }
-    if (backend->d2d_device == nullptr)
+    if (backend->device->d2d_device == nullptr)
     {
         return nullptr;
     }
 
-    HRESULT hr = backend->d2d_device->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE,
-                                                          &backend->shadow_bake_context);
+    HRESULT hr = backend->device->d2d_device->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE,
+                                                                  &backend->shadow_bake_context);
     if (FAILED(hr))
     {
         reach_d2d_log_hresult(L"CreateDeviceContext(shadow bake)", hr);

@@ -830,7 +830,8 @@ reach_result reach_d2d_draw_blurred_image(reach_render_backend *backend,
         if (bake_width > 4096 || bake_height > 4096 ||
             (uint64_t)bake_width * bake_height * 4 > 16 * 1024 * 1024)
             return REACH_ERROR;
-        hr = backend->d2d_device->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE, &bake);
+        hr = backend->device->d2d_device->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE,
+                                                              &bake);
         D2D1_BITMAP_PROPERTIES1 properties = D2D1::BitmapProperties1(
             D2D1_BITMAP_OPTIONS_TARGET,
             D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED));

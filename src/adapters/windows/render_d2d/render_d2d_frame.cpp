@@ -13,6 +13,8 @@ reach_result reach_d2d_begin_frame(reach_render_backend *backend)
         return REACH_INVALID_ARGUMENT;
     }
 
+    reach_d2d_device_surface_activated(backend);
+
     RECT client = {};
     GetClientRect(backend->hwnd, &client);
 

@@ -194,6 +194,10 @@ struct reach_render_device
     ID2D1Factory1 *factory = nullptr;
     IDWriteFactory *text_factory = nullptr;
     IWICImagingFactory *wic_factory = nullptr;
+    ID3D11Device *d3d_device = nullptr;
+    IDXGIDevice *dxgi_device = nullptr;
+    ID2D1Device *d2d_device = nullptr;
+    uint32_t active_surfaces = 0;
     int ro_initialized = 0;
 };
 
@@ -202,11 +206,9 @@ struct reach_render_backend
     HWND hwnd;
 
     reach_render_device *device;
+    bool surface_active = false;
     ID2D1RenderTarget *command_target = nullptr;
 
-    ID3D11Device *d3d_device;
-    IDXGIDevice *dxgi_device;
-    ID2D1Device *d2d_device;
     ID2D1DeviceContext *d2d_context;
     IDXGISwapChain1 *swap_chain;
     ID2D1Bitmap1 *swap_chain_bitmap;
@@ -303,6 +305,10 @@ reach_result reach_d2d_measure_text(void *context, const uint16_t *text, float t
 void reach_d2d_release_fonts(reach_render_backend *backend);
 D2D1_COLOR_F reach_d2d_color(reach_color color);
 void reach_d2d_log_hresult(const wchar_t *context, HRESULT hr);
+
+void reach_d2d_device_surface_activated(reach_render_backend *backend);
+void reach_d2d_device_surface_deactivated(reach_render_backend *backend);
+void reach_d2d_device_trim_if_idle(reach_render_device *device);
 
 HRESULT reach_d3d11_create_device(ID3D11Device **out_device, D3D_FEATURE_LEVEL *out_level);
 

@@ -126,26 +126,9 @@ reach_result reach_wuc_create_target(reach_render_backend *backend)
         height = 1;
     }
 
-    D3D_FEATURE_LEVEL actual_level = D3D_FEATURE_LEVEL_11_0;
-
-    HRESULT hr = reach_d3d11_create_device(&backend->d3d_device, &actual_level);
-    reach_d2d_log_hresult(L"D3D11CreateDevice", hr);
-    if (SUCCEEDED(hr))
-    {
-        hr = backend->d3d_device->QueryInterface(IID_PPV_ARGS(&backend->dxgi_device));
-        reach_d2d_log_hresult(L"ID3D11Device::QueryInterface IDXGIDevice", hr);
-    }
-    if (SUCCEEDED(hr))
-    {
-        hr = backend->device->factory->CreateDevice(backend->dxgi_device, &backend->d2d_device);
-        reach_d2d_log_hresult(L"ID2D1Factory1::CreateDevice", hr);
-    }
-    if (SUCCEEDED(hr))
-    {
-        hr = backend->d2d_device->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE,
-                                                      &backend->d2d_context);
-        reach_d2d_log_hresult(L"ID2D1Device::CreateDeviceContext", hr);
-    }
+    HRESULT hr = backend->device->d2d_device->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE,
+                                                                  &backend->d2d_context);
+    reach_d2d_log_hresult(L"ID2D1Device::CreateDeviceContext", hr);
     if (SUCCEEDED(hr))
     {
         hr = reach_dcomp_create_swap_chain(backend, width, height) == REACH_OK ? S_OK : E_FAIL;
@@ -221,7 +204,7 @@ reach_result reach_wuc_create_target(reach_render_backend *backend)
     }
     if (SUCCEEDED(hr))
     {
-        hr = compositor_interop->CreateGraphicsDevice(backend->d2d_device,
+        hr = compositor_interop->CreateGraphicsDevice(backend->device->d2d_device,
                                                       &backend->composition_graphics_device);
         reach_d2d_log_hresult(L"CreateCompositionGraphicsDevice", hr);
     }

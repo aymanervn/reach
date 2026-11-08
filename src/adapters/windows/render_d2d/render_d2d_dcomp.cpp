@@ -36,7 +36,7 @@ reach_result reach_dcomp_create_target_bitmap(reach_render_backend *backend)
 
 reach_result reach_dcomp_create_swap_chain(reach_render_backend *backend, UINT width, UINT height)
 {
-    if (backend == nullptr || backend->dxgi_device == nullptr)
+    if (backend == nullptr || backend->device->dxgi_device == nullptr)
     {
         return REACH_INVALID_ARGUMENT;
     }
@@ -44,7 +44,7 @@ reach_result reach_dcomp_create_swap_chain(reach_render_backend *backend, UINT w
     IDXGIAdapter *adapter = nullptr;
     IDXGIFactory2 *factory = nullptr;
 
-    HRESULT hr = backend->dxgi_device->GetAdapter(&adapter);
+    HRESULT hr = backend->device->dxgi_device->GetAdapter(&adapter);
     if (SUCCEEDED(hr))
     {
         hr = adapter->GetParent(IID_PPV_ARGS(&factory));
@@ -65,7 +65,7 @@ reach_result reach_dcomp_create_swap_chain(reach_render_backend *backend, UINT w
         desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
         desc.AlphaMode = DXGI_ALPHA_MODE_PREMULTIPLIED;
 
-        hr = factory->CreateSwapChainForComposition(backend->d3d_device, &desc, nullptr,
+        hr = factory->CreateSwapChainForComposition(backend->device->d3d_device, &desc, nullptr,
                                                     &backend->swap_chain);
     }
 
@@ -103,29 +103,16 @@ reach_result reach_dcomp_create_target(reach_render_backend *backend)
         height = 1;
     }
 
-    D3D_FEATURE_LEVEL actual_level = D3D_FEATURE_LEVEL_11_0;
-
-    HRESULT hr = reach_d3d11_create_device(&backend->d3d_device, &actual_level);
-    if (SUCCEEDED(hr))
-    {
-        hr = backend->d3d_device->QueryInterface(IID_PPV_ARGS(&backend->dxgi_device));
-    }
-    if (SUCCEEDED(hr))
-    {
-        hr = backend->device->factory->CreateDevice(backend->dxgi_device, &backend->d2d_device);
-    }
-    if (SUCCEEDED(hr))
-    {
-        hr = backend->d2d_device->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE,
-                                                      &backend->d2d_context);
-    }
+    HRESULT hr = backend->device->d2d_device->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE,
+                                                                  &backend->d2d_context);
     if (SUCCEEDED(hr))
     {
         hr = reach_dcomp_create_swap_chain(backend, width, height) == REACH_OK ? S_OK : E_FAIL;
     }
     if (SUCCEEDED(hr))
     {
-        hr = DCompositionCreateDevice3(backend->d2d_device, IID_PPV_ARGS(&backend->dcomp_device));
+        hr = DCompositionCreateDevice3(backend->device->d2d_device,
+                                       IID_PPV_ARGS(&backend->dcomp_device));
     }
     if (SUCCEEDED(hr))
     {

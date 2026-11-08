@@ -59,18 +59,7 @@ void reach_d2d_destroy(reach_render_backend *backend)
     {
         backend->d2d_context->Release();
     }
-    if (backend->d2d_device != nullptr)
-    {
-        backend->d2d_device->Release();
-    }
-    if (backend->dxgi_device != nullptr)
-    {
-        backend->dxgi_device->Release();
-    }
-    if (backend->d3d_device != nullptr)
-    {
-        backend->d3d_device->Release();
-    }
+    reach_d2d_device_surface_deactivated(backend);
     reach_d2d_release_fonts(backend);
 
     delete backend;
@@ -113,21 +102,6 @@ static void reach_d2d_release_composition_target_state(reach_render_backend *bac
     {
         backend->d2d_context->Release();
         backend->d2d_context = nullptr;
-    }
-    if (backend->d2d_device != nullptr)
-    {
-        backend->d2d_device->Release();
-        backend->d2d_device = nullptr;
-    }
-    if (backend->dxgi_device != nullptr)
-    {
-        backend->dxgi_device->Release();
-        backend->dxgi_device = nullptr;
-    }
-    if (backend->d3d_device != nullptr)
-    {
-        backend->d3d_device->Release();
-        backend->d3d_device = nullptr;
     }
 }
 
