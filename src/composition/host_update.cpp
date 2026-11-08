@@ -126,6 +126,8 @@ static int32_t reach_host_presentation_ready(reach_feature_runtime *runtime)
     int32_t complete = 0;
     reach_result result =
         renderer->ops.presentation_complete(renderer->backend, opacity->generation, &complete);
+    if (result == REACH_DEVICE_LOST)
+        return 1;
     if (result != REACH_OK)
     {
         if (renderer->ops.suspend != nullptr)

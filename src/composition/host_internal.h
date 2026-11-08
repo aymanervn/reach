@@ -538,6 +538,7 @@ void reach_host_close_activating_surfaces_on_focus_loss(reach_host *host);
 int32_t reach_host_any_surface_open(reach_host *host, uint32_t class_mask);
 int32_t reach_host_any_surface_dirty(const reach_host *host);
 void reach_host_mark_all_surfaces_dirty(reach_host *host);
+void reach_host_render_device_recovered(reach_host *host);
 void reach_host_invalidate_display_geometry(reach_host *host);
 
 #define REACH_SURFACE_ORIGIN_NONE REACH_HOST_SURFACE_COUNT

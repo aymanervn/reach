@@ -7,6 +7,12 @@ static reach_result reach_d2d_begin_frame_impl(reach_render_backend *backend)
 {
     REACH_ASSERT(backend != nullptr);
 
+    reach_result sync_result = reach_d2d_backend_sync_device(backend);
+    if (sync_result != REACH_OK)
+    {
+        return sync_result;
+    }
+
     ID2D1RenderTarget *target = reach_d2d_target(backend);
     if (backend == nullptr || target == nullptr)
     {

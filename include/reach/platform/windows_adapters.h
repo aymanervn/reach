@@ -8,6 +8,7 @@
 #include "reach/ports/bluetooth.h"
 #include "reach/ports/config_store.h"
 #include "reach/ports/image_loader.h"
+#include "reach/ports/render_device.h"
 #include "reach/ports/clock.h"
 #include "reach/ports/input_language.h"
 #include "reach/ports/installed_apps.h"
@@ -50,7 +51,8 @@ extern "C"
 
     reach_result reach_windows_create_render_device(reach_render_device **out_device);
     void reach_windows_destroy_render_device(reach_render_device *device);
-    void *reach_windows_render_device_removed_event(const reach_render_device *device);
+    void reach_windows_render_device_port(reach_render_device *device,
+                                          reach_render_device_port *out_port);
     reach_result reach_windows_create_dcomp_render_backend(reach_render_device *device,
                                                            reach_platform_window *window,
                                                            reach_render_backend_port *out_port);

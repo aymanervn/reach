@@ -22,6 +22,7 @@
 #include "reach/ports/popup_capture.h"
 #include "reach/ports/power_session.h"
 #include "reach/ports/render_backend.h"
+#include "reach/ports/render_device.h"
 #include "reach/ports/search_provider.h"
 #include "reach/ports/settings_launcher.h"
 #include "reach/ports/startup_apps.h"
@@ -80,7 +81,8 @@ extern "C"
 
     reach_result reach_windows_create_render_device(reach_render_device **out_device);
     void reach_windows_destroy_render_device(reach_render_device *device);
-    void *reach_windows_render_device_removed_event(const reach_render_device *device);
+    void reach_windows_render_device_port(reach_render_device *device,
+                                          reach_render_device_port *out_port);
     reach_result reach_windows_create_dcomp_render_backend(reach_render_device *device,
                                                            reach_platform_window *window,
                                                            reach_render_backend_port *out_port);

@@ -2,6 +2,7 @@
 #define REACH_ADAPTERS_WINDOWS_RENDER_D2D_INTERNAL_H
 
 #include "reach/ports/render_backend.h"
+#include "reach/support/render_recovery.h"
 
 #include <windows.h>
 #include <d2d1_1.h>
@@ -209,6 +210,10 @@ struct reach_render_device
     HRESULT lost_hr = S_OK;
     HRESULT lost_reason = S_OK;
     uint32_t losses = 0;
+    uint32_t recoveries = 0;
+    uint64_t generation = 0;
+    bool warp_active = false;
+    reach_render_recovery recovery = {};
 
     std::vector<reach_d2d_icon_cache_entry> icon_cache;
     std::vector<reach_d2d_cover_entry> cover_cache;
@@ -258,6 +263,7 @@ struct reach_render_backend
     HWND hwnd;
 
     reach_render_device *device;
+    uint64_t device_generation = 0;
     bool surface_active = false;
     ID2D1RenderTarget *command_target = nullptr;
 
@@ -331,6 +337,9 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
                                      const reach_render_command_buffer *commands);
 void reach_d2d_release_retained(reach_render_backend *backend);
 void reach_d2d_clear_retained_layers(reach_render_backend *backend);
+void reach_d2d_invalidate_retained_content(reach_render_backend *backend);
+void reach_d2d_release_swap_chain(reach_render_backend *backend);
+reach_result reach_d2d_backend_sync_device(reach_render_backend *backend);
 reach_result reach_d2d_push_group_masks(reach_render_backend *backend, ID2D1RenderTarget *target,
                                         const reach_render_command_buffer *commands, uint64_t id,
                                         double now_seconds, uint32_t *out_depth);
@@ -352,12 +361,15 @@ void reach_d2d_device_surface_deactivated(reach_render_backend *backend);
 void reach_d2d_device_trim_if_idle(reach_render_device *device);
 void reach_d2d_device_release_device_resources(reach_render_device *device);
 void reach_d2d_device_release_fonts(reach_render_device *device);
+void reach_d2d_device_register_removed_event(reach_render_device *device);
+void reach_d2d_device_unregister_removed_event(reach_render_device *device);
 reach_result reach_d2d_device_check(reach_render_device *device, HRESULT hr,
                                     const wchar_t *operation);
 reach_result reach_d2d_device_result(reach_render_device *device, reach_result result,
                                      const wchar_t *operation);
 
-HRESULT reach_d3d11_create_device(ID3D11Device **out_device, D3D_FEATURE_LEVEL *out_level);
+HRESULT reach_d3d11_create_device(D3D_DRIVER_TYPE driver_type, ID3D11Device **out_device,
+                                  D3D_FEATURE_LEVEL *out_level);
 
 reach_result reach_dcomp_create_swap_chain(reach_render_backend *backend, UINT width, UINT height);
 reach_result reach_dcomp_create_target_bitmap(reach_render_backend *backend);

@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 
+#include "reach/ports/render_device.h"
 #include "reach/support/util.h"
 
 #ifdef __cplusplus
@@ -18,6 +19,8 @@ extern "C"
     reach_result reach_settings_app_start(reach_settings_app *app);
     reach_result reach_settings_app_update(reach_settings_app *app, double delta_seconds);
     reach_result reach_settings_app_dispatch_events(reach_settings_app *app);
+    const reach_render_device_port *reach_settings_app_render_device(const reach_settings_app *app);
+    reach_result reach_settings_app_recover_render_device(reach_settings_app *app);
     int32_t reach_settings_app_has_pending_events(const reach_settings_app *app);
     int32_t reach_settings_app_needs_frame(const reach_settings_app *app);
     int32_t reach_settings_app_frame_rate_hz(const reach_settings_app *app);

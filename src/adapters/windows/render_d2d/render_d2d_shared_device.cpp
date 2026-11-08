@@ -8,7 +8,7 @@
 
 #include <stdio.h>
 
-static void reach_d2d_device_register_removed_event(reach_render_device *device)
+void reach_d2d_device_register_removed_event(reach_render_device *device)
 {
     device->removed_cookie = 0;
     if (device->removed_event == nullptr)
@@ -28,7 +28,7 @@ static void reach_d2d_device_register_removed_event(reach_render_device *device)
     }
 }
 
-static void reach_d2d_device_unregister_removed_event(reach_render_device *device)
+void reach_d2d_device_unregister_removed_event(reach_render_device *device)
 {
     if (device->removed_cookie == 0 || device->d3d_device == nullptr)
     {
@@ -41,11 +41,6 @@ static void reach_d2d_device_unregister_removed_event(reach_render_device *devic
         device4->UnregisterDeviceRemoved(device->removed_cookie);
     }
     device->removed_cookie = 0;
-}
-
-void *reach_windows_render_device_removed_event(const reach_render_device *device)
-{
-    return device != nullptr ? device->removed_event : nullptr;
 }
 
 reach_result reach_d2d_device_check(reach_render_device *device, HRESULT hr,
@@ -131,7 +126,7 @@ reach_result reach_windows_create_render_device(reach_render_device **out_device
     if (SUCCEEDED(hr))
     {
         D3D_FEATURE_LEVEL level = D3D_FEATURE_LEVEL_11_0;
-        hr = reach_d3d11_create_device(&device->d3d_device, &level);
+        hr = reach_d3d11_create_device(D3D_DRIVER_TYPE_HARDWARE, &device->d3d_device, &level);
         reach_d2d_log_hresult(L"D3D11CreateDevice", hr);
     }
     if (SUCCEEDED(hr))
