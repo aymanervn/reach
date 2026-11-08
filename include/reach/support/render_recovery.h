@@ -46,6 +46,8 @@ extern "C"
     void reach_render_recovery_attempt_failed(reach_render_recovery *recovery, uint64_t now_ms,
                                               int32_t used_warp);
     void reach_render_recovery_succeeded(reach_render_recovery *recovery);
+    int32_t reach_render_recovery_should_leave_warp(int32_t warp_active, int32_t lost,
+                                                    int32_t recovering);
 
 #ifdef __cplusplus
 }

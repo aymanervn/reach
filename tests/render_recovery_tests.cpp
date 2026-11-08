@@ -168,6 +168,18 @@ static void test_flapping_device_cannot_exhaust_the_budget_instantly(void)
     expect(now >= 3600, "five back-to-back losses take at least their accumulated backoff");
 }
 
+static void test_leaves_warp_only_when_healthy_and_idle(void)
+{
+    expect(reach_render_recovery_should_leave_warp(1, 0, 0) == 1,
+           "a healthy WARP device returns to hardware");
+    expect(reach_render_recovery_should_leave_warp(0, 0, 0) == 0,
+           "a hardware device has nothing to leave");
+    expect(reach_render_recovery_should_leave_warp(1, 1, 0) == 0,
+           "a lost device recovers through the loss path");
+    expect(reach_render_recovery_should_leave_warp(1, 0, 1) == 0,
+           "an active recovery is not interrupted");
+}
+
 static void test_begin_is_idempotent_while_recovering(void)
 {
     reach_render_recovery recovery = {};
@@ -188,6 +200,7 @@ int main(void)
     test_old_losses_expire();
     test_repeated_loss_backs_off_the_first_attempt();
     test_flapping_device_cannot_exhaust_the_budget_instantly();
+    test_leaves_warp_only_when_healthy_and_idle();
     test_begin_is_idempotent_while_recovering();
     return failed == 0 ? 0 : 1;
 }

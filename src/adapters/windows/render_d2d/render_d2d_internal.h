@@ -12,6 +12,7 @@
 #include <dwmapi.h>
 #include <dwrite_3.h>
 #include <dxgi1_2.h>
+#include <dxgi1_6.h>
 #include <roapi.h>
 #include <wincodec.h>
 #include <windows.ui.composition.h>
@@ -206,6 +207,8 @@ struct reach_render_device
 
     HANDLE removed_event = nullptr;
     DWORD removed_cookie = 0;
+    IDXGIFactory7 *adapters_factory = nullptr;
+    DWORD adapters_cookie = 0;
     bool lost = false;
     HRESULT lost_hr = S_OK;
     HRESULT lost_reason = S_OK;
@@ -363,6 +366,8 @@ void reach_d2d_device_release_device_resources(reach_render_device *device);
 void reach_d2d_device_release_fonts(reach_render_device *device);
 void reach_d2d_device_register_removed_event(reach_render_device *device);
 void reach_d2d_device_unregister_removed_event(reach_render_device *device);
+void reach_d2d_device_register_adapters_event(reach_render_device *device);
+void reach_d2d_device_unregister_adapters_event(reach_render_device *device);
 reach_result reach_d2d_device_check(reach_render_device *device, HRESULT hr,
                                     const wchar_t *operation);
 reach_result reach_d2d_device_result(reach_render_device *device, reach_result result,

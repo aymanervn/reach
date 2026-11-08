@@ -103,3 +103,9 @@ void reach_render_recovery_succeeded(reach_render_recovery *recovery)
     recovery->failed_attempts = 0;
     recovery->hardware_failures = 0;
 }
+
+int32_t reach_render_recovery_should_leave_warp(int32_t warp_active, int32_t lost,
+                                                int32_t recovering)
+{
+    return warp_active && !lost && !recovering;
+}
