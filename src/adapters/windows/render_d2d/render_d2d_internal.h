@@ -1,6 +1,8 @@
 #ifndef REACH_ADAPTERS_WINDOWS_RENDER_D2D_INTERNAL_H
 #define REACH_ADAPTERS_WINDOWS_RENDER_D2D_INTERNAL_H
 
+#include "../windows_adapters_internal.h"
+
 #include "reach/ports/render_backend.h"
 #include "reach/support/render_recovery.h"
 
@@ -375,6 +377,9 @@ reach_result reach_d2d_device_result(reach_render_device *device, reach_result r
 
 HRESULT reach_d3d11_create_device(D3D_DRIVER_TYPE driver_type, ID3D11Device **out_device,
                                   D3D_FEATURE_LEVEL *out_level);
+HRESULT reach_d3d11_create_adapter_device(bool warp, ID3D11Device **out_device,
+                                          D3D_FEATURE_LEVEL *out_level);
+reach_render_device_hint reach_d2d_device_take_hint(void);
 
 reach_result reach_dcomp_create_swap_chain(reach_render_backend *backend, UINT width, UINT height);
 reach_result reach_dcomp_create_target_bitmap(reach_render_backend *backend);

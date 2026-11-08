@@ -132,3 +132,37 @@ HRESULT reach_d3d11_create_device(D3D_DRIVER_TYPE driver_type, ID3D11Device **ou
 
     return hr;
 }
+
+HRESULT reach_d3d11_create_adapter_device(bool warp, ID3D11Device **out_device,
+                                          D3D_FEATURE_LEVEL *out_level)
+{
+    if (warp)
+    {
+        return reach_d3d11_create_device(D3D_DRIVER_TYPE_WARP, out_device, out_level);
+    }
+
+    HRESULT hr = reach_d3d11_create_device(D3D_DRIVER_TYPE_HARDWARE, out_device, out_level);
+    if (FAILED(hr))
+    {
+        return hr;
+    }
+
+    bool software = false;
+    ComPtr<IDXGIDevice> dxgi_device;
+    ComPtr<IDXGIAdapter> adapter;
+    ComPtr<IDXGIAdapter1> adapter1;
+    if (SUCCEEDED((*out_device)->QueryInterface(IID_PPV_ARGS(&dxgi_device))) &&
+        SUCCEEDED(dxgi_device->GetAdapter(&adapter)) && SUCCEEDED(adapter.As(&adapter1)))
+    {
+        DXGI_ADAPTER_DESC1 desc = {};
+        software =
+            SUCCEEDED(adapter1->GetDesc1(&desc)) && (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) != 0;
+    }
+    if (software)
+    {
+        (*out_device)->Release();
+        *out_device = nullptr;
+        return DXGI_ERROR_UNSUPPORTED;
+    }
+    return S_OK;
+}

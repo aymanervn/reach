@@ -6,7 +6,27 @@
 #include "reach/adapters/windows/diagnostics_log.h"
 #include "reach/support/render_device_loss.h"
 
+#include <atomic>
 #include <stdio.h>
+
+static std::atomic<uint32_t> reach_d2d_pending_hint{REACH_RENDER_DEVICE_HINT_NONE};
+static std::atomic<HANDLE> reach_d2d_hint_wake{nullptr};
+
+extern "C" void reach_windows_render_device_hint(reach_render_device_hint hint)
+{
+    uint32_t none = REACH_RENDER_DEVICE_HINT_NONE;
+    reach_d2d_pending_hint.compare_exchange_strong(none, (uint32_t)hint);
+    HANDLE wake = reach_d2d_hint_wake.load();
+    if (wake != nullptr)
+    {
+        SetEvent(wake);
+    }
+}
+
+reach_render_device_hint reach_d2d_device_take_hint(void)
+{
+    return (reach_render_device_hint)reach_d2d_pending_hint.exchange(REACH_RENDER_DEVICE_HINT_NONE);
+}
 
 void reach_d2d_device_register_removed_event(reach_render_device *device)
 {
@@ -15,6 +35,7 @@ void reach_d2d_device_register_removed_event(reach_render_device *device)
     {
         device->removed_event = CreateEventW(nullptr, FALSE, FALSE, nullptr);
     }
+    reach_d2d_hint_wake.store(device->removed_event);
     if (device->removed_event == nullptr || device->d3d_device == nullptr)
     {
         return;
@@ -161,8 +182,18 @@ reach_result reach_windows_create_render_device(reach_render_device **out_device
     if (SUCCEEDED(hr))
     {
         D3D_FEATURE_LEVEL level = D3D_FEATURE_LEVEL_11_0;
-        hr = reach_d3d11_create_device(D3D_DRIVER_TYPE_HARDWARE, &device->d3d_device, &level);
+        hr = reach_d3d11_create_adapter_device(false, &device->d3d_device, &level);
         reach_d2d_log_hresult(L"D3D11CreateDevice", hr);
+        if (reach_render_hardware_unavailable_hresult((int32_t)hr))
+        {
+            char message[96] = {};
+            sprintf_s(message, "device_warp_selected reason=no_hardware hr=0x%08X phase=startup",
+                      (unsigned)hr);
+            reach_diagnostics_log_write("warn", message);
+            hr = reach_d3d11_create_adapter_device(true, &device->d3d_device, &level);
+            reach_d2d_log_hresult(L"D3D11CreateDevice(WARP)", hr);
+            device->warp_active = SUCCEEDED(hr);
+        }
     }
     if (SUCCEEDED(hr))
     {
@@ -260,6 +291,7 @@ void reach_windows_destroy_render_device(reach_render_device *device)
     }
     if (device->removed_event != nullptr)
     {
+        reach_d2d_hint_wake.store(nullptr);
         CloseHandle(device->removed_event);
     }
     if (device->ro_initialized)

@@ -581,12 +581,20 @@ D3D11, DXGI and D2D devices, the compositor graphics device and every device-bou
 renderer backend compares its device generation with the device's before drawing and resets its
 per-surface state when it changed, and retained content is invalidated so the next frame redraws
 everything. Retry timing is the pure policy
-in `include/reach/support/render_recovery.h`: backoff of 0, 100, 500, 1000, 2000 and 4000 ms, a
-switch to the WARP software adapter after two failed hardware attempts, a 30 s recovery deadline,
-and a limit of five losses per 60 s. Recovery that exceeds the deadline or the loss rate returns a
-hard failure and the process exits with code 3 (`REACH_EXIT_DEVICE_LOST`), which the watchdog
-treats as an unexpected exit. While WARP is active, `recover` rebuilds back on the
-hardware adapter once the device is healthy and the adapter becomes available again.
+in `include/reach/support/render_recovery.h` and recovery stays on the GPU: the first attempt is
+immediate and hardware retries follow every 250 ms for the first 5 s (the driver-reset window), every
+2 s until 15 s and every 4 s after that, bounded at 30 s. A display-change, resume or session-unlock
+notification received by any platform window reaches the device through
+`reach_windows_render_device_hint`, which wakes the loop and makes the next hardware attempt due at
+once. The WARP software adapter is used only when hardware is unusable (the device reports
+`DXGI_ERROR_UNSUPPORTED` or `DXGI_ERROR_NOT_FOUND`, or the hardware adapter is a software adapter
+such as the Microsoft Basic Render Driver) or after the full 30 s hardware window, and the process
+exits with code 3 (`REACH_EXIT_DEVICE_LOST`), which the watchdog treats as an unexpected exit, only
+when WARP also fails or more than five losses occur within 60 s. While WARP is active, `recover`
+rebuilds back on the hardware adapter at the first adapters-changed, display-change, resume or
+session-unlock event once the device is healthy; nothing polls. Windows that receive these
+messages register for session notifications with `WTSRegisterSessionNotification`, and the switch
+reason and timing are logged as `device_adapter_switch`.
 
 The adapter caches ordered retained group identities and parent ownership separately from content
 and motion. Unchanged submissions, raster edits and property retargets keep the native tree intact;

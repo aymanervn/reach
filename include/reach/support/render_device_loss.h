@@ -16,6 +16,7 @@ extern "C"
     } reach_render_hresult_class;
 
     reach_render_hresult_class reach_render_classify_hresult(int32_t hr);
+    int32_t reach_render_hardware_unavailable_hresult(int32_t hr);
 
 #ifdef __cplusplus
 }

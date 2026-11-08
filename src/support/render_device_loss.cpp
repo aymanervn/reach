@@ -4,6 +4,8 @@ static const uint32_t REACH_HRESULT_DXGI_DEVICE_REMOVED = 0x887A0005u;
 static const uint32_t REACH_HRESULT_DXGI_DEVICE_HUNG = 0x887A0006u;
 static const uint32_t REACH_HRESULT_DXGI_DEVICE_RESET = 0x887A0007u;
 static const uint32_t REACH_HRESULT_DXGI_DRIVER_INTERNAL_ERROR = 0x887A0020u;
+static const uint32_t REACH_HRESULT_DXGI_NOT_FOUND = 0x887A0002u;
+static const uint32_t REACH_HRESULT_DXGI_UNSUPPORTED = 0x887A0004u;
 static const uint32_t REACH_HRESULT_D2D_RECREATE_TARGET = 0x8899000Cu;
 
 reach_render_hresult_class reach_render_classify_hresult(int32_t hr)
@@ -24,4 +26,10 @@ reach_render_hresult_class reach_render_classify_hresult(int32_t hr)
     default:
         return REACH_RENDER_HRESULT_FAILURE;
     }
+}
+
+int32_t reach_render_hardware_unavailable_hresult(int32_t hr)
+{
+    return (uint32_t)hr == REACH_HRESULT_DXGI_UNSUPPORTED ||
+           (uint32_t)hr == REACH_HRESULT_DXGI_NOT_FOUND;
 }
