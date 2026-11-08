@@ -58,6 +58,18 @@ reach_result reach_windows_create_render_device(reach_render_device **out_device
                               IID_PPV_ARGS(&device->wic_factory));
     }
 
+    if (SUCCEEDED(hr) && SUCCEEDED(reach_winrt_activate_compositor(&device->compositor)))
+    {
+        ComPtr<ABI::Windows::UI::Composition::ICompositorInterop> interop;
+        if (FAILED(device->compositor.As(&interop)) ||
+            FAILED(interop->CreateGraphicsDevice(device->d2d_device,
+                                                 &device->composition_graphics_device)))
+        {
+            device->composition_graphics_device.Reset();
+            device->compositor.Reset();
+        }
+    }
+
     if (FAILED(hr))
     {
         reach_windows_destroy_render_device(device);
@@ -75,6 +87,8 @@ void reach_windows_destroy_render_device(reach_render_device *device)
         return;
     }
 
+    device->composition_graphics_device.Reset();
+    device->compositor.Reset();
     if (device->d2d_device != nullptr)
     {
         device->d2d_device->Release();
