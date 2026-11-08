@@ -42,6 +42,7 @@ endfunction()
 
 add_library(reach_support STATIC
     src/support/util.cpp
+    src/support/diagnostics_log.cpp
     src/support/animation.cpp
     src/support/motion.cpp
     src/support/motion_clock.cpp
@@ -194,6 +195,7 @@ target_link_libraries(reach_features PUBLIC
 
 add_library(reach_windows_adapters STATIC
     src/adapters/windows/clipboard_win32.cpp
+    src/adapters/windows/diagnostics_log_win32.cpp
     src/adapters/windows/window_win32.cpp
     src/adapters/windows/frame_wait_win32.cpp
     src/adapters/windows/explorer_desktop_compat_host_win32.cpp
@@ -508,6 +510,9 @@ target_link_libraries(reachctl PRIVATE
 
 add_executable(reachWatchdog WIN32
     src/tools/reach_watchdog/reach_watchdog.cpp
+    src/adapters/windows/diagnostics_log_win32.cpp
+    src/support/diagnostics_log.cpp
+    src/support/util.cpp
 )
 
 set_target_properties(reachWatchdog PROPERTIES OUTPUT_NAME "reachWatchdog")
@@ -518,6 +523,7 @@ target_compile_features(reachWatchdog PRIVATE
     cxx_std_17
 )
 target_link_libraries(reachWatchdog PRIVATE
+    ole32
     shell32
     shlwapi
     user32
@@ -739,6 +745,18 @@ target_compile_features(reach_util_tests PRIVATE
     cxx_std_17
 )
 target_link_libraries(reach_util_tests PRIVATE
+    reach_support
+)
+
+add_executable(reach_diagnostics_log_tests
+    tests/diagnostics_log_tests.cpp
+)
+
+reach_configure_common(reach_diagnostics_log_tests)
+target_compile_features(reach_diagnostics_log_tests PRIVATE
+    cxx_std_17
+)
+target_link_libraries(reach_diagnostics_log_tests PRIVATE
     reach_support
 )
 
@@ -1134,6 +1152,7 @@ target_compile_features(reach_system_controls_network_tests PRIVATE
     add_test(NAME reach_svg_document_tests COMMAND reach_svg_document_tests)
     add_test(NAME reach_render_d2d_retained_tests COMMAND reach_render_d2d_retained_tests)
     add_test(NAME reach_util_tests COMMAND reach_util_tests)
+    add_test(NAME reach_diagnostics_log_tests COMMAND reach_diagnostics_log_tests)
     add_test(NAME reach_now_playing_animation_tests COMMAND reach_now_playing_animation_tests)
     add_test(NAME reach_wifi_tests COMMAND reach_wifi_tests)
     add_test(NAME reach_wifi_service_tests COMMAND reach_wifi_service_tests)

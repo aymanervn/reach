@@ -2,10 +2,23 @@
 
 #include <stdio.h>
 
+static reach_log_sink reach_log_active_sink = nullptr;
+
+void reach_log_set_sink(reach_log_sink sink)
+{
+    reach_log_active_sink = sink;
+}
+
 void reach_log_info(const char *message)
 {
     if (message == nullptr)
     {
+        return;
+    }
+
+    if (reach_log_active_sink != nullptr)
+    {
+        reach_log_active_sink("info", message);
         return;
     }
 
@@ -18,6 +31,12 @@ void reach_log_error(const char *message)
 {
     if (message == nullptr)
     {
+        return;
+    }
+
+    if (reach_log_active_sink != nullptr)
+    {
+        reach_log_active_sink("error", message);
         return;
     }
 
