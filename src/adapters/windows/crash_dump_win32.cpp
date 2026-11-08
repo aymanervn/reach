@@ -11,6 +11,7 @@
 
 #include <signal.h>
 #include <stdio.h>
+#include <crtdbg.h>
 #include <stdlib.h>
 #include <wchar.h>
 
@@ -207,8 +208,13 @@ static void reach_crash_dump_resolve_directory(void)
 
 void reach_crash_dump_install(const char *process_name)
 {
-    SetThreadErrorMode(SEM_FAILCRITICALERRORS, nullptr);
+    SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
     WerSetFlags(WER_FAULT_REPORTING_NO_UI);
+    _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
+#ifdef _DEBUG
+    _CrtSetReportMode(_CRT_ASSERT, _CRTDBG_MODE_DEBUG);
+    _CrtSetReportMode(_CRT_ERROR, _CRTDBG_MODE_DEBUG);
+#endif
 
     if (process_name != nullptr && process_name[0] != 0)
     {
