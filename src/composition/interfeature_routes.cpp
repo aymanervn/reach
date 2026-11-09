@@ -5,20 +5,6 @@
 #include "reach/features/dock.h"
 #include "reach/features/top_bar.h"
 
-#include <stdarg.h>
-#include <stdio.h>
-
-// Workaround: temporary trace for the dock preview close bug; remove after diagnosis.
-static void reach_host_trace_window_list(const char *format, ...)
-{
-    char line[256];
-    va_list args;
-    va_start(args, format);
-    vsnprintf(line, sizeof(line), format, args);
-    va_end(args);
-    reach_log_info(line);
-}
-
 static reach_rect_f32 reach_host_menu_monitor(reach_host *host, reach_rect_f32 fallback)
 {
     reach_rect_f32 monitor = {};
@@ -127,9 +113,6 @@ static void reach_host_open_window_list(reach_host *host, const reach_menu_reque
         reach_host_feature_capsule<reach_context_menu>(host, REACH_SURFACE_ID_CONTEXT_MENU),
         request->target_index, &ctx);
     reach_host_present_registered_popup(host, REACH_SURFACE_ID_CONTEXT_MENU, owner.surface);
-    // Workaround: temporary trace for the dock preview close bug; remove after diagnosis.
-    reach_host_trace_window_list("dock_preview_trace list_open target=%zu windows=%zu",
-                                 request->target_index, request->window_count);
     reach_host_watch_window_list_pointer(host);
 }
 
@@ -216,8 +199,6 @@ static void reach_host_route_pointer_region(void *user, uint32_t region_id,
         reach_host_feature_capsule<reach_context_menu>(host, REACH_SURFACE_ID_CONTEXT_MENU);
     if (reach_context_menu_window_list_target(menu) == REACH_CONTEXT_MENU_NO_TARGET)
     {
-        // Workaround: temporary trace for the dock preview close bug; remove after diagnosis.
-        reach_host_trace_window_list("dock_preview_trace route_region action=no_target");
         reach_host_watch_window_list_pointer(host);
         return;
     }
@@ -227,13 +208,7 @@ static void reach_host_route_pointer_region(void *user, uint32_t region_id,
     {
         return;
     }
-    int32_t hold =
-        reach_context_menu_window_list_holds_pointer(menu, (float)pointer.x, (float)pointer.y);
-    // Workaround: temporary trace for the dock preview close bug; remove after diagnosis.
-    reach_host_trace_window_list(
-        "dock_preview_trace route_region point=%d,%d observed=%d hold=%d action=%s", pointer.x,
-        pointer.y, observed != nullptr, hold, hold ? "keep" : "close");
-    if (hold)
+    if (reach_context_menu_window_list_holds_pointer(menu, (float)pointer.x, (float)pointer.y))
     {
         return;
     }
@@ -257,8 +232,6 @@ static void reach_host_route_pointer_moved(void *user, reach_point_i32 point)
     {
         return;
     }
-    // Workaround: temporary trace for the dock preview close bug; remove after diagnosis.
-    reach_host_trace_window_list("dock_preview_trace moved_close point=%d,%d", point.x, point.y);
     reach_host_close_registered_surface(host, REACH_SURFACE_ID_CONTEXT_MENU,
                                         REACH_SURFACE_CLOSE_SUPERSEDED);
     reach_host_watch_window_list_pointer(host);

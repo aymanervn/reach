@@ -254,12 +254,6 @@ static int32_t reach_host_bar_position_only(const reach_feature_runtime *desc)
 
 void reach_host_release_native_overlay(reach_host *host, reach_feature_runtime *desc)
 {
-    // Workaround: temporary trace for the Stage desktop flash bug; remove after diagnosis.
-    if (desc->native_overlay_registered)
-    {
-        reach_log_trace("native_overlay_release surface=%d target=0x%llx",
-                        (int)desc->definition->id, (unsigned long long)desc->native_overlay_target);
-    }
     desc->frame_context_valid = 0;
     desc->native_overlay_motion_pending = 0;
     desc->native_overlay_front_source = 0;
@@ -967,9 +961,6 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
         (native_overlay_result != REACH_OK && geometry.synchronize_presentation))
     {
         reach_result frame_result = result != REACH_OK ? result : native_overlay_result;
-        // Workaround: temporary trace for the Stage desktop flash bug; remove after diagnosis.
-        reach_log_trace("presentation_failed surface=%d window_result=%d native_result=%d",
-                        (int)desc->definition->id, (int)result, (int)native_overlay_result);
         if (desc->definition->capsule_ops->presentation_committed != nullptr)
         {
             reach_feature_tick_result tick = {};
@@ -987,18 +978,12 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
     result = reach_host_execute_registered_surface(host, desc, &surface_ctx, &geometry);
     if (geometry.synchronize_presentation)
     {
-        // Workaround: temporary trace for the Stage desktop flash bug; remove after diagnosis.
-        reach_log_trace("presentation_synchronize_begin surface=%d execute_result=%d",
-                        (int)desc->definition->id, (int)result);
         if (result == REACH_OK)
         {
             result = desc->surface->renderer.ops.synchronize != nullptr
                          ? desc->surface->renderer.ops.synchronize(desc->surface->renderer.backend)
                          : REACH_ERROR;
         }
-        // Workaround: temporary trace for the Stage desktop flash bug; remove after diagnosis.
-        reach_log_trace("presentation_synchronize_end surface=%d result=%d",
-                        (int)desc->definition->id, (int)result);
         if (desc->definition->capsule_ops->presentation_committed != nullptr)
         {
             reach_feature_tick_result tick = {};

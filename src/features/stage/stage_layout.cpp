@@ -433,21 +433,6 @@ void reach_stage_rebuild_layout(reach_stage *stage)
                                        border_thickness) +
              section_gap;
     }
-    // Workaround: temporary trace for the Stage desktop flash bug; remove after diagnosis.
-    for (size_t index = 0; index < state->tile_count; ++index)
-    {
-        const reach_stage_tile *tile = &state->tiles[index];
-        if (tile->departing)
-        {
-            continue;
-        }
-        // Workaround: temporary trace for the Stage desktop flash bug; remove after diagnosis.
-        reach_log_trace("stage_tile_open index=%u hwnd=0x%p desktop=%d minimized=%d "
-                        "screen=%.0f,%.0f,%.0f,%.0f",
-                        (unsigned)index, (void *)tile->window, (int)tile->desktop,
-                        (int)tile->minimized, tile->target_rect.x, tile->target_rect.y,
-                        tile->target_rect.width, tile->target_rect.height);
-    }
 }
 
 void reach_stage_apply_progress(reach_stage *stage)

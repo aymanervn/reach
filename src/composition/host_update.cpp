@@ -97,8 +97,6 @@ void reach_host_finish_surface_presentations(reach_host *host)
             continue;
         }
 
-        // Workaround: temporary trace for the Stage desktop flash bug; remove after diagnosis.
-        reach_log_trace("presentation_hidden surface=%d", (int)runtime->definition->id);
         const reach_feature_control_ops *control = runtime->definition->control_ops;
         if (control != nullptr && control->surface_hidden != nullptr && runtime->capsule != nullptr)
         {

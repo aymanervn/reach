@@ -504,13 +504,6 @@ void reach_host_close_registered_surface(reach_host *host, reach_surface_id id,
     {
         return;
     }
-    // Workaround: temporary trace for the dock preview close bug; remove after diagnosis.
-    if (id == REACH_SURFACE_ID_CONTEXT_MENU)
-    {
-        reach_log_info(intent == REACH_SURFACE_CLOSE_DISMISS
-                           ? "dock_preview_trace list_close intent=dismiss"
-                           : "dock_preview_trace list_close intent=superseded_or_other");
-    }
     if (intent == REACH_SURFACE_CLOSE_DISMISS)
     {
         reach_host_arm_focus_restore(host, id);

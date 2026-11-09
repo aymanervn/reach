@@ -26,8 +26,6 @@ extern "C"
     void reach_log_set_sink(reach_log_sink sink);
     void reach_log_info(const char *message);
     void reach_log_error(const char *message);
-    // Workaround: temporary trace for the Stage desktop flash bug; remove after diagnosis.
-    void reach_log_trace(const char *format, ...);
     size_t reach_strlen_utf16(const uint16_t *text);
     int32_t reach_utf16_equal(const uint16_t *a, const uint16_t *b);
     int32_t reach_utf16_equal_ascii_case_insensitive(const uint16_t *a, const uint16_t *b);

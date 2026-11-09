@@ -249,10 +249,6 @@ void reach_stage_handle_pointer(void *capsule, const reach_pointer_event *event,
             out->action.flags |= REACH_FEATURE_ACTION_FLAG_CLOSE_HANDOFF;
             out->action.index = index;
             out->action.window = state->tiles[index].window;
-            // Workaround: temporary trace for the Stage desktop flash bug; remove after diagnosis.
-            reach_log_trace("stage_tile_click index=%u hwnd=0x%llx desktop=%d minimized=%d",
-                            (unsigned)index, (unsigned long long)state->tiles[index].window,
-                            (int)state->tiles[index].desktop, (int)state->tiles[index].minimized);
         }
         return;
     }

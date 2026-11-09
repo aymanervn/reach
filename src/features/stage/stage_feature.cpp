@@ -315,18 +315,6 @@ size_t reach_stage_tile_generation(const reach_stage *stage)
     return stage != nullptr ? stage->state.tile_generation : 0;
 }
 
-// Workaround: temporary trace for the Stage desktop flash bug; remove after diagnosis.
-static void reach_stage_trace_phase(const reach_stage *stage, const char *event)
-{
-    const reach_stage_state *state = &stage->state;
-    reach_log_trace("stage_phase event=%s phase=%d closing=%d committed=%d handoff_pending=%d "
-                    "failed=%d progress=%.3f desktop_progress=%.3f backdrop=%.3f tiles=%u",
-                    event, (int)state->close_phase, (int)state->closing,
-                    (int)state->close_aligned_committed, (int)state->close_handoff_pending,
-                    (int)state->close_failed, state->progress, state->desktop_progress,
-                    state->backdrop_opacity, (unsigned)state->tile_count);
-}
-
 static reach_rect_f32 reach_stage_minimized_close_destination(const reach_stage_state *state,
                                                               reach_rect_f32 rect)
 {
@@ -392,19 +380,6 @@ void reach_stage_begin_close(reach_stage *stage)
         reach_animation_manager_set(&stage->animations, REACH_STAGE_ANIMATION_DESKTOP_PROGRESS,
                                     0.0f);
     }
-    // Workaround: temporary trace for the Stage desktop flash bug; remove after diagnosis.
-    reach_stage_trace_phase(stage, "begin_close");
-    for (size_t index = 0; index < stage->state.tile_count; ++index)
-    {
-        const reach_stage_tile *tile = &stage->state.tiles[index];
-        // Workaround: temporary trace for the Stage desktop flash bug; remove after diagnosis.
-        reach_log_trace("stage_tile index=%u hwnd=0x%llx desktop=%d minimized=%d "
-                        "dest=%.0f,%.0f,%.0f,%.0f",
-                        (unsigned)index, (unsigned long long)tile->window, (int)tile->desktop,
-                        (int)tile->minimized, tile->close_destination_rect.x,
-                        tile->close_destination_rect.y, tile->close_destination_rect.width,
-                        tile->close_destination_rect.height);
-    }
 }
 
 void reach_stage_force_close(reach_stage *stage)
@@ -415,11 +390,6 @@ void reach_stage_force_close(reach_stage *stage)
     }
 
     reach_stage_state *state = &stage->state;
-    // Workaround: temporary trace for the Stage desktop flash bug; remove after diagnosis.
-    if (state->open)
-    {
-        reach_stage_trace_phase(stage, "force_close");
-    }
     float animation_seconds = state->animation_seconds;
     *state = {};
     reach_pressable_reset(&stage->pressable, nullptr);
@@ -524,8 +494,6 @@ static int32_t reach_stage_update_closing_windows(reach_stage *stage,
         state->close_phase = REACH_STAGE_CLOSE_MOVING;
         state->close_aligned_committed = 0;
         state->retarget_progress = 1.0f;
-        // Workaround: temporary trace for the Stage desktop flash bug; remove after diagnosis.
-        reach_stage_trace_phase(stage, "retarget_moving");
         reach_animation_manager_start(&stage->animations, REACH_STAGE_ANIMATION_RETARGET, 1.0f,
                                       0.0f, reach_theme_default()->surface_close_seconds,
                                       REACH_EASING_EASE_OUT);
@@ -710,8 +678,6 @@ static void reach_stage_capsule_reset(void *capsule)
 static void reach_stage_begin_reveal(reach_stage *stage)
 {
     stage->state.close_phase = REACH_STAGE_CLOSE_REVEALING;
-    // Workaround: temporary trace for the Stage desktop flash bug; remove after diagnosis.
-    reach_stage_trace_phase(stage, "begin_reveal");
     reach_animation_manager_animate_to(&stage->animations, REACH_STAGE_ANIMATION_BACKDROP, 0.0f,
                                        reach_theme_default()->surface_close_seconds,
                                        REACH_EASING_EASE_OUT);
@@ -721,9 +687,6 @@ static void reach_stage_capsule_presentation_committed(void *capsule, reach_resu
                                                        reach_feature_tick_result *out)
 {
     reach_stage *stage = static_cast<reach_stage *>(capsule);
-    // Workaround: temporary trace for the Stage desktop flash bug; remove after diagnosis.
-    reach_log_trace("stage_presentation_committed result=%d phase=%d", (int)result,
-                    (int)stage->state.close_phase);
     if (result != REACH_OK && stage->state.closing &&
         stage->state.close_phase < REACH_STAGE_CLOSE_REVEALING)
     {
@@ -741,8 +704,6 @@ static void reach_stage_capsule_presentation_committed(void *capsule, reach_resu
     else if (stage->state.close_phase == REACH_STAGE_CLOSE_TRANSPARENT)
     {
         stage->state.close_phase = REACH_STAGE_CLOSE_FINISHED;
-        // Workaround: temporary trace for the Stage desktop flash bug; remove after diagnosis.
-        reach_stage_trace_phase(stage, "finished");
     }
     out->redraw = 1;
     out->request_update = 1;
@@ -757,8 +718,6 @@ static void reach_stage_capsule_set_close_handoff_pending(void *capsule, int32_t
         return;
     }
     stage->state.close_handoff_pending = pending ? 1 : 0;
-    // Workaround: temporary trace for the Stage desktop flash bug; remove after diagnosis.
-    reach_stage_trace_phase(stage, pending ? "handoff_pending" : "handoff_released");
     if (!stage->state.close_handoff_pending && stage->state.closing &&
         stage->state.close_phase == REACH_STAGE_CLOSE_ALIGNED &&
         stage->state.close_aligned_committed)
@@ -838,15 +797,11 @@ static void reach_stage_capsule_tick(void *capsule, double delta_seconds,
     {
         state->close_phase = REACH_STAGE_CLOSE_ALIGNED;
         state->close_aligned_committed = 0;
-        // Workaround: temporary trace for the Stage desktop flash bug; remove after diagnosis.
-        reach_stage_trace_phase(stage, "aligned");
     }
     if (state->close_phase == REACH_STAGE_CLOSE_REVEALING &&
         !reach_animation_manager_active(&stage->animations, REACH_STAGE_ANIMATION_BACKDROP))
     {
         state->close_phase = REACH_STAGE_CLOSE_TRANSPARENT;
-        // Workaround: temporary trace for the Stage desktop flash bug; remove after diagnosis.
-        reach_stage_trace_phase(stage, "transparent");
     }
 
     if (out != nullptr)
