@@ -37,6 +37,7 @@ static reach_motion reach_render_stretch_scale(const reach_motion *motion, float
     {
         result.from = (motion->from - caps) / band;
         result.to = (motion->to - caps) / band;
+        result.spring_velocity = motion->spring_velocity / band;
     }
     if (result.has_limits)
     {

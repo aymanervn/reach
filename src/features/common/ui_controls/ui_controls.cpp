@@ -114,11 +114,18 @@ reach_result reach_ui_motion_background_render(reach_render_command_buffer *comm
         dpi_scale <= 0 || !isfinite(border) || border < 0 || !isfinite(radius) || radius < 0)
         return REACH_INVALID_ARGUMENT;
     float left = 0, right = 0, top = 0, bottom = 0, minimum = 0, width = 0, height = 0;
-    if (reach_motion_range(&bounds->x, &left, &right) != REACH_OK ||
-        reach_motion_range(&bounds->y, &top, &bottom) != REACH_OK ||
-        reach_motion_range(&bounds->width, &minimum, &width) != REACH_OK || minimum < 0 ||
-        reach_motion_range(&bounds->height, &minimum, &height) != REACH_OK || minimum < 0)
+    reach_rect_motion extent = *bounds;
+    if (reach_motion_range(&extent.x, &left, &right) != REACH_OK ||
+        reach_motion_range(&extent.y, &top, &bottom) != REACH_OK ||
+        reach_motion_range(&extent.width, &minimum, &width) != REACH_OK)
         return REACH_INVALID_ARGUMENT;
+    if (minimum < 0)
+        extent.width = reach_motion_clamp(&extent.width, 0, fmaxf(0, width));
+    if (reach_motion_range(&extent.height, &minimum, &height) != REACH_OK)
+        return REACH_INVALID_ARGUMENT;
+    if (minimum < 0)
+        extent.height = reach_motion_clamp(&extent.height, 0, fmaxf(0, height));
+    bounds = &extent;
     if (width <= 0 || height <= 0)
         return REACH_OK;
     if (commands->count > REACH_MAX_RENDER_COMMANDS - 3 ||

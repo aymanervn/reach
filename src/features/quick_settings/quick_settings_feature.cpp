@@ -1756,10 +1756,11 @@ void reach_quick_settings_refresh_layout(reach_quick_settings *quick_settings,
     quick_settings->output_content_span = output_span;
     quick_settings->app_content_span = app_span;
     state.target_bounds = target.bounds;
-    float extent = environment_changed
-                       ? target.bounds.height
-                       : fmaxf(state.render_bounds.height,
-                               fmaxf(quick_settings->height.from, quick_settings->height.to));
+    float height_minimum = 0, height_maximum = 0;
+    if (reach_motion_range(&quick_settings->height, &height_minimum, &height_maximum) != REACH_OK)
+        height_maximum = fmaxf(quick_settings->height.from, quick_settings->height.to);
+    float extent = environment_changed ? target.bounds.height
+                                       : fmaxf(state.render_bounds.height, height_maximum);
     state.render_bounds = reach_quick_settings_placement(quick_settings, ctx, extent).bounds;
     reach_popup_anchor anchor = reach_quick_settings_popup_anchor(ctx);
     reach_rect_motion screen = {};

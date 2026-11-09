@@ -611,6 +611,46 @@ static void test_scaled_presentation_keeps_native_envelope_stationary(void)
                 "the native input presentation keeps the same base content bounds");
 }
 
+static void test_presentation_extent_covers_spring_overshoot(void)
+{
+    const float dpis[] = {1.0f, 1.25f, 1.5f, 2.0f};
+    reach_motion_spec spec =
+        reach_theme_motion_preset(reach_theme_default(), REACH_MOTION_PRESET_BOUNCY);
+    bool covered = true, overshot = false;
+    for (float dpi : dpis)
+    {
+        float origin = -40.0f * dpi;
+        reach_render_group group = {};
+        reach_motion_start_spec_at(&group.y, origin, 0.0f, -origin * 6.0f, spec, 10.0);
+        reach_motion_start_spec_at(&group.scale, 0.9f, 1.0f, 0.6f, spec, 10.0);
+        reach_rect_f32 translation = {0.0f, origin, 0.0f, -origin};
+        float max_scale = 1.0f;
+        reach_host_surface_presentation_extent(&group, &translation, &max_scale);
+        double deadline =
+            fmax(reach_motion_deadline(&group.y), reach_motion_deadline(&group.scale));
+        for (double at = 10.0; at <= deadline; at += 0.0005)
+        {
+            float y = reach_motion_value_at(&group.y, at);
+            float scale = reach_motion_value_at(&group.scale, at);
+            overshot = overshot || y > 0.5f || scale > 1.001f;
+            covered = covered && y >= translation.y - 0.001f &&
+                      y <= translation.y + translation.height + 0.001f && scale <= max_scale;
+        }
+    }
+    expect_true(overshot, "bouncy presentation springs overshoot their resting transform");
+    expect_true(covered, "presentation envelopes cover every sampled overshoot extreme");
+
+    reach_render_group monotone = {};
+    reach_motion_start_at(&monotone.y, -40.0f, 0.0f, 0.2, REACH_EASING_EASE_OUT, 10.0);
+    reach_motion_start_at(&monotone.scale, 0.96f, 1.0f, 0.2, REACH_EASING_EASE_OUT, 10.0);
+    reach_rect_f32 translation = {0.0f, -40.0f, 0.0f, 40.0f};
+    float max_scale = 1.08f;
+    reach_host_surface_presentation_extent(&monotone, &translation, &max_scale);
+    expect_true(translation.x == 0.0f && translation.y == -40.0f && translation.width == 0.0f &&
+                    translation.height == 40.0f && max_scale == 1.08f,
+                "monotone presentation envelopes stay exactly as declared");
+}
+
 static void test_window_state_commits_terminal_subpixel_position(void)
 {
     reach_platform_window_port window = {};
@@ -1977,6 +2017,7 @@ int main(void)
     test_window_manipulation_relevance_survives_unavailable_pointer();
     test_window_manipulation_tracks_pointer_monitor_membership();
     test_scaled_presentation_keeps_native_envelope_stationary();
+    test_presentation_extent_covers_spring_overshoot();
     test_window_state_commits_terminal_subpixel_position();
     test_popup_pointer_coordinates_are_surface_local();
     test_popup_activation_uses_owner_identity();

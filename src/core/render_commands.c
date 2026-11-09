@@ -87,18 +87,54 @@ reach_point_f32 reach_render_group_scale_at(const reach_render_group *group, dou
     return scale;
 }
 
+static float reach_render_unit(float value)
+{
+    return fminf(1.0f, fmaxf(0.0f, value));
+}
+
+reach_motion reach_render_unit_motion(const reach_motion *motion)
+{
+    reach_motion result = {0};
+    float minimum = 0, maximum = 0;
+    if (motion == 0)
+        return result;
+    result = *motion;
+    if (result.generation != 0 && reach_motion_range(&result, &minimum, &maximum) == REACH_OK &&
+        (minimum < 0 || maximum > 1))
+        result = reach_motion_clamp(&result, 0, 1);
+    return result;
+}
+
+static int32_t reach_render_motion_endpoints(const reach_motion *motion, float *out_minimum,
+                                             float *out_maximum)
+{
+    if (motion->repeating)
+        return reach_motion_range(motion, out_minimum, out_maximum) == REACH_OK;
+    float first = reach_motion_value_at(motion, motion->started_seconds);
+    float last = reach_motion_value_at(motion, reach_motion_deadline(motion));
+    *out_minimum = fminf(first, last);
+    *out_maximum = fmaxf(first, last);
+    return isfinite(first) && isfinite(last);
+}
+
 reach_color reach_render_group_tint_at(const reach_render_group *group, double now_seconds)
 {
     reach_color color = {1.0f, 1.0f, 1.0f, 1.0f};
     if (group != 0 && group->has_tint)
     {
-        color.r = reach_motion_value_at(&group->tint[REACH_RENDER_COLOR_RED], now_seconds);
-        color.g = reach_motion_value_at(&group->tint[REACH_RENDER_COLOR_GREEN], now_seconds);
-        color.b = reach_motion_value_at(&group->tint[REACH_RENDER_COLOR_BLUE], now_seconds);
-        color.a = reach_motion_value_at(&group->tint[REACH_RENDER_COLOR_ALPHA], now_seconds);
+        const reach_motion *tint = group->tint;
+        color.r =
+            reach_render_unit(reach_motion_value_at(&tint[REACH_RENDER_COLOR_RED], now_seconds));
+        color.g =
+            reach_render_unit(reach_motion_value_at(&tint[REACH_RENDER_COLOR_GREEN], now_seconds));
+        color.b =
+            reach_render_unit(reach_motion_value_at(&tint[REACH_RENDER_COLOR_BLUE], now_seconds));
+        color.a =
+            reach_render_unit(reach_motion_value_at(&tint[REACH_RENDER_COLOR_ALPHA], now_seconds));
         if (group->tint_rgb_mix.generation != 0)
         {
-            float weight = reach_motion_value_at(&group->tint_rgb_mix, now_seconds);
+            float weight =
+                reach_render_unit(reach_motion_value_at(&group->tint_rgb_mix, now_seconds));
             color.r += (group->tint_rgb_target.r - color.r) * weight;
             color.g += (group->tint_rgb_target.g - color.g) * weight;
             color.b += (group->tint_rgb_target.b - color.b) * weight;
@@ -200,10 +236,10 @@ reach_result reach_render_group_clip_radii_motion(const reach_render_group *grou
     {
         float minimum = 0, maximum = 0;
         if (reach_motion_range(&group->clip_radius_motion, &minimum, &maximum) != REACH_OK ||
-            minimum < 0 || reach_motion_min(&half_x, &group->clip_radius_motion, &x) != REACH_OK ||
+            reach_motion_min(&half_x, &group->clip_radius_motion, &x) != REACH_OK ||
             reach_motion_min(&half_y, &group->clip_radius_motion, &y) != REACH_OK)
             return REACH_INVALID_ARGUMENT;
-        radius_maximum = maximum;
+        radius_maximum = fmaxf(0, maximum);
     }
     if (group->clip_uniform_radius)
     {
@@ -320,6 +356,7 @@ static int32_t reach_render_repetition_valid(const reach_render_group *group, in
             !isfinite(group->clip_radius_motion.duration_seconds) ||
             group->clip_radius_motion.duration_seconds < 0 ||
             reach_motion_range(&group->clip_radius_motion, &minimum, &maximum) != REACH_OK ||
+            !reach_render_motion_endpoints(&group->clip_radius_motion, &minimum, &maximum) ||
             minimum < 0)
             return 0;
     }
@@ -622,7 +659,7 @@ float reach_render_command_buffer_group_opacity_at(const reach_render_command_bu
     while (group != 0 && depth++ < buffer->group_count)
     {
         if (group->opacity.generation != 0)
-            opacity *= reach_motion_value_at(&group->opacity, now_seconds);
+            opacity *= reach_render_unit(reach_motion_value_at(&group->opacity, now_seconds));
         group = reach_render_command_buffer_group(buffer, group->parent_id);
     }
     return opacity;
@@ -1013,13 +1050,21 @@ reach_result reach_render_push_width_text(reach_render_command_buffer *buffer,
                                           const reach_render_command *command,
                                           const reach_render_group *viewport)
 {
-    if (buffer == 0 || buffer->current_group_id != 0 ||
-        !reach_render_width_text_valid(command, viewport) ||
-        reach_render_command_buffer_group_shadow(buffer, viewport->parent_id) != 0)
+    if (buffer == 0 || buffer->current_group_id != 0 || viewport == 0)
+        return REACH_INVALID_ARGUMENT;
+    reach_render_group fitted = *viewport;
+    const reach_motion *right = &viewport->clip_insets[REACH_RENDER_CLIP_RIGHT];
+    float minimum = 0, maximum = 0, first = 0, last = 0;
+    if (reach_motion_range(right, &minimum, &maximum) == REACH_OK && minimum < 0 &&
+        reach_render_motion_endpoints(right, &first, &last) && first >= 0)
+        fitted.clip_insets[REACH_RENDER_CLIP_RIGHT] =
+            reach_motion_clamp(right, 0, fmaxf(0, maximum));
+    if (!reach_render_width_text_valid(command, &fitted) ||
+        reach_render_command_buffer_group_shadow(buffer, fitted.parent_id) != 0)
         return REACH_INVALID_ARGUMENT;
     if (buffer->count >= REACH_MAX_RENDER_COMMANDS)
         return REACH_ERROR;
-    reach_result result = reach_render_command_buffer_begin_group(buffer, viewport);
+    reach_result result = reach_render_command_buffer_begin_group(buffer, &fitted);
     if (result != REACH_OK)
         return result;
     reach_render_command text = *command;
@@ -1044,17 +1089,34 @@ static reach_result reach_render_push_fitted_rect(reach_render_command_buffer *b
         source->scale.generation || source->scale_y.generation || !isfinite(radius) || radius < 0 ||
         !isfinite(source->bounds.x) || !isfinite(source->bounds.y) ||
         !isfinite(source->bounds.width) || !isfinite(source->bounds.height) ||
-        source->bounds.width <= 0 || source->bounds.height <= 0 || source->bounds.width > 16384 ||
-        source->bounds.height > 16384 || bounds->width.generation == 0 ||
+        source->bounds.width <= 0 || source->bounds.height <= 0 || bounds->width.generation == 0 ||
         bounds->height.generation == 0 ||
         (source->has_tint && reach_render_command_buffer_group_shadow(buffer, source->parent_id)))
         return REACH_INVALID_ARGUMENT;
-    float minimum = 0, maximum = 0;
-    if (reach_motion_range(&bounds->width, &minimum, &maximum) != REACH_OK || minimum < 0 ||
-        maximum > source->bounds.width ||
-        reach_motion_range(&bounds->height, &minimum, &maximum) != REACH_OK || minimum < 0 ||
-        maximum > source->bounds.height)
+    reach_render_group raster = *source;
+    reach_rect_motion fitted = *bounds;
+    reach_motion *extents[] = {&fitted.width, &fitted.height};
+    float *sizes[] = {&raster.bounds.width, &raster.bounds.height};
+    for (size_t axis = 0; axis < 2; ++axis)
+    {
+        float minimum = 0, maximum = 0, first = 0, last = 0;
+        if (reach_motion_range(extents[axis], &minimum, &maximum) != REACH_OK ||
+            !reach_render_motion_endpoints(extents[axis], &first, &last) || first < 0 ||
+            last > *sizes[axis])
+            return REACH_INVALID_ARGUMENT;
+        if (minimum < 0)
+            *extents[axis] = reach_motion_clamp(extents[axis], 0, fmaxf(0, maximum));
+        if (maximum <= *sizes[axis])
+            continue;
+        if (command->type == REACH_RENDER_COMMAND_RECT)
+            *sizes[axis] = ceilf(maximum);
+        else
+            *extents[axis] = reach_motion_clamp(extents[axis], 0, *sizes[axis]);
+    }
+    if (raster.bounds.width > 16384 || raster.bounds.height > 16384)
         return REACH_INVALID_ARGUMENT;
+    source = &raster;
+    bounds = &fitted;
     if (buffer->count >= REACH_MAX_RENDER_COMMANDS ||
         buffer->group_count > REACH_MAX_RENDER_GROUPS - 2)
         return REACH_ERROR;

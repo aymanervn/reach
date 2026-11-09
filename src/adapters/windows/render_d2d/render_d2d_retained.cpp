@@ -365,7 +365,8 @@ static HRESULT sync_tint(reach_render_backend *backend, reach_d2d_retained_layer
         {
             if (initialized && reach_motion_equal(&group.tint[index], &layer.group.tint[index]))
                 continue;
-            reach_motion channel = reach_motion_affine(&group.tint[index], 255.0f, 0.0f);
+            reach_motion unit = reach_render_unit_motion(&group.tint[index]);
+            reach_motion channel = reach_motion_affine(&unit, 255.0f, 0.0f);
             hr = layer.tint_properties->InsertScalar(HStringReference(names[index]).Get(),
                                                      reach_motion_value(&channel));
             if (SUCCEEDED(hr))
@@ -460,11 +461,10 @@ static HRESULT sync_tint(reach_render_backend *backend, reach_d2d_retained_layer
         if (initialized && reach_motion_equal(&group.tint[index], &layer.group.tint[index]))
             continue;
         int row = index == REACH_RENDER_COLOR_ALPHA ? 3 : 4;
-        hr = layer.dcomp_tint->SetMatrixElement(row, (int)index,
-                                                reach_motion_value(&group.tint[index]));
+        reach_motion channel = reach_render_unit_motion(&group.tint[index]);
+        hr = layer.dcomp_tint->SetMatrixElement(row, (int)index, reach_motion_value(&channel));
         ComPtr<IDCompositionAnimation> animation;
-        HRESULT motion_hr =
-            SUCCEEDED(hr) ? dcomp_motion(backend, group.tint[index], &animation) : hr;
+        HRESULT motion_hr = SUCCEEDED(hr) ? dcomp_motion(backend, channel, &animation) : hr;
         if (FAILED(motion_hr))
             hr = motion_hr;
         else if (motion_hr == S_OK)
@@ -844,6 +844,7 @@ static HRESULT wuc_properties(reach_render_backend *backend, IInspectable *inspe
                               unsigned mask = 31)
 {
     reach_workload_add(REACH_WORKLOAD_PROPERTY_SUBMISSIONS, 1);
+    reach_motion opacity = reach_render_unit_motion(&group.opacity);
     ComPtr<IVisual> visual;
     HRESULT hr = inspectable->QueryInterface(IID_PPV_ARGS(&visual));
     if (SUCCEEDED(hr))
@@ -854,7 +855,7 @@ static HRESULT wuc_properties(reach_render_backend *backend, IInspectable *inspe
     if (SUCCEEDED(hr))
     {
         if (mask & 4)
-            hr = visual->put_Opacity(scalar_value(backend, group.opacity, 1.0f));
+            hr = visual->put_Opacity(scalar_value(backend, opacity, 1.0f));
     }
     if (SUCCEEDED(hr))
     {
@@ -870,7 +871,7 @@ static HRESULT wuc_properties(reach_render_backend *backend, IInspectable *inspe
     if (SUCCEEDED(hr) && (mask & 2))
         hr = wuc_motion(backend, inspectable, L"Offset.Y", y);
     if (SUCCEEDED(hr) && (mask & 4))
-        hr = wuc_motion(backend, inspectable, L"Opacity", group.opacity);
+        hr = wuc_motion(backend, inspectable, L"Opacity", opacity);
     if (SUCCEEDED(hr) && (mask & 8))
         hr = wuc_motion(backend, inspectable, L"Scale.X", group.scale);
     if (SUCCEEDED(hr) && (mask & 16))
@@ -883,6 +884,7 @@ static HRESULT dcomp_properties(reach_render_backend *backend, IDCompositionVisu
                                 float base_x, float base_y, unsigned mask = 31)
 {
     reach_workload_add(REACH_WORKLOAD_PROPERTY_SUBMISSIONS, 1);
+    reach_motion unit_opacity = reach_render_unit_motion(&group.opacity);
     HRESULT hr =
         !(mask & 1) ? S_OK : visual->SetOffsetX(base_x + scalar_value(backend, group.x, 0.0f));
     if (SUCCEEDED(hr) && (mask & 2))
@@ -891,12 +893,12 @@ static HRESULT dcomp_properties(reach_render_backend *backend, IDCompositionVisu
     if (SUCCEEDED(hr) && (mask & 4))
         hr = visual->QueryInterface(IID_PPV_ARGS(&opacity));
     if (SUCCEEDED(hr) && (mask & 4))
-        hr = opacity->SetOpacity(scalar_value(backend, group.opacity, 1.0f));
+        hr = opacity->SetOpacity(scalar_value(backend, unit_opacity, 1.0f));
     if (SUCCEEDED(hr) && (mask & 8))
         hr = scale->SetScaleX(scalar_value(backend, group.scale, 1.0f));
     if (SUCCEEDED(hr) && (mask & 16))
         hr = scale->SetScaleY(scalar_value(backend, reach_render_group_y_scale(&group), 1.0f));
-    reach_motion motions[5] = {group.x, group.y, group.opacity, group.scale,
+    reach_motion motions[5] = {group.x, group.y, unit_opacity, group.scale,
                                reach_render_group_y_scale(&group)};
     motions[0] = reach_motion_affine(&group.x, 1.0f, base_x);
     motions[1] = reach_motion_affine(&group.y, 1.0f, base_y);
@@ -1298,13 +1300,13 @@ static bool text_snap_transform(const reach_render_group &group)
     auto unit = [](const reach_motion &motion)
     {
         return motion.generation == 0 ||
-               (motion.duration_seconds <= 0
-                    ? reach_motion_value_at(&motion, 0) == 1
-                    : !motion.has_mapping && motion.from == 1 && motion.to == 1);
+               (motion.duration_seconds <= 0 ? reach_motion_value_at(&motion, 0) == 1
+                                             : !motion.has_mapping && motion.from == 1 &&
+                                                   motion.to == 1 && motion.spring_velocity == 0);
     };
     return unit(group.scale) && unit(reach_render_group_y_scale(&group)) &&
-           (group.x.generation == 0 ||
-            (!group.x.has_mapping && group.x.from == 0 && group.x.to == 0)) &&
+           (group.x.generation == 0 || (!group.x.has_mapping && group.x.from == 0 &&
+                                        group.x.to == 0 && group.x.spring_velocity == 0)) &&
            !group.x.repeating;
 }
 

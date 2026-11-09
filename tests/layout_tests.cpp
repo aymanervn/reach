@@ -1457,6 +1457,299 @@ static void test_popup_width_background_preflight(void)
     expect_true(!shadow, "covered width range avoids an unnecessary live shadow filter");
 }
 
+struct overshoot_extremes
+{
+    float minimum;
+    float maximum;
+};
+
+static overshoot_extremes overshoot_sample(const reach_motion &motion)
+{
+    overshoot_extremes result = {INFINITY, -INFINITY};
+    double deadline = reach_motion_deadline(&motion);
+    for (double at = motion.started_seconds; at <= deadline + .0005; at += .0005)
+    {
+        float value = reach_motion_value_at(&motion, at);
+        result.minimum = fminf(result.minimum, value);
+        result.maximum = fmaxf(result.maximum, value);
+    }
+    return result;
+}
+
+static reach_motion overshoot_spring(float from, float to, float push, reach_motion_preset preset)
+{
+    reach_motion_spec spec = reach_theme_motion_preset(reach_theme_default(), preset);
+    float velocity = push * (to - from) * 6.2831853f / spec.response_seconds;
+    reach_motion motion = {};
+    reach_motion_start_spec_at(&motion, from, to, velocity, spec, 10);
+    return motion;
+}
+
+static bool overshoot_compiles(const reach_motion &motion)
+{
+    reach_motion_segment segments[REACH_MOTION_MAX_SEGMENTS] = {};
+    return motion.generation == 0 || motion.repeating || motion.duration_seconds <= 0 ||
+           reach_motion_compile_at(&motion, motion.started_seconds, segments) > 0;
+}
+
+static bool overshoot_groups_compile(const reach_render_command_buffer &buffer)
+{
+    for (size_t index = 0; index < buffer.group_count; ++index)
+    {
+        const reach_render_group &group = buffer.groups[index];
+        const reach_motion motions[] = {group.x, group.y, reach_render_unit_motion(&group.opacity),
+                                        group.scale, reach_render_group_y_scale(&group)};
+        for (const reach_motion &motion : motions)
+            if (!overshoot_compiles(motion))
+                return false;
+        if (!group.has_clip)
+            continue;
+        reach_rect_motion clip = {};
+        if (reach_render_group_clip_motion(&group, &clip) != REACH_OK ||
+            !overshoot_compiles(clip.width) || !overshoot_compiles(clip.height))
+            return false;
+        for (const reach_motion &inset : group.clip_insets)
+            if (!overshoot_compiles(inset))
+                return false;
+        reach_motion radius_x = {}, radius_y = {};
+        if (reach_render_group_has_rounded_clip(&group) &&
+            (reach_render_group_clip_radii_motion(&group, &radius_x, &radius_y) != REACH_OK ||
+             !overshoot_compiles(radius_x) || !overshoot_compiles(radius_y)))
+            return false;
+    }
+    return true;
+}
+
+static bool overshoot_clip_covers(const reach_render_group *group, const reach_motion &width,
+                                  float limit)
+{
+    if (group == nullptr)
+        return false;
+    double deadline = reach_motion_deadline(&width);
+    for (double at = width.started_seconds; at <= deadline + .001; at += .001)
+    {
+        float value = reach_motion_value_at(&width, at);
+        float clip = reach_render_group_clip_at(group, at).width;
+        float expected = fminf(fmaxf(0, value), limit);
+        if (clip < 0 || clip > limit + .01f || fabsf(clip - expected) > .05f)
+            return false;
+    }
+    return true;
+}
+
+static void test_overshoot_render_envelopes(void)
+{
+    const float dpis[] = {1.0f, 1.25f, 1.5f, 2.0f};
+    const reach_motion_preset presets[] = {REACH_MOTION_PRESET_BOUNCY, REACH_MOTION_PRESET_RELEASE};
+    auto storage = std::make_unique<reach_render_command_buffer>();
+    auto &buffer = *storage;
+    bool rect_ok = true, rect_covers = true, image_ok = true, text_ok = true;
+    bool popup_ok = true, popup_covers = true, popup_motion_ok = true, height_ok = true;
+    bool radius_ok = true, unit_ok = true, compile_ok = true, stretch_ok = true;
+    bool overshoots = false, undershoots = false;
+    for (float dpi : dpis)
+        for (reach_motion_preset preset : presets)
+            for (float push : {0.0f, 0.5f})
+            {
+                float small = 24 * dpi, large = 1600 * dpi, height = 40 * dpi;
+                reach_motion grow = overshoot_spring(small, large, push, preset);
+                reach_motion shrink = overshoot_spring(large, small, push, preset);
+                overshoot_extremes grown = overshoot_sample(grow);
+                overshoot_extremes shrunk = overshoot_sample(shrink);
+                overshoots = overshoots || grown.maximum > large + 1;
+                undershoots = undershoots || shrunk.minimum < 0;
+                for (const reach_motion *width : {&grow, &shrink})
+                {
+                    reach_render_command_buffer_clear(&buffer);
+                    reach_render_group source = {};
+                    source.id = 10;
+                    source.bounds = {0, 0, ceilf(large), ceilf(height)};
+                    reach_rect_motion bounds = {};
+                    reach_motion_set(&bounds.x, 0);
+                    reach_motion_set(&bounds.y, 0);
+                    bounds.width = *width;
+                    reach_motion_set(&bounds.height, height);
+                    overshoot_extremes sampled = overshoot_sample(*width);
+                    bool pushed = reach_render_push_rect_motion(&buffer, &source, &bounds, 8 * dpi,
+                                                                {1, 1, 1, 1}) == REACH_OK &&
+                                  reach_render_command_buffer_validate_groups(&buffer) == REACH_OK;
+                    rect_ok = rect_ok && pushed;
+                    const auto *paint = reach_render_command_buffer_group(&buffer, 11);
+                    rect_covers = rect_covers && pushed && paint != nullptr &&
+                                  paint->bounds.width >= sampled.maximum &&
+                                  overshoot_clip_covers(paint, *width, paint->bounds.width);
+                    compile_ok = compile_ok && overshoot_groups_compile(buffer);
+
+                    reach_render_command_buffer_clear(&buffer);
+                    reach_render_command image = {};
+                    image.type = REACH_RENDER_COMMAND_ICON;
+                    image.icon_id = 7;
+                    pushed = reach_render_push_image_motion(&buffer, &source, &bounds, 0, &image) ==
+                                 REACH_OK &&
+                             reach_render_command_buffer_validate_groups(&buffer) == REACH_OK;
+                    image_ok = image_ok && pushed &&
+                               overshoot_clip_covers(reach_render_command_buffer_group(&buffer, 11),
+                                                     *width, source.bounds.width);
+
+                    reach_render_command_buffer_clear(&buffer);
+                    reach_render_command text = {};
+                    text.type = REACH_RENDER_COMMAND_TEXT;
+                    text.rect = {0, 0, ceilf(large), height};
+                    text.text_size = 13 * dpi;
+                    text.text[0] = 'A';
+                    reach_render_group viewport = {};
+                    viewport.id = 20;
+                    viewport.bounds = viewport.clip = text.rect;
+                    viewport.has_clip = 1;
+                    viewport.clip_insets[REACH_RENDER_CLIP_RIGHT] =
+                        reach_motion_affine(width, -1, text.rect.width);
+                    pushed = reach_render_push_width_text(&buffer, &text, &viewport) == REACH_OK &&
+                             reach_render_command_buffer_validate_groups(&buffer) == REACH_OK;
+                    text_ok = text_ok && pushed &&
+                              overshoot_clip_covers(reach_render_command_buffer_group(&buffer, 20),
+                                                    *width, text.rect.width);
+                }
+
+                reach_popup_anchor anchor = {};
+                anchor.monitor = {0, 0, 2560 * dpi, 1440 * dpi};
+                anchor.button = {300 * dpi, 0, 40 * dpi, 32 * dpi};
+                anchor.bar_edge_y = 32 * dpi;
+                anchor.direction = REACH_POPUP_DROP_DOWN;
+                reach_popup_background_input input = {};
+                input.theme = reach_theme_default();
+                input.dpi_scale = dpi;
+                input.notch_side = REACH_NOTCH_SIDE_TOP;
+                const float spans[][2] = {{20, 180}, {220, 400}, {900, 40}, {40, 900}};
+                for (const auto &span : spans)
+                {
+                    reach_motion width =
+                        overshoot_spring(span[0] * dpi, span[1] * dpi, push, preset);
+                    reach_rect_motion body = {};
+                    reach_motion notch = {};
+                    bool placed = reach_popup_width_motion(&anchor, &width, 180 * dpi, 8 * dpi, dpi,
+                                                           &body, &notch) == REACH_OK;
+                    float minimum = 0, maximum = 0;
+                    placed = placed &&
+                             reach_motion_range(&body.width, &minimum, &maximum) == REACH_OK &&
+                             minimum > 0;
+                    popup_motion_ok = popup_motion_ok && placed;
+                    reach_render_command_buffer_clear(&buffer);
+                    overshoot_extremes sampled = overshoot_sample(width);
+                    input.bounds = {0, 0, fmaxf(span[0], span[1]) * dpi, 180 * dpi};
+                    auto center = reach_motion_affine(&width, .5f, 0);
+                    bool pushed = reach_popup_push_width_background(&input, &width, &center, 0, 100,
+                                                                    &buffer) == REACH_OK &&
+                                  reach_render_command_buffer_validate_groups(&buffer) == REACH_OK;
+                    popup_ok = popup_ok && pushed;
+                    compile_ok = compile_ok && overshoot_groups_compile(buffer);
+                    const auto *caster = reach_render_command_buffer_group(&buffer, 100);
+                    if (pushed && caster != nullptr && caster->has_shadow)
+                        popup_covers = popup_covers && caster->bounds.width >= sampled.maximum;
+
+                    reach_motion tall =
+                        overshoot_spring(span[1] * dpi, span[0] * dpi, push, preset);
+                    reach_rect_motion screen = {};
+                    reach_render_command_buffer_clear(&buffer);
+                    input.bounds = {0, 0, 320 * dpi, 600 * dpi};
+                    height_ok =
+                        height_ok &&
+                        reach_popup_height_motion(&anchor, 320 * dpi, &tall, 8 * dpi, &screen) ==
+                            REACH_OK &&
+                        reach_motion_range(&screen.height, &minimum, &maximum) == REACH_OK &&
+                        minimum > 0 &&
+                        reach_popup_push_height_background(&input, &tall, 0, 200, &buffer) ==
+                            REACH_OK &&
+                        reach_render_command_buffer_validate_groups(&buffer) == REACH_OK;
+                }
+
+                reach_render_command_buffer_clear(&buffer);
+                reach_render_group rounded = {};
+                rounded.id = 30;
+                rounded.bounds = rounded.clip = {0, 0, 200 * dpi, 120 * dpi};
+                rounded.has_clip = 1;
+                rounded.clip_radius_motion = overshoot_spring(24 * dpi, 0, push, preset);
+                reach_motion radius_x = {}, radius_y = {};
+                float minimum = 0, maximum = 0;
+                bool rounded_ok =
+                    reach_render_command_buffer_begin_group(&buffer, &rounded) == REACH_OK &&
+                    reach_render_group_clip_radii_motion(&rounded, &radius_x, &radius_y) ==
+                        REACH_OK &&
+                    reach_motion_range(&radius_x, &minimum, &maximum) == REACH_OK && minimum >= 0 &&
+                    overshoot_compiles(radius_x);
+                reach_render_command_buffer_end_group(&buffer);
+                for (double at = 10; rounded_ok && at < 10 + 3; at += .002)
+                    rounded_ok = reach_render_group_clip_radii_at(&rounded, at).x >= 0;
+                radius_ok = radius_ok && rounded_ok;
+
+                reach_motion fade = overshoot_spring(0, 1, push, preset);
+                reach_motion unit = reach_render_unit_motion(&fade);
+                bool bounded = reach_motion_range(&unit, &minimum, &maximum) == REACH_OK &&
+                               minimum >= 0 && maximum <= 1 && overshoot_compiles(unit);
+                reach_render_command_buffer_clear(&buffer);
+                reach_render_group tinted = {};
+                tinted.id = 40;
+                tinted.bounds = {0, 0, 10, 10};
+                tinted.opacity = fade;
+                tinted.has_tint = 1;
+                for (auto &channel : tinted.tint)
+                    channel = fade;
+                bounded = bounded &&
+                          reach_render_command_buffer_begin_group(&buffer, &tinted) == REACH_OK;
+                reach_render_command_buffer_end_group(&buffer);
+                for (double at = 10; bounded && at < 10 + 3; at += .002)
+                {
+                    float opacity = reach_render_command_buffer_group_opacity_at(&buffer, 40, at);
+                    reach_color tint = reach_render_group_tint_at(&tinted, at);
+                    bounded = opacity >= 0 && opacity <= 1 && tint.r >= 0 && tint.r <= 1 &&
+                              tint.a >= 0 && tint.a <= 1;
+                }
+                unit_ok = unit_ok && bounded;
+
+                reach_render_group chrome = {};
+                chrome.id = 50;
+                chrome.bounds = {0, 0, 81, 81};
+                reach_render_stretch stretch = {};
+                stretch.left = stretch.right = stretch.top = stretch.bottom = 30;
+                stretch.width = overshoot_spring(200 * dpi, 900 * dpi, push, preset);
+                reach_motion_set(&stretch.height, 81);
+                reach_render_group center_patch = {}, right_patch = {};
+                bool patched =
+                    reach_render_stretch_patch(&chrome, &stretch, 1, &center_patch) == REACH_OK &&
+                    reach_render_stretch_patch(&chrome, &stretch, 2, &right_patch) == REACH_OK;
+                for (double at = 10; patched && at < 10 + 3; at += .002)
+                {
+                    float scale = reach_motion_value_at(&center_patch.scale, at);
+                    float center_right = center_patch.bounds.x +
+                                         reach_motion_value_at(&center_patch.x, at) +
+                                         center_patch.bounds.width * scale;
+                    float right_left =
+                        right_patch.bounds.x + reach_motion_value_at(&right_patch.x, at);
+                    patched = fabsf(center_right - right_left) < .05f;
+                }
+                stretch_ok = stretch_ok && patched;
+            }
+    expect_true(overshoots && undershoots,
+                "bouncy presets overshoot their target and undershoot zero at worst-case spans");
+    expect_true(rect_ok, "fitted rects accept bouncy widths at every DPI");
+    expect_true(rect_covers, "fitted rect sources cover every sampled overshoot extreme");
+    expect_true(image_ok, "fitted images clamp bouncy widths to their raster source");
+    expect_true(text_ok, "width text clamps overshoot to its retained text envelope");
+    expect_true(popup_motion_ok, "popup width placement keeps overshooting widths positive");
+    expect_true(popup_ok, "rigid and narrow popup chrome accept bouncy widths at every DPI");
+    expect_true(popup_covers, "narrow popup shadow sources cover the sampled width maximum");
+    expect_true(height_ok, "popup height chrome accepts bouncy heights below its caps");
+    expect_true(radius_ok, "bouncy corner radii clamp at zero instead of rejecting the group");
+    expect_true(unit_ok, "opacity and tint stay inside [0, 1] while their springs overshoot");
+    expect_true(compile_ok, "overshoot-safe render motions still compile natively");
+    expect_true(stretch_ok, "stretched center patches follow spring velocity without seams");
+
+    reach_motion monotone = {};
+    reach_motion_start_at(&monotone, 0, 1, .2, REACH_EASING_EASE_OUT, 10);
+    reach_motion unit = reach_render_unit_motion(&monotone);
+    expect_true(reach_motion_equal(&unit, &monotone),
+                "monotone opacity descriptors are submitted unchanged");
+}
+
 static void test_presentation_center_uses_canonical_motion(void)
 {
     auto buffer = std::make_unique<reach_render_command_buffer>();
@@ -1491,6 +1784,7 @@ int main(void)
     test_rect_motion_source_ownership();
     test_width_text_source_ownership();
     test_popup_width_background_preflight();
+    test_overshoot_render_envelopes();
     test_shadow_source_ownership();
     test_textbox_caret_reference_ownership();
     test_group_equality_preserves_intent_without_padding();

@@ -305,7 +305,9 @@ reach_result reach_d2d_execute_fallback(reach_render_backend *backend,
                D2D1::Matrix3x2F::Translation(reach_motion_value_at(&group.x, now_seconds),
                                              reach_motion_value_at(&group.y, now_seconds));
         root_opacity =
-            group.opacity.generation ? reach_motion_value_at(&group.opacity, now_seconds) : 1.0f;
+            group.opacity.generation
+                ? fminf(1.0f, fmaxf(0.0f, reach_motion_value_at(&group.opacity, now_seconds)))
+                : 1.0f;
     }
     bool has_shadow = false;
     for (size_t index = 0; index < commands->group_count; ++index)

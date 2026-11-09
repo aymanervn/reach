@@ -93,6 +93,18 @@ reach_popup_placement reach_popup_place(const reach_popup_anchor *anchor, float 
     return placement;
 }
 
+static bool reach_popup_positive_extent(reach_motion *motion)
+{
+    float first = reach_motion_value_at(motion, motion->started_seconds);
+    float last = reach_motion_value_at(motion, reach_motion_deadline(motion));
+    float minimum = 0, maximum = 0;
+    if (!(fminf(first, last) > 0) || reach_motion_range(motion, &minimum, &maximum) != REACH_OK)
+        return false;
+    if (minimum <= 0)
+        *motion = reach_motion_clamp(motion, fminf(1.0f, fminf(first, last)), maximum);
+    return true;
+}
+
 reach_result reach_popup_height_motion(const reach_popup_anchor *anchor, float width,
                                        const reach_motion *height, float margin,
                                        reach_rect_motion *out_bounds)
@@ -109,11 +121,11 @@ reach_result reach_popup_height_motion(const reach_popup_anchor *anchor, float w
     float bottom = anchor->monitor.y + anchor->monitor.height - vertical_margin;
     if (constrained)
         result.height = reach_motion_clamp(height, 0, bottom - top);
-    float first = reach_motion_value_at(&result.height, result.height.started_seconds);
-    float last = reach_motion_value_at(&result.height, reach_motion_deadline(&result.height));
-    if (fminf(first, last) <= 0)
+    float minimum = 0, maximum = 0;
+    if (!reach_popup_positive_extent(&result.height) ||
+        reach_motion_range(&result.height, &minimum, &maximum) != REACH_OK)
         return REACH_INVALID_ARGUMENT;
-    reach_popup_placement placement = reach_popup_place(anchor, width, fmaxf(first, last), margin);
+    reach_popup_placement placement = reach_popup_place(anchor, width, maximum, margin);
     reach_motion_set(&result.x, placement.bounds.x);
     reach_motion_set(&result.width, placement.bounds.width);
     if (anchor->direction == REACH_POPUP_DROP_DOWN)
@@ -160,7 +172,8 @@ reach_result reach_popup_width_motion(const reach_popup_anchor *anchor, const re
     if (constrained)
         result.width = reach_motion_clamp(width, 0, right - left);
     float minimum = 0, maximum = 0;
-    if (reach_motion_range(&result.width, &minimum, &maximum) != REACH_OK || minimum <= 0)
+    if (!reach_popup_positive_extent(&result.width) ||
+        reach_motion_range(&result.width, &minimum, &maximum) != REACH_OK || minimum <= 0)
         return REACH_INVALID_ARGUMENT;
     reach_popup_placement narrow = reach_popup_place(anchor, minimum, height, margin);
     reach_popup_placement wide = reach_popup_place(anchor, maximum, height, margin);
@@ -294,8 +307,9 @@ reach_result reach_popup_push_height_background(const reach_popup_background_inp
     pad.right = ceilf(pad.right);
     pad.top = ceilf(pad.top);
     pad.bottom = ceilf(pad.bottom);
-    float first = reach_motion_value_at(height, height->started_seconds);
-    float last = reach_motion_value_at(height, reach_motion_deadline(height));
+    float minimum = 0, maximum = 0;
+    if (reach_motion_range(height, &minimum, &maximum) != REACH_OK)
+        return REACH_INVALID_ARGUMENT;
     auto commands = std::unique_ptr<reach_render_command_buffer>(new (std::nothrow)
                                                                      reach_render_command_buffer());
     if (!commands)
@@ -315,10 +329,10 @@ reach_result reach_popup_push_height_background(const reach_popup_background_inp
                            (input->notch_side == REACH_NOTCH_SIDE_BOTTOM ? notch : 0));
     source.bounds.height = stretch.top + stretch.bottom + 1;
     float source_body_height = source.bounds.height - pad.top - pad.bottom;
-    if (first == last && first < source_body_height)
+    if (minimum == maximum && minimum < source_body_height)
     {
-        shape.bounds.height = last;
-        source.bounds.height = ceilf(last + pad.top + pad.bottom);
+        shape.bounds.height = maximum;
+        source.bounds.height = ceilf(maximum + pad.top + pad.bottom);
         reach_result result = reach_popup_push_background(&shape, commands.get());
         if (result != REACH_OK)
             return result;
@@ -335,7 +349,10 @@ reach_result reach_popup_push_height_background(const reach_popup_background_inp
     if (result != REACH_OK)
         return result;
     reach_motion_set(&stretch.width, source.bounds.width);
-    stretch.height = reach_motion_affine(height, 1, pad.top + pad.bottom);
+    reach_motion body = *height;
+    if (minimum < source_body_height)
+        body = reach_motion_clamp(height, source_body_height, fmaxf(source_body_height, maximum));
+    stretch.height = reach_motion_affine(&body, 1, pad.top + pad.bottom);
     return reach_render_push_stretched_chrome(out_commands, &source, &stretch, commands->commands,
                                               commands->count);
 }
@@ -427,10 +444,13 @@ reach_result reach_popup_push_width_background(const reach_popup_background_inpu
         out_commands->group_count > REACH_MAX_RENDER_GROUPS ||
         first_group_id >= UINT64_C(0x8000000000000000) - 15)
         return REACH_INVALID_ARGUMENT;
+    reach_motion positive_width = *width;
     float minimum = 0, maximum = 0;
-    if (reach_motion_range(width, &minimum, &maximum) != REACH_OK || minimum <= 0 ||
+    if (!reach_popup_positive_extent(&positive_width) ||
+        reach_motion_range(&positive_width, &minimum, &maximum) != REACH_OK || minimum <= 0 ||
         !isfinite(input->bounds.height) || input->bounds.height <= 0)
         return REACH_INVALID_ARGUMENT;
+    width = &positive_width;
     auto batch = std::unique_ptr<reach_render_command_buffer>(new (std::nothrow)
                                                                   reach_render_command_buffer());
     if (!batch)
