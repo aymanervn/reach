@@ -243,7 +243,8 @@ static void expect_hold_matches_shape(const reach_context_menu *menu, const reac
             int32_t in_popup = x >= popup.x - margin && x < popup.x + popup.width + margin &&
                                y >= popup.y - margin && y < popup.y + popup.height + margin;
             int32_t in_slot = x >= slot.x - margin && x < slot.x + slot.width + margin &&
-                              y >= slot.y - margin && y < slot.y + slot.height + margin;
+                              y >= fminf(slot.y - margin, bar_edge_y) &&
+                              y < slot.y + slot.height + margin;
             float left = fminf(popup.x, slot.x);
             float right = fmaxf(popup.x + popup.width, slot.x + slot.width);
             int32_t in_corridor = x >= left - margin && x < right + margin &&
@@ -252,8 +253,8 @@ static void expect_hold_matches_shape(const reach_context_menu *menu, const reac
             int32_t published = reach_rect_union_contains(shape, x, y);
             int32_t held = reach_context_menu_window_list_holds_pointer(menu, x, y);
             mismatch |= expected != published || published != held;
-            int32_t beside = y >= slot.y + slot.height + margin &&
-                             (x < slot.x - margin || x >= slot.x + slot.width + margin);
+            int32_t beside =
+                y >= bar_edge_y && (x < slot.x - margin || x >= slot.x + slot.width + margin);
             beside_slot_held |= beside && held;
         }
     }
@@ -279,7 +280,7 @@ static void test_window_list_holds_the_pointer_across_the_gap(void)
     reach_menu_request request = {};
     request.target_index = 3;
     request.anchored = 1;
-    request.anchor_button = {380.0f, 960.0f, 40.0f, 40.0f};
+    request.anchor_button = {380.0f, 1012.8f, 38.4f, 38.4f};
     request.bar_edge_y = 1000.0f;
     request.drop_direction = REACH_POPUP_DROP_UP;
 
@@ -323,6 +324,59 @@ static void test_window_list_holds_the_pointer_across_the_gap(void)
                               {200.0f, 600.0f, 500.0f, 480.0f});
 
     reach_context_menu_destroy(menu);
+}
+
+static void test_window_list_holds_the_pointer_from_the_icon_to_the_preview(void)
+{
+    const float scales[] = {1.0f, 1.25f, 1.5f};
+    for (float scale : scales)
+    {
+        const float dock_top = 1000.0f;
+        const float dock_height = 64.0f * scale;
+        const float margin = 12.0f * scale;
+        reach_menu_request request = {};
+        request.anchored = 1;
+        request.anchor_button = {400.0f, dock_top + dock_height * 0.2f, 40.0f * scale,
+                                 dock_height * 0.6f};
+        request.bar_edge_y = dock_top;
+        request.drop_direction = REACH_POPUP_DROP_UP;
+        request.window_count = 1;
+        request.windows[0].window = 11;
+        reach_copy_utf16(request.windows[0].title, 260, (const uint16_t *)L"one");
+        reach_context_menu_open_context ctx = {};
+        ctx.theme = reach_theme_default();
+        ctx.dpi_scale = scale;
+        ctx.anchored = 1;
+        ctx.anchor_button = request.anchor_button;
+        ctx.bar_edge_y = request.bar_edge_y;
+        ctx.drop_direction = request.drop_direction;
+        ctx.monitor = {0.0f, 0.0f, 1920.0f, 1400.0f};
+        ctx.request = &request;
+        reach_context_menu *menu = nullptr;
+        reach_context_menu_create(&menu);
+        reach_context_menu_open_window_list(menu, 0, &ctx);
+
+        const reach_rect_f32 slot = request.anchor_button;
+        const reach_rect_f32 popup = reach_context_menu_state_ptr(menu)->bounds;
+        const float center_x = slot.x + slot.width * 0.5f;
+        int32_t path_dropped = 0;
+        for (float y = slot.y + slot.height * 0.5f; y > popup.y + popup.height * 0.5f; y -= 1.0f)
+        {
+            path_dropped |= !reach_context_menu_window_list_holds_pointer(menu, center_x, y);
+        }
+        expect_true(!path_dropped, "the icon to preview path never drops the list");
+
+        int32_t beside_held = 0;
+        for (float y = dock_top; y < dock_top + dock_height; y += 1.0f)
+        {
+            beside_held |=
+                reach_context_menu_window_list_holds_pointer(menu, slot.x - margin - 1.0f, y);
+            beside_held |= reach_context_menu_window_list_holds_pointer(
+                menu, slot.x + slot.width + margin + 1.0f, y);
+        }
+        expect_true(!beside_held, "the dock beside the icon does not hold the list open");
+        reach_context_menu_destroy(menu);
+    }
 }
 
 static reach_window_snapshot preview_windows[REACH_MENU_MAX_WINDOWS];
@@ -760,7 +814,7 @@ static void test_window_list_shape_shrinks_when_reflow_settles(void)
     ctx.dpi_scale = 1.0f;
     ctx.anchored = 1;
     ctx.drop_direction = REACH_POPUP_DROP_UP;
-    ctx.anchor_button = {400, 1000, 40, 40};
+    ctx.anchor_button = {400, 1012.8f, 38.4f, 38.4f};
     ctx.bar_edge_y = 1000;
     ctx.request = &request;
     request.anchored = 1;
@@ -918,6 +972,7 @@ int main(void)
     test_preview_reflow_preserves_surviving_sources();
     test_capsule_owns_popup_pointer_policy();
     test_rect_union_containment();
+    test_window_list_holds_the_pointer_from_the_icon_to_the_preview();
     test_window_list_shape_shrinks_when_reflow_settles();
     return failures == 0 ? 0 : 1;
 }
