@@ -777,7 +777,7 @@ target_compile_features(reach_util_tests PRIVATE
     cxx_std_17
 )
 target_link_libraries(reach_util_tests PRIVATE
-    reach_support
+    reach_core
 )
 
 add_executable(reach_diagnostics_log_tests

@@ -801,14 +801,22 @@ time at which the damped oscillator's decay envelope bounds displacement below 5
 amplitude `|from - to| + |velocity| / omega`. Every spring with the same parameters therefore shares
 one duration regardless of span or velocity, so same-epoch derivations compare durations exactly;
 the deadline snaps exactly to `to`, so completion and `wait_ms` are unchanged.
-`reach_motion_spring_to_at` and `reach_animation_manager_spring_to_at` retarget from any finite, repeating, mapped or clamped curve,
-preserving value and `reach_motion_velocity_at` at the event time. `reach_motion_spec` names either
-a spring or a legacy curve for later presets. Range, crossing, mapping, lookup, combination and
-clamp helpers treat the spring's raw domain as including its analytic extrema and split time at
+`reach_motion_spring_to_at` and `reach_animation_manager_spring_to_at` retarget from any finite,
+repeating, mapped or clamped curve, preserving value and `reach_motion_velocity_at` at the event
+time. `reach_motion_spec` names either a spring or a legacy curve. Range, crossing, mapping,
+lookup, combination and clamp helpers treat the spring's raw domain as including its analytic extrema and split time at
 turns and raw boundary crossings, so overshoot is supported rather than assumed monotone. Native
 compilation uses adaptive cubic Hermite pieces with an analytic fourth-derivative bound, split at
 velocity zeros, within the existing 32-piece cap; exhausted budgets return no curve. Repeating
 springs and normalized products of zero-span springs are rejected without output mutation.
+
+Reach has one motion vocabulary: `reach_theme.motion_presets`, indexed by `reach_motion_preset`
+and read through `reach_theme_motion_preset`. Springs `snappy`, `smooth`, `bouncy`, `press` and
+`release` store only response and damping, so their settle time stays derived by the engine; the
+`fade_in`, `fade_out` and `menu_fade` ease-out curves store a duration. `reach_motion_spec_scaled`
+multiplies response and duration by one time scale, and `reach_theme_stage_motion_scale` derives
+that scale from the persisted Stage duration relative to `stage_motion_reference_seconds`. Features
+migrate from their legacy per-feature seconds to presets incrementally.
 
 Each retained submission samples initial native property values and compiles finite/repeating
 curves from one captured timestamp. Renderer-owned source sampling uses the same scoped policy.

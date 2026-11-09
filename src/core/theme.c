@@ -73,6 +73,23 @@
     .surface_close_seconds = 0.12f, .bar_reveal_seconds = 0.25f, .stage_animation_seconds = 0.28f, \
     .stage_close_hover_seconds = 0.14f, .stage_reflow_seconds = 0.34f
 
+#define REACH_THEME_SPRING(response, damping) {REACH_EASING_SPRING, (response), (damping), 0.0}
+#define REACH_THEME_FADE(seconds) {REACH_EASING_EASE_OUT, 0.0f, 0.0f, (seconds)}
+
+#define REACH_THEME_MOTION                                                                         \
+    .motion_presets =                                                                              \
+        {                                                                                          \
+            [REACH_MOTION_PRESET_SNAPPY] = REACH_THEME_SPRING(0.24f, 1.0f),                        \
+            [REACH_MOTION_PRESET_SMOOTH] = REACH_THEME_SPRING(0.38f, 1.0f),                        \
+            [REACH_MOTION_PRESET_BOUNCY] = REACH_THEME_SPRING(0.34f, 0.78f),                       \
+            [REACH_MOTION_PRESET_PRESS] = REACH_THEME_SPRING(0.16f, 1.0f),                         \
+            [REACH_MOTION_PRESET_RELEASE] = REACH_THEME_SPRING(0.30f, 0.72f),                      \
+            [REACH_MOTION_PRESET_FADE_IN] = REACH_THEME_FADE(0.14),                                \
+            [REACH_MOTION_PRESET_FADE_OUT] = REACH_THEME_FADE(0.11),                               \
+            [REACH_MOTION_PRESET_MENU_FADE] = REACH_THEME_FADE(0.09),                              \
+        },                                                                                         \
+    .stage_motion_reference_seconds = 0.28f
+
 static const reach_theme reach_theme_dark = {
     .mode = REACH_THEME_MODE_DARK,
 
@@ -221,6 +238,7 @@ static const reach_theme reach_theme_dark = {
 
     REACH_THEME_SHADOWS,
     REACH_THEME_METRICS,
+    REACH_THEME_MOTION,
 };
 
 static const reach_theme reach_theme_light = {
@@ -371,6 +389,7 @@ static const reach_theme reach_theme_light = {
 
     REACH_THEME_SHADOWS,
     REACH_THEME_METRICS,
+    REACH_THEME_MOTION,
 };
 
 static float reach_theme_min(float a, float b)
@@ -504,4 +523,22 @@ float reach_theme_tray_slot_size(const reach_theme *theme, float dock_height)
 {
     const reach_theme *actual = theme != 0 ? theme : reach_theme_default();
     return dock_height * actual->tray_slot_size_ratio;
+}
+
+reach_motion_spec reach_theme_motion_preset(const reach_theme *theme, reach_motion_preset preset)
+{
+    const reach_theme *actual = theme != 0 ? theme : reach_theme_default();
+    if (preset < 0 || preset >= REACH_MOTION_PRESET_COUNT)
+    {
+        preset = REACH_MOTION_PRESET_SMOOTH;
+    }
+    return actual->motion_presets[preset];
+}
+
+float reach_theme_stage_motion_scale(const reach_theme *theme, float stage_seconds)
+{
+    const reach_theme *actual = theme != 0 ? theme : reach_theme_default();
+    float reference = actual->stage_motion_reference_seconds;
+    float scale = stage_seconds / reference;
+    return reference > 0.0f && stage_seconds > 0.0f && scale < 1e30f ? scale : 1.0f;
 }
