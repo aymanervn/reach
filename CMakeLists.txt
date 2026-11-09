@@ -247,6 +247,7 @@ add_library(reach_windows_adapters STATIC
     src/adapters/windows/settings_launcher_win32.cpp
     src/adapters/windows/tray_win32.cpp
     src/adapters/windows/icon_shell.cpp
+    src/adapters/windows/package_store_path.cpp
     src/adapters/windows/windows_icon_handle.cpp
     src/adapters/windows/input_language_win32.cpp
     src/adapters/windows/installed_apps_win32.cpp
@@ -872,6 +873,16 @@ add_executable(reach_pin_config_tests
     tests/pin_config_tests.cpp
 )
 
+add_executable(reach_package_store_path_tests
+    tests/package_store_path_tests.cpp
+    src/adapters/windows/package_store_path.cpp
+)
+reach_configure_common(reach_package_store_path_tests)
+target_include_directories(reach_package_store_path_tests PRIVATE
+    src/adapters/windows
+)
+target_compile_features(reach_package_store_path_tests PRIVATE cxx_std_17)
+
 add_executable(reach_taskbar_pin_blob_tests
     tests/taskbar_pin_blob_tests.cpp
     src/adapters/windows/taskbar_pin_blob.cpp
@@ -1260,6 +1271,7 @@ target_compile_features(reach_system_controls_network_tests PRIVATE
     add_test(NAME reach_wifi_service_tests COMMAND reach_wifi_service_tests)
     add_test(NAME reach_bluetooth_tests COMMAND reach_bluetooth_tests)
     add_test(NAME reach_pin_config_tests COMMAND reach_pin_config_tests)
+    add_test(NAME reach_package_store_path_tests COMMAND reach_package_store_path_tests)
     add_test(NAME reach_taskbar_pin_blob_tests COMMAND reach_taskbar_pin_blob_tests)
     add_test(NAME reach_config_service_tests COMMAND reach_config_service_tests)
     add_test(NAME reach_config_ini_tests COMMAND reach_config_ini_tests)
