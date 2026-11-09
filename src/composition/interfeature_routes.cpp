@@ -84,9 +84,6 @@ static void reach_host_route_dock_item_context_menu(void *user, const reach_menu
     (void)reach_host_redraw_registered_surface(host, REACH_SURFACE_ID_DOCK);
 }
 
-/* Reach only sees pointer moves over its own windows, so the window list also asks the platform
-   to watch the exact shape it holds open. Leaving that shape over a foreign window is the case
-   that has no other signal at all. */
 static void reach_host_watch_window_list_pointer(reach_host *host)
 {
     reach_context_menu *menu =

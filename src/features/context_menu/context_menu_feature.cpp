@@ -131,9 +131,6 @@ void reach_context_menu_force_close(reach_context_menu *menu)
     }
 }
 
-/* The window list stays up while the pointer is anywhere in the band that joins it to the
-   control it hangs off, so it survives the gap the pointer crosses on the way over. The same
-   shape is what the platform watches, so what holds the list open is exactly what is observed. */
 int32_t reach_context_menu_window_list_hold_shape(const reach_context_menu *menu,
                                                   reach_rect_union *out_shape)
 {
@@ -517,7 +514,17 @@ reach_rect_union reach_context_menu_hover_shape(reach_rect_f32 popup_bounds,
     float corridor_bottom = drop_direction == REACH_POPUP_DROP_DOWN ? popup_bounds.y : bar_edge_y;
     reach_rect_union shape = {};
     shape.rects[shape.count++] = reach_context_menu_grow(popup_bounds, margin);
-    shape.rects[shape.count++] = reach_context_menu_grow(anchor_slot, margin);
+    reach_rect_f32 slot = reach_context_menu_grow(anchor_slot, margin);
+    if (drop_direction == REACH_POPUP_DROP_DOWN)
+    {
+        slot.height = fmaxf(slot.height, bar_edge_y - slot.y);
+    }
+    else if (bar_edge_y < slot.y)
+    {
+        slot.height += slot.y - bar_edge_y;
+        slot.y = bar_edge_y;
+    }
+    shape.rects[shape.count++] = slot;
     shape.rects[shape.count++] = {corridor_left - margin, corridor_top,
                                   corridor_right - corridor_left + margin * 2.0f,
                                   corridor_bottom - corridor_top};
