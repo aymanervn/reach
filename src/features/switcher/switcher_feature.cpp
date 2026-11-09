@@ -1,4 +1,5 @@
 #include "reach/features/switcher.h"
+#include "reach/core/typography.h"
 #include "reach/features/common/presentation.h"
 #include "reach/features/common/window_preview_layout.h"
 
@@ -695,7 +696,10 @@ int32_t reach_switcher_arrange(reach_switcher *switcher, const reach_switcher_ar
     target.width =
         fminf(fmaxf(row_width + padding * 2.0f + border * 2.0f, REACH_SWITCHER_MIN_WIDTH * scale),
               ctx->monitor_bounds.width - padding * 2.0f);
-    target.height = height + padding * 2.0f +
+    float bottom_padding = (REACH_SWITCHER_PADDING - REACH_SWITCHER_SELECTION_INSET -
+                            (REACH_SWITCHER_LABEL_HEIGHT - REACH_TEXT_SIZE_MEDIUM)) *
+                           scale;
+    target.height = height + padding + bottom_padding +
                     (REACH_SWITCHER_LABEL_GAP + REACH_SWITCHER_LABEL_HEIGHT) * scale +
                     border * 2.0f;
     double now = reach_motion_now_seconds();
