@@ -764,6 +764,10 @@ static reach_result reach_host_handle_pointer_leave(reach_host *host, reach_surf
             host, src->definition->id, nullptr, REACH_POINTER_EVENT_LEAVE);
         (void)reach_host_apply_surface_action(host, src->definition->id, &leave);
     }
+    if (host->pointer_region_route != nullptr)
+    {
+        host->pointer_region_route(host, static_cast<uint32_t>(src->definition->id));
+    }
     if (src->definition->surface.bar_reveal.ops != nullptr)
     {
         reach_host_request_bar_visibility_update(host);
