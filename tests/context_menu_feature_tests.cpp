@@ -431,7 +431,9 @@ static void advance_preview_layout(reach_context_menu *menu,
     reach_context_menu_reanchor(menu, ctx);
 }
 
-static void test_preview_geometry_and_paging_across_dpi(void)
+static void expect_window_list_renders(reach_context_menu *menu, const char *message);
+
+static void test_preview_row_fits_every_window_across_dpi(void)
 {
     expect_near(reach_window_preview_aspect({0, 0, 600, 1200}), 0.5f, 0.001f,
                 "portrait geometry keeps its aspect");
@@ -480,66 +482,65 @@ static void test_preview_geometry_and_paging_across_dpi(void)
             advance_preview_layout(menu, &ctx, 0.8);
             expect_true(reach_context_menu_state_ptr(menu)->item_count == REACH_MENU_MAX_WINDOWS,
                         "preview capacity is independent of command capacity");
-            bool seen[REACH_MENU_MAX_WINDOWS] = {};
+            expect_true(reach_context_menu_thumbnail_count(menu) == REACH_MENU_MAX_WINDOWS,
+                        "every supplied window is shown at once");
+            expect_window_list_renders(menu, "every supplied window fits the render budget");
+            const reach_context_menu_state *state = reach_context_menu_state_ptr(menu);
+            expect_true(
+                state->bounds.x >= monitor.x && state->bounds.y >= monitor.y &&
+                    state->bounds.x + state->bounds.width <= monitor.x + monitor.width + 0.01f &&
+                    state->bounds.y + state->bounds.height <= monitor.y + monitor.height + 0.01f,
+                "preview popup fits its monitor");
             float common_height = 0.0f;
-            size_t pages = 0;
-            do
+            float previous_right = -INFINITY;
+            for (size_t index = 0; index < reach_context_menu_thumbnail_count(menu); ++index)
             {
-                advance_preview_layout(menu, &ctx, 0.8);
-                const reach_context_menu_state *state = reach_context_menu_state_ptr(menu);
-                expect_true(state->bounds.x >= monitor.x && state->bounds.y >= monitor.y &&
-                                state->bounds.x + state->bounds.width <=
-                                    monitor.x + monitor.width + 0.01f &&
-                                state->bounds.y + state->bounds.height <=
-                                    monitor.y + monitor.height + 0.01f,
-                            "preview popup fits its monitor");
-                for (size_t index = 0; index < reach_context_menu_thumbnail_count(menu); ++index)
+                reach_window_id window = 0;
+                reach_rect_f32 rect = {};
+                reach_context_menu_thumbnail_at(menu, index, &window, &rect);
+                expect_true(window == index + 1, "previews keep their source order");
+                if (window == 0 || window > REACH_MENU_MAX_WINDOWS)
                 {
-                    reach_window_id window = 0;
-                    reach_rect_f32 rect = {};
-                    reach_context_menu_thumbnail_at(menu, index, &window, &rect);
-                    expect_true(window >= 1 && window <= REACH_MENU_MAX_WINDOWS,
-                                "visible preview has its source identity");
-                    if (window == 0 || window > REACH_MENU_MAX_WINDOWS)
-                    {
-                        continue;
-                    }
-                    seen[window - 1] = true;
-                    if (common_height == 0.0f)
-                    {
-                        common_height = rect.height;
-                    }
-                    expect_near(rect.height, common_height, 0.01f,
-                                "every page retains a common preview height");
-                    expect_near(rect.width / rect.height,
-                                reach_window_preview_aspect(preview_frames[window - 1]), 0.001f,
-                                "each preview retains its source ratio");
-                    expect_true(
-                        rect.x >= state->bounds.x && rect.y >= state->bounds.y &&
-                            rect.x + rect.width <= state->bounds.x + state->bounds.width + 0.01f &&
-                            rect.y + rect.height <= state->bounds.y + state->bounds.height + 0.01f,
-                        "complete previews fit inside the popup");
+                    continue;
                 }
-                ++pages;
-            } while (pages < REACH_MENU_MAX_WINDOWS &&
-                     reach_context_menu_window_list_page(menu, 1));
-            for (bool visited : seen)
-            {
-                expect_true(visited, "paging reaches every supplied window");
+                if (index == 0)
+                {
+                    common_height = rect.height;
+                }
+                expect_near(rect.height, common_height, 0.01f,
+                            "every preview shares one row height");
+                expect_near(rect.width / rect.height,
+                            reach_window_preview_aspect(preview_frames[window - 1]), 0.001f,
+                            "each preview retains its source ratio");
+                expect_true(rect.x >= previous_right - 0.01f, "previews do not overlap");
+                previous_right = rect.x + rect.width;
+                expect_true(
+                    rect.x >= state->bounds.x && rect.y >= state->bounds.y &&
+                        rect.x + rect.width <= state->bounds.x + state->bounds.width + 0.01f &&
+                        rect.y + rect.height <= state->bounds.y + state->bounds.height + 0.01f,
+                    "complete previews fit inside the popup");
             }
-            if (monitor.height >= 1080.0f)
-            {
-                expect_near(common_height, 140.0f * scale, 0.01f,
-                            "unconstrained preview height is DPI-scaled DP");
-            }
-            for (size_t page = 1; page < pages; ++page)
-            {
-                expect_true(reach_context_menu_window_list_page(menu, -1),
-                            "previous page returns through the same page sequence");
-            }
-            expect_true(reach_context_menu_state_ptr(menu)->visible_start == 0,
-                        "previous navigation reaches the first page");
+            expect_true(common_height > 0.0f && common_height < 140.0f * scale,
+                        "many windows shrink the row height to fit");
         }
+    }
+
+    request.window_count = 3;
+    ctx.monitor = {0, 0, 1920, 1080};
+    for (float scale : scales)
+    {
+        ctx.dpi_scale = scale;
+        ctx.anchor_button = {940, 1040, 40, 40};
+        ctx.bar_edge_y = ctx.anchor_button.y;
+        reach_context_menu_set_open(menu, 0);
+        reach_context_menu_open_window_list(menu, 0, &ctx);
+        advance_preview_layout(menu, &ctx, 0.2);
+        reach_window_id window = 0;
+        reach_rect_f32 rect = {};
+        reach_context_menu_thumbnail_at(menu, 0, &window, &rect);
+        expect_true(reach_context_menu_thumbnail_count(menu) == 3, "few windows all show");
+        expect_near(rect.height, 140.0f * scale, 0.01f,
+                    "unconstrained preview height is DPI-scaled DP");
     }
     reach_context_menu_destroy(menu);
     reach_window_tracking_destroy(windows);
@@ -624,21 +625,107 @@ static void test_preview_membership_refresh_and_reanchor(void)
     ctx.anchor_button = {300, 320, 40, 40};
     ctx.bar_edge_y = 320;
     reach_context_menu_reanchor(menu, &ctx);
-    while (reach_context_menu_window_list_page(menu, 1))
-    {
-    }
-    expect_true(reach_context_menu_state_ptr(menu)->visible_start > 0,
-                "constrained sources have later pages");
+    expect_true(reach_context_menu_thumbnail_count(menu) == 3,
+                "constrained sources all stay visible");
     preview_window_count = 2;
     reach_window_tracking_refresh(windows, nullptr);
     reach_context_menu_notify_windows_changed(menu, &tick);
-    expect_true(reach_context_menu_state_ptr(menu)->visible_start < 2 &&
-                    reach_context_menu_thumbnail_count(menu) > 0,
-                "departure from the last page clamps to surviving sources");
+    expect_true(reach_context_menu_thumbnail_count(menu) == 2,
+                "departure leaves the surviving sources visible");
     preview_window_count = 0;
     reach_window_tracking_refresh(windows, nullptr);
     reach_context_menu_notify_windows_changed(menu, &tick);
     expect_true(!reach_context_menu_is_open(menu), "the last departure closes the popup");
+    reach_context_menu_destroy(menu);
+    reach_window_tracking_destroy(windows);
+}
+
+static float first_thumbnail_height(const reach_context_menu *menu)
+{
+    reach_window_id window = 0;
+    reach_rect_f32 rect = {};
+    reach_context_menu_thumbnail_at(menu, 0, &window, &rect);
+    return rect.height;
+}
+
+static void expect_window_list_renders(reach_context_menu *menu, const char *message)
+{
+    static reach_render_command_buffer buffer;
+    reach_context_menu_render_context render = {};
+    render.theme = reach_theme_default();
+    render.dpi_scale = 1.0f;
+    render.icon_size_px = 32;
+    reach_result result = reach_context_menu_append_render_commands(menu, &render, &buffer);
+    if (result != REACH_OK)
+    {
+        printf("render result=%d\n", (int)result);
+    }
+    expect_true(result == REACH_OK, message);
+}
+
+static void test_shrunk_cards_grow_smoothly_after_a_close(void)
+{
+    const size_t count = 40;
+    reset_preview_windows(count);
+    reach_window_manager_port port = {};
+    port.ops.window_count = preview_count;
+    port.ops.window_at = preview_at;
+    port.ops.frame_bounds = preview_frame;
+    reach_window_tracking *windows = nullptr;
+    reach_window_tracking_create(port, &windows);
+    reach_window_tracking_refresh(windows, nullptr);
+    reach_context_menu *menu = nullptr;
+    reach_context_menu_create(&menu);
+    reach_context_menu_attach_services(menu, windows, nullptr);
+    reach_menu_request request = {};
+    request.window_count = count;
+    for (size_t index = 0; index < count; ++index)
+    {
+        request.windows[index].window = index + 1;
+    }
+    reach_context_menu_open_context ctx = {};
+    ctx.theme = reach_theme_default();
+    ctx.monitor = {0, 0, 1920, 1080};
+    ctx.dpi_scale = 1.0f;
+    ctx.anchored = 1;
+    ctx.drop_direction = REACH_POPUP_DROP_UP;
+    ctx.anchor_button = {940, 1040, 40, 40};
+    ctx.bar_edge_y = 1040;
+    ctx.request = &request;
+    reach_context_menu_open_window_list(menu, 0, &ctx);
+    advance_preview_layout(menu, &ctx, 0.5);
+    expect_window_list_renders(menu, "a settled shrunk window list renders");
+    float before = first_thumbnail_height(menu);
+    float popup_before = reach_context_menu_state_ptr(menu)->bounds.height;
+    reach_feature_surface_geometry window_before = {};
+    reach_context_menu_capsule_ops()->surface_geometry(menu, &window_before);
+    expect_true(before > 0.0f && before < 140.0f, "forty windows shrink the cards");
+
+    reach_feature_tick_result tick = {};
+    preview_window_count = count - 20;
+    reach_window_tracking_refresh(windows, nullptr);
+    reach_context_menu_notify_windows_changed(menu, &tick);
+    expect_near(first_thumbnail_height(menu), before, 0.5f,
+                "closing a card keeps the current card size on the first frame");
+    expect_near(reach_context_menu_state_ptr(menu)->bounds.height, popup_before, 0.5f,
+                "closing a card keeps the current popup height on the first frame");
+
+    advance_preview_layout(menu, &ctx, 0.09);
+    expect_window_list_renders(menu, "a reflowing window list renders");
+    float middle = first_thumbnail_height(menu);
+    float popup_middle = reach_context_menu_state_ptr(menu)->bounds.height;
+    advance_preview_layout(menu, &ctx, 0.5);
+    float after = first_thumbnail_height(menu);
+    float popup_after = reach_context_menu_state_ptr(menu)->bounds.height;
+    reach_feature_surface_geometry settled = {};
+    reach_context_menu_capsule_ops()->surface_geometry(menu, &settled);
+    expect_true(reach_rect_equal(settled.visible_bounds, window_before.visible_bounds),
+                "closing a card never resizes or moves the popup window");
+    expect_true(after > before + 1.0f, "fewer windows let the cards grow");
+    expect_true(middle > before + 0.5f && middle < after - 0.5f,
+                "cards grow through intermediate sizes");
+    expect_true(popup_middle > popup_before + 0.5f && popup_middle < popup_after - 0.5f,
+                "popup height grows through intermediate sizes");
     reach_context_menu_destroy(menu);
     reach_window_tracking_destroy(windows);
 }
@@ -970,8 +1057,9 @@ int main(void)
     test_menu_commands_execute_only_from_the_published_snapshot();
     test_power_commands_and_text();
     test_window_list_remove();
-    test_preview_geometry_and_paging_across_dpi();
+    test_preview_row_fits_every_window_across_dpi();
     test_preview_membership_refresh_and_reanchor();
+    test_shrunk_cards_grow_smoothly_after_a_close();
     test_preview_width_animation_retarget_and_reset();
     test_preview_reflow_preserves_surviving_sources();
     test_capsule_owns_popup_pointer_policy();

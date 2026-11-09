@@ -955,7 +955,9 @@ static void test_popup_width_motion_matches_constrained_placement(void)
                                           10);
                     width = reach_motion_clamp(&width, 30 * dpi, 900 * dpi);
                     reach_rect_motion bounds = {};
-                    expect_true(reach_popup_width_motion(&anchor, &width, 180 * dpi, 8 * dpi, dpi,
+                    reach_motion height = {};
+                    reach_motion_set(&height, 180 * dpi);
+                    expect_true(reach_popup_width_motion(&anchor, &width, &height, 8 * dpi, dpi,
                                                          &bounds, &notch) == REACH_OK,
                                 "popup width derives physical placement and notch intent");
                     for (int sample = 0; sample <= 80; ++sample)
@@ -1384,8 +1386,8 @@ static void test_popup_width_background_preflight(void)
     reach_motion width = {};
     reach_motion_start_at(&width, 20, 180, .18, REACH_EASING_EASE_IN_OUT, 10);
     auto notch = reach_motion_affine(&width, .5f, 0);
-    expect_true(reach_popup_push_width_background(&input, &width, &notch, 0, 100, &buffer) ==
-                    REACH_OK,
+    expect_true(reach_popup_push_width_background(&input, &width, nullptr, &notch, 0, 100,
+                                                  &buffer) == REACH_OK,
                 "compact width background composes canonical shape motion");
     expect_true(reach_render_command_buffer_validate_groups(&buffer) == REACH_OK,
                 "width background preserves neutral source/filter ownership");
@@ -1394,13 +1396,13 @@ static void test_popup_width_background_preflight(void)
         shadow = shadow || buffer.groups[index].has_shadow;
     expect_true(shadow, "compact width uses shape shadow rather than overlapping rigid caps");
     size_t count = buffer.count, groups = buffer.group_count;
-    expect_true(reach_popup_push_width_background(&input, &width, &notch, 0, 100, &buffer) ==
-                        REACH_INVALID_ARGUMENT &&
+    expect_true(reach_popup_push_width_background(&input, &width, nullptr, &notch, 0, 100,
+                                                  &buffer) == REACH_INVALID_ARGUMENT &&
                     buffer.count == count && buffer.group_count == groups,
                 "group identity collisions leave the append buffer untouched");
     reach_render_command_buffer_clear(&buffer);
-    expect_true(reach_popup_push_width_background(&input, &width, &notch, 999, 100, &buffer) ==
-                        REACH_INVALID_ARGUMENT &&
+    expect_true(reach_popup_push_width_background(&input, &width, nullptr, &notch, 999, 100,
+                                                  &buffer) == REACH_INVALID_ARGUMENT &&
                     buffer.count == 0 && buffer.group_count == 0,
                 "missing parent rejects the entire width background append");
     reach_render_group parent = {};
@@ -1411,16 +1413,16 @@ static void test_popup_width_background_preflight(void)
     expect_true(reach_render_command_buffer_begin_group(&buffer, &parent) == REACH_OK,
                 "shadow parent is valid before attaching compact chrome");
     reach_render_command_buffer_end_group(&buffer);
-    expect_true(reach_popup_push_width_background(&input, &width, &notch, 99, 100, &buffer) ==
-                        REACH_INVALID_ARGUMENT &&
+    expect_true(reach_popup_push_width_background(&input, &width, nullptr, &notch, 99, 100,
+                                                  &buffer) == REACH_INVALID_ARGUMENT &&
                     buffer.count == 0 && buffer.group_count == 1,
                 "nested shadow rejects the entire width background append");
     reach_render_command_buffer_clear(&buffer);
     auto theme = *input.theme;
     theme.popup_shadow.color.a = 0;
     input.theme = &theme;
-    expect_true(reach_popup_push_width_background(&input, &width, &notch, 0, 100, &buffer) ==
-                        REACH_OK &&
+    expect_true(reach_popup_push_width_background(&input, &width, nullptr, &notch, 0, 100,
+                                                  &buffer) == REACH_OK &&
                     reach_render_command_buffer_validate_groups(&buffer) == REACH_OK,
                 "disabled shadow keeps compact width chrome valid");
     shadow = false;
@@ -1431,8 +1433,8 @@ static void test_popup_width_background_preflight(void)
     reach_render_command_buffer_clear(&buffer);
     reach_rect_f32 scissor = {10, 10, 50, 50};
     reach_render_command_buffer_set_scissor(&buffer, scissor);
-    expect_true(reach_popup_push_width_background(&input, &width, &notch, 0, 100, &buffer) ==
-                        REACH_OK &&
+    expect_true(reach_popup_push_width_background(&input, &width, nullptr, &notch, 0, 100,
+                                                  &buffer) == REACH_OK &&
                     reach_render_command_buffer_validate_groups(&buffer) == REACH_OK,
                 "scissored width chrome preserves valid retained ownership");
     const auto *clip = reach_render_command_buffer_group(&buffer, 115);
@@ -1440,15 +1442,15 @@ static void test_popup_width_background_preflight(void)
                 "scissor clips complete popup output including its shadow");
     reach_render_command_buffer_clear(&buffer);
     input.dpi_scale = 0;
-    expect_true(reach_popup_push_width_background(&input, &width, &notch, 0, 100, &buffer) ==
-                        REACH_INVALID_ARGUMENT &&
+    expect_true(reach_popup_push_width_background(&input, &width, nullptr, &notch, 0, 100,
+                                                  &buffer) == REACH_INVALID_ARGUMENT &&
                     buffer.count == 0 && buffer.group_count == 0,
                 "invalid DPI rejects width chrome without appending");
     input.dpi_scale = 1;
     reach_motion_start_at(&width, 220, 400, .18, REACH_EASING_EASE_IN_OUT, 10);
     notch = reach_motion_affine(&width, .5f, 0);
-    expect_true(reach_popup_push_width_background(&input, &width, &notch, 0, 100, &buffer) ==
-                        REACH_OK &&
+    expect_true(reach_popup_push_width_background(&input, &width, nullptr, &notch, 0, 100,
+                                                  &buffer) == REACH_OK &&
                     reach_render_command_buffer_validate_groups(&buffer) == REACH_OK,
                 "ordinary width background keeps rigid cap sources");
     shadow = false;
@@ -1626,7 +1628,9 @@ static void test_overshoot_render_envelopes(void)
                         overshoot_spring(span[0] * dpi, span[1] * dpi, push, preset);
                     reach_rect_motion body = {};
                     reach_motion notch = {};
-                    bool placed = reach_popup_width_motion(&anchor, &width, 180 * dpi, 8 * dpi, dpi,
+                    reach_motion height = {};
+                    reach_motion_set(&height, 180 * dpi);
+                    bool placed = reach_popup_width_motion(&anchor, &width, &height, 8 * dpi, dpi,
                                                            &body, &notch) == REACH_OK;
                     float minimum = 0, maximum = 0;
                     placed = placed &&
@@ -1637,9 +1641,10 @@ static void test_overshoot_render_envelopes(void)
                     overshoot_extremes sampled = overshoot_sample(width);
                     input.bounds = {0, 0, fmaxf(span[0], span[1]) * dpi, 180 * dpi};
                     auto center = reach_motion_affine(&width, .5f, 0);
-                    bool pushed = reach_popup_push_width_background(&input, &width, &center, 0, 100,
-                                                                    &buffer) == REACH_OK &&
-                                  reach_render_command_buffer_validate_groups(&buffer) == REACH_OK;
+                    bool pushed =
+                        reach_popup_push_width_background(&input, &width, nullptr, &center, 0, 100,
+                                                          &buffer) == REACH_OK &&
+                        reach_render_command_buffer_validate_groups(&buffer) == REACH_OK;
                     popup_ok = popup_ok && pushed;
                     compile_ok = compile_ok && overshoot_groups_compile(buffer);
                     const auto *caster = reach_render_command_buffer_group(&buffer, 100);

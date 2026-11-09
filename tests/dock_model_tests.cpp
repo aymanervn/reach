@@ -138,6 +138,28 @@ static void test_unpinned_windows_group_into_one_item(void)
     reach_dock_feature_model_destroy(&model);
 }
 
+static void test_item_keeps_every_open_window_as_an_instance(void)
+{
+    reach_dock_feature_model model = {};
+    reach_dock_feature_model_init(&model);
+    uint32_t next_key = 1;
+
+    static reach_window_snapshot windows[REACH_MAX_OPEN_WINDOWS];
+    uint32_t group_ids[REACH_MAX_OPEN_WINDOWS] = {};
+    for (size_t index = 0; index < REACH_MAX_OPEN_WINDOWS; ++index)
+    {
+        windows[index] = make_window(1000 + index, "C:\\apps\\brave.exe", "");
+        group_ids[index] = 7;
+    }
+
+    reach_dock_feature_model_build_items(&model, &next_key, nullptr, 0, windows, group_ids,
+                                         REACH_MAX_OPEN_WINDOWS, matches_thunk, nullptr);
+
+    expect_true(model.item_count == 1 && model.items[0].instance_count == REACH_MAX_OPEN_WINDOWS,
+                "one app keeps every open window so close all reaches them all");
+    reach_dock_feature_model_destroy(&model);
+}
+
 static void test_pinned_app_claims_matching_windows(void)
 {
     reach_dock_feature_model model = {};
@@ -681,6 +703,7 @@ int main(void)
     test_pinned_item_pressable_release_opens_its_target();
     test_pinned_reorder_survives_the_config_round_trip();
     test_unpinned_windows_group_into_one_item();
+    test_item_keeps_every_open_window_as_an_instance();
     test_pinned_app_claims_matching_windows();
     test_shortcut_pin_matches_executable();
     test_key_stable_when_representative_closes();

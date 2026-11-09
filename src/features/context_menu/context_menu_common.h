@@ -54,6 +54,8 @@ typedef struct reach_context_menu_preview_card
     float source_height;
     float header_height;
     reach_rect_motion motion;
+    reach_motion size;
+    reach_motion header_top;
     uint64_t render_id;
     int32_t live;
 } reach_context_menu_preview_card;
@@ -72,19 +74,14 @@ typedef struct reach_context_menu_preview_layout
 {
     reach_context_menu_preview_card cards[REACH_MENU_MAX_WINDOWS];
     size_t count;
-    reach_rect_motion previous;
-    reach_rect_motion next;
-    reach_rect_motion footer;
     reach_rect_motion body;
     reach_rect_motion viewport;
     reach_rect_f32 envelope;
     reach_motion notch;
     float header_y;
     float border;
-    int32_t overflow;
-    size_t page_starts[REACH_MENU_MAX_WINDOWS];
-    size_t page_count;
-    size_t page_index;
+    float card_scale;
+    reach_motion card_size;
 } reach_context_menu_preview_layout;
 
 typedef struct reach_context_menu_preview_origin

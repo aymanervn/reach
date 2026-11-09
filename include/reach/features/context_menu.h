@@ -35,7 +35,6 @@ extern "C"
         uintptr_t item_windows[REACH_MENU_MAX_WINDOWS];
         uint16_t item_titles[REACH_MENU_MAX_WINDOWS][260];
         size_t item_count;
-        size_t visible_start;
         size_t visible_count;
         size_t hovered_index;
         size_t close_hovered_index;
@@ -66,7 +65,6 @@ extern "C"
                                                    reach_feature_tick_result *out);
     void reach_context_menu_refresh_window_list(reach_context_menu *menu,
                                                 const reach_menu_request *request);
-    int32_t reach_context_menu_window_list_page(reach_context_menu *menu, int32_t direction);
     size_t reach_context_menu_preview_generation(const reach_context_menu *menu);
     size_t reach_context_menu_thumbnail_count(const reach_context_menu *menu);
     reach_result reach_context_menu_thumbnail_at(const reach_context_menu *menu, size_t index,

@@ -71,7 +71,7 @@ reach_context_menu_hit_result reach_context_menu_hit_test_menu_items(const reach
         auto sampled = reach_context_menu_preview_card_at(menu, index, now);
         const auto *card = &sampled;
         reach_rect_f32 slot = {card->header.x, card->header.y, card->header.width,
-                               menu->state.item_height};
+                               card->preview.y + card->preview.height - card->header.y};
         if (reach_context_menu_rect_contains(slot, x, y))
         {
             hit.hit = 1;

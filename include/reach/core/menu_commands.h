@@ -6,6 +6,7 @@
 
 #include "reach/core/application.h"
 #include "reach/core/geometry.h"
+#include "reach/core/limits.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -13,7 +14,7 @@ extern "C"
 #endif
 
 #define REACH_CONTEXT_MENU_MAX_ITEMS 8
-#define REACH_MENU_MAX_WINDOWS 16
+#define REACH_MENU_MAX_WINDOWS REACH_MAX_OPEN_WINDOWS
 #define REACH_MENU_TEXT_CAPACITY 260
 
     typedef enum reach_context_menu_command
