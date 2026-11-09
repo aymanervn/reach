@@ -54,6 +54,7 @@ struct reach_service_request
     uint32_t process_id;
     uint32_t thread_id;
     int32_t split_mode;
+    int32_t covered;
     wchar_t class_name[128];
 };
 

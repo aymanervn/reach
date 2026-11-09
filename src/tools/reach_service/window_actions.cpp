@@ -215,7 +215,7 @@ static int32_t reach_window_management_focus_target(HWND target, int32_t bring_t
     return foreground_ok || reach_window_management_foreground_matches(target);
 }
 
-static reach_result reach_window_management_activate_impl(HWND hwnd, int32_t exact)
+static reach_result reach_window_management_activate_impl(HWND hwnd, int32_t exact, int32_t covered)
 {
     if (hwnd == nullptr || !IsWindow(hwnd))
     {
@@ -252,8 +252,15 @@ static reach_result reach_window_management_activate_impl(HWND hwnd, int32_t exa
         return REACH_ERROR;
     }
 
-    SetWindowPos(target, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
-    SetWindowPos(target, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+    if (covered)
+    {
+        SetWindowPos(target, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+    }
+    else
+    {
+        SetWindowPos(target, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+        SetWindowPos(target, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+    }
     BringWindowToTop(target);
 
     if (reach_window_management_focus_target(target, 1))
@@ -268,12 +275,17 @@ static reach_result reach_window_management_activate_impl(HWND hwnd, int32_t exa
 
 reach_result reach_window_management_activate(HWND hwnd)
 {
-    return reach_window_management_activate_impl(hwnd, 0);
+    return reach_window_management_activate_impl(hwnd, 0, 0);
+}
+
+reach_result reach_window_management_activate_covered(HWND hwnd)
+{
+    return reach_window_management_activate_impl(hwnd, 0, 1);
 }
 
 reach_result reach_window_management_activate_exact(HWND hwnd)
 {
-    return reach_window_management_activate_impl(hwnd, 1);
+    return reach_window_management_activate_impl(hwnd, 1, 0);
 }
 
 reach_result reach_window_management_minimize(HWND hwnd)

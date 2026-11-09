@@ -854,6 +854,8 @@ int32_t reach_host_window_is_minimized(const reach_host *host, uintptr_t window_
 reach_result reach_host_schedule_window_control(reach_host *host,
                                                 reach_window_control_action action,
                                                 uintptr_t window_id, uint64_t *out_request_id);
+reach_result reach_host_schedule_covered_activation(reach_host *host, uintptr_t window_id,
+                                                    uint64_t *out_request_id);
 reach_result reach_host_schedule_minimize_open_windows(reach_host *host, uint64_t *out_request_id);
 reach_result reach_host_schedule_open_terminal(reach_host *host);
 reach_result reach_host_schedule_terminal_command(reach_host *host, const uint16_t *command);

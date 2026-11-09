@@ -1158,7 +1158,7 @@ static int32_t reach_helper_game_mode_active(void)
     return InterlockedCompareExchange(&g_game_mode_active, 0, 0) != 0;
 }
 
-static reach_result reach_helper_activate_window(HWND target)
+static reach_result reach_helper_activate_window(HWND target, int32_t covered)
 {
     HWND foreground = GetForegroundWindow();
     if (foreground != nullptr && foreground != target)
@@ -1169,7 +1169,8 @@ static reach_result reach_helper_activate_window(HWND target)
             (void)reach_window_management_leave_game_to_desktop(foreground);
         }
     }
-    return reach_window_management_activate(target);
+    return covered ? reach_window_management_activate_covered(target)
+                   : reach_window_management_activate(target);
 }
 
 static reach_result reach_helper_execute(const reach_service_request *request,
@@ -1203,7 +1204,7 @@ static reach_result reach_helper_execute(const reach_service_request *request,
     switch (request->command)
     {
     case REACH_SERVICE_COMMAND_ACTIVATE:
-        result = reach_helper_activate_window(hwnd);
+        result = reach_helper_activate_window(hwnd, request->covered);
         break;
     case REACH_SERVICE_COMMAND_MINIMIZE:
         result = reach_window_management_minimize(hwnd);

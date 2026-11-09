@@ -60,11 +60,15 @@ reach_result reach_host_apply_feature_action(reach_host *host, reach_feature_run
     case REACH_FEATURE_ACTION_ACTIVATE_WINDOW:
     {
         uint64_t request_id = 0;
-        reach_result activate_result =
-            action->window != 0
-                ? reach_host_schedule_window_control(host, REACH_WINDOW_CONTROL_ACTIVATE,
-                                                     action->window, &request_id)
-                : REACH_OK;
+        const bool covered = (action->flags & REACH_FEATURE_ACTION_FLAG_CLOSE_HANDOFF) != 0;
+        reach_result activate_result = REACH_OK;
+        if (action->window != 0)
+        {
+            activate_result =
+                covered ? reach_host_schedule_covered_activation(host, action->window, &request_id)
+                        : reach_host_schedule_window_control(host, REACH_WINDOW_CONTROL_ACTIVATE,
+                                                             action->window, &request_id);
+        }
         if (activate_result == REACH_OK)
         {
             reach_host_arm_close_handoff(host, desc, action, request_id);

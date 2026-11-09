@@ -108,9 +108,10 @@ static void reach_window_manager_fill_request_identity(const reach_window_manage
     reach_window_manager_unlock(manager);
 }
 
-static reach_result reach_window_manager_send_helper(reach_window_manager *manager,
-                                                     reach_service_command command,
-                                                     uintptr_t window_id, reach_split_mode mode)
+static reach_result reach_window_manager_send_helper_request(reach_window_manager *manager,
+                                                             reach_service_command command,
+                                                             uintptr_t window_id,
+                                                             reach_split_mode mode, int32_t covered)
 {
     if (!reach_service_shared_reader_connected())
     {
@@ -121,9 +122,17 @@ static reach_result reach_window_manager_send_helper(reach_window_manager *manag
     request.version = reach_service_protocol_version();
     request.command = command;
     request.split_mode = static_cast<int32_t>(mode);
+    request.covered = covered;
     reach_window_manager_fill_request_identity(manager, window_id, &request);
 
     return reach_service_send_request(&request, nullptr);
+}
+
+static reach_result reach_window_manager_send_helper(reach_window_manager *manager,
+                                                     reach_service_command command,
+                                                     uintptr_t window_id, reach_split_mode mode)
+{
+    return reach_window_manager_send_helper_request(manager, command, window_id, mode, 0);
 }
 
 static int32_t
@@ -757,6 +766,13 @@ static reach_result reach_window_manager_activate(reach_window_manager *manager,
     return result;
 }
 
+static reach_result reach_window_manager_activate_covered(reach_window_manager *manager,
+                                                          uintptr_t window_id)
+{
+    return reach_window_manager_send_helper_request(manager, REACH_SERVICE_COMMAND_ACTIVATE,
+                                                    window_id, REACH_SPLIT_LEFT, 1);
+}
+
 static int32_t reach_window_manager_is_foreground(const reach_window_manager *manager,
                                                   reach_window_id window)
 {
@@ -833,6 +849,7 @@ reach_result reach_windows_create_window_manager(reach_window_manager_port *out_
     out_port->ops.privileged_control_available = reach_window_manager_privileged_control_available;
     out_port->ops.start_privileged_control = reach_window_manager_start_privileged_control;
     out_port->ops.activate = reach_window_manager_activate;
+    out_port->ops.activate_covered = reach_window_manager_activate_covered;
     out_port->ops.is_foreground = reach_window_manager_is_foreground;
     out_port->ops.minimize = reach_window_manager_minimize;
     out_port->ops.close = reach_window_manager_close;

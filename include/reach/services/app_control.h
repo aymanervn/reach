@@ -83,6 +83,9 @@ extern "C"
                                                     reach_window_control_action action,
                                                     const uintptr_t *window_ids,
                                                     size_t window_count, uint64_t *out_request_id);
+    reach_result reach_app_control_schedule_covered_activation(reach_app_control *service,
+                                                               uintptr_t window_id,
+                                                               uint64_t *out_request_id);
     reach_result reach_app_control_schedule_snap(reach_app_control *service, uintptr_t window_id,
                                                  reach_split_mode mode, uint64_t *out_request_id);
 
