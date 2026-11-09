@@ -169,6 +169,7 @@ void reach_host_refresh_window_world(reach_host *host)
         host->surfaces[REACH_SURFACE_ID_DOCK].dirty_flags = 1;
         host->surfaces[REACH_SURFACE_ID_TOP_BAR].dirty_flags = 1;
     }
+    reach_host_settle_close_handoffs(host);
     reach_host_request_update(host);
 }
 

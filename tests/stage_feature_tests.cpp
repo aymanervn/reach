@@ -466,6 +466,45 @@ static void test_close_handoff_holds_only_the_reveal(void)
     expect_true(reach_stage_state_ptr(stage)->close_phase == REACH_STAGE_CLOSE_REVEALING,
                 "handoff completion releases the shared reveal");
     reach_stage_destroy(stage);
+
+    reach_stage *restoring = nullptr;
+    reach_stage_create(&restoring);
+    reach_stage_open_window app = make_window(1, make_rect(100, 120, 1200, 675));
+    app.minimized = 1;
+    reach_stage_open(restoring, make_rect(0, 0, 1920, 1080), 1, &app, 1);
+    advance_stage(restoring, 30, 0.016);
+    ops->set_close_handoff_pending(restoring, 1, &tick);
+    reach_stage_begin_close(restoring);
+    reach_test_motion_clock_advance(1.0);
+    ops->tick(restoring, 1.0, &tick);
+    ops->presentation_committed(restoring, REACH_OK, &tick);
+    int32_t revealed_while_held = 0;
+    for (int step = 0; step < 10; ++step)
+    {
+        tick_stage(restoring, 0.016, &tick);
+        revealed_while_held |=
+            reach_stage_state_ptr(restoring)->close_phase == REACH_STAGE_CLOSE_REVEALING;
+    }
+    expect_true(!revealed_while_held &&
+                    reach_stage_state_ptr(restoring)->close_phase == REACH_STAGE_CLOSE_ALIGNED,
+                "the reveal stays held until the restore is observed");
+    app.minimized = 0;
+    reach_stage_update_windows(restoring, &app, 1);
+    expect_true(reach_stage_state_ptr(restoring)->close_phase == REACH_STAGE_CLOSE_MOVING,
+                "an observed restore retargets while the reveal is still held");
+    ops->set_close_handoff_pending(restoring, 0, &tick);
+    int32_t reveal_started = 0;
+    int32_t moved_after_reveal = 0;
+    for (int step = 0; step < 120; ++step)
+    {
+        tick_stage(restoring, 0.016, &tick);
+        reach_stage_close_phase phase = reach_stage_state_ptr(restoring)->close_phase;
+        reveal_started |= phase == REACH_STAGE_CLOSE_REVEALING;
+        moved_after_reveal |= reveal_started && phase == REACH_STAGE_CLOSE_MOVING;
+    }
+    expect_true(reveal_started && !moved_after_reveal,
+                "the phase never returns from revealing to moving");
+    reach_stage_destroy(restoring);
 }
 
 static void test_app_click_uses_shared_close_animation(void)

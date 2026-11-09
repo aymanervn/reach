@@ -864,6 +864,7 @@ reach_result reach_host_schedule_window_controls(reach_host *host,
                                                  const uintptr_t *window_ids, size_t window_count,
                                                  uint64_t *out_request_id);
 void reach_host_apply_window_control_result(reach_host *host);
+void reach_host_settle_close_handoffs(reach_host *host);
 
 void reach_host_invalidate_bar_coverage(reach_host *host);
 void reach_host_refresh_window_world(reach_host *host);

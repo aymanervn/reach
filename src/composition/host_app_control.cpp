@@ -210,7 +210,8 @@ reach_result reach_host_schedule_minimize_open_windows(reach_host *host, uint64_
                : REACH_OK;
 }
 
-static void reach_host_resolve_close_handoff(reach_host *host, uint64_t request_id)
+static void reach_host_complete_close_handoff(reach_host *host, uint64_t request_id,
+                                              reach_result result)
 {
     if (request_id == 0)
     {
@@ -218,14 +219,43 @@ static void reach_host_resolve_close_handoff(reach_host *host, uint64_t request_
     }
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
+        reach_surface_runtime *surface = host->feature_runtimes[index].surface;
+        if (surface == nullptr || !surface->close_handoff_pending ||
+            surface->close_handoff_request_id != request_id)
+        {
+            continue;
+        }
+        surface->close_handoff_completed = 1;
+        surface->close_handoff_result = result;
+    }
+}
+
+void reach_host_settle_close_handoffs(reach_host *host)
+{
+    if (host == nullptr)
+    {
+        return;
+    }
+    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    {
         reach_feature_runtime *runtime = &host->feature_runtimes[index];
-        if (runtime->surface == nullptr || !runtime->surface->close_handoff_pending ||
-            runtime->surface->close_handoff_request_id != request_id)
+        if (runtime->surface == nullptr || !runtime->surface->close_handoff_pending)
+        {
+            continue;
+        }
+        const reach_surface_runtime *surface = runtime->surface;
+        int32_t target_minimized =
+            surface->close_handoff_window != 0 &&
+            reach_host_window_is_minimized(host, surface->close_handoff_window);
+        if (!reach_close_handoff_ready(surface->close_handoff_completed,
+                                       surface->close_handoff_result, target_minimized))
         {
             continue;
         }
         runtime->surface->close_handoff_pending = 0;
         runtime->surface->close_handoff_request_id = 0;
+        runtime->surface->close_handoff_completed = 0;
+        runtime->surface->close_handoff_window = 0;
         if (runtime->definition != nullptr && runtime->definition->capsule_ops != nullptr &&
             runtime->definition->capsule_ops->set_close_handoff_pending != nullptr)
         {
@@ -248,9 +278,9 @@ void reach_host_apply_window_control_result(reach_host *host)
     {
         host->dirty.z_order = 1;
         reach_host_end_programmatic_window_manipulation(host);
+        reach_host_complete_close_handoff(host, completion.request_id, completion.result);
         reach_host_refresh_window_world(host);
         reach_host_apply_foreground_change(host);
-        reach_host_resolve_close_handoff(host, completion.request_id);
 
         if (completion.result == REACH_OK)
         {

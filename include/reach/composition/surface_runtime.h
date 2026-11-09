@@ -21,7 +21,10 @@ extern "C"
         int32_t activated;
         int32_t native_visibility_invalidated;
         uint64_t close_handoff_request_id;
+        uintptr_t close_handoff_window;
+        reach_result close_handoff_result;
         int32_t close_handoff_pending;
+        int32_t close_handoff_completed;
         uint32_t dirty_flags;
         reach_rect_f32 render_content_rect;
         reach_transform_f32 render_transform;
@@ -30,6 +33,8 @@ extern "C"
         int32_t commands_require_content_sampling;
     } reach_surface_runtime;
 
+    int32_t reach_close_handoff_ready(int32_t completed, reach_result result,
+                                      int32_t target_minimized);
     void reach_surface_runtime_init(reach_surface_runtime *runtime);
     void reach_surface_runtime_mark_dirty(reach_surface_runtime *runtime, uint32_t dirty_flags);
     void reach_surface_runtime_clear_dirty(reach_surface_runtime *runtime, uint32_t dirty_flags);
