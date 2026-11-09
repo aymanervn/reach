@@ -52,10 +52,6 @@ static void reach_host_layout_apply_visibility(const reach_host_layout_target *t
         reach_surface_runtime *surface = target->runtime->surface;
         int32_t activates = (target->runtime->definition->surface.behavior_flags &
                              REACH_SURFACE_BEHAVIOR_ACTIVATES) != 0;
-        // Workaround: temporary trace for the Stage desktop flash bug; remove after diagnosis.
-        reach_log_trace("surface_visibility surface=%d hwnd=0x%llx visible=%d",
-                        (int)target->runtime->definition->id,
-                        (unsigned long long)reach_host_layout_native_id(target), (int)visible);
 
         if (!visible)
         {

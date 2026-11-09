@@ -766,11 +766,6 @@ static reach_result reach_host_handle_pointer_leave(reach_host *host, reach_surf
     }
     if (host->pointer_region_route != nullptr)
     {
-        // Workaround: temporary trace for the dock preview close bug; remove after diagnosis.
-        if (src->definition->id == REACH_SURFACE_ID_CONTEXT_MENU)
-        {
-            reach_log_info("dock_preview_trace pointer_leave surface=context_menu");
-        }
         host->pointer_region_route(host, static_cast<uint32_t>(src->definition->id), nullptr);
     }
     if (src->definition->surface.bar_reveal.ops != nullptr)
