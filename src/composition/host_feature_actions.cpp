@@ -73,6 +73,10 @@ reach_result reach_host_apply_feature_action(reach_host *host, reach_feature_run
                         : reach_host_schedule_window_control(host, REACH_WINDOW_CONTROL_ACTIVATE,
                                                              action->window, &request_id);
         }
+        // Workaround: temporary trace for the Stage desktop flash bug; remove after diagnosis.
+        reach_log_trace("activation_requested hwnd=0x%llx request=%llu covered=%d result=%d",
+                        (unsigned long long)action->window, (unsigned long long)request_id,
+                        covered ? 1 : 0, (int)activate_result);
         if (activate_result == REACH_OK)
         {
             reach_host_arm_close_handoff(host, desc, action, request_id);
@@ -104,6 +108,9 @@ reach_result reach_host_apply_feature_action(reach_host *host, reach_feature_run
     {
         uint64_t request_id = 0;
         reach_result minimize_result = reach_host_schedule_minimize_open_windows(host, &request_id);
+        // Workaround: temporary trace for the Stage desktop flash bug; remove after diagnosis.
+        reach_log_trace("minimize_all_requested request=%llu result=%d",
+                        (unsigned long long)request_id, (int)minimize_result);
         if (minimize_result == REACH_OK)
         {
             reach_host_arm_close_handoff(host, desc, action, request_id);

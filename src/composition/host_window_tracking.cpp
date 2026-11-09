@@ -148,6 +148,29 @@ void reach_host_end_programmatic_window_manipulation(reach_host *host)
     reach_host_update_window_manipulation(host);
 }
 
+// Workaround: temporary trace for the Stage desktop flash bug; remove after diagnosis.
+static int32_t reach_host_flash_trace_active(const reach_host *host)
+{
+    static int32_t was_presented = 0;
+    static uint32_t tail = 0;
+    int32_t presented = host->feature_runtimes[REACH_SURFACE_ID_STAGE].presentation_visible;
+    if (was_presented && !presented)
+    {
+        tail = 12;
+    }
+    was_presented = presented;
+    if (presented)
+    {
+        return 1;
+    }
+    if (tail > 0)
+    {
+        --tail;
+        return 1;
+    }
+    return 0;
+}
+
 void reach_host_refresh_window_world(reach_host *host)
 {
     if (host == nullptr)
@@ -168,6 +191,15 @@ void reach_host_refresh_window_world(reach_host *host)
         reach_host_notify_windows_changed(host);
         host->surfaces[REACH_SURFACE_ID_DOCK].dirty_flags = 1;
         host->surfaces[REACH_SURFACE_ID_TOP_BAR].dirty_flags = 1;
+    }
+    // Workaround: temporary trace for the Stage desktop flash bug; remove after diagnosis.
+    if (reach_host_flash_trace_active(host))
+    {
+        reach_log_trace(
+            "window_world_refresh changed=%d foreground=0x%llx windows=%u",
+            (int)open_windows_changed,
+            (unsigned long long)reach_window_tracking_current_foreground(host->window_tracking),
+            (unsigned)reach_window_tracking_window_count(host->window_tracking));
     }
     reach_host_settle_close_handoffs(host);
     reach_host_request_update(host);
@@ -326,6 +358,8 @@ void reach_host_apply_foreground_change(reach_host *host)
     }
     if (foreground != reach_window_tracking_current_foreground(host->window_tracking))
     {
+        // Workaround: temporary trace for the Stage desktop flash bug; remove after diagnosis.
+        reach_log_trace("foreground_changed hwnd=0x%llx", (unsigned long long)foreground);
         reach_window_tracking_note_current_foreground(host->window_tracking, foreground);
         host->dirty.z_order = 1;
         reach_host_request_update(host);
