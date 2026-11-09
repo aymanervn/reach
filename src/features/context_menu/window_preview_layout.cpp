@@ -145,14 +145,7 @@ static int32_t reach_context_menu_arrange_previews_as(reach_context_menu *menu,
     float height =
         reach_window_preview_height(aspects, state->item_count, reach_preview_height_dp * scale,
                                     available_height - chrome, room);
-    float aspect_sum = 0.0f;
-    for (size_t index = 0; index < state->item_count; ++index)
-    {
-        aspect_sum += aspects[index];
-    }
-    float natural_row =
-        aspect_sum * height + (state->item_count > 1 ? gap * (float)(state->item_count - 1) : 0.0f);
-    float fit_scale = reach_window_preview_row_scale(natural_row, room);
+    float fit_scale = reach_window_preview_row_fit(aspects, state->item_count, height, gap, room);
     float tallest_popup =
         (border + padding) * 2 + notch + header + header_gap +
         fminf(reach_preview_height_dp * scale, fmaxf(0.0f, available_height - chrome));
@@ -161,16 +154,15 @@ static int32_t reach_context_menu_arrange_previews_as(reach_context_menu *menu,
     header *= fit_scale;
     header_gap *= fit_scale;
     float widths[REACH_MENU_MAX_WINDOWS] = {};
-    reach_window_preview_range range = {};
-    range.end = state->item_count;
+    float content_width = 0.0f;
     for (size_t index = 0; index < state->item_count; ++index)
     {
         widths[index] = aspects[index] * height;
-        range.width += (index > 0 ? gap : 0.0f) + widths[index];
+        content_width += (index > 0 ? gap : 0.0f) + widths[index];
     }
     reach_context_menu_preview_layout layout = {};
     layout.card_scale = scale * fit_scale;
-    float row_width = fminf(room, fmaxf(range.width, header));
+    float row_width = fminf(room, fmaxf(content_width, header));
     float target_width = row_width + (padding + border) * 2;
     float content = header + header_gap + height;
     double now = reach_motion_now_seconds();
@@ -180,7 +172,7 @@ static int32_t reach_context_menu_arrange_previews_as(reach_context_menu *menu,
                   !reach_rect_equal(previous_context.anchor_button, ctx->anchor_button) ||
                   previous_context.drop_direction != ctx->drop_direction ||
                   previous_context.bar_edge_y != ctx->bar_edge_y;
-    layout.count = range.end - range.start;
+    layout.count = state->item_count;
     layout.border = border;
     layout.header_y = border + padding + (ctx->drop_direction == REACH_POPUP_DROP_DOWN ? notch : 0);
     int32_t sources_changed = layout.count != menu->previews.count;
@@ -189,7 +181,7 @@ static int32_t reach_context_menu_arrange_previews_as(reach_context_menu *menu,
     size_t survivors = 0;
     for (size_t visible = 0; visible < layout.count; ++visible)
     {
-        size_t index = range.start + visible;
+        size_t index = visible;
         auto &card = layout.cards[visible];
         card.window = state->item_windows[index];
         card.index = index;
@@ -284,9 +276,9 @@ static int32_t reach_context_menu_arrange_previews_as(reach_context_menu *menu,
     reach_motion fit = {};
     auto available = reach_motion_affine(&menu->width, 1, -(padding + border) * 2);
     available = reach_motion_clamp(&available, 0, room);
-    if (range.width > 0)
+    if (content_width > 0)
     {
-        fit = reach_motion_affine(&available, 1 / range.width, 0);
+        fit = reach_motion_affine(&available, 1 / content_width, 0);
         fit = reach_motion_clamp(&fit, 0, 1);
     }
     else
@@ -304,7 +296,7 @@ static int32_t reach_context_menu_arrange_previews_as(reach_context_menu *menu,
     {
         auto &card = layout.cards[visible];
         card.size = size;
-        if (reach_motion_combine(&center, 1, &size, prefix - range.width * .5f, 0,
+        if (reach_motion_combine(&center, 1, &size, prefix - content_width * .5f, 0,
                                  &card.motion.x) != REACH_OK ||
             reach_motion_combine(&layout.card_size, content * .5f, &size, -content * .5f,
                                  layout.header_y, &card.header_top) != REACH_OK ||

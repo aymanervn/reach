@@ -423,7 +423,6 @@ reach_switcher_handle_event_with_context(reach_switcher *switcher, const reach_u
         reach_switcher_rebuild_ring(state, ctx);
         state->open = state->window_count > 0 ? 1 : 0;
         state->selected_index = state->window_count > 1 ? 1 : 0;
-        state->visible_start = 0;
         reach_switcher_reset_width_animation(switcher);
         action.type = state->open ? REACH_SWITCHER_ACTION_OPENED : REACH_SWITCHER_ACTION_CLOSED;
         return action;
@@ -499,7 +498,6 @@ reach_switcher_sync_windows_with_context(reach_switcher *switcher,
     {
         state->open = 0;
         state->selected_index = 0;
-        state->visible_start = 0;
         reach_switcher_reset_width_animation(switcher);
         action.type = REACH_SWITCHER_ACTION_CLOSED;
         return action;
@@ -665,39 +663,17 @@ int32_t reach_switcher_arrange(reach_switcher *switcher, const reach_switcher_ar
     float height = reach_window_preview_height(aspects, state->window_count,
                                                REACH_SWITCHER_PREVIEW_HEIGHT * scale,
                                                REACH_SWITCHER_PREVIEW_HEIGHT * scale, room);
+    float fit_scale = reach_window_preview_row_fit(aspects, state->window_count, height, gap, room);
+    height *= fit_scale;
+    gap *= fit_scale;
     float widths[REACH_MAX_OPEN_WINDOWS] = {};
+    float row_width = 0.0f;
     for (size_t index = 0; index < state->window_count; ++index)
     {
         widths[index] = height * aspects[index];
+        row_width += (index > 0 ? gap : 0.0f) + widths[index];
     }
-
-    size_t start = state->window_count > 0 && state->visible_start < state->window_count
-                       ? state->visible_start
-                       : 0;
-    if (state->selected_index < start)
-    {
-        start = state->selected_index;
-    }
-    reach_window_preview_range range = reach_window_preview_pack(
-        widths, state->window_count, start, REACH_SWITCHER_VISIBLE_MAX, room, gap);
-    size_t end = range.end;
-    float row_width = range.width;
-    while (state->selected_index >= end && end < state->window_count)
-    {
-        ++start;
-        range = reach_window_preview_pack(widths, state->window_count, start,
-                                          REACH_SWITCHER_VISIBLE_MAX, room, gap);
-        end = range.end;
-        row_width = range.width;
-    }
-    while (start > 0 && end - start < REACH_SWITCHER_VISIBLE_MAX &&
-           row_width + gap + widths[start - 1] <= room)
-    {
-        --start;
-        row_width += gap + widths[start];
-    }
-    state->visible_start = start;
-    state->visible_count = end - start;
+    state->visible_count = state->window_count;
 
     reach_feature_transition_configure(&switcher->surface_transition, ctx->theme, scale,
                                        REACH_FEATURE_TRANSITION_FROM_BELOW);
@@ -722,6 +698,7 @@ int32_t reach_switcher_arrange(reach_switcher *switcher, const reach_switcher_ar
     reach_switcher_layout layout = {};
     layout.count = state->visible_count;
     layout.scale = scale;
+    layout.card_scale = scale * fit_scale;
     layout.envelope.width = cut ? maximum : fmaxf(maximum, switcher->layout.envelope.width);
     layout.envelope.height =
         cut ? target.height : fmaxf(target.height, switcher->layout.envelope.height);
@@ -744,11 +721,12 @@ int32_t reach_switcher_arrange(reach_switcher *switcher, const reach_switcher_ar
     }
     else
         reach_motion_set(&fit, 1);
+    layout.fit = fit;
     float prefix = 0;
     reach_rect_f32 selection = {};
     for (size_t visible = 0; visible < layout.count; ++visible)
     {
-        size_t index = start + visible;
+        size_t index = visible;
         reach_switcher_card *card = &layout.cards[visible];
         card->window = state->windows[index];
         card->preview = {0, 0, widths[index], height};
@@ -820,7 +798,6 @@ void reach_switcher_force_close(reach_switcher *switcher)
     reach_switcher_state *state = &switcher->state;
     state->open = 0;
     state->selected_index = 0;
-    state->visible_start = 0;
     reach_feature_transition_reset(&switcher->surface_transition);
     reach_switcher_reset_width_animation(switcher);
     switcher->layout = {};

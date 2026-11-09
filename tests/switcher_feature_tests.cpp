@@ -6,8 +6,8 @@
 #include <thread>
 
 static int failures;
-static reach_window_snapshot fake_windows[16];
-static reach_rect_f32 fake_frames[16];
+static reach_window_snapshot fake_windows[REACH_MAX_OPEN_WINDOWS];
+static reach_rect_f32 fake_frames[REACH_MAX_OPEN_WINDOWS];
 static size_t fake_count = 2;
 
 static size_t fake_window_count(const reach_window_manager *manager)
@@ -177,9 +177,9 @@ static void test_switcher_fits_variable_width_previews_and_keeps_selection_visib
         reach_switcher_capsule_ops()->handle_event(switcher, &event, &result);
         (void)reach_switcher_arrange(switcher, &arrange);
         const reach_switcher_state *state = reach_switcher_state_ptr(switcher);
-        expect_true(state->selected_index >= state->visible_start &&
-                        state->selected_index < state->visible_start + state->visible_count,
-                    "cycling and wrapping keep selection in the fitted range");
+        expect_true(state->visible_count == state->window_count &&
+                        reach_switcher_thumbnail_count(switcher) == state->window_count,
+                    "cycling and wrapping keep every window visible");
         float common_height = 0.0f;
         for (size_t index = 0; index < reach_switcher_thumbnail_count(switcher); ++index)
         {
@@ -226,6 +226,8 @@ static void test_switcher_fits_variable_width_previews_and_keeps_selection_visib
     expect_true(portrait.visible && portrait.window == 2 &&
                     fabsf(portrait.destination.width / portrait.destination.height - 2.0f) < 0.01f,
                 "restored and resized sources publish their current aspect ratio");
+    fake_count = 3;
+    (void)reach_window_tracking_refresh(windows, nullptr);
     const float scales[] = {1.25f, 1.5f, 2.0f};
     for (float scale : scales)
     {
@@ -374,10 +376,193 @@ static void test_switcher_worst_case_navigation_and_overshoot_render_within_budg
     worst_case_count = REACH_MAX_OPEN_WINDOWS;
 }
 
+static void test_switcher_shows_every_window_in_one_fitted_row(void)
+{
+    fake_count = REACH_MAX_OPEN_WINDOWS;
+    for (size_t index = 0; index < fake_count; ++index)
+    {
+        fake_windows[index] = {};
+        fake_windows[index].id = index + 1;
+        fake_windows[index].title[0] = 'A';
+        fake_frames[index] = {0.0f, 0.0f, 1600.0f, 900.0f};
+    }
+    fake_frames[1] = {0.0f, 0.0f, 600.0f, 1200.0f};
+    reach_window_manager_port port = {};
+    port.ops.window_count = fake_window_count;
+    port.ops.window_at = fake_window_at;
+    port.ops.frame_bounds = fake_frame_bounds;
+    reach_window_tracking *windows = nullptr;
+    (void)reach_window_tracking_create(port, &windows);
+    (void)reach_window_tracking_refresh(windows, nullptr);
+    reach_switcher *switcher = nullptr;
+    (void)reach_switcher_create(&switcher);
+    reach_switcher_attach_services(switcher, nullptr, windows);
+    static reach_render_command_buffer buffer;
+    const reach_rect_f32 monitors[] = {
+        {0, 0, 1920, 1080}, {100, -200, 3840, 2160}, {10, 20, 640, 360}};
+    const float scales[] = {1.0f, 1.25f, 1.5f, 2.0f};
+    for (reach_rect_f32 monitor : monitors)
+    {
+        for (float scale : scales)
+        {
+            reach_ui_event event = {};
+            event.type = REACH_UI_EVENT_APP_SWITCH_BEGIN;
+            reach_capsule_event_result result = {};
+            reach_switcher_capsule_ops()->handle_event(switcher, &event, &result);
+            event.type = REACH_UI_EVENT_APP_SWITCH_PREVIOUS;
+            reach_switcher_capsule_ops()->handle_event(switcher, &event, &result);
+            reach_switcher_arrange_context arrange = {};
+            arrange.theme = reach_theme_default();
+            arrange.monitor_bounds = monitor;
+            arrange.dpi_scale = scale;
+            arrange.transition_visible = 1;
+            (void)reach_switcher_arrange(switcher, &arrange);
+            const reach_switcher_state *state = reach_switcher_state_ptr(switcher);
+            expect_true(reach_switcher_thumbnail_count(switcher) == REACH_MAX_OPEN_WINDOWS,
+                        "every open window is shown without paging");
+            float common_height = 0.0f;
+            float previous_right = -1.0e9f;
+            for (size_t index = 0; index < reach_switcher_thumbnail_count(switcher); ++index)
+            {
+                reach_switcher_thumbnail_placement item = {};
+                (void)reach_switcher_thumbnail_at(switcher, index, &item);
+                if (index == 0)
+                    common_height = item.destination.height;
+                expect_true(fabsf(common_height - item.destination.height) < 0.01f,
+                            "every preview shares one row height");
+                expect_true(item.destination.x >= previous_right - 0.01f,
+                            "previews do not overlap");
+                previous_right = item.destination.x + item.destination.width;
+                expect_true(item.destination.x >= state->bounds.x &&
+                                previous_right <= state->bounds.x + state->bounds.width + 0.01f,
+                            "every preview fits inside the Switcher");
+            }
+            expect_true(common_height > 0.0f && common_height < 125.0f * scale,
+                        "many windows shrink the row height to fit");
+            expect_true(state->bounds.x >= monitor.x && state->bounds.x + state->bounds.width <=
+                                                            monitor.x + monitor.width + 0.01f,
+                        "the Switcher stays inside the monitor");
+            reach_switcher_render_context render = {};
+            render.theme = reach_theme_default();
+            render.icon_size_px = 32;
+            expect_true(reach_switcher_append_render_commands(switcher, &render, &buffer) ==
+                            REACH_OK,
+                        "every window fits the render budget");
+            size_t titles = 0;
+            for (size_t command = 0; command < buffer.count; ++command)
+                titles += buffer.commands[command].type == REACH_RENDER_COMMAND_TEXT &&
+                          buffer.commands[command].text_fit_to_clip != 0;
+            expect_true(titles == 1, "the selected window keeps its clipped title label");
+        }
+    }
+    reach_switcher_destroy(switcher);
+    reach_window_tracking_destroy(windows);
+}
+
+static reach_rect_f32 rendered_label(const reach_switcher *switcher,
+                                     const reach_render_command_buffer *buffer)
+{
+    double now = reach_motion_now_seconds();
+    const reach_switcher_state *state = reach_switcher_state_ptr(switcher);
+    for (size_t index = 0; index < buffer->count; ++index)
+    {
+        const reach_render_command *command = &buffer->commands[index];
+        if (command->type != REACH_RENDER_COMMAND_TEXT || command->text_fit_to_clip == 0)
+            continue;
+        const reach_render_group *viewport =
+            reach_render_command_buffer_group(buffer, command->group_id);
+        const reach_render_group *position =
+            viewport != nullptr ? reach_render_command_buffer_group(buffer, viewport->parent_id)
+                                : nullptr;
+        if (position == nullptr)
+            break;
+        return {state->bounds.x + reach_motion_value_at(&position->x, now), 0,
+                position->bounds.width, position->bounds.height};
+    }
+    return {};
+}
+
+static void test_switcher_label_centers_and_pins_to_the_edge(void)
+{
+    fake_count = 5;
+    for (size_t index = 0; index < fake_count; ++index)
+    {
+        fake_windows[index] = {};
+        fake_windows[index].id = index + 1;
+        fake_frames[index] = {0.0f, 0.0f, 1600.0f, 900.0f};
+    }
+    reach_window_manager_port port = {};
+    port.ops.window_count = fake_window_count;
+    port.ops.window_at = fake_window_at;
+    port.ops.frame_bounds = fake_frame_bounds;
+    reach_window_tracking *windows = nullptr;
+    (void)reach_window_tracking_create(port, &windows);
+    reach_switcher *switcher = nullptr;
+    (void)reach_switcher_create(&switcher);
+    reach_switcher_attach_services(switcher, nullptr, windows);
+    static reach_render_command_buffer buffer;
+    reach_switcher_render_context render = {};
+    render.theme = reach_theme_default();
+    render.icon_size_px = 32;
+    reach_switcher_arrange_context arrange = {};
+    arrange.theme = reach_theme_default();
+    arrange.monitor_bounds = {0, 0, 1920, 1080};
+    arrange.dpi_scale = 1.0f;
+    arrange.transition_visible = 1;
+    const size_t lengths[] = {2, 30, 200};
+    for (size_t length : lengths)
+    {
+        for (size_t index = 0; index < fake_count; ++index)
+        {
+            for (size_t at = 0; at < length; ++at)
+                fake_windows[index].title[at] = 'W';
+            fake_windows[index].title[length] = 0;
+        }
+        (void)reach_window_tracking_refresh(windows, nullptr);
+        for (size_t selected = 0; selected < fake_count; ++selected)
+        {
+            reach_ui_event event = {};
+            event.type = REACH_UI_EVENT_APP_SWITCH_BEGIN;
+            reach_capsule_event_result result = {};
+            reach_switcher_capsule_ops()->handle_event(switcher, &event, &result);
+            event.type = REACH_UI_EVENT_APP_SWITCH_PREVIOUS;
+            reach_switcher_capsule_ops()->handle_event(switcher, &event, &result);
+            event.type = REACH_UI_EVENT_APP_SWITCH_NEXT;
+            for (size_t step = 0; step < selected; ++step)
+                reach_switcher_capsule_ops()->handle_event(switcher, &event, &result);
+            (void)reach_switcher_arrange(switcher, &arrange);
+            (void)reach_switcher_append_render_commands(switcher, &render, &buffer);
+            const reach_switcher_state *state = reach_switcher_state_ptr(switcher);
+            reach_switcher_thumbnail_placement card = {};
+            (void)reach_switcher_thumbnail_at(switcher, state->selected_index, &card);
+            reach_rect_f32 label = rendered_label(switcher, &buffer);
+            float card_center = card.destination.x + card.destination.width * .5f;
+            float inner_left = state->bounds.x + 24.0f;
+            float inner_right = state->bounds.x + state->bounds.width - 24.0f;
+            expect_true(label.width > 0 && label.x >= inner_left - 2.0f &&
+                            label.x + label.width <= inner_right + 2.0f,
+                        "the title stays inside the Switcher content area");
+            bool fits_centered = card_center - label.width * .5f >= inner_left - 2.0f &&
+                                 card_center + label.width * .5f <= inner_right + 2.0f;
+            if (fits_centered)
+                expect_true(fabsf(label.x + label.width * .5f - card_center) < 0.5f,
+                            "a title that fits is centered under its card");
+            else
+                expect_true(fabsf(label.x - inner_left) < 2.0f ||
+                                fabsf(label.x + label.width - inner_right) < 2.0f,
+                            "a title that cannot be centered sits against the nearest edge");
+        }
+    }
+    reach_switcher_destroy(switcher);
+    reach_window_tracking_destroy(windows);
+}
+
 int main(void)
 {
     test_switcher_presents_immediately_and_closes_before_activation();
     test_switcher_fits_variable_width_previews_and_keeps_selection_visible();
     test_switcher_worst_case_navigation_and_overshoot_render_within_budget();
+    test_switcher_shows_every_window_in_one_fitted_row();
+    test_switcher_label_centers_and_pins_to_the_edge();
     return failures == 0 ? 0 : 1;
 }
