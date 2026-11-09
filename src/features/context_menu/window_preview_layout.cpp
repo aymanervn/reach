@@ -3,12 +3,11 @@
 
 #include <math.h>
 
-static constexpr float reach_preview_height_dp = 140.0f;
+static constexpr float reach_preview_height_dp = 80.0f;
 static constexpr float reach_preview_padding_dp = 12.0f;
 static constexpr float reach_preview_gap_dp = 12.0f;
 static constexpr float reach_preview_header_dp = 24.0f;
 static constexpr float reach_preview_header_gap_dp = 8.0f;
-static constexpr float reach_preview_margin_dp = 16.0f;
 
 void reach_context_menu_attach_services(reach_context_menu *menu, reach_window_tracking *windows,
                                         reach_icon_service *icons)
@@ -100,10 +99,10 @@ static int32_t reach_context_menu_arrange_previews_as(reach_context_menu *menu,
     float scale = ctx->dpi_scale > 0.0f ? ctx->dpi_scale : 1.0f;
     reach_context_menu_load_motion_specs(menu, ctx->theme);
     float base_border = reach_theme_border_thickness(ctx->theme, 1.0f);
-    scale = fminf(scale, ctx->monitor.width / (2.0f * (reach_preview_margin_dp +
-                                                       reach_preview_padding_dp + base_border) +
-                                               1.0f));
-    float chrome_units = 2.0f * (reach_preview_margin_dp + reach_preview_padding_dp + base_border) +
+    float margin_dp = reach_context_menu_popup_metrics.screen_margin;
+    scale = fminf(scale, ctx->monitor.width /
+                             (2.0f * (margin_dp + reach_preview_padding_dp + base_border) + 1.0f));
+    float chrome_units = 2.0f * (margin_dp + reach_preview_padding_dp + base_border) +
                          reach_popup_notch_height() + reach_preview_header_dp +
                          reach_preview_header_gap_dp;
     scale = fminf(scale, available_height / (chrome_units + 1.0f));
@@ -112,7 +111,7 @@ static int32_t reach_context_menu_arrange_previews_as(reach_context_menu *menu,
     float gap = reach_preview_gap_dp * scale;
     float header = reach_preview_header_dp * scale;
     float header_gap = reach_preview_header_gap_dp * scale;
-    float margin = reach_preview_margin_dp * scale;
+    float margin = margin_dp * scale;
     float notch = reach_popup_notch_height_scaled(scale);
     float room = fmaxf(0.0f, ctx->monitor.width - 2.0f * (margin + border + padding));
     float chrome = 2.0f * (margin + border + padding) + notch + header + header_gap;
