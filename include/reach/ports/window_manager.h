@@ -59,6 +59,7 @@ extern "C"
         int32_t (*privileged_control_available)(const reach_window_manager *manager);
         reach_result (*start_privileged_control)(reach_window_manager *manager);
         reach_result (*activate)(reach_window_manager *manager, reach_window_id window_id);
+        reach_result (*activate_covered)(reach_window_manager *manager, reach_window_id window_id);
         reach_result (*minimize)(reach_window_manager *manager, reach_window_id window_id);
         reach_result (*close)(reach_window_manager *manager, reach_window_id window_id);
         void (*destroy)(reach_window_manager *manager);

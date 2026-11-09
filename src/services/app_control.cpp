@@ -224,6 +224,7 @@ struct reach_app_control_window_request
     reach_window_control_action action = REACH_WINDOW_CONTROL_ACTIVATE;
     std::vector<uintptr_t> windows;
     int32_t is_snap = 0;
+    int32_t covered = 0;
     reach_split_mode snap_mode = REACH_SPLIT_LEFT;
 };
 
@@ -247,11 +248,16 @@ struct reach_app_control
 
 static reach_result reach_app_control_window_dispatch(reach_app_control *service,
                                                       reach_window_control_action action,
-                                                      uintptr_t window_id)
+                                                      uintptr_t window_id, int32_t covered)
 {
     switch (action)
     {
     case REACH_WINDOW_CONTROL_ACTIVATE:
+        if (covered && service->window_manager.ops.activate_covered != nullptr)
+        {
+            return service->window_manager.ops.activate_covered(service->window_manager.manager,
+                                                                window_id);
+        }
         return service->window_manager.ops.activate != nullptr
                    ? service->window_manager.ops.activate(service->window_manager.manager,
                                                           window_id)
@@ -272,7 +278,7 @@ static reach_result reach_app_control_window_dispatch(reach_app_control *service
 
 static reach_result reach_app_control_window_execute(reach_app_control *service,
                                                      reach_window_control_action action,
-                                                     uintptr_t window_id)
+                                                     uintptr_t window_id, int32_t covered)
 {
     if (service == nullptr || window_id == 0)
     {
@@ -282,7 +288,7 @@ static reach_result reach_app_control_window_execute(reach_app_control *service,
     if (service->window_manager.ops.privileged_control_available != nullptr &&
         service->window_manager.ops.privileged_control_available(service->window_manager.manager))
     {
-        return reach_app_control_window_dispatch(service, action, window_id);
+        return reach_app_control_window_dispatch(service, action, window_id, covered);
     }
 
     if (service->window_manager.ops.start_privileged_control == nullptr ||
@@ -298,7 +304,7 @@ static reach_result reach_app_control_window_execute(reach_app_control *service,
         return REACH_ERROR;
     }
 
-    return reach_app_control_window_dispatch(service, action, window_id);
+    return reach_app_control_window_dispatch(service, action, window_id, covered);
 }
 
 static reach_result reach_app_control_snap_dispatch(reach_app_control *service, uintptr_t window_id,
@@ -362,7 +368,8 @@ static void reach_app_control_window_thread_main(reach_app_control *service)
         {
             reach_result window_result =
                 request.is_snap ? reach_app_control_snap_execute(service, window, request.snap_mode)
-                                : reach_app_control_window_execute(service, request.action, window);
+                                : reach_app_control_window_execute(service, request.action, window,
+                                                                   request.covered);
             if (window_result != REACH_OK && result == REACH_OK)
             {
                 result = window_result;
@@ -746,6 +753,25 @@ reach_result reach_app_control_schedule_window(reach_app_control *service,
                                                uintptr_t window_id, uint64_t *out_request_id)
 {
     return reach_app_control_schedule_windows(service, action, &window_id, 1, out_request_id);
+}
+
+reach_result reach_app_control_schedule_covered_activation(reach_app_control *service,
+                                                           uintptr_t window_id,
+                                                           uint64_t *out_request_id)
+{
+    if (out_request_id != nullptr)
+    {
+        *out_request_id = 0;
+    }
+    if (service == nullptr || window_id == 0)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    reach_app_control_window_request request;
+    request.action = REACH_WINDOW_CONTROL_ACTIVATE;
+    request.windows.push_back(window_id);
+    request.covered = 1;
+    return reach_app_control_enqueue_window(service, std::move(request), out_request_id);
 }
 
 reach_result reach_app_control_schedule_snap(reach_app_control *service, uintptr_t window_id,

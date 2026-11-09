@@ -2,7 +2,7 @@
 
 uint32_t reach_service_protocol_version(void)
 {
-    return 13;
+    return 14;
 }
 
 int32_t reach_service_command_valid(uint32_t command)
@@ -25,6 +25,12 @@ int32_t reach_service_request_valid(const reach_service_request *request)
 {
     if (request == nullptr || request->version != reach_service_protocol_version() ||
         !reach_service_command_valid(request->command))
+    {
+        return 0;
+    }
+
+    if (request->covered != 0 &&
+        (request->covered != 1 || request->command != REACH_SERVICE_COMMAND_ACTIVATE))
     {
         return 0;
     }

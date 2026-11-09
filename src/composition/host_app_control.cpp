@@ -150,6 +150,22 @@ reach_result reach_host_schedule_window_control(reach_host *host,
     return result;
 }
 
+reach_result reach_host_schedule_covered_activation(reach_host *host, uintptr_t window_id,
+                                                    uint64_t *out_request_id)
+{
+    if (host == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    reach_result result =
+        reach_app_control_schedule_covered_activation(host->app_control, window_id, out_request_id);
+    if (result == REACH_OK)
+    {
+        reach_host_request_update(host);
+    }
+    return result;
+}
+
 reach_result reach_host_schedule_window_controls(reach_host *host,
                                                  reach_window_control_action action,
                                                  const uintptr_t *window_ids, size_t window_count,

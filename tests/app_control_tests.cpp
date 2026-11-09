@@ -29,6 +29,7 @@ static uintptr_t fake_closed[FAKE_MAX_CALLS];
 static size_t fake_closed_count;
 static size_t fake_minimized_count;
 static size_t fake_activated_count;
+static size_t fake_covered_activated_count;
 static std::atomic<int> fake_notified;
 static std::atomic<int> fake_terminal_called;
 static reach_terminal_launch_request fake_terminal_request;
@@ -56,6 +57,14 @@ static reach_result fake_activate(reach_window_manager *manager, reach_window_id
     (void)manager;
     (void)window_id;
     ++fake_activated_count;
+    return REACH_OK;
+}
+
+static reach_result fake_activate_covered(reach_window_manager *manager, reach_window_id window_id)
+{
+    (void)manager;
+    (void)window_id;
+    ++fake_covered_activated_count;
     return REACH_OK;
 }
 
@@ -211,6 +220,50 @@ static void test_open_location_never_touches_the_port_on_the_caller(void)
     reach_app_control_destroy(service);
 }
 
+static void test_covered_activation_uses_the_covered_dispatch(void)
+{
+    fake_activated_count = 0;
+    fake_covered_activated_count = 0;
+    fake_notified.store(0);
+
+    reach_window_manager_port window_manager = {};
+    window_manager.ops.activate = fake_activate;
+    window_manager.ops.activate_covered = fake_activate_covered;
+    window_manager.ops.privileged_control_available = fake_privileged_available;
+
+    reach_app_control *service = nullptr;
+    reach_app_launcher_port launcher = {};
+    reach_explorer_service_port explorer = {};
+    reach_terminal_launcher_port terminal_launcher = {};
+    if (reach_app_control_create(launcher, terminal_launcher, explorer, window_manager, fake_notify,
+                                 nullptr, &service) != REACH_OK ||
+        service == nullptr)
+    {
+        ++failures;
+        fprintf(stderr, "FAILED: app control creation\n");
+        return;
+    }
+
+    uint64_t covered_id = 0;
+    expect_true(reach_app_control_schedule_covered_activation(service, 7, &covered_id) == REACH_OK,
+                "a covered activation is accepted");
+    reach_window_control_completion completion = {};
+    expect_true(wait_for_completion(service, &completion) && completion.request_id == covered_id &&
+                    completion.action == REACH_WINDOW_CONTROL_ACTIVATE,
+                "a covered activation completes as an ordinary activation");
+    expect_true(fake_covered_activated_count == 1 && fake_activated_count == 0,
+                "a covered activation takes the covered dispatch only");
+
+    expect_true(reach_app_control_schedule_window(service, REACH_WINDOW_CONTROL_ACTIVATE, 8,
+                                                  nullptr) == REACH_OK,
+                "an ordinary activation is accepted");
+    expect_true(wait_for_completion(service, &completion), "ordinary activation completes");
+    expect_true(fake_covered_activated_count == 1 && fake_activated_count == 1,
+                "an ordinary activation keeps the ordinary dispatch");
+
+    reach_app_control_destroy(service);
+}
+
 static void test_schedule_windows_closes_every_window(void)
 {
     fake_closed_count = 0;
@@ -304,6 +357,7 @@ int main(void)
 {
     test_open_location_never_touches_the_port_on_the_caller();
     test_schedule_windows_closes_every_window();
+    test_covered_activation_uses_the_covered_dispatch();
     test_terminal_command_is_queued_unchanged();
     return failures == 0 ? 0 : 1;
 }
