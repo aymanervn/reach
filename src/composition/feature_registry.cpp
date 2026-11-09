@@ -1255,6 +1255,7 @@ static reach_result reach_switcher_surface_render(void *capsule,
     reach_switcher_render_context render = {};
     render.theme = ctx->theme;
     render.icon_size_px = ctx->icon_size_px;
+    render.text_measure = ctx->text_measure;
     return reach_switcher_append_render_commands(static_cast<reach_switcher *>(capsule), &render,
                                                  out_commands);
 }

@@ -10,20 +10,18 @@
 #include "reach/services/window_tracking.h"
 #include "reach/core/theme.h"
 #include "reach/core/ui_events.h"
+#include "reach/ports/text_measure.h"
 
 #ifdef __cplusplus
 extern "C"
 {
 #endif
 
-#define REACH_SWITCHER_VISIBLE_MAX 12
-
     typedef struct reach_switcher_state
     {
         int32_t open;
         reach_rect_f32 bounds;
         size_t selected_index;
-        size_t visible_start;
         uintptr_t windows[REACH_MAX_OPEN_WINDOWS];
         size_t window_count;
         size_t visible_count;
@@ -78,6 +76,7 @@ extern "C"
     {
         const reach_theme *theme;
         int32_t icon_size_px;
+        reach_text_measure_port text_measure;
     } reach_switcher_render_context;
 
     void reach_switcher_force_close(reach_switcher *switcher);

@@ -29,22 +29,13 @@ float reach_window_preview_row_scale(float row_width, float available_width)
     return row_width > 0.0f ? fminf(1.0f, fmaxf(0.0f, available_width) / row_width) : 1.0f;
 }
 
-reach_window_preview_range reach_window_preview_pack(const float *widths, size_t count,
-                                                     size_t start, size_t capacity, float room,
-                                                     float gap)
+float reach_window_preview_row_fit(const float *aspects, size_t count, float height, float gap,
+                                   float available_width)
 {
-    reach_window_preview_range range = {};
-    range.start = start < count ? start : count;
-    range.end = range.start;
-    while (range.end < count && range.end - range.start < capacity)
+    float row_width = count > 1 ? gap * (float)(count - 1) : 0.0f;
+    for (size_t index = 0; index < count; ++index)
     {
-        float next = range.width + (range.end > range.start ? gap : 0.0f) + widths[range.end];
-        if (range.end > range.start && next > room + 0.01f)
-        {
-            break;
-        }
-        range.width = next;
-        ++range.end;
+        row_width += aspects[index] * height;
     }
-    return range;
+    return reach_window_preview_row_scale(row_width, available_width);
 }

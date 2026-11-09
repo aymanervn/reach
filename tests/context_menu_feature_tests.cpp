@@ -439,6 +439,11 @@ static void test_preview_row_fits_every_window_across_dpi(void)
                 "portrait geometry keeps its aspect");
     expect_near(reach_window_preview_aspect({0, 0, NAN, 1200}), 1.0f, 0.001f,
                 "invalid geometry uses a finite fallback");
+    const float square_aspects[] = {1.0f, 1.0f};
+    expect_near(reach_window_preview_row_fit(square_aspects, 2, 100.0f, 10.0f, 105.0f), 0.5f,
+                0.001f, "an overflowing row shrinks height and gaps together to fit");
+    expect_near(reach_window_preview_row_fit(square_aspects, 2, 100.0f, 10.0f, 500.0f), 1.0f,
+                0.001f, "a row that fits keeps its natural size");
     reach_menu_request request = {};
     request.window_count = REACH_MENU_MAX_WINDOWS;
     reset_preview_windows(request.window_count);

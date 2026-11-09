@@ -15,9 +15,11 @@ typedef struct reach_switcher_card
 
 typedef struct reach_switcher_layout
 {
-    reach_switcher_card cards[REACH_SWITCHER_VISIBLE_MAX];
+    reach_switcher_card cards[REACH_MAX_OPEN_WINDOWS];
     size_t count;
     float scale;
+    float card_scale;
+    reach_motion fit;
     reach_rect_motion body;
     reach_rect_motion selection;
     int32_t has_selection;
@@ -32,6 +34,7 @@ static const float REACH_SWITCHER_GAP = 24.0f;
 static const float REACH_SWITCHER_SELECTION_INSET = 5.0f;
 static const float REACH_SWITCHER_LABEL_GAP = 12.0f;
 static const float REACH_SWITCHER_LABEL_HEIGHT = 20.0f;
+static const float REACH_SWITCHER_LABEL_GLYPH_ADVANCE = 0.6f;
 
 const reach_switcher_layout *reach_switcher_card_layout(const reach_switcher *switcher);
 reach_icon_service *reach_switcher_icons(reach_switcher *switcher);
