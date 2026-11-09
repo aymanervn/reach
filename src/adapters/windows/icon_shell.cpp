@@ -2,8 +2,10 @@
 #include "shortcut_win32.h"
 
 #include "reach/ports/icon_provider.h"
+#include "package_store_path.h"
 #include "windows_icon_handle_internal.h"
 
+#include <appmodel.h>
 #include <commctrl.h>
 #include <commoncontrols.h>
 #include <shellapi.h>
@@ -14,6 +16,7 @@
 #include <cstdlib>
 #include <mutex>
 #include <new>
+#include <vector>
 
 struct reach_icon_provider
 {
@@ -59,6 +62,57 @@ static int32_t reach_icon_resolve_search_path(const wchar_t *path, wchar_t *reso
 
     DWORD length = SearchPathW(nullptr, path, nullptr, resolved_count, resolved, nullptr);
     return length > 0 && length < resolved_count;
+}
+
+static int32_t reach_icon_path_exists(const wchar_t *path)
+{
+    return GetFileAttributesW(path) != INVALID_FILE_ATTRIBUTES;
+}
+
+static int32_t reach_icon_current_package_path(const wchar_t *path, wchar_t *out_path,
+                                               DWORD out_path_count)
+{
+    wchar_t family_name[PACKAGE_FAMILY_NAME_MAX_LENGTH + 1] = {};
+    const wchar_t *relative = nullptr;
+    if (path == nullptr || path[0] == 0 || out_path == nullptr || out_path_count == 0 ||
+        reach_icon_path_exists(path) ||
+        !reach_package_store_path_split(path, family_name, ARRAYSIZE(family_name), &relative))
+    {
+        return 0;
+    }
+
+    UINT32 count = 0;
+    UINT32 buffer_length = 0;
+    if (GetPackagesByPackageFamily(family_name, &count, nullptr, &buffer_length, nullptr) !=
+            ERROR_INSUFFICIENT_BUFFER ||
+        count == 0 || buffer_length == 0)
+    {
+        return 0;
+    }
+    std::vector<PWSTR> full_names(count);
+    std::vector<wchar_t> buffer(buffer_length);
+    if (GetPackagesByPackageFamily(family_name, &count, full_names.data(), &buffer_length,
+                                   buffer.data()) != ERROR_SUCCESS)
+    {
+        return 0;
+    }
+
+    for (UINT32 index = 0; index < count; ++index)
+    {
+        wchar_t root[MAX_PATH] = {};
+        UINT32 root_length = MAX_PATH;
+        if (GetPackagePathByFullName(full_names[index], &root_length, root) != ERROR_SUCCESS)
+        {
+            continue;
+        }
+        if (swprintf_s(out_path, out_path_count, L"%ls\\%ls", root, relative) > 0 &&
+            reach_icon_path_exists(out_path))
+        {
+            return 1;
+        }
+    }
+    out_path[0] = 0;
+    return 0;
 }
 
 static int32_t reach_icon_split_resource_ref(const wchar_t *path, wchar_t *out_path,
@@ -260,6 +314,12 @@ static reach_result reach_icon_load(reach_icon_provider *provider,
             (void)reach_icon_copy_path(resolved, 260, requested_path);
             icon_path = resolved;
         }
+    }
+
+    wchar_t package_path[MAX_PATH] = {};
+    if (reach_icon_current_package_path(icon_path, package_path, MAX_PATH))
+    {
+        icon_path = package_path;
     }
 
     uint64_t icon_id = 0;
