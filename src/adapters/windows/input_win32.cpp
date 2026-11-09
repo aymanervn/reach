@@ -7,6 +7,9 @@
 
 #include <windows.h>
 #include <new>
+#include <stdarg.h>
+#include <stdio.h>
+#include <string.h>
 
 static const size_t REACH_INPUT_POINTER_REGION_CAPACITY = 16;
 
@@ -15,6 +18,8 @@ struct reach_input_pointer_region
     reach_rect_union shape;
     int32_t enabled;
     int32_t inside;
+    // Workaround: temporary trace for the dock preview close bug; remove after diagnosis.
+    POINT trace_point;
 };
 
 struct reach_input_source
@@ -38,6 +43,41 @@ struct reach_input_source
 };
 
 static reach_input_source *g_pointer_hook_source;
+
+// Workaround: temporary trace for the dock preview close bug; remove after diagnosis.
+static void reach_input_trace(const char *format, ...)
+{
+    char line[512];
+    va_list args;
+    va_start(args, format);
+    vsnprintf(line, sizeof(line), format, args);
+    va_end(args);
+    reach_log_info(line);
+}
+
+// Workaround: temporary trace for the dock preview close bug; remove after diagnosis.
+static void reach_input_trace_region(const char *event, uint32_t region_id,
+                                     const reach_rect_union *shape, int32_t inside,
+                                     reach_result result)
+{
+    char rects[320] = {};
+    size_t used = 0;
+    for (uint32_t index = 0; shape != nullptr && index < shape->count && used < sizeof(rects);
+         ++index)
+    {
+        const reach_rect_f32 &rect = shape->rects[index];
+        int written = snprintf(rects + used, sizeof(rects) - used, "%s%.0f,%.0f,%.0f,%.0f",
+                               index > 0 ? ";" : "", rect.x, rect.y, rect.width, rect.height);
+        if (written < 0)
+        {
+            break;
+        }
+        used += (size_t)written;
+    }
+    reach_input_trace("dock_preview_trace %s id=%u count=%u rects=[%s] inside=%d result=%d", event,
+                      region_id, shape != nullptr ? (unsigned)shape->count : 0u, rects, inside,
+                      (int)result);
+}
 
 static const wchar_t *REACH_INPUT_WINDOW_CLASS = L"ReachInputMessageWindow";
 static const UINT REACH_INPUT_WM_UI_EVENT = WM_APP + 21;
@@ -90,6 +130,8 @@ static void reach_input_update_pointer_regions(reach_input_source *source, POINT
         if (inside != region->inside)
         {
             region->inside = inside;
+            // Workaround: temporary trace for the dock preview close bug; remove after diagnosis.
+            region->trace_point = point;
             changed[changed_count++] = index;
         }
     }
@@ -149,8 +191,12 @@ static reach_result reach_input_sync_pointer_hook(reach_input_source *source)
                                              &source->pointer_hook) != REACH_OK)
         {
             g_pointer_hook_source = nullptr;
+            // Workaround: temporary trace for the dock preview close bug; remove after diagnosis.
+            reach_input_trace("dock_preview_trace hook_install result=failed");
             return REACH_ERROR;
         }
+        // Workaround: temporary trace for the dock preview close bug; remove after diagnosis.
+        reach_input_trace("dock_preview_trace hook_install result=ok");
     }
     else if (!enabled && source->pointer_hook != nullptr)
     {
@@ -160,6 +206,8 @@ static reach_result reach_input_sync_pointer_hook(reach_input_source *source)
         {
             g_pointer_hook_source = nullptr;
         }
+        // Workaround: temporary trace for the dock preview close bug; remove after diagnosis.
+        reach_input_trace("dock_preview_trace hook_uninstall");
     }
     return REACH_OK;
 }
@@ -540,6 +588,20 @@ static LRESULT CALLBACK reach_input_window_proc(HWND hwnd, UINT message, WPARAM 
         {
             InterlockedExchange(&source->manipulation_event_pending, 0);
         }
+        // Workaround: temporary trace for the dock preview close bug; remove after diagnosis.
+        if (event.type == REACH_UI_EVENT_POINTER_REGION_CHANGED &&
+            event.id < REACH_INPUT_POINTER_REGION_CAPACITY)
+        {
+            AcquireSRWLockExclusive(&source->pointer_region_lock);
+            reach_input_pointer_region region = source->pointer_regions[event.id];
+            ReleaseSRWLockExclusive(&source->pointer_region_lock);
+            POINT cursor = {};
+            int32_t have_cursor = GetCursorPos(&cursor) != 0;
+            reach_input_trace("dock_preview_trace region_crossed id=%u enabled=%d inside=%d "
+                              "hook=%ld,%ld cursor=%ld,%ld cursor_ok=%d",
+                              event.id, region.enabled, region.inside, region.trace_point.x,
+                              region.trace_point.y, cursor.x, cursor.y, have_cursor);
+        }
         source->callback(source->user, &event);
         return 0;
     }
@@ -666,9 +728,17 @@ static reach_result reach_input_set_pointer_region(reach_input_source *source, u
     if (shape == nullptr || shape->count == 0 || shape->count > REACH_RECT_UNION_CAPACITY)
     {
         AcquireSRWLockExclusive(&source->pointer_region_lock);
+        // Workaround: temporary trace for the dock preview close bug; remove after diagnosis.
+        int32_t trace_was_enabled = region->enabled;
         *region = {};
         ReleaseSRWLockExclusive(&source->pointer_region_lock);
-        return reach_input_sync_pointer_hook(source);
+        reach_result trace_result = reach_input_sync_pointer_hook(source);
+        // Workaround: temporary trace for the dock preview close bug; remove after diagnosis.
+        if (trace_was_enabled)
+        {
+            reach_input_trace_region("region_clear", region_id, shape, 0, trace_result);
+        }
+        return trace_result;
     }
 
     POINT point = {};
@@ -676,6 +746,9 @@ static reach_result reach_input_set_pointer_region(reach_input_source *source, u
     int32_t changed = 0;
 
     AcquireSRWLockExclusive(&source->pointer_region_lock);
+    // Workaround: temporary trace for the dock preview close bug; remove after diagnosis.
+    int32_t trace_shape_changed =
+        !region->enabled || memcmp(&region->shape, shape, sizeof(*shape)) != 0;
     region->shape = *shape;
     region->enabled = 1;
     if (have_point)
@@ -683,14 +756,26 @@ static reach_result reach_input_set_pointer_region(reach_input_source *source, u
         int32_t inside = reach_input_point_in_region(point, region->shape);
         changed = inside != region->inside;
         region->inside = inside;
+        if (changed)
+        {
+            // Workaround: temporary trace for the dock preview close bug; remove after diagnosis.
+            region->trace_point = point;
+        }
     }
+    int32_t trace_inside = region->inside;
     ReleaseSRWLockExclusive(&source->pointer_region_lock);
 
     if (changed)
     {
         reach_input_post_pointer_region_event(source, region_id);
     }
-    return reach_input_sync_pointer_hook(source);
+    reach_result trace_result = reach_input_sync_pointer_hook(source);
+    // Workaround: temporary trace for the dock preview close bug; remove after diagnosis.
+    if (trace_shape_changed || changed)
+    {
+        reach_input_trace_region("region_publish", region_id, shape, trace_inside, trace_result);
+    }
+    return trace_result;
 }
 
 static reach_result reach_input_get_window_manipulation(reach_input_source *source,
