@@ -31,7 +31,7 @@ extern "C"
                                                            const reach_window_snapshot *window);
 
 #define REACH_DOCK_TEXT_CAPACITY 260
-#define REACH_DOCK_MAX_INSTANCES 16
+#define REACH_DOCK_MAX_INSTANCES REACH_MAX_OPEN_WINDOWS
 
     /* One entry per application on the dock. Pinned and running are properties of an entry, not
 

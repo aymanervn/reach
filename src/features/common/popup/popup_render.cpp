@@ -152,16 +152,20 @@ reach_result reach_popup_height_motion(const reach_popup_anchor *anchor, float w
 }
 
 reach_result reach_popup_width_motion(const reach_popup_anchor *anchor, const reach_motion *width,
-                                      float height, float margin, float dpi_scale,
+                                      const reach_motion *height, float margin, float dpi_scale,
                                       reach_rect_motion *out_bounds, reach_motion *out_notch_center)
 {
-    if (anchor == nullptr || width == nullptr || out_bounds == nullptr ||
+    float height_minimum = 0, height_maximum = 0;
+    if (anchor == nullptr || width == nullptr || height == nullptr || out_bounds == nullptr ||
         out_notch_center == nullptr || width->generation == 0 || width->has_mapping ||
-        !isfinite(height) || height <= 0 || !isfinite(margin) || margin < 0 ||
-        !isfinite(dpi_scale) || dpi_scale <= 0 || !isfinite(anchor->button.x) ||
-        !isfinite(anchor->button.width) || !isfinite(anchor->monitor.x) ||
-        !isfinite(anchor->monitor.y) || !isfinite(anchor->monitor.width) ||
-        !isfinite(anchor->monitor.height) || !isfinite(anchor->bar_edge_y))
+        height->generation == 0 ||
+        reach_motion_range(height, &height_minimum, &height_maximum) != REACH_OK ||
+        !isfinite(height_minimum) || !isfinite(height_maximum) || height_minimum <= 0 ||
+        !isfinite(margin) || margin < 0 || !isfinite(dpi_scale) || dpi_scale <= 0 ||
+        !isfinite(anchor->button.x) || !isfinite(anchor->button.width) ||
+        !isfinite(anchor->monitor.x) || !isfinite(anchor->monitor.y) ||
+        !isfinite(anchor->monitor.width) || !isfinite(anchor->monitor.height) ||
+        !isfinite(anchor->bar_edge_y))
         return REACH_INVALID_ARGUMENT;
     reach_rect_motion result = {};
     result.width = *width;
@@ -175,8 +179,8 @@ reach_result reach_popup_width_motion(const reach_popup_anchor *anchor, const re
     if (!reach_popup_positive_extent(&result.width) ||
         reach_motion_range(&result.width, &minimum, &maximum) != REACH_OK || minimum <= 0)
         return REACH_INVALID_ARGUMENT;
-    reach_popup_placement narrow = reach_popup_place(anchor, minimum, height, margin);
-    reach_popup_placement wide = reach_popup_place(anchor, maximum, height, margin);
+    reach_popup_placement narrow = reach_popup_place(anchor, minimum, height_maximum, margin);
+    reach_popup_placement wide = reach_popup_place(anchor, maximum, height_maximum, margin);
     reach_motion raw_width = *width;
     raw_width.has_limits = 0;
     float owner = anchor->button.x + anchor->button.width * 0.5f;
@@ -192,8 +196,13 @@ reach_result reach_popup_width_motion(const reach_popup_anchor *anchor, const re
     }
     result.x = reach_motion_clamp(&result.x, fminf(narrow.bounds.x, wide.bounds.x),
                                   fmaxf(narrow.bounds.x, wide.bounds.x));
-    reach_motion_set(&result.y, narrow.bounds.y);
-    reach_motion_set(&result.height, narrow.bounds.height);
+    result.height = *height;
+    if (narrow.bounds.height < height_maximum)
+        result.height = reach_motion_clamp(height, 0, narrow.bounds.height);
+    if (anchor->direction == REACH_POPUP_DROP_DOWN)
+        reach_motion_set(&result.y, narrow.bounds.y);
+    else
+        result.y = reach_motion_affine(&result.height, -1, narrow.bounds.y + narrow.bounds.height);
     float clearance = reach_popup_radius_scaled(reach_theme_default(), dpi_scale) +
                       reach_popup_notch_width_scaled(dpi_scale);
     float distance =
@@ -432,6 +441,7 @@ static reach_result reach_popup_motion_shape(reach_render_command_buffer *out, u
 
 reach_result reach_popup_push_width_background(const reach_popup_background_input *input,
                                                const reach_motion *width,
+                                               const reach_motion *height,
                                                const reach_motion *notch_center, uint64_t parent_id,
                                                uint64_t first_group_id,
                                                reach_render_command_buffer *out_commands)
@@ -451,6 +461,13 @@ reach_result reach_popup_push_width_background(const reach_popup_background_inpu
         !isfinite(input->bounds.height) || input->bounds.height <= 0)
         return REACH_INVALID_ARGUMENT;
     width = &positive_width;
+    float height_minimum = input->bounds.height, height_maximum = input->bounds.height;
+    if (height != nullptr &&
+        (height->generation == 0 ||
+         reach_motion_range(height, &height_minimum, &height_maximum) != REACH_OK ||
+         height_minimum <= 0 || height_maximum > input->bounds.height))
+        return REACH_INVALID_ARGUMENT;
+    bool height_changes = height_minimum != height_maximum;
     auto batch = std::unique_ptr<reach_render_command_buffer>(new (std::nothrow)
                                                                   reach_render_command_buffer());
     if (!batch)
@@ -487,9 +504,20 @@ reach_result reach_popup_push_width_background(const reach_popup_background_inpu
     stretch.focal_right = stretch.focal_left + focal_width;
     stretch.focal_x = reach_motion_affine(&center, 1, pad.left);
     stretch.width = reach_motion_affine(width, 1, pad.left + pad.right);
-    reach_motion_set(&stretch.height, source.bounds.height);
+    if (height != nullptr)
+    {
+        stretch.top = ceilf(pad.top + radius + extent +
+                            (input->notch_side == REACH_NOTCH_SIDE_TOP ? notch_height : 0));
+        stretch.bottom = ceilf(pad.bottom + radius + extent +
+                               (input->notch_side == REACH_NOTCH_SIDE_BOTTOM ? notch_height : 0));
+        source.bounds.height = stretch.top + stretch.bottom + 1;
+        stretch.height = reach_motion_affine(height, 1, pad.top + pad.bottom);
+    }
+    else
+        reach_motion_set(&stretch.height, source.bounds.height);
     reach_popup_background_input shape = *input;
     shape.bounds.width = source.bounds.width - pad.left - pad.right;
+    shape.bounds.height = source.bounds.height - pad.top - pad.bottom;
     shape.notch_center_x = (stretch.focal_left + stretch.focal_right) * .5f - pad.left;
     auto paint = std::unique_ptr<reach_render_command_buffer>(new (std::nothrow)
                                                                   reach_render_command_buffer());
@@ -503,7 +531,7 @@ reach_result reach_popup_push_width_background(const reach_popup_background_inpu
     {
         reach_render_command_buffer_clear(batch.get());
         float notch_minimum = 0, notch_maximum = 0;
-        bool fixed = minimum == maximum &&
+        bool fixed = minimum == maximum && !height_changes &&
                      reach_motion_range(&center, &notch_minimum, &notch_maximum) == REACH_OK &&
                      notch_minimum == notch_maximum;
         if (fixed)

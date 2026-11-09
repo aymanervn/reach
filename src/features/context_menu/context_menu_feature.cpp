@@ -80,9 +80,7 @@ enum
 {
     REACH_CONTEXT_MENU_PRESSABLE_BACKGROUND = 1,
     REACH_CONTEXT_MENU_PRESSABLE_ITEM = 2,
-    REACH_CONTEXT_MENU_PRESSABLE_CLOSE = 3,
-    REACH_CONTEXT_MENU_PRESSABLE_PREVIOUS = 4,
-    REACH_CONTEXT_MENU_PRESSABLE_NEXT = 5
+    REACH_CONTEXT_MENU_PRESSABLE_CLOSE = 3
 };
 
 const reach_context_menu_state *reach_context_menu_state_ptr(const reach_context_menu *menu)
@@ -102,7 +100,7 @@ const reach_context_menu_state *reach_context_menu_state_ptr(const reach_context
         {
             auto card = reach_context_menu_preview_card_at(menu, visible, now);
             state->item_slots[card.index] = {card.header.x, card.header.y, card.header.width,
-                                             state->item_height};
+                                             card.preview.y + card.preview.height - card.header.y};
         }
     }
     return menu != nullptr ? &menu->state : nullptr;
@@ -199,7 +197,6 @@ void reach_context_menu_reset(reach_context_menu *menu)
     menu->state.hovered_index = REACH_CONTEXT_MENU_NO_ITEM;
     menu->state.close_hovered_index = REACH_CONTEXT_MENU_NO_ITEM;
     menu->state.item_count = 0;
-    menu->state.visible_start = 0;
     menu->state.visible_count = 0;
     menu->previews = {};
     ++menu->preview_generation;
@@ -618,21 +615,6 @@ static uint64_t reach_context_menu_pressable_target(const reach_context_menu *me
                    ? ((uint64_t)REACH_CONTEXT_MENU_PRESSABLE_BACKGROUND << 32)
                    : REACH_PRESSABLE_TARGET_NONE;
     }
-    if (menu->state.window_list_open)
-    {
-        double now = reach_motion_now_seconds();
-        reach_rect_f32 previous =
-            reach_context_menu_preview_bounds_at(menu, &menu->previews.previous, now);
-        reach_rect_f32 next = reach_context_menu_preview_bounds_at(menu, &menu->previews.next, now);
-        if (previous.width > 0.0f && reach_context_menu_hit_test_items(&previous, 1, x, y).hit)
-        {
-            return (uint64_t)REACH_CONTEXT_MENU_PRESSABLE_PREVIOUS << 32;
-        }
-        if (next.width > 0.0f && reach_context_menu_hit_test_items(&next, 1, x, y).hit)
-        {
-            return (uint64_t)REACH_CONTEXT_MENU_PRESSABLE_NEXT << 32;
-        }
-    }
     if (menu->state.window_list_open &&
         reach_context_menu_point_in_item_viewport(&menu->state, x, y))
     {
@@ -666,10 +648,6 @@ static uint64_t reach_context_menu_pressable_identity(const reach_context_menu *
     }
     size_t index = (size_t)(target & UINT32_MAX);
     uint64_t kind = target >> 32;
-    if (kind == REACH_CONTEXT_MENU_PRESSABLE_PREVIOUS || kind == REACH_CONTEXT_MENU_PRESSABLE_NEXT)
-    {
-        return ((uint64_t)menu->state.visible_start << 32) | kind;
-    }
     if (kind == REACH_CONTEXT_MENU_PRESSABLE_BACKGROUND || index >= menu->state.item_count)
     {
         return 0;
@@ -786,16 +764,6 @@ static void reach_context_menu_capsule_handle_pointer(void *capsule,
             out->action.kind = REACH_FEATURE_ACTION_CLOSE_SELF;
             break;
         }
-        if (kind == REACH_CONTEXT_MENU_PRESSABLE_PREVIOUS ||
-            kind == REACH_CONTEXT_MENU_PRESSABLE_NEXT)
-        {
-            if (identity == reach_context_menu_pressable_identity(menu, result.activated_target))
-            {
-                out->redraw = reach_context_menu_window_list_page(
-                    menu, kind == REACH_CONTEXT_MENU_PRESSABLE_NEXT ? 1 : -1);
-            }
-            break;
-        }
         if (index >= menu->state.item_count ||
             identity != reach_context_menu_pressable_identity(menu, result.activated_target))
         {
@@ -881,7 +849,6 @@ static void reach_context_menu_capsule_handle_pointer(void *capsule,
         if (menu->state.window_list_open)
         {
             out->handled = 1;
-            out->redraw = reach_context_menu_window_list_page(menu, -event->wheel_delta);
             break;
         }
         if (menu->state.scroll_max <= 0.0f || event->wheel_delta == 0)

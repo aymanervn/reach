@@ -37,12 +37,14 @@ void reach_context_menu_stop_preview_reflow(reach_context_menu *menu)
     freeze(menu->width);
     freeze_rect(menu->previews.body);
     freeze_rect(menu->previews.viewport);
-    freeze_rect(menu->previews.previous);
-    freeze_rect(menu->previews.next);
-    freeze_rect(menu->previews.footer);
     freeze(menu->previews.notch);
+    freeze(menu->previews.card_size);
     for (size_t index = 0; index < menu->previews.count; ++index)
+    {
         freeze_rect(menu->previews.cards[index].motion);
+        freeze(menu->previews.cards[index].size);
+        freeze(menu->previews.cards[index].header_top);
+    }
     reach_motion_set(&menu->reflow, 1);
     menu->preview_origin_count = 0;
     menu->layout_cleanup_pending = 0;
@@ -120,10 +122,11 @@ reach_context_menu_preview_card_at(const reach_context_menu *menu, size_t index,
     card.live = source.live;
     card.preview = reach_context_menu_preview_bounds_at(menu, &source.motion, now);
     auto body = reach_rect_motion_value_at(&menu->previews.body, now);
-    card.header = {card.preview.x, body.y + menu->previews.header_y, card.preview.width,
-                   source.header_height};
-    float close = fminf(source.header_height, card.header.width);
+    float size = reach_motion_value_at(&source.size, now);
+    card.header = {card.preview.x, body.y + reach_motion_value_at(&source.header_top, now),
+                   card.preview.width, source.header_height * size};
+    float close = fminf(card.header.height, card.header.width);
     card.close = {card.header.x + card.header.width - close, card.header.y, close,
-                  source.header_height};
+                  card.header.height};
     return card;
 }
