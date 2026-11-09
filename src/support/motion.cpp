@@ -1,10 +1,197 @@
 #include "reach/support/motion.h"
 
+#include <float.h>
 #include <math.h>
 #include <initializer_list>
 
+static constexpr double reach_motion_pi = 3.14159265358979323846;
+static constexpr double reach_spring_settle_ratio = 5e-6;
+
+struct reach_spring
+{
+    double to;
+    double displacement;
+    double velocity;
+    double omega;
+    double decay;
+    double frequency;
+    double cosine;
+    double sine;
+    double amplitude;
+    double phase;
+    double turn;
+    bool critical;
+};
+
+static bool reach_spring_valid(const reach_motion &motion)
+{
+    return motion.easing == REACH_EASING_SPRING && !motion.repeating && isfinite(motion.from) &&
+           isfinite(motion.to) && isfinite(motion.spring_response) && motion.spring_response > 0 &&
+           isfinite(motion.spring_damping) && motion.spring_damping >= .5f &&
+           motion.spring_damping <= 1 && isfinite(motion.spring_velocity);
+}
+
+static reach_spring reach_spring_shape(double to, double displacement, double velocity,
+                                       double response, double damping)
+{
+    reach_spring spring = {};
+    spring.to = to;
+    spring.displacement = displacement;
+    spring.velocity = velocity;
+    spring.omega = 2 * reach_motion_pi / response;
+    spring.critical = damping >= 1 - 1e-6;
+    spring.decay = spring.critical ? spring.omega : damping * spring.omega;
+    spring.frequency = spring.critical ? 0 : spring.omega * sqrt(1 - damping * damping);
+    spring.cosine = spring.displacement;
+    spring.sine = spring.critical
+                      ? spring.velocity + spring.omega * spring.displacement
+                      : (spring.velocity + spring.decay * spring.displacement) / spring.frequency;
+    if (!spring.critical)
+    {
+        spring.amplitude = hypot(spring.cosine, spring.sine);
+        spring.phase = atan2(-spring.sine, spring.cosine);
+        spring.turn = atan2(spring.frequency, -spring.decay);
+    }
+    return spring;
+}
+
+static reach_spring reach_spring_make(const reach_motion &motion)
+{
+    return reach_spring_shape(motion.to, (double)motion.from - motion.to, motion.spring_velocity,
+                              motion.spring_response, motion.spring_damping);
+}
+
+static double reach_spring_offset(const reach_spring &spring, double t)
+{
+    double envelope = exp(-spring.decay * t);
+    if (spring.critical)
+        return (spring.cosine + spring.sine * t) * envelope;
+    return envelope *
+           (spring.cosine * cos(spring.frequency * t) + spring.sine * sin(spring.frequency * t));
+}
+
+static double reach_spring_rate(const reach_spring &spring, double t)
+{
+    double envelope = exp(-spring.decay * t);
+    if (spring.critical)
+        return (spring.velocity - spring.omega * spring.sine * t) * envelope;
+    return envelope * (spring.velocity * cos(spring.frequency * t) -
+                       (spring.cosine * spring.frequency + spring.decay * spring.sine) *
+                           sin(spring.frequency * t));
+}
+
+static double reach_spring_bound(const reach_spring &spring, int order, double begin, double end)
+{
+    double scale = pow(spring.omega, order);
+    if (spring.critical)
+    {
+        double base = spring.cosine - order * spring.sine / spring.omega;
+        auto magnitude = [&](double t)
+        { return fabs(base + spring.sine * t) * exp(-spring.omega * t); };
+        double peak = fmax(magnitude(begin), magnitude(end));
+        if (spring.sine != 0)
+        {
+            double stationary = 1 / spring.omega - base / spring.sine;
+            if (stationary > begin && stationary < end)
+                peak = fmax(peak, magnitude(stationary));
+        }
+        return scale * peak;
+    }
+    double first = spring.frequency * begin + spring.phase + order * spring.turn;
+    double last = spring.frequency * end + spring.phase + order * spring.turn;
+    double peak = 1;
+    if (last - first < reach_motion_pi && ceil(first / reach_motion_pi) * reach_motion_pi > last)
+        peak = fmax(fabs(cos(first)), fabs(cos(last)));
+    return scale * spring.amplitude * exp(-spring.decay * begin) * peak;
+}
+
+template <typename Visit>
+static bool reach_spring_each_turn(const reach_spring &spring, double begin, double end,
+                                   Visit &&visit)
+{
+    if (spring.critical)
+    {
+        if (spring.sine != 0)
+        {
+            double turn = 1 / spring.omega - spring.cosine / spring.sine;
+            if (turn > begin && turn < end)
+                return visit(turn);
+        }
+        return true;
+    }
+    double offset = spring.phase + spring.turn - reach_motion_pi / 2;
+    double index = floor((spring.frequency * begin + offset) / reach_motion_pi);
+    for (int visited = 0; visited < 4096; ++visited, index += 1)
+    {
+        double turn = (index * reach_motion_pi - offset) / spring.frequency;
+        if (turn <= begin)
+            continue;
+        if (turn >= end)
+            return true;
+        if (!visit(turn))
+            return false;
+    }
+    return false;
+}
+
+static double reach_spring_settle(const reach_motion &motion)
+{
+    reach_spring spring = reach_spring_make(motion);
+    double amplitude = fabs(spring.displacement) + fabs(spring.velocity) / spring.omega;
+    if (!(amplitude > 0) || !isfinite(amplitude))
+        return 0;
+    auto envelope = [&](double t) { return exp(-spring.decay * t) * (1 + spring.omega * t); };
+    double start = (spring.omega - spring.decay) / (spring.decay * spring.omega);
+    double finish = start + 1 / spring.omega;
+    for (int step = 0; step < 128 && envelope(finish) > reach_spring_settle_ratio; ++step)
+        finish = start + 2 * (finish - start);
+    if (!isfinite(finish) || envelope(finish) > reach_spring_settle_ratio)
+        return 0;
+    for (int step = 0; step < 96; ++step)
+    {
+        double middle = (start + finish) * .5;
+        if (envelope(middle) > reach_spring_settle_ratio)
+            start = middle;
+        else
+            finish = middle;
+    }
+    if (!spring.critical)
+        finish = fmin(finish, log(spring.omega / (spring.frequency * reach_spring_settle_ratio)) /
+                                  spring.decay);
+    return finish;
+}
+
+static bool reach_motion_raw_domain(const reach_motion &motion, float &low, float &high)
+{
+    low = fminf(motion.from, motion.to);
+    high = fmaxf(motion.from, motion.to);
+    if (motion.easing != REACH_EASING_SPRING || !(motion.duration_seconds > 0))
+        return true;
+    if (!reach_spring_valid(motion) || !isfinite(motion.duration_seconds))
+        return false;
+    reach_spring spring = reach_spring_make(motion);
+    auto include = [&](double t)
+    {
+        float raw = (float)(spring.to + reach_spring_offset(spring, t));
+        low = fminf(low, raw);
+        high = fmaxf(high, raw);
+        return true;
+    };
+    include(motion.duration_seconds);
+    return reach_spring_each_turn(spring, 0, motion.duration_seconds, include) && isfinite(low) &&
+           isfinite(high);
+}
+
+static bool reach_motion_moves(const reach_motion &motion)
+{
+    return motion.from != motion.to ||
+           (motion.easing == REACH_EASING_SPRING && motion.spring_velocity != 0);
+}
+
 static bool reach_motion_mapping_valid(const reach_motion *motion)
 {
+    if (motion->easing == REACH_EASING_SPRING && !reach_spring_valid(*motion))
+        return false;
     if (!motion->has_mapping)
         return motion->mapping_extra_count == 0;
     if (motion->has_mapping != 1 && motion->has_mapping != REACH_MOTION_MAPPING_STEPS &&
@@ -16,11 +203,17 @@ static bool reach_motion_mapping_valid(const reach_motion *motion)
                motion->mapping_center == 0 && isfinite(motion->mapping_value) &&
                isfinite(motion->mapping_left_slope) && isfinite(motion->mapping_right_slope);
     if (motion->has_mapping == REACH_MOTION_MAPPING_RATIO)
+    {
+        float low = 0, high = 0;
         return !motion->repeating && motion->mapping_extra_count == 0 &&
                isfinite(motion->mapping_value) && isfinite(motion->mapping_left_slope) &&
                isfinite(motion->mapping_center) && isfinite(motion->mapping_right_slope) &&
+               reach_motion_raw_domain(*motion, low, high) &&
                motion->mapping_center + motion->mapping_right_slope * motion->from > 0 &&
-               motion->mapping_center + motion->mapping_right_slope * motion->to > 0;
+               motion->mapping_center + motion->mapping_right_slope * motion->to > 0 &&
+               motion->mapping_center + motion->mapping_right_slope * low > 0 &&
+               motion->mapping_center + motion->mapping_right_slope * high > 0;
+    }
     if (motion->has_mapping == REACH_MOTION_MAPPING_STEPS &&
         (motion->repeating || motion->mapping_left_slope != 0))
         return false;
@@ -102,7 +295,10 @@ int32_t reach_motion_equal(const reach_motion *first, const reach_motion *second
            first->mapping_center == second->mapping_center &&
            first->mapping_left_slope == second->mapping_left_slope &&
            first->mapping_right_slope == second->mapping_right_slope &&
-           first->mapping_value == second->mapping_value;
+           first->mapping_value == second->mapping_value &&
+           first->spring_response == second->spring_response &&
+           first->spring_damping == second->spring_damping &&
+           first->spring_velocity == second->spring_velocity;
 }
 
 void reach_motion_set(reach_motion *motion, float value)
@@ -127,13 +323,81 @@ void reach_motion_start_at(reach_motion *motion, float from, float to, double du
     {
         return;
     }
-    if (duration_seconds <= 0.0 || from == to)
+    if (duration_seconds <= 0.0 || from == to || easing == REACH_EASING_SPRING)
     {
         reach_motion_set(motion, to);
         return;
     }
     uint64_t generation = motion->generation + 1;
     *motion = {from, to, now_seconds, duration_seconds, easing, generation};
+}
+
+void reach_motion_spring_start_at(reach_motion *motion, float from, float to, float velocity,
+                                  float response_seconds, float damping, double now_seconds)
+{
+    if (motion == nullptr)
+        return;
+    reach_motion spring = {from, to, now_seconds, 0.0, REACH_EASING_SPRING, motion->generation + 1};
+    spring.spring_response = response_seconds;
+    spring.spring_damping = damping;
+    spring.spring_velocity = velocity;
+    if (!isfinite(now_seconds) || !reach_spring_valid(spring) || !reach_motion_moves(spring))
+    {
+        reach_motion_set(motion, to);
+        return;
+    }
+    spring.duration_seconds = reach_spring_settle(spring);
+    if (!(spring.duration_seconds > 0) || !isfinite(spring.duration_seconds))
+    {
+        reach_motion_set(motion, to);
+        return;
+    }
+    *motion = spring;
+}
+
+void reach_motion_spring_to_at(reach_motion *motion, float to, float response_seconds,
+                               float damping, double now_seconds)
+{
+    if (motion != nullptr)
+        reach_motion_spring_start_at(motion, reach_motion_value_at(motion, now_seconds), to,
+                                     reach_motion_velocity_at(motion, now_seconds),
+                                     response_seconds, damping, now_seconds);
+}
+
+reach_motion_spec reach_motion_spec_curve(double duration_seconds, reach_easing easing)
+{
+    reach_motion_spec spec = {};
+    spec.easing = easing;
+    spec.duration_seconds = duration_seconds;
+    return spec;
+}
+
+reach_motion_spec reach_motion_spec_spring(float response_seconds, float damping)
+{
+    reach_motion_spec spec = {};
+    spec.easing = REACH_EASING_SPRING;
+    spec.response_seconds = response_seconds;
+    spec.damping = damping;
+    return spec;
+}
+
+void reach_motion_start_spec_at(reach_motion *motion, float from, float to, float velocity,
+                                reach_motion_spec spec, double now_seconds)
+{
+    if (spec.easing == REACH_EASING_SPRING)
+        reach_motion_spring_start_at(motion, from, to, velocity, spec.response_seconds,
+                                     spec.damping, now_seconds);
+    else
+        reach_motion_start_at(motion, from, to, spec.duration_seconds, spec.easing, now_seconds);
+}
+
+void reach_motion_animate_spec_to_at(reach_motion *motion, float to, reach_motion_spec spec,
+                                     double now_seconds)
+{
+    if (spec.easing == REACH_EASING_SPRING)
+        reach_motion_spring_to_at(motion, to, spec.response_seconds, spec.damping, now_seconds);
+    else
+        reach_motion_animate_to_at(motion, to, spec.duration_seconds, spec.easing, now_seconds);
 }
 
 void reach_motion_animate_to(reach_motion *motion, float to, double duration_seconds,
@@ -174,6 +438,7 @@ reach_motion reach_motion_affine(const reach_motion *motion, float multiplier, f
     {
         result.from = result.from * multiplier + offset;
         result.to = result.to * multiplier + offset;
+        result.spring_velocity *= multiplier;
     }
     if (result.has_limits)
     {
@@ -218,9 +483,14 @@ reach_result reach_motion_range(const reach_motion *motion, float *out_minimum, 
                                 motion->minimum > motion->maximum)) ||
         !reach_motion_mapping_valid(motion))
         return REACH_INVALID_ARGUMENT;
+    float low = 0, high = 0;
+    if (!reach_motion_raw_domain(*motion, low, high))
+        return REACH_INVALID_ARGUMENT;
     float first = reach_motion_limit(motion, motion->from);
     float last = reach_motion_limit(motion, motion->to);
-    if (!isfinite(first) || !isfinite(last))
+    float lowest = reach_motion_limit(motion, low);
+    float highest = reach_motion_limit(motion, high);
+    if (!isfinite(first) || !isfinite(last) || !isfinite(lowest) || !isfinite(highest))
         return REACH_INVALID_ARGUMENT;
     float minimum = fminf(first, last), maximum = fmaxf(first, last);
     if (motion->repeating && motion->duration_seconds == 0)
@@ -229,11 +499,12 @@ reach_result reach_motion_range(const reach_motion *motion, float *out_minimum, 
         *out_maximum = maximum;
         return REACH_OK;
     }
+    minimum = fminf(minimum, fminf(lowest, highest));
+    maximum = fmaxf(maximum, fmaxf(lowest, highest));
     if (motion->has_mapping == REACH_MOTION_MAPPING_QUADRATIC && motion->mapping_right_slope != 0)
     {
         double critical = -(double)motion->mapping_left_slope / (2 * motion->mapping_right_slope);
-        if (critical > fminf(motion->from, motion->to) &&
-            critical < fmaxf(motion->from, motion->to))
+        if (critical > low && critical < high)
         {
             float value = reach_motion_limit(motion, (float)critical);
             if (!isfinite(value))
@@ -244,7 +515,6 @@ reach_result reach_motion_range(const reach_motion *motion, float *out_minimum, 
     }
     auto include_boundary = [&](float center)
     {
-        float low = fminf(motion->from, motion->to), high = fmaxf(motion->from, motion->to);
         if (center < low || center > high)
             return true;
         for (float raw : {center, nextafterf(center, -INFINITY), nextafterf(center, INFINITY)})
@@ -306,18 +576,82 @@ reach_result reach_motion_hinge(const reach_motion *motion, float center, float 
     float minimum = 0, maximum = 0;
     if (reach_motion_range(&result, &minimum, &maximum) != REACH_OK)
         return REACH_INVALID_ARGUMENT;
-    if ((!result.repeating && result.duration_seconds <= 0) || result.from == result.to ||
+    if ((!result.repeating && result.duration_seconds <= 0) || !reach_motion_moves(result) ||
         result.generation == 0)
         reach_motion_set(&result, reach_motion_limit(&result, result.to));
     *out_motion = result;
     return REACH_OK;
 }
 
-static bool reach_motion_same_epoch(const reach_motion &a, const reach_motion &b)
+static double reach_motion_ulp(float value)
 {
-    return a.started_seconds == b.started_seconds && a.duration_seconds == b.duration_seconds &&
-           a.easing == b.easing && a.generation == b.generation && a.repeating == b.repeating &&
-           a.hold_start_seconds == b.hold_start_seconds && a.hold_end_seconds == b.hold_end_seconds;
+    return ldexp(1.0, ilogb(fmaxf(fabsf(value), FLT_MIN)) - FLT_MANT_DIG + 1);
+}
+
+static double reach_spring_velocity_reach(const reach_motion &motion)
+{
+    return 1 / (exp(1.0) * reach_spring_make(motion).decay);
+}
+
+static bool reach_motion_same_epoch(const reach_motion &a, const reach_motion &b,
+                                    bool normalized = false)
+{
+    if (!(a.started_seconds == b.started_seconds && a.duration_seconds == b.duration_seconds &&
+          a.easing == b.easing && a.generation == b.generation && a.repeating == b.repeating &&
+          a.hold_start_seconds == b.hold_start_seconds && a.hold_end_seconds == b.hold_end_seconds))
+        return false;
+    if (a.easing != REACH_EASING_SPRING)
+        return true;
+    if (a.spring_response != b.spring_response || a.spring_damping != b.spring_damping)
+        return false;
+    double a_displacement = (double)a.from - a.to, b_displacement = (double)b.from - b.to;
+    double first = a_displacement * b.spring_velocity;
+    double second = b_displacement * a.spring_velocity;
+    double mismatch = fabs(first - second);
+    if (mismatch == 0)
+        return true;
+    double omega = 2 * reach_motion_pi / a.spring_response;
+    double a_position = reach_motion_ulp(a.from) + reach_motion_ulp(a.to);
+    double b_position = reach_motion_ulp(b.from) + reach_motion_ulp(b.to);
+    double rounding = a_position * (fabs(b.spring_velocity) + omega * fabs(b_displacement)) +
+                      b_position * (fabs(a.spring_velocity) + omega * fabs(a_displacement)) +
+                      reach_motion_ulp(a.spring_velocity) * fabs(b_displacement) +
+                      reach_motion_ulp(b.spring_velocity) * fabs(a_displacement);
+    if (mismatch > 1e-5 * (fabs(first) + fabs(second)) + 4 * rounding)
+        return false;
+    double drift = a_displacement != 0
+                       ? mismatch * reach_spring_velocity_reach(a) / fabs(a_displacement)
+                       : INFINITY;
+    if (!normalized && a.spring_velocity != 0)
+        drift = fmin(drift, mismatch / fabs(a.spring_velocity));
+    return drift <= fmax(.01, 4 * fmax(a_position, b_position));
+}
+
+static bool reach_motion_raw_relation(const reach_motion &a, const reach_motion &b, double &ratio,
+                                      double &shift)
+{
+    double a_span = (double)a.to - a.from;
+    bool by_velocity = a.easing == REACH_EASING_SPRING &&
+                       fabs(a.spring_velocity) * reach_spring_velocity_reach(a) > fabs(a_span);
+    ratio = by_velocity   ? (double)b.spring_velocity / a.spring_velocity
+            : a_span != 0 ? ((double)b.to - b.from) / a_span
+                          : 0;
+    shift = b.from - ratio * a.from;
+    return ratio != 0 && isfinite(ratio) && isfinite(shift);
+}
+
+static bool reach_motion_normalize(reach_motion &result, const reach_motion &source)
+{
+    double span = (double)source.to - source.from;
+    if (source.easing == REACH_EASING_SPRING)
+    {
+        if (span == 0)
+            return false;
+        result.spring_velocity = (float)(source.spring_velocity / span);
+    }
+    result.from = 0;
+    result.to = 1;
+    return true;
 }
 
 reach_result reach_motion_multiply(const reach_motion *first, const reach_motion *second,
@@ -336,14 +670,15 @@ reach_result reach_motion_multiply(const reach_motion *first, const reach_motion
             a_min == a_max ? reach_motion_affine(&b, a_min, 0) : reach_motion_affine(&a, b_min, 0);
     else
     {
-        if (!reach_motion_same_epoch(a, b) || a.repeating || a.has_mapping || b.has_mapping ||
+        if (!reach_motion_same_epoch(a, b, true) || a.repeating || a.has_mapping || b.has_mapping ||
             !isfinite(a.started_seconds) || !isfinite(a.duration_seconds) ||
             a.duration_seconds < 0 || !reach_motion_remove_inactive_limits(&a) ||
             !reach_motion_remove_inactive_limits(&b))
             return REACH_INVALID_ARGUMENT;
         result = a;
-        result.from = 0;
-        result.to = 1;
+        if (!reach_motion_normalize(result, a) ||
+            (b.easing == REACH_EASING_SPRING && b.from == b.to))
+            return REACH_INVALID_ARGUMENT;
         result.has_mapping = REACH_MOTION_MAPPING_QUADRATIC;
         result.mapping_center = 0;
         result.mapping_value = (float)((double)a.from * b.from);
@@ -383,6 +718,7 @@ static size_t reach_motion_quadratic_roots(double a, double b, double c, double 
 static bool reach_motion_polynomial(reach_motion motion, double coefficients[3])
 {
     if ((motion.has_mapping && motion.has_mapping != REACH_MOTION_MAPPING_QUADRATIC) ||
+        (motion.easing == REACH_EASING_SPRING && motion.from == motion.to) ||
         !reach_motion_remove_inactive_limits(&motion))
         return false;
     double from = motion.from, span = (double)motion.to - from;
@@ -427,11 +763,12 @@ reach_result reach_motion_ratio(const reach_motion *numerator, const reach_motio
         *out_motion = result;
         return REACH_OK;
     }
-    if (a_min != a_max && !reach_motion_same_epoch(a, b))
+    if (a_min != a_max && !reach_motion_same_epoch(b, a, true))
         return REACH_INVALID_ARGUMENT;
     reach_motion result = b;
-    result.from = 0;
-    result.to = 1;
+    if (!reach_motion_normalize(result, b) ||
+        (a_min != a_max && a.easing == REACH_EASING_SPRING && a.from == a.to))
+        return REACH_INVALID_ARGUMENT;
     result.has_mapping = REACH_MOTION_MAPPING_RATIO;
     result.mapping_value = a_min == a_max ? a_min : a.from;
     result.mapping_left_slope = a_min == a_max ? 0 : a.to - a.from;
@@ -505,7 +842,9 @@ struct reach_motion_boundaries
 
 static bool reach_motion_raw_boundaries(const reach_motion &motion, reach_motion_boundaries &points)
 {
-    float low = fminf(motion.from, motion.to), high = fmaxf(motion.from, motion.to);
+    float low = 0, high = 0;
+    if (!reach_motion_raw_domain(motion, low, high))
+        return false;
     if (motion.has_mapping == REACH_MOTION_MAPPING_QUADRATIC)
     {
         if (motion.mapping_right_slope != 0 &&
@@ -597,9 +936,10 @@ reach_result reach_motion_lookup(const reach_motion *motion, const float *thresh
         return values[index];
     };
     reach_motion_boundaries points = {};
-    if (!reach_motion_raw_boundaries(*motion, points))
+    float low = 0, high = 0;
+    if (!reach_motion_raw_boundaries(*motion, points) ||
+        !reach_motion_raw_domain(*motion, low, high))
         return REACH_INVALID_ARGUMENT;
-    float low = fminf(motion->from, motion->to), high = fmaxf(motion->from, motion->to);
     for (size_t at = 0; at <= points.count; ++at)
     {
         float begin = at == 0 ? low : points.values[at - 1];
@@ -679,12 +1019,12 @@ static reach_result reach_motion_compose(const reach_motion &a, float a_factor,
         a.has_mapping == REACH_MOTION_MAPPING_RATIO ||
         b.has_mapping == REACH_MOTION_MAPPING_RATIO ||
         a.has_mapping == REACH_MOTION_MAPPING_STEPS ||
-        b.has_mapping == REACH_MOTION_MAPPING_STEPS || !reach_motion_same_epoch(a, b) ||
-        a.from == a.to || b.from == b.to)
+        b.has_mapping == REACH_MOTION_MAPPING_STEPS || !reach_motion_same_epoch(a, b))
         return REACH_INVALID_ARGUMENT;
-    float low = fminf(a.from, a.to), high = fmaxf(a.from, a.to);
-    double ratio = ((double)b.to - b.from) / ((double)a.to - a.from);
-    double shift = b.from - ratio * a.from;
+    float low = 0, high = 0;
+    double ratio = 0, shift = 0;
+    if (!reach_motion_raw_relation(a, b, ratio, shift) || !reach_motion_raw_domain(a, low, high))
+        return REACH_INVALID_ARGUMENT;
     reach_motion_boundaries a_points = {}, b_points = {}, points = {};
     if (!reach_motion_raw_boundaries(a, a_points) || !reach_motion_raw_boundaries(b, b_points))
         return REACH_INVALID_ARGUMENT;
@@ -773,6 +1113,7 @@ static reach_result reach_motion_compose(const reach_motion &a, float a_factor,
     {
         result.from = output(a.from);
         result.to = output(a.to);
+        result.spring_velocity = a.spring_velocity * previous_slope;
         result.mapping_center = result.mapping_value = 0;
         result.mapping_left_slope = result.mapping_right_slope = 0;
     }
@@ -847,12 +1188,12 @@ reach_result reach_motion_combine(const reach_motion *first, float first_factor,
         b.has_mapping == REACH_MOTION_MAPPING_QUADRATIC)
     {
         double ac[3] = {}, bc[3] = {};
-        if (!reach_motion_same_epoch(a, b) || !reach_motion_polynomial(a, ac) ||
+        if (!reach_motion_same_epoch(a, b, true) || !reach_motion_polynomial(a, ac) ||
             !reach_motion_polynomial(b, bc))
             return REACH_INVALID_ARGUMENT;
         reach_motion result = a;
-        result.from = 0;
-        result.to = 1;
+        if (!reach_motion_normalize(result, a))
+            return REACH_INVALID_ARGUMENT;
         result.has_limits = 0;
         result.has_mapping = REACH_MOTION_MAPPING_QUADRATIC;
         result.mapping_center = 0;
@@ -879,6 +1220,8 @@ reach_result reach_motion_combine(const reach_motion *first, float first_factor,
         reach_motion result = a;
         result.from = first_factor * a.from + second_factor * b.from + offset;
         result.to = first_factor * a.to + second_factor * b.to + offset;
+        result.spring_velocity =
+            first_factor * a.spring_velocity + second_factor * b.spring_velocity;
         if (reach_motion_range(&result, &a_min, &a_max) != REACH_OK)
             return REACH_INVALID_ARGUMENT;
         *out_motion = result;
@@ -886,10 +1229,16 @@ reach_result reach_motion_combine(const reach_motion *first, float first_factor,
     }
     if (!a.has_mapping)
         return reach_motion_combine(&b, second_factor, &a, first_factor, offset, out_motion);
-    if (b.has_mapping && (a.from != b.from || a.to != b.to || a.mapping_center != b.mapping_center))
+    if (b.has_mapping &&
+        (a.from != b.from || a.to != b.to || a.mapping_center != b.mapping_center ||
+         a.spring_velocity != b.spring_velocity))
         return reach_motion_compose(*first, first_factor, *second, second_factor, offset, 0,
                                     out_motion);
-    float slope = (b.to - b.from) / (a.to - a.from);
+    double ratio = 0, shift = 0;
+    if (!b.has_mapping && !reach_motion_raw_relation(a, b, ratio, shift))
+        return REACH_INVALID_ARGUMENT;
+    float slope =
+        a.easing == REACH_EASING_SPRING ? (float)ratio : (b.to - b.from) / (a.to - a.from);
     float b_value = b.has_mapping ? b.mapping_value : b.from + slope * (a.mapping_center - a.from);
     reach_motion result = a;
     result.mapping_left_slope = first_factor * a.mapping_left_slope +
@@ -1088,6 +1437,315 @@ static bool reach_motion_nonlinear_piece(const reach_motion &motion, double begi
     return true;
 }
 
+static double reach_motion_map_slope(const reach_motion &motion, double raw, bool forward)
+{
+    if (motion.has_mapping == REACH_MOTION_MAPPING_QUADRATIC)
+        return motion.mapping_left_slope + 2.0 * motion.mapping_right_slope * raw;
+    if (motion.has_mapping == REACH_MOTION_MAPPING_RATIO)
+    {
+        double denominator = motion.mapping_center + motion.mapping_right_slope * raw;
+        return ((double)motion.mapping_left_slope * motion.mapping_center -
+                (double)motion.mapping_value * motion.mapping_right_slope) /
+               (denominator * denominator);
+    }
+    if (motion.has_mapping == REACH_MOTION_MAPPING_STEPS)
+        return 0;
+    if (!motion.has_mapping)
+        return 1;
+    auto beyond = [&](float center) { return forward ? raw >= center : raw > center; };
+    double slope =
+        beyond(motion.mapping_center) ? motion.mapping_right_slope : motion.mapping_left_slope;
+    for (int32_t at = 0; at < motion.mapping_extra_count && at < REACH_MOTION_MAX_EXTRA_KNOTS; ++at)
+        if (beyond(motion.mapping_extra_centers[at]))
+            slope += motion.mapping_extra_deltas[at];
+    return slope;
+}
+
+static bool reach_motion_spring_breaks(const reach_motion &motion, const reach_spring &spring,
+                                       double begin, double end, double *times, size_t capacity,
+                                       size_t *out_count)
+{
+    if (capacity < 2)
+        return false;
+    size_t count = 0;
+    times[count++] = begin;
+    if (!reach_spring_each_turn(spring, begin, end,
+                                [&](double turn)
+                                {
+                                    if (count + 1 >= capacity)
+                                        return false;
+                                    times[count++] = turn;
+                                    return true;
+                                }))
+        return false;
+    times[count++] = end;
+    reach_motion_boundaries points = {};
+    if (!reach_motion_raw_boundaries(motion, points))
+        return false;
+    size_t monotone_count = count;
+    for (size_t index = 1; index < monotone_count; ++index)
+    {
+        double left = times[index - 1], right = times[index];
+        double first = spring.to + reach_spring_offset(spring, left);
+        double last = spring.to + reach_spring_offset(spring, right);
+        for (size_t at = 0; at < points.count; ++at)
+        {
+            double value = points.values[at];
+            if (value <= fmin(first, last) || value >= fmax(first, last))
+                continue;
+            double low = left, high = right;
+            for (int step = 0; step < 80; ++step)
+            {
+                double middle = (low + high) * .5;
+                double raw = spring.to + reach_spring_offset(spring, middle);
+                if (last > first ? raw < value : raw > value)
+                    low = middle;
+                else
+                    high = middle;
+            }
+            if (count == capacity)
+                return false;
+            times[count++] = high;
+        }
+    }
+    for (size_t index = 1; index < count; ++index)
+    {
+        double value = times[index];
+        size_t position = index;
+        while (position > 0 && times[position - 1] > value)
+        {
+            times[position] = times[position - 1];
+            --position;
+        }
+        times[position] = value;
+    }
+    size_t unique_count = 1;
+    for (size_t index = 1; index + 1 < count; ++index)
+        if (times[index] > times[unique_count - 1] + 1e-7 && times[index] < end - 1e-7)
+            times[unique_count++] = times[index];
+    times[unique_count++] = end;
+    *out_count = unique_count;
+    return end > begin;
+}
+
+static double reach_motion_spring_tail_spread(const reach_motion &motion,
+                                              const reach_spring &spring, double begin, double end)
+{
+    if (motion.has_mapping != 0 && motion.has_mapping != 1)
+        return INFINITY;
+    double envelope = reach_spring_bound(spring, 0, begin, end);
+    double low = spring.to - envelope, high = spring.to + envelope;
+    float least = INFINITY, most = -INFINITY;
+    auto include = [&](double raw)
+    {
+        float value = reach_motion_limit(&motion, (float)raw);
+        least = fminf(least, value);
+        most = fmaxf(most, value);
+    };
+    include(low);
+    include(spring.to);
+    include(high);
+    if (motion.has_mapping)
+    {
+        if (motion.mapping_center > low && motion.mapping_center < high)
+            include(motion.mapping_center);
+        for (int32_t at = 0; at < motion.mapping_extra_count && at < REACH_MOTION_MAX_EXTRA_KNOTS;
+             ++at)
+            if (motion.mapping_extra_centers[at] > low && motion.mapping_extra_centers[at] < high)
+                include(motion.mapping_extra_centers[at]);
+    }
+    double spread = (double)most - least;
+    return isfinite(envelope) && isfinite(spread) ? spread : INFINITY;
+}
+
+static size_t reach_motion_compile_spring(const reach_motion &motion, double elapsed,
+                                          reach_motion_segment segments[REACH_MOTION_MAX_SEGMENTS])
+{
+    reach_spring spring = reach_spring_make(motion);
+    double duration = motion.duration_seconds;
+    double times[REACH_MOTION_MAX_SEGMENTS + 1] = {};
+    size_t time_count = 0;
+    float minimum = 0, maximum = 0;
+    if (!reach_motion_spring_breaks(motion, spring, elapsed, duration, times,
+                                    REACH_MOTION_MAX_SEGMENTS + 1, &time_count) ||
+        reach_motion_range(&motion, &minimum, &maximum) != REACH_OK)
+        return 0;
+    reach_motion unbounded = motion;
+    unbounded.has_limits = 0;
+    float final_value = reach_motion_limit(&motion, motion.to);
+    auto raw_at = [&](double t) { return spring.to + reach_spring_offset(spring, t); };
+    auto output = [&](double t)
+    { return t >= duration ? final_value : reach_motion_limit(&motion, (float)raw_at(t)); };
+    double gap = fabs((double)reach_motion_limit(&motion, (float)raw_at(duration)) - final_value);
+    double tolerance = fmax(1e-6, fmin(.09, 1e-3 * ((double)maximum - minimum)));
+    if (!(gap < tolerance))
+        return 0;
+    double tail = INFINITY;
+    for (size_t index = 0; index + 1 < time_count; ++index)
+        if (reach_motion_spring_tail_spread(motion, spring, times[index], duration) <=
+            fmin(.01, tolerance))
+        {
+            tail = times[index];
+            times[index + 1] = duration;
+            time_count = index + 2;
+            break;
+        }
+    bool smooth = motion.has_mapping == REACH_MOTION_MAPPING_QUADRATIC ||
+                  motion.has_mapping == REACH_MOTION_MAPPING_RATIO;
+    size_t count = 0;
+    for (size_t index = 1; index < time_count; ++index)
+    {
+        double at = times[index - 1], end = times[index];
+        double middle_raw = raw_at((at + end) * .5);
+        float mapped = reach_motion_limit(&unbounded, (float)middle_raw);
+        bool constant =
+            motion.has_mapping == REACH_MOTION_MAPPING_STEPS ||
+            (motion.has_limits && (mapped <= motion.minimum || mapped >= motion.maximum));
+        bool forward = raw_at(end) >= raw_at(at);
+        double slope = reach_motion_map_slope(motion, middle_raw, forward);
+        auto error = [&](double begin, double finish)
+        {
+            double b1 = reach_spring_bound(spring, 1, begin, finish);
+            double b2 = reach_spring_bound(spring, 2, begin, finish);
+            double b3 = reach_spring_bound(spring, 3, begin, finish);
+            double b4 = reach_spring_bound(spring, 4, begin, finish);
+            double first_raw = raw_at(begin), last_raw = raw_at(finish);
+            double fourth = fabs(slope) * b4;
+            if (motion.has_mapping == REACH_MOTION_MAPPING_QUADRATIC)
+                fourth = fmax(fabs(reach_motion_map_slope(motion, first_raw, forward)),
+                              fabs(reach_motion_map_slope(motion, last_raw, forward))) *
+                             b4 +
+                         fabs(motion.mapping_right_slope) * (8 * b1 * b3 + 6 * b2 * b2);
+            else if (motion.has_mapping == REACH_MOTION_MAPPING_RATIO)
+            {
+                double factor = fabs(motion.mapping_right_slope);
+                double denominator =
+                    fmin(motion.mapping_center + motion.mapping_right_slope * first_raw,
+                         motion.mapping_center + motion.mapping_right_slope * last_raw);
+                double determinant = (double)motion.mapping_left_slope * motion.mapping_center -
+                                     (double)motion.mapping_value * motion.mapping_right_slope;
+                double d1 = b1 * factor, d2 = b2 * factor, d3 = b3 * factor, d4 = b4 * factor;
+                fourth = factor == 0 ? fabs(motion.mapping_left_slope / motion.mapping_center) * b4
+                                     : fabs(determinant / motion.mapping_right_slope) *
+                                           (24 * pow(d1, 4) / pow(denominator, 5) +
+                                            36 * d1 * d1 * d2 / pow(denominator, 4) +
+                                            (6 * d2 * d2 + 8 * d1 * d3) / pow(denominator, 3) +
+                                            d4 / (denominator * denominator));
+            }
+            double width = finish - begin;
+            return fourth * width * width * width * width / 384;
+        };
+        double allowance = end >= duration ? tolerance - gap : tolerance;
+        while (at < end)
+        {
+            if (count == REACH_MOTION_MAX_SEGMENTS)
+                return 0;
+            double next = end;
+            if (!constant && at != tail && !(error(at, end) <= allowance))
+            {
+                double low = at, high = end;
+                for (int step = 0; step < 48; ++step)
+                {
+                    double middle = (low + high) * .5;
+                    if (error(at, middle) <= allowance)
+                        low = middle;
+                    else
+                        high = middle;
+                }
+                next = low;
+                if (end - next < 1e-7)
+                    next = at + (end - at) * .5;
+            }
+            if (!(next > at + 1e-7))
+                return 0;
+            reach_motion_segment segment = {};
+            segment.start = at - elapsed;
+            segment.end = next - elapsed;
+            segment.value = output(at);
+            segment.end_value = output(next);
+            if (constant)
+            {
+                if (motion.has_mapping == REACH_MOTION_MAPPING_STEPS)
+                    segment.value = reach_motion_limit(&motion, (float)middle_raw);
+            }
+            else if (at == tail)
+            {
+                double dt = next - at;
+                double chord = ((double)segment.end_value - segment.value) / dt;
+                segment.quadratic = (float)(3 * chord / dt);
+                segment.cubic = (float)(-2 * chord / (dt * dt));
+            }
+            else
+            {
+                double dt = next - at;
+                double first_slope =
+                    smooth ? reach_motion_map_slope(motion, raw_at(at), forward) : slope;
+                double last_slope =
+                    smooth ? reach_motion_map_slope(motion, raw_at(next), forward) : slope;
+                double first_derivative = first_slope * reach_spring_rate(spring, at);
+                double last_derivative = last_slope * reach_spring_rate(spring, next);
+                double chord = ((double)segment.end_value - segment.value) / dt;
+                segment.linear = (float)first_derivative;
+                segment.quadratic =
+                    (float)((3 * chord - 2 * first_derivative - last_derivative) / dt);
+                segment.cubic =
+                    (float)((first_derivative + last_derivative - 2 * chord) / (dt * dt));
+            }
+            segments[count++] = segment;
+            at = next;
+        }
+    }
+    if (motion.has_mapping == REACH_MOTION_MAPPING_STEPS)
+        for (size_t index = 0; index + 1 < count; ++index)
+            segments[index].end_value = segments[index + 1].value;
+    return count;
+}
+
+static double reach_motion_spring_time_to_value(const reach_motion &motion, float target_value,
+                                                double now_seconds)
+{
+    double delay = fmax(0.0, motion.started_seconds - now_seconds);
+    double elapsed = fmax(0.0, now_seconds - motion.started_seconds);
+    double duration = motion.duration_seconds;
+    double remaining = delay + fmax(0.0, duration - elapsed);
+    if (!isfinite(target_value) || !reach_spring_valid(motion))
+        return remaining;
+    if (reach_motion_value_at(&motion, now_seconds) == target_value)
+        return 0;
+    reach_spring spring = reach_spring_make(motion);
+    double times[512] = {};
+    size_t count = 0;
+    if (!reach_motion_spring_breaks(motion, spring, elapsed, duration, times, 512, &count))
+        return remaining;
+    auto output = [&](double t)
+    { return reach_motion_limit(&motion, (float)(spring.to + reach_spring_offset(spring, t))); };
+    for (size_t index = 1; index < count; ++index)
+    {
+        double left = times[index - 1], right = times[index];
+        float first = output(left), last = output(right), middle = output((left + right) * .5);
+        if (motion.has_mapping == REACH_MOTION_MAPPING_STEPS || (first == last && first == middle))
+        {
+            if (middle == target_value)
+                return delay + left - elapsed;
+            continue;
+        }
+        if (target_value < fminf(first, last) || target_value > fmaxf(first, last))
+            continue;
+        double low = left, high = right;
+        for (int step = 0; step < 64; ++step)
+        {
+            double at = (low + high) * .5;
+            float value = output(at);
+            if (last > first ? value >= target_value : value <= target_value)
+                high = at;
+            else
+                low = at;
+        }
+        return delay + high - elapsed;
+    }
+    return remaining;
+}
+
 size_t reach_motion_compile_at(const reach_motion *motion, double now_seconds,
                                reach_motion_segment segments[REACH_MOTION_MAX_SEGMENTS])
 {
@@ -1101,6 +1759,8 @@ size_t reach_motion_compile_at(const reach_motion *motion, double now_seconds,
     double duration = motion->duration_seconds;
     if (duration <= elapsed)
         return 0;
+    if (motion->easing == REACH_EASING_SPRING)
+        return reach_motion_compile_spring(*motion, elapsed, segments);
     double boundaries[REACH_MOTION_MAX_SEGMENTS + 1] = {elapsed, duration};
     size_t boundary_count = 2;
     double split = duration * 0.5;
@@ -1324,10 +1984,10 @@ void reach_motion_repeat_at(reach_motion *motion, float from, float to, double t
     if (motion == nullptr)
         return;
     double cycle = travel_seconds * 2 + hold_start_seconds + hold_end_seconds;
-    if (!isfinite(travel_seconds) || travel_seconds < 0 || !isfinite(hold_start_seconds) ||
-        hold_start_seconds < 0 || !isfinite(hold_end_seconds) || hold_end_seconds < 0 ||
-        !isfinite(cycle) || cycle <= 0 || !isfinite(now_seconds) || !isfinite(from) ||
-        !isfinite(to))
+    if (easing == REACH_EASING_SPRING || !isfinite(travel_seconds) || travel_seconds < 0 ||
+        !isfinite(hold_start_seconds) || hold_start_seconds < 0 || !isfinite(hold_end_seconds) ||
+        hold_end_seconds < 0 || !isfinite(cycle) || cycle <= 0 || !isfinite(now_seconds) ||
+        !isfinite(from) || !isfinite(to))
     {
         reach_motion_set(motion, to);
         return;
@@ -1484,6 +2144,15 @@ float reach_motion_value_at(const reach_motion *motion, double now_seconds)
     }
     if (now_seconds <= motion->started_seconds)
         return reach_motion_limit(motion, motion->from);
+    if (motion->easing == REACH_EASING_SPRING)
+    {
+        if (!reach_spring_valid(*motion))
+            return reach_motion_limit(motion, motion->to);
+        return reach_motion_limit(
+            motion,
+            (float)(motion->to + reach_spring_offset(reach_spring_make(*motion),
+                                                     now_seconds - motion->started_seconds)));
+    }
     float progress = (float)((now_seconds - motion->started_seconds) / motion->duration_seconds);
     if (motion->easing == REACH_EASING_EXPONENTIAL_OUT)
         return reach_motion_limit(
@@ -1498,6 +2167,94 @@ float reach_motion_value_at(const reach_motion *motion, double now_seconds)
 float reach_motion_value(const reach_motion *motion)
 {
     return reach_motion_value_at(motion, reach_motion_now_seconds());
+}
+
+static double reach_easing_rate(double progress, reach_easing easing)
+{
+    double t = fmin(1.0, fmax(0.0, progress));
+    if (easing == REACH_EASING_EASE_IN)
+        return 3 * t * t;
+    if (easing == REACH_EASING_EASE_OUT)
+        return 3 * (1 - t) * (1 - t);
+    if (easing == REACH_EASING_EXPONENTIAL_OUT)
+        return 12 * exp(-12 * t) / -expm1(-12.0);
+    return t < .5 ? 12 * t * t : 12 * (1 - t) * (1 - t);
+}
+
+static void reach_motion_raw_rate(const reach_motion &motion, double now_seconds, double &raw,
+                                  double &rate)
+{
+    double span = (double)motion.to - motion.from;
+    raw = motion.to;
+    rate = 0;
+    if (motion.repeating)
+    {
+        double cycle = reach_motion_cycle_seconds(&motion);
+        raw = motion.from;
+        if (cycle <= 0 || now_seconds <= motion.started_seconds || motion.duration_seconds == 0)
+            return;
+        double phase = reach_motion_repeat_phase(&motion, now_seconds, cycle);
+        if (phase <= motion.hold_start_seconds)
+            return;
+        phase -= motion.hold_start_seconds;
+        if (phase <= motion.duration_seconds)
+        {
+            double progress = phase / motion.duration_seconds;
+            raw = motion.from + span * reach_easing_apply((float)progress, motion.easing);
+            rate = span * reach_easing_rate(progress, motion.easing) / motion.duration_seconds;
+            return;
+        }
+        phase -= motion.duration_seconds;
+        raw = motion.to;
+        if (phase <= motion.hold_end_seconds)
+            return;
+        phase -= motion.hold_end_seconds;
+        double progress = phase / motion.duration_seconds;
+        raw = motion.to - span * reach_easing_apply((float)progress, motion.easing);
+        rate = -span * reach_easing_rate(progress, motion.easing) / motion.duration_seconds;
+        return;
+    }
+    if (motion.duration_seconds <= 0.0 || now_seconds >= reach_motion_deadline(&motion))
+        return;
+    raw = motion.from;
+    if (now_seconds < motion.started_seconds)
+        return;
+    double elapsed = now_seconds - motion.started_seconds;
+    if (motion.easing == REACH_EASING_SPRING)
+    {
+        if (!reach_spring_valid(motion))
+            return;
+        reach_spring spring = reach_spring_make(motion);
+        raw = spring.to + reach_spring_offset(spring, elapsed);
+        rate = reach_spring_rate(spring, elapsed);
+        return;
+    }
+    double progress = elapsed / motion.duration_seconds;
+    raw = motion.from + span * reach_easing_apply((float)progress, motion.easing);
+    rate = span * reach_easing_rate(progress, motion.easing) / motion.duration_seconds;
+}
+
+float reach_motion_velocity_at(const reach_motion *motion, double now_seconds)
+{
+    if (motion == nullptr || !isfinite(now_seconds) ||
+        motion->has_mapping == REACH_MOTION_MAPPING_STEPS)
+        return 0.0f;
+    double raw = 0, rate = 0;
+    reach_motion_raw_rate(*motion, now_seconds, raw, rate);
+    if (rate == 0 || !isfinite(rate))
+        return 0.0f;
+    double velocity = reach_motion_map_slope(*motion, raw, rate > 0) * rate;
+    if (motion->has_limits)
+    {
+        reach_motion unbounded = *motion;
+        unbounded.has_limits = 0;
+        float mapped = reach_motion_limit(&unbounded, (float)raw);
+        if (mapped < motion->minimum || mapped > motion->maximum ||
+            (mapped == motion->minimum && velocity < 0) ||
+            (mapped == motion->maximum && velocity > 0))
+            return 0.0f;
+    }
+    return isfinite(velocity) ? (float)velocity : 0.0f;
 }
 
 int32_t reach_motion_active(const reach_motion *motion)
@@ -1516,8 +2273,10 @@ int32_t reach_motion_active_at(const reach_motion *motion, double now_seconds)
 double reach_motion_time_to_value_at(const reach_motion *motion, float target_value,
                                      double now_seconds)
 {
-    if (!reach_motion_active_at(motion, now_seconds) || motion->from == motion->to)
+    if (!reach_motion_active_at(motion, now_seconds) || !reach_motion_moves(*motion))
         return 0.0;
+    if (motion->easing == REACH_EASING_SPRING)
+        return reach_motion_spring_time_to_value(*motion, target_value, now_seconds);
     if (motion->has_mapping == REACH_MOTION_MAPPING_QUADRATIC)
     {
         if (!isfinite(target_value) || reach_motion_value_at(motion, now_seconds) == target_value)

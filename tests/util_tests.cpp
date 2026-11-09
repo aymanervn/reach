@@ -1,5 +1,6 @@
 #include "reach/support/util.h"
 #include "reach/support/motion.h"
+#include "reach/support/animation.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -980,8 +981,548 @@ static void test_quadratic_motion_extrema_crossings_and_rejection(void)
            "constant products preserve existing nonlinear intent through affine mapping");
 }
 
+static double spring_offset(double displacement, double velocity, double response, double damping,
+                            double t)
+{
+    double omega = 2 * 3.14159265358979323846 / response;
+    if (damping == 1)
+        return (displacement + (velocity + omega * displacement) * t) * exp(-omega * t);
+    double decay = damping * omega, frequency = omega * sqrt(1 - damping * damping);
+    return exp(-decay * t) * (displacement * cos(frequency * t) +
+                              (velocity + decay * displacement) / frequency * sin(frequency * t));
+}
+
+static void expect_spring_compiles_like_cpu(const reach_motion &motion, double now,
+                                            double tolerance, const char *message)
+{
+    reach_motion_segment pieces[REACH_MOTION_MAX_SEGMENTS] = {};
+    size_t count = reach_motion_compile_at(&motion, now, pieces);
+    expect(count > 0 && count <= REACH_MOTION_MAX_SEGMENTS && pieces[0].start == 0 &&
+               fabs(now + pieces[count - 1].end - reach_motion_deadline(&motion)) < 1e-9 &&
+               pieces[count - 1].end_value ==
+                   reach_motion_value_at(&motion, reach_motion_deadline(&motion)),
+           message);
+    for (size_t index = 0; index < count; ++index)
+    {
+        const reach_motion_segment &piece = pieces[index];
+        expect(index == 0 || (piece.start == pieces[index - 1].end &&
+                              piece.value == pieces[index - 1].end_value),
+               message);
+        double dt = piece.end - piece.start;
+        for (int sample = 0; sample < 40; ++sample)
+        {
+            double at = dt * sample / 40;
+            double value = piece.value + piece.linear * at + piece.quadratic * at * at +
+                           piece.cubic * at * at * at;
+            expect(fabs(value - reach_motion_value_at(&motion, now + piece.start + at)) <=
+                       tolerance,
+                   message);
+        }
+    }
+}
+
+static void test_spring_sampling_and_settle(void)
+{
+    const float dampings[] = {.5f, .7f, 1.f};
+    for (float damping : dampings)
+        for (float velocity : {0.f, 900.f, -400.f})
+        {
+            reach_motion motion = {};
+            reach_motion_spring_start_at(&motion, 20, 120, velocity, .4f, damping, 10);
+            expect(motion.easing == REACH_EASING_SPRING && motion.from == 20 && motion.to == 120 &&
+                       motion.spring_velocity == velocity && motion.duration_seconds > 0 &&
+                       reach_motion_value_at(&motion, 10) == 20 &&
+                       reach_motion_velocity_at(&motion, 10) == velocity,
+                   "spring starts at its event time with explicit value and velocity");
+            for (double t : {.01, .05, .1, .2, .35, .5})
+            {
+                if (t >= motion.duration_seconds)
+                    continue;
+                double expected = 120 + spring_offset(-100, velocity, .4, damping, t);
+                double rate = (spring_offset(-100, velocity, .4, damping, t + 1e-6) -
+                               spring_offset(-100, velocity, .4, damping, t - 1e-6)) /
+                              2e-6;
+                expect(fabs(reach_motion_value_at(&motion, 10 + t) - expected) < 1e-3 &&
+                           fabs(reach_motion_velocity_at(&motion, 10 + t) - rate) <
+                               1e-3 * fabs(rate) + 1e-2,
+                       "spring samples analytic position and velocity");
+            }
+            double deadline = reach_motion_deadline(&motion);
+            double tolerance = .05;
+            expect(deadline == 10 + motion.duration_seconds &&
+                       reach_motion_active_at(&motion, deadline - 1e-6) &&
+                       !reach_motion_active_at(&motion, deadline) &&
+                       reach_motion_value_at(&motion, deadline) == 120.0f &&
+                       reach_motion_velocity_at(&motion, deadline) == 0,
+                   "spring settles at a finite deadline on the exact target");
+            for (int sample = 0; sample <= 400; ++sample)
+            {
+                double t = motion.duration_seconds + sample * .005;
+                expect(fabs(spring_offset(-100, velocity, .4, damping, t)) <= tolerance + 1e-9,
+                       "spring residual after the deadline stays visually nil");
+            }
+        }
+    reach_motion critical = {};
+    reach_motion_spring_start_at(&critical, 0, 4000, 0, .3f, 1, 0);
+    reach_motion bouncy = {};
+    reach_motion_spring_start_at(&bouncy, 0, 4000, 0, .3f, .6f, 0);
+    expect(critical.duration_seconds < .9 && bouncy.duration_seconds < 1.5 &&
+               fabs(spring_offset(-4000, 0, .3, 1, critical.duration_seconds)) <= .05 + 1e-9,
+           "large spans settle below a twentieth of a unit without an unbounded tail");
+    reach_motion invalid = critical;
+    uint64_t generation = invalid.generation;
+    reach_motion_spring_start_at(&invalid, 0, 50, 0, .3f, .4f, 1);
+    expect(invalid.easing != REACH_EASING_SPRING && reach_motion_value_at(&invalid, 1) == 50 &&
+               invalid.generation == generation + 1,
+           "unsupported spring damping settles immediately like any invalid timing");
+    reach_motion_repeat_at(&invalid, 0, 10, .3, .1, .1, REACH_EASING_SPRING, 2);
+    expect(!invalid.repeating && reach_motion_value_at(&invalid, 2.2) == 10,
+           "repeating motion rejects springs");
+}
+
+static void test_spring_without_travel_moves_and_settles(void)
+{
+    reach_motion motion = {};
+    reach_motion_spring_start_at(&motion, 50, 50, 600, .35f, .8f, 3);
+    float minimum = 0, maximum = 0;
+    expect(reach_motion_active_at(&motion, 3.05) && reach_motion_value_at(&motion, 3.05) > 55 &&
+               reach_motion_range(&motion, &minimum, &maximum) == REACH_OK && maximum > 60 &&
+               minimum < 50 && reach_motion_value_at(&motion, reach_motion_deadline(&motion)) == 50,
+           "equal endpoints with velocity still travel, overshoot and settle exactly");
+    reach_motion_spring_start_at(&motion, 50, 50, 0, .35f, .8f, 3);
+    expect(!reach_motion_active_at(&motion, 3) && reach_motion_value_at(&motion, 3) == 50,
+           "equal endpoints without velocity are static");
+    reach_motion_spring_start_at(&motion, 50, 50, -600, .35f, 1, 3);
+    expect_spring_compiles_like_cpu(motion, 3, .1, "zero-span spring compiles like CPU");
+    reach_motion hinge = {};
+    expect(reach_motion_hinge(&motion, 45, 0, -1, 2, &hinge) == REACH_OK &&
+               reach_motion_active_at(&hinge, 3.05) &&
+               fabsf(reach_motion_value_at(&hinge, 3.05) -
+                     fmaxf(0, -(reach_motion_value_at(&motion, 3.05) - 45))) < 1e-4f,
+           "zero-span springs keep moving through piecewise mappings");
+    expect_spring_compiles_like_cpu(hinge, 3.01, .1, "mapped zero-span spring compiles");
+}
+
+static void test_spring_retarget_preserves_velocity(void)
+{
+    for (int easing = REACH_EASING_EASE_IN; easing <= REACH_EASING_SPRING; ++easing)
+    {
+        reach_motion source = {};
+        if (easing == REACH_EASING_SPRING)
+            reach_motion_spring_start_at(&source, 0, 300, 0, .45f, .55f, 5);
+        else
+            reach_motion_start_at(&source, 0, 300, .8, (reach_easing)easing, 5);
+        reach_motion bounded = reach_motion_clamp(&source, 0, 280);
+        reach_motion mapped = {};
+        expect(reach_motion_hinge(&source, 150, 150, .5f, 2, &mapped) == REACH_OK,
+               "retarget source maps");
+        for (const reach_motion &current : {source, bounded, mapped})
+            for (double t : {5.05, 5.2, 5.37})
+            {
+                float value = reach_motion_value_at(&current, t);
+                float velocity = reach_motion_velocity_at(&current, t);
+                double slope = (reach_motion_value_at(&current, t + 1e-4) -
+                                reach_motion_value_at(&current, t - 1e-4)) /
+                               2e-4;
+                expect(fabs(velocity - slope) < .01 * fabs(slope) + 2,
+                       "velocity matches the sampled slope for every curve");
+                reach_motion next = current;
+                uint64_t generation = next.generation;
+                reach_motion_spring_to_at(&next, -40, .3f, .7f, t);
+                expect(next.easing == REACH_EASING_SPRING && next.from == value &&
+                           next.spring_velocity == velocity && next.started_seconds == t &&
+                           next.generation == generation + 1 && !next.has_mapping &&
+                           !next.has_limits && reach_motion_value_at(&next, t) == value &&
+                           reach_motion_velocity_at(&next, t) == velocity,
+                       "spring retarget preserves value and velocity at one event time");
+                double after = (reach_motion_value_at(&next, t + 3e-5) - value) / 3e-5;
+                expect(fabs(after - velocity) < .01 * fabs(velocity) + 5,
+                       "retargeted motion leaves with the interrupted velocity");
+            }
+    }
+    reach_animation_track tracks[1] = {};
+    reach_animation_manager manager = {};
+    reach_animation_manager_init(&manager, tracks, 1);
+    reach_animation_manager_start_at(&manager, 0, 0, 100, .5, REACH_EASING_EASE_IN_OUT, 1);
+    float velocity = reach_motion_velocity_at(reach_animation_manager_motion(&manager, 0), 1.2);
+    reach_animation_manager_spring_to_at(&manager, 0, 10, .3f, 1, 1.2);
+    const reach_motion *track = reach_animation_manager_motion(&manager, 0);
+    expect(track->easing == REACH_EASING_SPRING && track->spring_velocity == velocity &&
+               reach_animation_manager_active(&manager, 0) &&
+               reach_animation_manager_value(&manager, 0) == track->from &&
+               reach_animation_manager_target(&manager, 0) == 10,
+           "animation manager retargets tracks with springs");
+    reach_animation_manager_sample_at(&manager, reach_motion_deadline(track));
+    expect(!reach_animation_manager_active(&manager, 0) &&
+               reach_animation_manager_value(&manager, 0) == 10,
+           "spring tracks finish on the exact endpoint");
+    reach_motion spec_motion = {};
+    reach_motion_start_spec_at(&spec_motion, 0, 10, 40, reach_motion_spec_spring(.3f, .8f), 2);
+    reach_motion direct = {};
+    reach_motion_spring_start_at(&direct, 0, 10, 40, .3f, .8f, 2);
+    direct.generation = spec_motion.generation;
+    expect(reach_motion_equal(&spec_motion, &direct), "spring specs start canonical springs");
+    reach_motion_animate_spec_to_at(&spec_motion, 4,
+                                    reach_motion_spec_curve(.2, REACH_EASING_EASE_OUT), 2.1);
+    expect(spec_motion.easing == REACH_EASING_EASE_OUT && spec_motion.duration_seconds == .2 &&
+               spec_motion.to == 4,
+           "curve specs keep legacy retargeting");
+    direct.spring_velocity += 1;
+    expect(!reach_motion_equal(&spec_motion, &direct), "equality compares spring fields");
+}
+
+static void test_spring_range_and_first_future_crossing(void)
+{
+    reach_motion motion = {};
+    reach_motion_spring_start_at(&motion, 0, 100, 0, .4f, .5f, 0);
+    double omega = 2 * 3.14159265358979323846 / .4, decay = .5 * omega;
+    double frequency = omega * sqrt(.75);
+    float minimum = 0, maximum = 0;
+    double overshoot = 100 + 100 * exp(-decay * 3.14159265358979323846 / frequency);
+    expect(reach_motion_range(&motion, &minimum, &maximum) == REACH_OK && minimum == 0 &&
+               fabs(maximum - overshoot) < 1e-3,
+           "range includes the analytic overshoot extremum");
+    reach_motion critical = {};
+    reach_motion_spring_start_at(&critical, 0, 100, 0, .4f, 1, 0);
+    expect(reach_motion_range(&critical, &minimum, &maximum) == REACH_OK && minimum == 0 &&
+               maximum == 100,
+           "critically damped range stays between its endpoints");
+    double first = (3.14159265358979323846 - atan(frequency / decay)) / frequency;
+    double second = first + 3.14159265358979323846 / frequency;
+    expect(fabs(reach_motion_time_to_value_at(&motion, 100, 0) - first) < 1e-6,
+           "crossing query finds the first overshooting arrival");
+    double peak = 3.14159265358979323846 / frequency;
+    expect(fabs(reach_motion_time_to_value_at(&motion, 100, peak) - (second - peak)) < 1e-6 &&
+               fabs(reach_motion_time_to_value_at(&motion, 50, .01) -
+                    reach_motion_time_to_value_at(&motion, 50, 0) + .01) < 1e-6,
+           "crossing query returns the first future crossing after a turn");
+    double crossing = reach_motion_time_to_value_at(&motion, 108, peak * .5);
+    expect(crossing > 0 && fabsf(reach_motion_value_at(&motion, peak * .5 + crossing) - 108) < 1e-3,
+           "overshoot values are reachable crossings");
+    expect(fabs(reach_motion_time_to_value_at(&motion, 140, 0) - motion.duration_seconds) < 1e-12,
+           "unreached values wait for the spring deadline");
+    reach_motion clamped = reach_motion_clamp(&motion, 0, 100);
+    expect(reach_motion_range(&clamped, &minimum, &maximum) == REACH_OK && maximum == 100 &&
+               fabs(reach_motion_time_to_value_at(&clamped, 100, 0) - first) < 1e-6,
+           "clamped springs saturate at the first crossing");
+}
+
+static void test_spring_derived_motion(void)
+{
+    reach_motion spring = {};
+    reach_motion_spring_start_at(&spring, 10, 410, 1500, .35f, .55f, 20);
+    reach_motion width = reach_motion_affine(&spring, -.5f, 300);
+    reach_motion clamped = reach_motion_clamp(&spring, 50, 400);
+    reach_motion hinge = {}, peak = {}, combined = {}, smaller = {}, product = {}, quotient = {},
+                 lookup = {};
+    float thresholds[] = {100, 405};
+    float values[] = {0, 1, 2};
+    reach_motion constant = {};
+    reach_motion_set(&constant, 3);
+    reach_motion progress = reach_motion_affine(&spring, .0025f, 0);
+    reach_motion mixed = {};
+    reach_motion share = reach_motion_affine(&width, 1 / 300.f, 0);
+    expect(reach_motion_hinge(&spring, 200, 20, .5f, 1.5f, &hinge) == REACH_OK &&
+               reach_motion_peak(&spring, 400, 30, &peak) == REACH_OK &&
+               reach_motion_combine(&spring, 1, &width, 1, 5, &combined) == REACH_OK &&
+               reach_motion_min(&spring, &width, &smaller) == REACH_OK &&
+               reach_motion_multiply(&progress, &share, &product) == REACH_OK &&
+               reach_motion_ratio(&constant, &width, &quotient) == REACH_OK &&
+               reach_motion_lookup(&spring, thresholds, values, 2, &lookup) == REACH_OK &&
+               reach_motion_combine(&spring, 1, &product, 100, 0, &mixed) == REACH_OK,
+           "bouncing springs support every canonical derivation");
+    for (double t : {20.03, 20.11, 20.24, 20.4, 20.7})
+    {
+        float a = reach_motion_value_at(&spring, t), b = reach_motion_value_at(&width, t);
+        expect(fabsf(b - (300 - .5f * a)) < 1e-3f &&
+                   fabsf(reach_motion_value_at(&clamped, t) - fminf(400, fmaxf(50, a))) < 1e-3f &&
+                   fabsf(reach_motion_value_at(&combined, t) - (a + b + 5)) < 1e-2f &&
+                   fabsf(reach_motion_value_at(&smaller, t) - fminf(a, b)) < 1e-2f &&
+                   fabsf(reach_motion_value_at(&product, t) - a * .0025f * b / 300) < 1e-5f &&
+                   fabsf(reach_motion_value_at(&quotient, t) - 3 / b) < 1e-5f &&
+                   fabsf(reach_motion_value_at(&mixed, t) -
+                         (a + 100 * reach_motion_value_at(&product, t))) < 1e-2f &&
+                   reach_motion_value_at(&lookup, t) == (a >= 405   ? 2
+                                                         : a >= 100 ? 1
+                                                                    : 0) &&
+                   fabsf(reach_motion_value_at(&peak, t) - fmaxf(0, 1 - fabsf(a - 400) / 30)) <
+                       1e-4f,
+               "derived springs sample the same overshooting source");
+    }
+    float minimum = 0, maximum = 0;
+    expect(reach_motion_range(&lookup, &minimum, &maximum) == REACH_OK && maximum == 2 &&
+               reach_motion_range(&peak, &minimum, &maximum) == REACH_OK && maximum == 1,
+           "derived ranges include values visited only by overshoot");
+    const reach_motion derived[] = {width,   clamped, hinge,    peak,  combined,
+                                    smaller, product, quotient, lookup};
+    const double tolerances[] = {.1, .1, .1, .005, .1, .1, .005, 1e-4, 1.01};
+    for (size_t index = 0; index < sizeof(derived) / sizeof(derived[0]); ++index)
+        expect_spring_compiles_like_cpu(derived[index], 20.02, tolerances[index],
+                                        "derived spring native curves follow CPU sampling");
+    double first = reach_motion_time_to_value_at(&lookup, 2, 20);
+    expect(first > 0 && reach_motion_value_at(&lookup, 20 + first + 1e-6) == 2 &&
+               reach_motion_value_at(&lookup, 20 + first - 1e-4) == 1,
+           "discrete springs cross their overshoot threshold once it is reached");
+}
+
+static void test_spring_rejection_preserves_output(void)
+{
+    reach_motion spring = {}, other = {}, sentinel = {}, output = {};
+    reach_motion_spring_start_at(&spring, 0, 100, 0, .3f, .7f, 1);
+    other = spring;
+    other.spring_damping = .9f;
+    reach_motion_set(&sentinel, 77);
+    output = sentinel;
+    expect(reach_motion_combine(&spring, 1, &other, 1, 0, &output) == REACH_INVALID_ARGUMENT &&
+               reach_motion_min(&spring, &other, &output) == REACH_INVALID_ARGUMENT &&
+               reach_motion_equal(&output, &sentinel),
+           "incompatible spring epochs reject without output mutation");
+    reach_motion still = {};
+    reach_motion_spring_start_at(&still, 40, 40, 300, .3f, .7f, 1);
+    reach_motion moving = still;
+    moving.from = 20;
+    moving.spring_velocity = 0;
+    expect(reach_motion_multiply(&still, &still, &output) == REACH_INVALID_ARGUMENT &&
+               reach_motion_ratio(&still, &still, &output) == REACH_INVALID_ARGUMENT &&
+               reach_motion_combine(&still, 1, &moving, 1, 0, &output) == REACH_INVALID_ARGUMENT &&
+               reach_motion_equal(&output, &sentinel),
+           "zero-span springs reject normalized products without output mutation");
+    reach_motion broken = spring;
+    broken.spring_damping = .2f;
+    float minimum = -1, maximum = -1;
+    expect(reach_motion_hinge(&broken, 50, 0, 1, 1, &output) == REACH_INVALID_ARGUMENT &&
+               reach_motion_range(&broken, &minimum, &maximum) == REACH_INVALID_ARGUMENT &&
+               minimum == -1 && reach_motion_equal(&output, &sentinel),
+           "invalid spring descriptors reject without output mutation");
+    broken = spring;
+    broken.repeating = 1;
+    reach_motion_segment pieces[REACH_MOTION_MAX_REPEAT_SEGMENTS] = {};
+    expect(reach_motion_peak(&broken, 50, 10, &output) == REACH_INVALID_ARGUMENT &&
+               reach_motion_compile_repeat_at(&broken, 1, pieces) == 0 &&
+               reach_motion_equal(&output, &sentinel),
+           "repeating springs are rejected");
+}
+
+static void test_spring_settle_is_relative_to_amplitude(void)
+{
+    reach_motion unit = {};
+    reach_motion_spring_start_at(&unit, 0, 1, 0, .3f, .7f, 4);
+    reach_motion pixels = reach_motion_affine(&unit, 1000, 0);
+    double deadline = reach_motion_deadline(&pixels);
+    expect(fabsf(reach_motion_value_at(&pixels, deadline - 1e-9) - 1000) <= .1f &&
+               reach_motion_value_at(&pixels, deadline) == 1000,
+           "amplified springs snap at most a tenth of a unit at the deadline");
+    expect_spring_compiles_like_cpu(pixels, 4, .1, "amplified springs compile within a tenth");
+    for (float damping : {1.f, .85f, .6f})
+        for (float velocity : {0.f, 2.f})
+        {
+            reach_motion near = {}, far = {};
+            reach_motion_spring_start_at(&near, 0, 300, velocity * 300, .4f, damping, 7);
+            reach_motion_spring_start_at(&far, 0, 3000, velocity * 3000, .4f, damping, 7);
+            expect(near.duration_seconds > 0 && near.duration_seconds == far.duration_seconds,
+                   "proportional springs share one settle duration across spans");
+        }
+    reach_motion small = {}, large = {}, output = {};
+    reach_motion_spring_start_at(&small, 0, 300, 0, .35f, 1, 2);
+    reach_motion_spring_start_at(&large, 0, 3000, 0, .35f, 1, 2);
+    expect(reach_motion_combine(&small, 1, &large, -.1f, 5, &output) == REACH_OK &&
+               fabsf(reach_motion_value_at(&output, 2.1) -
+                     (reach_motion_value_at(&small, 2.1) -
+                      .1f * reach_motion_value_at(&large, 2.1) + 5)) < 1e-3f &&
+               reach_motion_min(&small, &large, &output) == REACH_OK &&
+               reach_motion_value_at(&output, 2.1) == reach_motion_value_at(&small, 2.1) &&
+               reach_motion_max(&small, &large, &output) == REACH_OK &&
+               reach_motion_value_at(&output, 2.1) == reach_motion_value_at(&large, 2.1),
+           "critically damped springs with different spans combine as one epoch");
+}
+
+static void test_spring_epochs_ignore_velocity_rounding(void)
+{
+    for (float response : {.15f, .3f, .45f, .7f})
+        for (float damping : {.5f, .75f, .85f, 1.f})
+            for (float ratio : {.4f, -.7f, 1.f})
+            {
+                float omega = 6.2831853f / response;
+                reach_motion near = {}, far = {}, output = {};
+                reach_motion_spring_start_at(&near, 0, 300, ratio * 300 * omega, response, damping,
+                                             2);
+                reach_motion_spring_start_at(&far, 0, 3000, ratio * 3000 * omega, response, damping,
+                                             2);
+                double t = 2 + response * .3;
+                float a = reach_motion_value_at(&near, t), b = reach_motion_value_at(&far, t);
+                expect(near.duration_seconds == far.duration_seconds &&
+                           reach_motion_combine(&near, 1, &far, -.1f, 5, &output) == REACH_OK &&
+                           fabsf(reach_motion_value_at(&output, t) - (a - .1f * b + 5)) < 1e-2f &&
+                           reach_motion_min(&near, &far, &output) == REACH_OK &&
+                           fabsf(reach_motion_value_at(&output, t) - fminf(a, b)) < 1e-2f &&
+                           reach_motion_max(&near, &far, &output) == REACH_OK &&
+                           fabsf(reach_motion_value_at(&output, t) - fmaxf(a, b)) < 1e-2f,
+                       "springs with float-proportional velocities combine as one epoch");
+            }
+    reach_motion small = {}, large = {}, output = {};
+    reach_motion_start_at(&small, 0, 100, .5, REACH_EASING_EASE_OUT, 1);
+    reach_motion_start_at(&large, 0, 1000, .5, REACH_EASING_EASE_OUT, 1);
+    reach_motion_spring_to_at(&small, 0, .35f, 1, 1.17);
+    reach_motion_spring_to_at(&large, 0, .35f, 1, 1.17);
+    for (double t : {1.2, 1.4, 1.7})
+    {
+        float a = reach_motion_value_at(&small, t), b = reach_motion_value_at(&large, t);
+        expect(small.duration_seconds == large.duration_seconds &&
+                   reach_motion_combine(&small, 1, &large, 1, 0, &output) == REACH_OK &&
+                   fabsf(reach_motion_value_at(&output, t) - (a + b)) < 1e-2f &&
+                   reach_motion_min(&small, &large, &output) == REACH_OK &&
+                   fabsf(reach_motion_value_at(&output, t) - fminf(a, b)) < 1e-2f &&
+                   reach_motion_max(&small, &large, &output) == REACH_OK &&
+                   fabsf(reach_motion_value_at(&output, t) - fmaxf(a, b)) < 1e-2f,
+               "same-time spring retargets of different ease-outs combine");
+    }
+}
+
+static void test_spring_epochs_tolerate_coordinate_rounding(void)
+{
+    uint32_t seed = 12345;
+    auto next = [&seed](double low, double high)
+    {
+        seed = seed * 1664525u + 1013904223u;
+        return low + (high - low) * (seed >> 8) / 16777216.0;
+    };
+    size_t edges = 0, pairs = 0;
+    for (int index = 0; index < 4000; ++index)
+    {
+        float x0 = (float)next(1700, 3800), width = (float)next(-1500, 1500);
+        float dx = (float)next(-400, 400);
+        double duration = next(.2, .6), at = 3 + duration * next(0, .02);
+        float target = index & 1 ? 0 : dx + (float)next(-50, 50);
+        reach_motion left = {}, right = {}, output = {};
+        reach_motion_start_at(&left, x0, x0 + dx, duration, REACH_EASING_EASE_OUT, 3);
+        reach_motion_start_at(&right, x0 + width, x0 + width + dx, duration, REACH_EASING_EASE_OUT,
+                              3);
+        reach_motion_spring_to_at(&left, x0 + target, .35f, 1, at);
+        reach_motion_spring_to_at(&right, x0 + width + target, .35f, 1, at);
+        double t = at + .05;
+        float a = reach_motion_value_at(&left, t), b = reach_motion_value_at(&right, t);
+        edges += reach_motion_combine(&left, 1, &right, -1, 0, &output) == REACH_OK &&
+                 fabsf(reach_motion_value_at(&output, t) - (a - b)) < 1e-2f &&
+                 reach_motion_min(&left, &right, &output) == REACH_OK &&
+                 fabsf(reach_motion_value_at(&output, t) - fminf(a, b)) < 1e-2f &&
+                 reach_motion_max(&left, &right, &output) == REACH_OK &&
+                 fabsf(reach_motion_value_at(&output, t) - fmaxf(a, b)) < 1e-2f;
+    }
+    expect(edges == 4000, "translated edge-pair spring retargets combine at large coordinates");
+    for (int index = 0; index < 4000; ++index)
+    {
+        float response = (float)next(.15, .7), span = (float)next(-10, 10);
+        float velocity = (float)(next(-1, 1) * span * 6.2831853 / response);
+        float first = (float)next(-4000, 4000), second = (float)next(-4000, 4000);
+        reach_motion a = {}, b = {}, output = {};
+        reach_motion_spring_start_at(&a, first, first + span, velocity, response, 1, 5);
+        reach_motion_spring_start_at(&b, second, second + span, velocity, response, 1, 5);
+        double t = 5 + response * .4;
+        float av = reach_motion_value_at(&a, t), bv = reach_motion_value_at(&b, t);
+        pairs += reach_motion_combine(&a, 1, &b, -1, 0, &output) == REACH_OK &&
+                 reach_motion_min(&a, &b, &output) == REACH_OK &&
+                 fabsf(reach_motion_value_at(&output, t) - fminf(av, bv)) < 1e-2f &&
+                 reach_motion_max(&a, &b, &output) == REACH_OK &&
+                 fabsf(reach_motion_value_at(&output, t) - fmaxf(av, bv)) < 1e-2f;
+    }
+    expect(pairs == 4000, "critically damped pairs at large bases with small spans combine");
+    for (float span : {5.f, 500.f})
+        for (float base : {3000.f, -3999.f})
+        {
+            reach_motion a = {}, b = {}, sentinel = {}, output = {};
+            reach_motion_spring_start_at(&a, base, base + span, span * 10, .35f, 1, 5);
+            reach_motion_spring_start_at(&b, base + 7, base + 7 + span, span * 15, .35f, 1, 5);
+            reach_motion_set(&sentinel, 9);
+            output = sentinel;
+            expect(reach_motion_combine(&a, 1, &b, -1, 0, &output) == REACH_INVALID_ARGUMENT &&
+                       reach_motion_min(&a, &b, &output) == REACH_INVALID_ARGUMENT &&
+                       reach_motion_equal(&output, &sentinel),
+                   "springs with genuinely different shapes still reject");
+        }
+}
+
+static void test_spring_native_compile_proof(void)
+{
+    size_t peak = 0;
+    double worst = 0;
+    for (float span : {1.f, 72.f, 1000.f, 4000.f})
+        for (float response : {.15f, .25f, .35f, .5f, .7f})
+            for (float damping : {.5f, .6f, .75f, .9f, 1.f})
+                for (int reverse : {0, 1})
+                    for (float boost : {0.f, .5f})
+                    {
+                        float from = reverse ? span : 0, to = reverse ? 0 : span;
+                        reach_motion motion = {};
+                        reach_motion_spring_start_at(&motion, from, to,
+                                                     boost * (to - from) * 6.2831853f / response,
+                                                     response, damping, 10);
+                        for (double elapsed : {0., .03})
+                        {
+                            reach_motion_segment pieces[REACH_MOTION_MAX_SEGMENTS] = {};
+                            size_t count = reach_motion_compile_at(&motion, 10 + elapsed, pieces);
+                            expect(count > 0 && count <= REACH_MOTION_MAX_SEGMENTS &&
+                                       pieces[count - 1].end_value == to &&
+                                       fabs(10 + elapsed + pieces[count - 1].end -
+                                            reach_motion_deadline(&motion)) < 1e-9,
+                                   "spring native compile fits the supported grid");
+                            peak = count > peak ? count : peak;
+                            for (size_t index = 0; index < count; ++index)
+                            {
+                                const reach_motion_segment &piece = pieces[index];
+                                expect(index == 0 || (piece.start == pieces[index - 1].end &&
+                                                      piece.value == pieces[index - 1].end_value),
+                                       "spring native pieces have consistent junctions");
+                                double dt = piece.end - piece.start;
+                                double direction = piece.end_value - piece.value;
+                                double previous = piece.value;
+                                for (int sample = 0; sample <= 48; ++sample)
+                                {
+                                    double at = dt * sample / 48;
+                                    double value = piece.value + piece.linear * at +
+                                                   piece.quadratic * at * at +
+                                                   piece.cubic * at * at * at;
+                                    double cpu = reach_motion_value_at(
+                                        &motion, 10 + elapsed + piece.start + at -
+                                                     (sample == 48 ? 1e-9 : 0));
+                                    worst = fmax(worst, fabs(value - cpu));
+                                    expect((direction >= 0 ? previous - value : value - previous) <
+                                               1e-3,
+                                           "spring native pieces are monotone");
+                                    previous = value;
+                                }
+                            }
+                        }
+                    }
+    expect(peak <= REACH_MOTION_MAX_SEGMENTS && worst <= .1,
+           "spring native compile stays within capacity and a tenth of a unit");
+    reach_motion sliver = {};
+    reach_motion_spring_start_at(&sliver, 0, 1000, -9666.44f, .325f, .875f, 10);
+    expect_spring_compiles_like_cpu(sliver, 10.2, .1, "sliver pieces never force the CPU fallback");
+    reach_motion wide = {};
+    reach_motion_spring_start_at(&wide, 0, 4000, -400000, .2f, .5f, 10);
+    reach_motion oversized = {};
+    reach_motion_spring_start_at(&oversized, -3e38f, 3e38f, 0, .3f, .8f, 10);
+    reach_motion_segment pieces[REACH_MOTION_MAX_SEGMENTS] = {};
+    expect(reach_motion_compile_at(&wide, 10, pieces) == 0 &&
+               isfinite(reach_motion_value_at(&wide, 10.2)) && reach_motion_deadline(&wide) > 10 &&
+               isfinite(reach_motion_deadline(&wide)) &&
+               reach_motion_compile_at(&oversized, 10, pieces) == 0 &&
+               isfinite(reach_motion_value_at(&oversized, 10.1)),
+           "exhausted spring budgets keep the finite CPU fallback");
+}
+
 int main(void)
 {
+    test_spring_sampling_and_settle();
+    test_spring_without_travel_moves_and_settles();
+    test_spring_retarget_preserves_velocity();
+    test_spring_range_and_first_future_crossing();
+    test_spring_derived_motion();
+    test_spring_rejection_preserves_output();
+    test_spring_settle_is_relative_to_amplitude();
+    test_spring_epochs_ignore_velocity_rounding();
+    test_spring_epochs_tolerate_coordinate_rounding();
+    test_spring_native_compile_proof();
     test_quadratic_motion_geometry_and_compilation();
     test_quadratic_motion_extrema_crossings_and_rejection();
     test_ratio_motion_sampling_compilation_and_interruption();

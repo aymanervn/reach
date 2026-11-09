@@ -41,6 +41,9 @@ extern "C"
     void reach_animation_manager_animate_to_at(reach_animation_manager *manager, size_t track_id,
                                                float to, double duration_seconds,
                                                reach_easing easing, double now_seconds);
+    void reach_animation_manager_spring_to_at(reach_animation_manager *manager, size_t track_id,
+                                              float to, float response_seconds, float damping,
+                                              double now_seconds);
     void reach_animation_manager_reset(reach_animation_manager *manager, size_t track_id);
     float reach_animation_manager_value(const reach_animation_manager *manager, size_t track_id);
     float reach_animation_manager_target(const reach_animation_manager *manager, size_t track_id);
