@@ -7,6 +7,16 @@
 
 #include <new>
 
+// Workaround: temporary trace for the Stage desktop flash bug; remove after diagnosis.
+static unsigned long long reach_window_thumbnail_trace_frame(void)
+{
+    DWM_TIMING_INFO timing = {};
+    timing.cbSize = sizeof(timing);
+    return SUCCEEDED(DwmGetCompositionTimingInfo(nullptr, &timing))
+               ? (unsigned long long)timing.cFrame
+               : 0ull;
+}
+
 static HRESULT reach_window_thumbnail_register(HWND destination, HWND source, HTHUMBNAIL *out)
 {
     reach_workload_add(REACH_WORKLOAD_THUMBNAIL_REGISTRATIONS, 1);
@@ -144,11 +154,25 @@ static void reach_window_thumbnail_destroy_entry(reach_window_thumbnail_entry *e
     if (entry->handle != nullptr)
     {
         reach_window_thumbnail_unregister(entry->handle);
+        // Workaround: temporary trace for the Stage desktop flash bug; remove after diagnosis.
+        reach_log_trace("thumbnail_unregister source=0x%llx destination=0x%llx plane=%d "
+                        "dwm_frame=%llu",
+                        (unsigned long long)(uintptr_t)entry->source,
+                        (unsigned long long)(uintptr_t)entry->destination, (int)entry->plane,
+                        reach_window_thumbnail_trace_frame());
     }
     if (entry->plane == REACH_WINDOW_THUMBNAIL_PLANE_BEHIND_TARGET && entry->destination != nullptr)
     {
         SetWindowLongPtrW(entry->destination, GWLP_USERDATA, 0);
+        // Workaround: temporary trace for the Stage desktop flash bug; remove after diagnosis.
+        int32_t trace_visible = IsWindowVisible(entry->destination) ? 1 : 0;
         DestroyWindow(entry->destination);
+        // Workaround: temporary trace for the Stage desktop flash bug; remove after diagnosis.
+        reach_log_trace("thumbnail_host_destroy host=0x%llx alpha=%u visible_before=%d "
+                        "dwm_frame=%llu",
+                        (unsigned long long)(uintptr_t)entry->destination,
+                        (unsigned)entry->background_opacity, (int)trace_visible,
+                        reach_window_thumbnail_trace_frame());
     }
     delete entry;
 }
@@ -246,6 +270,11 @@ static reach_result reach_window_thumbnail_create(reach_window_thumbnails *thumb
     entry->target = target_hwnd;
     entry->destination = destination;
     entry->plane = plane;
+    // Workaround: temporary trace for the Stage desktop flash bug; remove after diagnosis.
+    reach_log_trace("thumbnail_register source=0x%llx destination=0x%llx plane=%d dwm_frame=%llu",
+                    (unsigned long long)(uintptr_t)source_hwnd,
+                    (unsigned long long)(uintptr_t)destination, (int)plane,
+                    reach_window_thumbnail_trace_frame());
     if (plane == REACH_WINDOW_THUMBNAIL_PLANE_BEHIND_TARGET)
     {
         SetWindowLongPtrW(destination, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(entry));
@@ -321,6 +350,11 @@ reach_window_thumbnail_set_placement(reach_window_thumbnails *thumbnails,
             }
             entry->background_opacity = opacity;
             entry->opacity_set = 1;
+            // Workaround: temporary trace for the Stage desktop flash bug; remove after diagnosis.
+            reach_log_trace("thumbnail_host_alpha host=0x%llx alpha=%u thumbnail_visible=%d "
+                            "thumbnail_opacity=%.3f dwm_frame=%llu",
+                            (unsigned long long)(uintptr_t)entry->destination, (unsigned)opacity,
+                            (int)thumbnail_visible, clamped, reach_window_thumbnail_trace_frame());
         }
         bool was_visible = IsWindowVisible(entry->destination) != 0;
         if (host_visible)
@@ -343,6 +377,20 @@ reach_window_thumbnail_set_placement(reach_window_thumbnails *thumbnails,
                 if (!was_visible)
                 {
                     flags |= SWP_SHOWWINDOW;
+                    // Workaround: temporary trace for the Stage desktop flash bug; remove after
+                    // diagnosis.
+                    reach_log_trace("thumbnail_host_show host=0x%llx after=0x%llx dwm_frame=%llu",
+                                    (unsigned long long)(uintptr_t)entry->destination,
+                                    (unsigned long long)(uintptr_t)entry->target,
+                                    reach_window_thumbnail_trace_frame());
+                }
+                // Workaround: temporary trace for the Stage desktop flash bug; remove after
+                // diagnosis.
+                if (order_changed)
+                {
+                    reach_log_trace("thumbnail_host_reorder host=0x%llx after=0x%llx",
+                                    (unsigned long long)(uintptr_t)entry->destination,
+                                    (unsigned long long)(uintptr_t)entry->target);
                 }
                 if (!SetWindowPos(entry->destination, entry->target, target_rect.left,
                                   target_rect.top, target_width, target_height, flags))
@@ -359,6 +407,10 @@ reach_window_thumbnail_set_placement(reach_window_thumbnails *thumbnails,
         else if (was_visible)
         {
             ShowWindow(entry->destination, SW_HIDE);
+            // Workaround: temporary trace for the Stage desktop flash bug; remove after diagnosis.
+            reach_log_trace("thumbnail_host_hide host=0x%llx dwm_frame=%llu",
+                            (unsigned long long)(uintptr_t)entry->destination,
+                            reach_window_thumbnail_trace_frame());
         }
 
         props.rcDestination.left = destination_left;
@@ -471,6 +523,10 @@ static reach_result reach_window_thumbnail_bring_to_front(reach_window_thumbnail
 
     reach_window_thumbnail_unregister(entry->handle);
     entry->handle = replacement;
+    // Workaround: temporary trace for the Stage desktop flash bug; remove after diagnosis.
+    reach_log_trace("thumbnail_bring_to_front source=0x%llx dwm_frame=%llu",
+                    (unsigned long long)(uintptr_t)entry->source,
+                    reach_window_thumbnail_trace_frame());
     return REACH_OK;
 }
 

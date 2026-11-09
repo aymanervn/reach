@@ -1,6 +1,9 @@
 #include "reach/support/util.h"
 
+#include <stdarg.h>
 #include <stdio.h>
+
+#include <chrono>
 
 static reach_log_sink reach_log_active_sink = nullptr;
 
@@ -43,6 +46,29 @@ void reach_log_error(const char *message)
     fputs("[reach:error] ", stderr);
     fputs(message, stderr);
     fputc('\n', stderr);
+}
+
+// Workaround: temporary trace for the Stage desktop flash bug; remove after diagnosis.
+void reach_log_trace(const char *format, ...)
+{
+    if (reach_log_active_sink == nullptr || format == nullptr)
+    {
+        return;
+    }
+    double now_ms = std::chrono::duration<double, std::milli>(
+                        std::chrono::steady_clock::now().time_since_epoch())
+                        .count();
+    char message[512] = {};
+    int prefix = snprintf(message, sizeof(message), "stage_flash_trace qpc_ms=%.3f ", now_ms);
+    if (prefix < 0 || (size_t)prefix >= sizeof(message))
+    {
+        return;
+    }
+    va_list args;
+    va_start(args, format);
+    vsnprintf(message + prefix, sizeof(message) - (size_t)prefix, format, args);
+    va_end(args);
+    reach_log_active_sink("info", message);
 }
 
 size_t reach_strlen_utf16(const uint16_t *text)

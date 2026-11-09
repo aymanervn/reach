@@ -247,8 +247,14 @@ void reach_host_settle_close_handoffs(reach_host *host)
         int32_t target_minimized =
             surface->close_handoff_window != 0 &&
             reach_host_window_is_minimized(host, surface->close_handoff_window);
-        if (!reach_close_handoff_ready(surface->close_handoff_completed,
-                                       surface->close_handoff_result, target_minimized))
+        // Workaround: temporary trace for the Stage desktop flash bug; remove after diagnosis.
+        int32_t ready = reach_close_handoff_ready(surface->close_handoff_completed,
+                                                  surface->close_handoff_result, target_minimized);
+        reach_log_trace("handoff_settle hwnd=0x%llx completed=%d result=%d minimized=%d ready=%d",
+                        (unsigned long long)surface->close_handoff_window,
+                        (int)surface->close_handoff_completed, (int)surface->close_handoff_result,
+                        (int)target_minimized, (int)ready);
+        if (!ready)
         {
             continue;
         }
@@ -276,6 +282,9 @@ void reach_host_apply_window_control_result(reach_host *host)
     reach_window_control_completion completion = {};
     while (reach_app_control_take_window_completion(host->app_control, &completion))
     {
+        // Workaround: temporary trace for the Stage desktop flash bug; remove after diagnosis.
+        reach_log_trace("activation_completed request=%llu result=%d",
+                        (unsigned long long)completion.request_id, (int)completion.result);
         host->dirty.z_order = 1;
         reach_host_end_programmatic_window_manipulation(host);
         reach_host_complete_close_handoff(host, completion.request_id, completion.result);
