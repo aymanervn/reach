@@ -53,6 +53,7 @@ typedef struct reach_context_menu_preview_card
     float source_width;
     float source_height;
     float header_height;
+    float header_gap;
     reach_rect_motion motion;
     reach_motion size;
     reach_motion header_top;

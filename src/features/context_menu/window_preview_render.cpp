@@ -135,13 +135,14 @@ reach_result reach_context_menu_render_previews(reach_context_menu *menu,
     {
         const auto &card = layout.cards[visible];
         float header = card.header_height, border = layout.border;
-        float thumbnail_y = header + 8 * card_scale;
+        float thumbnail_y = header + card.header_gap;
         float close_width = fminf(header, card.source_width);
-        float title_maximum = fmaxf(0, card.source_width - close_width - 12 * card_scale);
         float close_radius = fminf(theme->radius_small * card_scale, header * .4f);
         float glyph = close_width * .32f;
         int32_t interactive =
             state.hovered_index == card.index || state.close_hovered_index == card.index;
+        float title_maximum = fmaxf(
+            0, card.source_width - (interactive ? close_width + 12 * card_scale : 16 * card_scale));
         const auto *label = state.item_titles[card.index][0] ? state.item_titles[card.index]
                                                              : (const uint16_t *)L"App";
         uint64_t icon = 0;

@@ -747,10 +747,13 @@ static void test_hovered_card_keeps_its_title_in_place(void)
                         "a hovered card with its fading close button renders");
             reach_render_command hovered = {};
             expect_true(find_title(&buffer, card_group, &hovered) &&
-                            memcmp(&hovered.rect, &resting.rect, sizeof(resting.rect)) == 0 &&
+                            hovered.rect.x == resting.rect.x && hovered.rect.y == resting.rect.y &&
+                            hovered.rect.height == resting.rect.height &&
                             hovered.text_size == resting.text_size &&
                             hovered.text_fit_to_clip == resting.text_fit_to_clip,
                         "hovering a card does not move or restyle its title");
+            expect_true(hovered.rect.width < resting.rect.width,
+                        "a resting title uses the close button's space until hover");
         }
     }
     reach_context_menu_destroy(menu);
