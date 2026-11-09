@@ -203,7 +203,8 @@ static void reach_host_route_dock_windows_changed(void *user, const reach_menu_r
 
 /* The window list is the only surface that must survive the pointer crossing the gap between
    the control it hangs off and itself, so it decides when the pointer has truly left. */
-static void reach_host_route_pointer_region(void *user, uint32_t region_id)
+static void reach_host_route_pointer_region(void *user, uint32_t region_id,
+                                            const reach_point_i32 *observed)
 {
     reach_host *host = static_cast<reach_host *>(user);
     if (host == nullptr || region_id != (uint32_t)REACH_SURFACE_ID_CONTEXT_MENU)
@@ -221,16 +222,18 @@ static void reach_host_route_pointer_region(void *user, uint32_t region_id)
         return;
     }
 
-    reach_point_i32 pointer = {};
+    reach_point_i32 pointer = observed != nullptr ? *observed : reach_point_i32{};
+    if (observed == nullptr && !reach_host_get_pointer_position(host, &pointer))
+    {
+        return;
+    }
+    int32_t hold =
+        reach_context_menu_window_list_holds_pointer(menu, (float)pointer.x, (float)pointer.y);
     // Workaround: temporary trace for the dock preview close bug; remove after diagnosis.
-    int32_t trace_pointer_ok = reach_host_get_pointer_position(host, &pointer);
-    int32_t trace_hold = trace_pointer_ok && reach_context_menu_window_list_holds_pointer(
-                                                 menu, (float)pointer.x, (float)pointer.y);
     reach_host_trace_window_list(
-        "dock_preview_trace route_region cursor=%d,%d cursor_ok=%d hold=%d action=%s", pointer.x,
-        pointer.y, trace_pointer_ok, trace_hold,
-        trace_pointer_ok && !trace_hold ? "close" : "keep");
-    if (!trace_pointer_ok || trace_hold)
+        "dock_preview_trace route_region point=%d,%d observed=%d hold=%d action=%s", pointer.x,
+        pointer.y, observed != nullptr, hold, hold ? "keep" : "close");
+    if (hold)
     {
         return;
     }

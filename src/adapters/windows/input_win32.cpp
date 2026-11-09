@@ -18,6 +18,7 @@ struct reach_input_pointer_region
     reach_rect_union shape;
     int32_t enabled;
     int32_t inside;
+    reach_point_i32 point;
     // Workaround: temporary trace for the dock preview close bug; remove after diagnosis.
     POINT trace_point;
 };
@@ -130,6 +131,7 @@ static void reach_input_update_pointer_regions(reach_input_source *source, POINT
         if (inside != region->inside)
         {
             region->inside = inside;
+            region->point = {point.x, point.y};
             // Workaround: temporary trace for the dock preview close bug; remove after diagnosis.
             region->trace_point = point;
             changed[changed_count++] = index;
@@ -588,6 +590,14 @@ static LRESULT CALLBACK reach_input_window_proc(HWND hwnd, UINT message, WPARAM 
         {
             InterlockedExchange(&source->manipulation_event_pending, 0);
         }
+        if (event.type == REACH_UI_EVENT_POINTER_REGION_CHANGED &&
+            event.id < REACH_INPUT_POINTER_REGION_CAPACITY)
+        {
+            AcquireSRWLockShared(&source->pointer_region_lock);
+            event.x = source->pointer_regions[event.id].point.x;
+            event.y = source->pointer_regions[event.id].point.y;
+            ReleaseSRWLockShared(&source->pointer_region_lock);
+        }
         // Workaround: temporary trace for the dock preview close bug; remove after diagnosis.
         if (event.type == REACH_UI_EVENT_POINTER_REGION_CHANGED &&
             event.id < REACH_INPUT_POINTER_REGION_CAPACITY)
@@ -756,6 +766,7 @@ static reach_result reach_input_set_pointer_region(reach_input_source *source, u
         int32_t inside = reach_input_point_in_region(point, region->shape);
         changed = inside != region->inside;
         region->inside = inside;
+        region->point = {point.x, point.y};
         if (changed)
         {
             // Workaround: temporary trace for the dock preview close bug; remove after diagnosis.

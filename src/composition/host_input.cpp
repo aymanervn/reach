@@ -771,7 +771,7 @@ static reach_result reach_host_handle_pointer_leave(reach_host *host, reach_surf
         {
             reach_log_info("dock_preview_trace pointer_leave surface=context_menu");
         }
-        host->pointer_region_route(host, static_cast<uint32_t>(src->definition->id));
+        host->pointer_region_route(host, static_cast<uint32_t>(src->definition->id), nullptr);
     }
     if (src->definition->surface.bar_reveal.ops != nullptr)
     {
@@ -947,7 +947,8 @@ static reach_result reach_host_handle_surface_event(reach_host *host, const reac
     {
         if (host->pointer_region_route != nullptr)
         {
-            host->pointer_region_route(host, event->id);
+            reach_point_i32 pointer = {event->x, event->y};
+            host->pointer_region_route(host, event->id, &pointer);
         }
         reach_host_request_bar_visibility_update(host);
         return REACH_OK;
