@@ -15,8 +15,12 @@ static void reach_host_arm_close_handoff(reach_host *host, reach_feature_runtime
     }
     desc->surface->close_handoff_request_id = request_id;
     desc->surface->close_handoff_pending = 1;
+    desc->surface->close_handoff_completed = 0;
+    desc->surface->close_handoff_result = REACH_OK;
+    desc->surface->close_handoff_window = 0;
     if (action->kind == REACH_FEATURE_ACTION_ACTIVATE_WINDOW && action->window != 0)
     {
+        desc->surface->close_handoff_window = action->window;
         reach_host_set_native_overlay_front_source(host, desc, action->window);
     }
     if (desc->definition != nullptr && desc->definition->capsule_ops != nullptr &&

@@ -1,5 +1,14 @@
 #include "reach/composition/surface_runtime.h"
 
+int32_t reach_close_handoff_ready(int32_t completed, reach_result result, int32_t target_minimized)
+{
+    if (!completed)
+    {
+        return 0;
+    }
+    return result != REACH_OK || !target_minimized;
+}
+
 void reach_surface_runtime_init(reach_surface_runtime *runtime)
 {
     if (runtime == nullptr)

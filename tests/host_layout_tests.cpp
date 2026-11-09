@@ -1893,8 +1893,23 @@ static void test_feature_tick_redraw_marks_only_its_own_surface(void)
     reach_host_destroy_registered_features(host);
 }
 
+static void test_close_handoff_readiness_waits_for_observed_restore(void)
+{
+    expect_true(!reach_close_handoff_ready(0, REACH_OK, 0),
+                "a handoff is pending until its activation completes");
+    expect_true(!reach_close_handoff_ready(0, REACH_ERROR, 0),
+                "a failure result is only meaningful once completed");
+    expect_true(reach_close_handoff_ready(1, REACH_ERROR, 1),
+                "a failed activation releases the handoff at once");
+    expect_true(!reach_close_handoff_ready(1, REACH_OK, 1),
+                "a completed activation with a stale minimized snapshot stays held");
+    expect_true(reach_close_handoff_ready(1, REACH_OK, 0),
+                "a later snapshot with the target restored releases the handoff");
+}
+
 int main(void)
 {
+    test_close_handoff_readiness_waits_for_observed_restore();
     test_native_overlay_placement_follows_surface_presentation();
     test_order_invalidation_rechains_without_replaying_visibility();
     test_app_band_surface_does_not_invalidate_topmost_order();
