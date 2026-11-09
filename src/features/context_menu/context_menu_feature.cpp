@@ -522,7 +522,17 @@ reach_rect_union reach_context_menu_hover_shape(reach_rect_f32 popup_bounds,
         drop_direction == REACH_POPUP_DROP_DOWN ? bar_edge_y : popup_bounds.y + popup_bounds.height;
     float corridor_bottom = drop_direction == REACH_POPUP_DROP_DOWN ? popup_bounds.y : bar_edge_y;
     reach_rect_union shape = {};
-    shape.rects[shape.count++] = reach_context_menu_grow(popup_bounds, margin);
+    reach_rect_f32 popup = reach_context_menu_grow(popup_bounds, margin);
+    if (drop_direction == REACH_POPUP_DROP_DOWN && popup.y < bar_edge_y)
+    {
+        popup.height = fmaxf(0.0f, popup.y + popup.height - bar_edge_y);
+        popup.y = bar_edge_y;
+    }
+    else if (drop_direction != REACH_POPUP_DROP_DOWN && popup.y + popup.height > bar_edge_y)
+    {
+        popup.height = fmaxf(0.0f, bar_edge_y - popup.y);
+    }
+    shape.rects[shape.count++] = popup;
     reach_rect_f32 slot = reach_context_menu_grow(anchor_slot, margin);
     if (drop_direction == REACH_POPUP_DROP_DOWN)
     {

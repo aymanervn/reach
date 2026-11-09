@@ -530,6 +530,7 @@ reach_result reach_popup_push_width_background(const reach_popup_background_inpu
     if (result == REACH_INVALID_ARGUMENT)
     {
         reach_render_command_buffer_clear(batch.get());
+        source.bounds.height = ceilf(input->bounds.height + pad.top + pad.bottom);
         float notch_minimum = 0, notch_maximum = 0;
         bool fixed = minimum == maximum && !height_changes &&
                      reach_motion_range(&center, &notch_minimum, &notch_maximum) == REACH_OK &&

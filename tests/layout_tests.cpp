@@ -1373,6 +1373,35 @@ static void test_width_text_source_ownership(void)
                 "width text retains explicit ink-overflow and source trimming intent");
 }
 
+static void test_narrow_popup_background_keeps_its_full_height(void)
+{
+    auto storage = std::make_unique<reach_render_command_buffer>();
+    auto &buffer = *storage;
+    reach_render_command_buffer_clear(&buffer);
+    reach_popup_background_input input = {};
+    input.theme = reach_theme_default();
+    input.bounds = {0, 0, 88.75f, 182.5f};
+    input.dpi_scale = 1.25f;
+    input.notch_side = REACH_NOTCH_SIDE_BOTTOM;
+    input.notch_center_x = 44;
+    reach_motion width = {}, height = {}, notch = {};
+    reach_motion_set(&width, 88.75f);
+    reach_motion_set(&height, 182.5f);
+    reach_motion_set(&notch, 44);
+    expect_true(reach_popup_push_width_background(&input, &width, &height, &notch, 0, 8, &buffer) ==
+                    REACH_OK,
+                "a narrow popup background renders");
+    float covered = 0;
+    for (size_t index = 0; index < buffer.group_count; ++index)
+    {
+        const reach_render_group &group = buffer.groups[index];
+        if (group.parent_id == 0)
+            covered = fmaxf(covered, group.bounds.y + group.bounds.height);
+    }
+    expect_true(covered >= input.bounds.height,
+                "a narrow popup background covers the popup's full height");
+}
+
 static void test_popup_width_background_preflight(void)
 {
     auto storage = std::make_unique<reach_render_command_buffer>();
@@ -1790,6 +1819,7 @@ int main(void)
     test_width_text_source_ownership();
     test_popup_width_background_preflight();
     test_overshoot_render_envelopes();
+    test_narrow_popup_background_keeps_its_full_height();
     test_shadow_source_ownership();
     test_textbox_caret_reference_ownership();
     test_group_equality_preserves_intent_without_padding();

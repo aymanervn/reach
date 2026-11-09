@@ -6,6 +6,7 @@
 
 #include <math.h>
 #include <stdio.h>
+#include <string.h>
 
 static int failures;
 
@@ -241,7 +242,8 @@ static void expect_hold_matches_shape(const reach_context_menu *menu, const reac
         for (float x = area.x; x < area.x + area.width; x += 1.0f)
         {
             int32_t in_popup = x >= popup.x - margin && x < popup.x + popup.width + margin &&
-                               y >= popup.y - margin && y < popup.y + popup.height + margin;
+                               y >= popup.y - margin && y < popup.y + popup.height + margin &&
+                               y < bar_edge_y;
             int32_t in_slot = x >= slot.x - margin && x < slot.x + slot.width + margin &&
                               y >= fminf(slot.y - margin, bar_edge_y) &&
                               y < slot.y + slot.height + margin;
@@ -525,7 +527,7 @@ static void test_preview_row_fits_every_window_across_dpi(void)
                         rect.y + rect.height <= state->bounds.y + state->bounds.height + 0.01f,
                     "complete previews fit inside the popup");
             }
-            expect_true(common_height > 0.0f && common_height < 140.0f * scale,
+            expect_true(common_height > 0.0f && common_height < 80.0f * scale,
                         "many windows shrink the row height to fit");
         }
     }
@@ -544,7 +546,7 @@ static void test_preview_row_fits_every_window_across_dpi(void)
         reach_rect_f32 rect = {};
         reach_context_menu_thumbnail_at(menu, 0, &window, &rect);
         expect_true(reach_context_menu_thumbnail_count(menu) == 3, "few windows all show");
-        expect_near(rect.height, 140.0f * scale, 0.01f,
+        expect_near(rect.height, 80.0f * scale, 0.01f,
                     "unconstrained preview height is DPI-scaled DP");
     }
     reach_context_menu_destroy(menu);
@@ -668,6 +670,93 @@ static void expect_window_list_renders(reach_context_menu *menu, const char *mes
     expect_true(result == REACH_OK, message);
 }
 
+static int32_t find_title(const reach_render_command_buffer *buffer, uint64_t card_group,
+                          reach_render_command *out)
+{
+    for (size_t index = 0; index < buffer->count; ++index)
+        if (buffer->commands[index].type == REACH_RENDER_COMMAND_TEXT &&
+            buffer->commands[index].group_id == card_group)
+        {
+            *out = buffer->commands[index];
+            return 1;
+        }
+    return 0;
+}
+
+static void test_hovered_card_keeps_its_title_in_place(void)
+{
+    reset_preview_windows(2);
+    reach_window_manager_port port = {};
+    port.ops.window_count = preview_count;
+    port.ops.window_at = preview_at;
+    port.ops.frame_bounds = preview_frame;
+    reach_window_tracking *windows = nullptr;
+    reach_window_tracking_create(port, &windows);
+    reach_window_tracking_refresh(windows, nullptr);
+    reach_context_menu *menu = nullptr;
+    reach_context_menu_create(&menu);
+    reach_context_menu_attach_services(menu, windows, nullptr);
+    reach_menu_request request = {};
+    request.window_count = 2;
+    request.windows[0].window = 1;
+    request.windows[1].window = 2;
+    reach_context_menu_open_context ctx = {};
+    ctx.theme = reach_theme_default();
+    ctx.monitor = {0, 0, 1920, 1080};
+    ctx.anchored = 1;
+    ctx.drop_direction = REACH_POPUP_DROP_UP;
+    ctx.anchor_button = {940, 1040, 40, 40};
+    ctx.bar_edge_y = 1040;
+    ctx.request = &request;
+    static reach_render_command_buffer buffer;
+    reach_context_menu_render_context render = {};
+    render.theme = reach_theme_default();
+    render.dpi_scale = 1.0f;
+    render.icon_size_px = 32;
+    const float scales[] = {1.0f, 1.5f};
+    for (float scale : scales)
+    {
+        ctx.dpi_scale = scale;
+        reach_context_menu_set_open(menu, 0);
+        reach_context_menu_open_window_list(menu, 0, &ctx);
+        advance_preview_layout(menu, &ctx, 0.5);
+        expect_true(reach_context_menu_append_render_commands(menu, &render, &buffer) == REACH_OK,
+                    "a resting window list renders");
+        reach_render_command resting = {};
+        uint64_t card_group = 0;
+        for (size_t index = 0; index < buffer.count && card_group == 0; ++index)
+            if (buffer.commands[index].type == REACH_RENDER_COMMAND_TEXT)
+                card_group = buffer.commands[index].group_id;
+        expect_true(find_title(&buffer, card_group, &resting), "a resting card has its title");
+        reach_rect_f32 slot = reach_context_menu_state_ptr(menu)->item_slots[0];
+        reach_pointer_event pointer = {};
+        pointer.kind = REACH_POINTER_EVENT_MOVE;
+        pointer.coordinate_space = REACH_POINTER_COORDINATE_SURFACE_LOCAL;
+        pointer.surface_relation = REACH_POINTER_SURFACE_INSIDE;
+        const float targets[][2] = {{slot.x + slot.width * .5f, slot.y + slot.height * .5f},
+                                    {slot.x + slot.width - 4.0f * scale, slot.y + 6.0f * scale}};
+        for (const auto &target : targets)
+        {
+            pointer.x = (int32_t)target[0];
+            pointer.y = (int32_t)target[1];
+            reach_capsule_pointer_result moved = {};
+            reach_context_menu_capsule_ops()->handle_pointer(menu, &pointer, &moved);
+            advance_preview_layout(menu, &ctx, 0.05);
+            expect_true(reach_context_menu_append_render_commands(menu, &render, &buffer) ==
+                            REACH_OK,
+                        "a hovered card with its fading close button renders");
+            reach_render_command hovered = {};
+            expect_true(find_title(&buffer, card_group, &hovered) &&
+                            memcmp(&hovered.rect, &resting.rect, sizeof(resting.rect)) == 0 &&
+                            hovered.text_size == resting.text_size &&
+                            hovered.text_fit_to_clip == resting.text_fit_to_clip,
+                        "hovering a card does not move or restyle its title");
+        }
+    }
+    reach_context_menu_destroy(menu);
+    reach_window_tracking_destroy(windows);
+}
+
 static void test_shrunk_cards_grow_smoothly_after_a_close(void)
 {
     const size_t count = 40;
@@ -704,7 +793,7 @@ static void test_shrunk_cards_grow_smoothly_after_a_close(void)
     float popup_before = reach_context_menu_state_ptr(menu)->bounds.height;
     reach_feature_surface_geometry window_before = {};
     reach_context_menu_capsule_ops()->surface_geometry(menu, &window_before);
-    expect_true(before > 0.0f && before < 140.0f, "forty windows shrink the cards");
+    expect_true(before > 0.0f && before < 80.0f, "forty windows shrink the cards");
 
     reach_feature_tick_result tick = {};
     preview_window_count = count - 20;
@@ -827,7 +916,7 @@ static void test_preview_width_animation_retarget_and_reset(void)
     reach_window_id window = 0;
     reach_rect_f32 rect = {};
     reach_context_menu_thumbnail_at(menu, 0, &window, &rect);
-    expect_near(rect.height, 140.0f, 0.01f, "settled previews return to nominal height");
+    expect_near(rect.height, 80.0f, 0.01f, "settled previews return to nominal height");
     request.window_count = 1;
     reach_context_menu_open_window_list(menu, 4, &ctx);
     advance_preview_layout(menu, &ctx, 0.03);
@@ -1065,6 +1154,7 @@ int main(void)
     test_preview_row_fits_every_window_across_dpi();
     test_preview_membership_refresh_and_reanchor();
     test_shrunk_cards_grow_smoothly_after_a_close();
+    test_hovered_card_keeps_its_title_in_place();
     test_preview_width_animation_retarget_and_reset();
     test_preview_reflow_preserves_surviving_sources();
     test_capsule_owns_popup_pointer_policy();

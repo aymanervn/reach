@@ -23,31 +23,6 @@ static reach_result reach_preview_fill(reach_render_command_buffer *out, uint64_
     return reach_render_push_rect_motion(out, &source, &rect, radius, color);
 }
 
-static reach_result reach_preview_text(reach_render_command_buffer *out, uint64_t id,
-                                       uint64_t parent, reach_rect_f32 source,
-                                       const reach_motion &width, const uint16_t *text, float size,
-                                       int32_t alignment, reach_color color)
-{
-    if (source.width <= 0 || source.height <= 0)
-        return REACH_OK;
-    reach_render_group viewport = {};
-    viewport.id = id;
-    viewport.parent_id = parent;
-    viewport.bounds = viewport.clip = source;
-    viewport.has_clip = 1;
-    viewport.clip_insets[REACH_RENDER_CLIP_RIGHT] = reach_motion_affine(&width, -1, source.width);
-    reach_render_command command = {};
-    command.type = REACH_RENDER_COMMAND_TEXT;
-    command.rect = source;
-    command.color = color;
-    command.text_size = size;
-    command.text_weight = REACH_TEXT_WEIGHT_NORMAL;
-    command.text_alignment = alignment;
-    command.text_ellipsis = 1;
-    reach_copy_utf16(command.text, REACH_MENU_TEXT_CAPACITY, text);
-    return reach_render_push_width_text(out, &command, &viewport);
-}
-
 static void reach_preview_border_geometry(const reach_render_command_buffer *commands,
                                           uint64_t parent, float border, reach_rect_motion *outer,
                                           reach_rect_motion *inner)
@@ -177,9 +152,6 @@ reach_result reach_context_menu_render_previews(reach_context_menu *menu,
             icon =
                 path && path[0] ? reach_icon_service_get(menu->icons, path, ctx->icon_size_px) : 0;
         }
-        reach_rect_f32 icon_rect = {(card.source_width - icon_size) * .5f,
-                                    thumbnail_y + (card.source_height - icon_size) * .5f, icon_size,
-                                    icon_size};
         reach_rect_f32 close_rect = {card.source_width - close_width * .9f, header * .1f,
                                      close_width * .8f, header * .8f};
         reach_rect_f32 glyph_rect = {card.source_width - close_width * .66f,
@@ -187,18 +159,14 @@ reach_result reach_context_menu_render_previews(reach_context_menu *menu,
         reach_color base = theme->popup_background, outline = theme->context_menu_hover_background;
         base.a = outline.a = 1;
 
-        reach_render_group parent = {};
-        parent.id = card.render_id;
-        parent.parent_id = body.id;
+        reach_render_group frame = {};
+        frame.parent_id = body.id;
         float pad = ceilf(border) + 1;
-        parent.bounds = {-pad, 0, ceilf(card.source_width + pad * 2),
-                         ceilf(thumbnail_y + card.source_height + pad)};
-        parent.x = card.motion.x;
-        parent.y = card.header_top;
-        parent.scale = card.size;
-        result = reach_render_command_buffer_begin_group(out, &parent);
-        if (result != REACH_OK)
-            return result;
+        frame.bounds = {-pad, 0, ceilf(card.source_width + pad * 2),
+                        ceilf(thumbnail_y + card.source_height + pad)};
+        frame.x = card.motion.x;
+        frame.y = card.header_top;
+        frame.scale = card.size;
         reach_rect_motion rect = {};
         reach_motion_set(&rect.x, 0);
         reach_motion_set(&rect.y, thumbnail_y);
@@ -209,53 +177,82 @@ reach_result reach_context_menu_render_previews(reach_context_menu *menu,
         outer.y = reach_motion_affine(&outer.y, 1, -border);
         outer.width = reach_motion_affine(&outer.width, 1, border * 2);
         outer.height = reach_motion_affine(&outer.height, 1, border * 2);
-        reach_preview_border_geometry(out, parent.id, border, &outer, &rect);
+
+        reach_motion hover = {};
+        reach_motion_set(&hover, 0);
+        if (state.hovered_index == card.index)
+            hover = menu->hover;
+        if (interactive)
+        {
+            reach_render_group underlay = frame;
+            underlay.id = card.render_id + 13;
+            result = reach_render_command_buffer_begin_group(out, &underlay);
+            reach_render_command_buffer_end_group(out);
+            if (result != REACH_OK)
+                return result;
+            reach_preview_border_geometry(out, underlay.id, border, &outer, &rect);
+            reach_rect_motion strip = {};
+            reach_motion_set(&strip.x, 0);
+            reach_motion_set(&strip.y, 0);
+            reach_motion_set(&strip.width, card.source_width);
+            reach_motion_set(&strip.height, header);
+            result = reach_preview_fill(
+                out, card.render_id + 1, underlay.id, strip, card.source_width, header,
+                header * .5f, reach_theme_color_alpha(theme->context_menu_hover_background, 1),
+                &hover);
+            if (result == REACH_OK)
+                result = reach_preview_fill(out, card.render_id + 3, underlay.id, outer,
+                                            card.source_width + border * 2 + 1,
+                                            card.source_height + border * 2 + 1, 0, {1, 1, 1, 1},
+                                            nullptr, &hover, base, outline);
+            if (result != REACH_OK)
+                return result;
+        }
+
+        frame.id = card.render_id;
+        result = reach_render_command_buffer_begin_group(out, &frame);
+        if (result != REACH_OK)
+            return result;
+        if (!interactive)
+            reach_preview_border_geometry(out, frame.id, border, &outer, &rect);
+        auto push = [&](reach_render_command command)
+        {
+            if (result == REACH_OK)
+                result = reach_render_command_buffer_push(out, &command);
+        };
+        reach_render_command shape = {};
+        shape.type = REACH_RENDER_COMMAND_RECT;
+        shape.color = base;
         if (!interactive)
         {
-            auto push = [&](reach_render_command command)
-            {
-                if (result == REACH_OK)
-                    result = reach_render_command_buffer_push(out, &command);
-            };
-            reach_render_command shape = {};
-            shape.type = REACH_RENDER_COMMAND_RECT;
-            shape.color = base;
             shape.rect = reach_rect_motion_value_at(&outer, 0);
             push(shape);
-            shape.rect = reach_rect_motion_value_at(&rect, 0);
-            push(shape);
-            if (icon != 0)
-            {
-                reach_render_command image = {};
-                image.type = REACH_RENDER_COMMAND_ICON;
-                image.rect = icon_rect;
-                image.icon_id = icon;
-                image.color = {1, 1, 1, 1};
-                push(image);
-            }
-            if (title_maximum > 0)
-            {
-                reach_render_command text = {};
-                text.type = REACH_RENDER_COMMAND_TEXT;
-                text.rect = {8 * card_scale, 0, title_maximum, header};
-                text.color = theme->context_menu_text;
-                text.text_size = REACH_TEXT_SIZE_MEDIUM * card_scale;
-                text.text_weight = REACH_TEXT_WEIGHT_NORMAL;
-                text.text_alignment = REACH_TEXT_ALIGNMENT_LEADING;
-                text.text_ellipsis = 1;
-                reach_copy_utf16(text.text, REACH_MENU_TEXT_CAPACITY, label);
-                push(text);
-            }
-            shape.rect = close_rect;
-            shape.radius = close_radius;
-            shape.color = reach_theme_color_alpha(theme->context_menu_close_background, .14f);
-            push(shape);
-            reach_render_command cross = {};
-            cross.type = REACH_RENDER_COMMAND_VECTOR_ICON;
-            cross.rect = glyph_rect;
-            cross.icon_id = REACH_VECTOR_ICON_CLOSE;
-            cross.color = theme->context_menu_close_glyph;
-            push(cross);
+        }
+        shape.rect = reach_rect_motion_value_at(&rect, 0);
+        push(shape);
+        if (icon != 0)
+        {
+            reach_render_command image = {};
+            image.type = REACH_RENDER_COMMAND_ICON;
+            image.rect = {(card.source_width - icon_size) * .5f,
+                          thumbnail_y + (card.source_height - icon_size) * .5f, icon_size,
+                          icon_size};
+            image.icon_id = icon;
+            image.color = {1, 1, 1, 1};
+            push(image);
+        }
+        if (title_maximum > 0)
+        {
+            reach_render_command text = {};
+            text.type = REACH_RENDER_COMMAND_TEXT;
+            text.rect = {8 * card_scale, 0, title_maximum, header};
+            text.color = theme->context_menu_text;
+            text.text_size = REACH_TEXT_SIZE_SMALL * card_scale;
+            text.text_weight = REACH_TEXT_WEIGHT_NORMAL;
+            text.text_alignment = REACH_TEXT_ALIGNMENT_LEADING;
+            text.text_ellipsis = 1;
+            reach_copy_utf16(text.text, REACH_MENU_TEXT_CAPACITY, label);
+            push(text);
         }
         reach_render_command_buffer_end_group(out);
         if (result != REACH_OK)
@@ -263,42 +260,15 @@ reach_result reach_context_menu_render_previews(reach_context_menu *menu,
         if (!interactive)
             continue;
 
-        reach_motion hover = {};
-        reach_motion_set(&hover, 0);
-        if (state.hovered_index == card.index)
-            hover = menu->hover;
-        reach_rect_motion strip = {};
-        reach_motion_set(&strip.x, 0);
-        reach_motion_set(&strip.y, 0);
-        reach_motion_set(&strip.width, card.source_width);
-        reach_motion_set(&strip.height, header);
-        result = reach_preview_fill(
-            out, card.render_id + 1, parent.id, strip, card.source_width, header, header * .5f,
-            reach_theme_color_alpha(theme->context_menu_hover_background, 1), &hover);
-        if (result == REACH_OK)
-            result = reach_preview_fill(out, card.render_id + 3, parent.id, outer,
-                                        card.source_width + border * 2 + 1,
-                                        card.source_height + border * 2 + 1, 0, {1, 1, 1, 1},
-                                        nullptr, &hover, base, outline);
-        if (result == REACH_OK)
-            result = reach_preview_fill(out, card.render_id + 5, parent.id, rect,
-                                        card.source_width + 1, card.source_height + 1, 0, base);
-        if (result == REACH_OK && icon != 0)
-        {
-            reach_motion x = {}, y = {}, size = {};
-            reach_motion_set(&x, icon_rect.x);
-            reach_motion_set(&y, icon_rect.y);
-            reach_motion_set(&size, icon_size);
-            result = reach_preview_icon(out, card.render_id + 11, parent.id, x, y, size, icon_size,
-                                        REACH_RENDER_COMMAND_ICON, icon, {1, 1, 1, 1});
-        }
-        reach_motion title_width = {};
-        reach_motion_set(&title_width, title_maximum);
-        if (result == REACH_OK)
-            result = reach_preview_text(out, card.render_id + 7, parent.id,
-                                        {8 * card_scale, 0, title_maximum, header}, title_width,
-                                        label, REACH_TEXT_SIZE_MEDIUM * card_scale,
-                                        REACH_TEXT_ALIGNMENT_LEADING, theme->context_menu_text);
+        reach_render_group reveal = {};
+        reveal.id = card.render_id + 12;
+        reveal.parent_id = frame.id;
+        reveal.bounds = {0, 0, ceilf(card.source_width), ceilf(header)};
+        reveal.opacity = hover;
+        result = reach_render_command_buffer_begin_group(out, &reveal);
+        reach_render_command_buffer_end_group(out);
+        if (result != REACH_OK)
+            return result;
         reach_motion close_hover = {};
         reach_motion_set(&close_hover, 0);
         if (state.close_hovered_index == card.index)
@@ -309,17 +279,16 @@ reach_result reach_context_menu_render_previews(reach_context_menu *menu,
         reach_motion_set(&close.y, close_rect.y);
         reach_motion_set(&close.width, close_rect.width);
         reach_motion_set(&close.height, close_rect.height);
-        if (result == REACH_OK)
-            result = reach_preview_fill(
-                out, card.render_id + 8, parent.id, close, close_rect.width, close_rect.height,
-                close_radius, reach_theme_color_alpha(theme->context_menu_close_background, 1),
-                &opacity);
+        result = reach_preview_fill(
+            out, card.render_id + 8, reveal.id, close, close_rect.width, close_rect.height,
+            close_radius, reach_theme_color_alpha(theme->context_menu_close_background, 1),
+            &opacity);
         reach_motion glyph_x = {}, glyph_y = {}, glyph_size = {};
         reach_motion_set(&glyph_x, glyph_rect.x);
         reach_motion_set(&glyph_y, glyph_rect.y);
         reach_motion_set(&glyph_size, glyph);
         if (result == REACH_OK)
-            result = reach_preview_icon(out, card.render_id + 10, parent.id, glyph_x, glyph_y,
+            result = reach_preview_icon(out, card.render_id + 10, reveal.id, glyph_x, glyph_y,
                                         glyph_size, glyph, REACH_RENDER_COMMAND_VECTOR_ICON,
                                         REACH_VECTOR_ICON_CLOSE, theme->context_menu_close_glyph);
         if (result != REACH_OK)
