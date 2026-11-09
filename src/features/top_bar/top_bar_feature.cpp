@@ -1093,6 +1093,7 @@ static void reach_top_bar_apply_window_push(reach_top_bar *top_bar, float animat
     push_request.hover_revealed = top_bar->push_hover_revealed;
     push_request.fully_hidden = fully_hidden;
     push_request.excluded_window = top_bar->push_excluded_window;
+    push_request.recover_maximized = top_bar->state.mode == REACH_CONFIG_TOP_BAR_MODE_DYNAMIC;
     reach_top_bar_window_push_apply(top_bar->window_push, &push_request);
 }
 

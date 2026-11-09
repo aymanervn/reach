@@ -16,6 +16,7 @@ typedef struct reach_top_bar_window_push_request
     int32_t hover_revealed;
     int32_t fully_hidden;
     uintptr_t excluded_window;
+    int32_t recover_maximized;
 } reach_top_bar_window_push_request;
 
 reach_result reach_top_bar_window_push_create(reach_top_bar_window_push **out_push);
