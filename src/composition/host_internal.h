@@ -649,7 +649,7 @@ struct reach_host
 
     reach_window_tracking *window_tracking;
     void (*pointer_moved_route)(void *user, reach_point_i32 point);
-    void (*pointer_region_route)(void *user, uint32_t region_id);
+    void (*pointer_region_route)(void *user, uint32_t region_id, const reach_point_i32 *pointer);
     float layout_dpi_scale;
     int32_t has_layout;
     reach_host_dirty_state dirty;

@@ -55,6 +55,7 @@ static reach_host bar_enter_host;
 static reach_host pointer_release_host;
 static reach_host popup_trigger_host;
 static reach_host popup_owner_host;
+static reach_host window_list_region_host;
 static reach_host popup_render_host;
 static reach_window_manipulation observed_manipulation;
 static reach_point_i32 observed_pointer;
@@ -727,6 +728,66 @@ static void test_power_popup_resolves_its_exact_top_bar_owner(void)
                     owner.slot == REACH_TOP_BAR_CONTROL_POWER && owner.index == 0,
                 "the Power popup owner exactly matches the Top Bar Power control token");
 
+    reach_context_menu_destroy(menu);
+}
+
+static void test_window_list_region_crossing_uses_the_observed_point(void)
+{
+    reach_context_menu *menu = nullptr;
+    expect_true(reach_context_menu_create(&menu) == REACH_OK,
+                "a context menu is created for the region crossing");
+    if (menu == nullptr)
+    {
+        return;
+    }
+
+    reach_menu_request request = {};
+    request.window_count = 1;
+    request.windows[0].window = 11;
+    reach_context_menu_open_context ctx = {};
+    ctx.theme = reach_theme_default();
+    ctx.dpi_scale = 1.0f;
+    ctx.anchored = 1;
+    ctx.anchor_button = {380.0f, 1000.0f, 40.0f, 40.0f};
+    ctx.bar_edge_y = 1000.0f;
+    ctx.drop_direction = REACH_POPUP_DROP_UP;
+    ctx.monitor = {0.0f, 0.0f, 1920.0f, 1080.0f};
+    ctx.request = &request;
+    reach_context_menu_open_window_list(menu, 0, &ctx);
+
+    reach_rect_union shape = {};
+    expect_true(reach_context_menu_window_list_hold_shape(menu, &shape) && shape.count > 0,
+                "the open window list publishes a hold shape");
+    reach_rect_f32 popup = shape.rects[0];
+    reach_point_i32 inside = {(int32_t)(popup.x + popup.width * 0.5f),
+                              (int32_t)(popup.y + popup.height * 0.5f)};
+    reach_point_i32 above = {inside.x, (int32_t)(popup.y - 200.0f)};
+
+    reach_host *host = &window_list_region_host;
+    reach_host_init_feature_registry(host);
+    host->feature_runtimes[REACH_SURFACE_ID_CONTEXT_MENU].capsule = menu;
+    host->input_source.ops.get_pointer_position = fake_get_pointer_position;
+    reach_host_bind_interfeature_routes(host);
+
+    reach_ui_event crossing = {};
+    crossing.type = REACH_UI_EVENT_POINTER_REGION_CHANGED;
+    crossing.id = REACH_SURFACE_ID_CONTEXT_MENU;
+    crossing.x = inside.x;
+    crossing.y = inside.y;
+    observed_pointer = above;
+    (void)reach_host_handle_event(host, &crossing);
+    expect_true(reach_context_menu_window_list_is_open(menu),
+                "a crossing observed inside the hold keeps the list open");
+
+    crossing.x = above.x;
+    crossing.y = above.y;
+    observed_pointer = inside;
+    (void)reach_host_handle_event(host, &crossing);
+    expect_true(!reach_context_menu_window_list_is_open(menu),
+                "a crossing observed outside closes the list even when the cursor read lags");
+
+    reach_host_clear_interfeature_routes(host);
+    host->feature_runtimes[REACH_SURFACE_ID_CONTEXT_MENU].capsule = nullptr;
     reach_context_menu_destroy(menu);
 }
 
@@ -1920,6 +1981,7 @@ int main(void)
     test_popup_pointer_coordinates_are_surface_local();
     test_popup_activation_uses_owner_identity();
     test_power_popup_resolves_its_exact_top_bar_owner();
+    test_window_list_region_crossing_uses_the_observed_point();
     test_captured_release_precedes_exclusive_popup();
     test_popup_trigger_press_bypasses_unrelated_open_popup();
     test_foreground_reconciles_after_window_discovery();
