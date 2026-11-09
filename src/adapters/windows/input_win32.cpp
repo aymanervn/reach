@@ -12,7 +12,7 @@ static const size_t REACH_INPUT_POINTER_REGION_CAPACITY = 16;
 
 struct reach_input_pointer_region
 {
-    reach_rect_f32 bounds;
+    reach_rect_union shape;
     int32_t enabled;
     int32_t inside;
 };
@@ -54,10 +54,9 @@ static const int REACH_INPUT_HOTKEY_BRIGHTNESS_DOWN = 8;
 
 static void reach_input_reset_hotkey_state(reach_input_source *source);
 
-static int32_t reach_input_point_in_region(POINT point, reach_rect_f32 bounds)
+static int32_t reach_input_point_in_region(POINT point, const reach_rect_union &shape)
 {
-    return (float)point.x >= bounds.x && (float)point.x < bounds.x + bounds.width &&
-           (float)point.y >= bounds.y && (float)point.y < bounds.y + bounds.height;
+    return reach_rect_union_contains(&shape, (float)point.x, (float)point.y);
 }
 
 static void reach_input_post_pointer_region_event(reach_input_source *source, uint32_t region_id)
@@ -87,7 +86,7 @@ static void reach_input_update_pointer_regions(reach_input_source *source, POINT
         {
             continue;
         }
-        int32_t inside = reach_input_point_in_region(point, region->bounds);
+        int32_t inside = reach_input_point_in_region(point, region->shape);
         if (inside != region->inside)
         {
             region->inside = inside;
@@ -656,7 +655,7 @@ static reach_result reach_input_get_pointer_position(reach_input_source *source,
 }
 
 static reach_result reach_input_set_pointer_region(reach_input_source *source, uint32_t region_id,
-                                                   reach_rect_f32 bounds, int32_t enabled)
+                                                   const reach_rect_union *shape)
 {
     if (source == nullptr || region_id >= REACH_INPUT_POINTER_REGION_CAPACITY)
     {
@@ -664,7 +663,7 @@ static reach_result reach_input_set_pointer_region(reach_input_source *source, u
     }
 
     reach_input_pointer_region *region = &source->pointer_regions[region_id];
-    if (!enabled || bounds.width <= 0.0f || bounds.height <= 0.0f)
+    if (shape == nullptr || shape->count == 0 || shape->count > REACH_RECT_UNION_CAPACITY)
     {
         AcquireSRWLockExclusive(&source->pointer_region_lock);
         *region = {};
@@ -677,11 +676,11 @@ static reach_result reach_input_set_pointer_region(reach_input_source *source, u
     int32_t changed = 0;
 
     AcquireSRWLockExclusive(&source->pointer_region_lock);
-    region->bounds = bounds;
+    region->shape = *shape;
     region->enabled = 1;
     if (have_point)
     {
-        int32_t inside = reach_input_point_in_region(point, bounds);
+        int32_t inside = reach_input_point_in_region(point, region->shape);
         changed = inside != region->inside;
         region->inside = inside;
     }

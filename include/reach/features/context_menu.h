@@ -120,15 +120,14 @@ extern "C"
     uint64_t reach_context_menu_owner_identity(const reach_context_menu *menu);
     int32_t reach_context_menu_window_list_holds_pointer(const reach_context_menu *menu,
                                                          float screen_x, float screen_y);
-    int32_t reach_context_menu_window_list_hover_bounds(const reach_context_menu *menu,
-                                                        reach_rect_f32 *out_bounds);
+    int32_t reach_context_menu_window_list_hold_shape(const reach_context_menu *menu,
+                                                      reach_rect_union *out_shape);
 
     size_t reach_context_menu_window_list_remove(reach_context_menu *menu, uintptr_t window);
 
-    int32_t reach_context_menu_hover_region_contains(reach_rect_f32 popup_bounds,
-                                                     reach_rect_f32 anchor_slot, float bar_edge_y,
-                                                     int32_t drop_direction, float margin, float x,
-                                                     float y);
+    reach_rect_union reach_context_menu_hover_shape(reach_rect_f32 popup_bounds,
+                                                    reach_rect_f32 anchor_slot, float bar_edge_y,
+                                                    int32_t drop_direction, float margin);
 
     const reach_context_menu_state *reach_context_menu_state_ptr(const reach_context_menu *menu);
 

@@ -80,8 +80,9 @@ static void reach_context_menu_load_windows(reach_context_menu *menu,
     menu->state.close_hovered_index = REACH_CONTEXT_MENU_NO_ITEM;
 }
 
-int32_t reach_context_menu_arrange_previews(reach_context_menu *menu,
-                                            const reach_context_menu_open_context *ctx)
+static int32_t reach_context_menu_arrange_previews_as(reach_context_menu *menu,
+                                                      const reach_context_menu_open_context *ctx,
+                                                      int32_t force_cut)
 {
     if (ctx->theme == nullptr || ctx->monitor.width <= 0.0f || ctx->monitor.height <= 0.0f)
     {
@@ -198,7 +199,7 @@ int32_t reach_context_menu_arrange_previews(reach_context_menu *menu,
     float target_width = row_width + (padding + border) * 2;
     float popup_height = height + chrome - margin * 2 + (overflow ? header + header_gap : 0);
     double now = reach_motion_now_seconds();
-    int32_t cut = !menu->layout_initialized ||
+    int32_t cut = force_cut || !menu->layout_initialized ||
                   !reach_feature_transition_visible(&menu->popup_transition) || monitor_changed ||
                   scale != state->dpi_scale || border != menu->previews.border ||
                   !reach_rect_equal(previous_context.anchor_button, ctx->anchor_button) ||
@@ -379,6 +380,17 @@ int32_t reach_context_menu_arrange_previews(reach_context_menu *menu,
     menu->request.drop_direction = ctx->drop_direction;
     menu->hover_margin = 12.0f * scale;
     return changed;
+}
+
+int32_t reach_context_menu_arrange_previews(reach_context_menu *menu,
+                                            const reach_context_menu_open_context *ctx)
+{
+    return reach_context_menu_arrange_previews_as(menu, ctx, 0);
+}
+
+int32_t reach_context_menu_settle_previews(reach_context_menu *menu)
+{
+    return reach_context_menu_arrange_previews_as(menu, &menu->preview_context, 1);
 }
 
 void reach_context_menu_open_window_list(reach_context_menu *menu, size_t target_index,

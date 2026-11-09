@@ -1,6 +1,7 @@
 #ifndef REACH_PORTS_INPUT_SOURCE_H
 #define REACH_PORTS_INPUT_SOURCE_H
 
+#include "reach/core/geometry.h"
 #include "reach/core/ui_events.h"
 #include "reach/core/window_id.h"
 
@@ -27,7 +28,7 @@ extern "C"
         reach_result (*get_pointer_position)(reach_input_source *source,
                                              reach_point_i32 *out_position);
         reach_result (*set_pointer_region)(reach_input_source *source, uint32_t region_id,
-                                           reach_rect_f32 bounds, int32_t enabled);
+                                           const reach_rect_union *shape);
         reach_result (*get_window_manipulation)(reach_input_source *source,
                                                 reach_window_manipulation *out_manipulation);
         void (*destroy)(reach_input_source *source);

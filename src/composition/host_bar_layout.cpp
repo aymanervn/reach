@@ -182,14 +182,14 @@ static void reach_host_apply_edge_reveal(reach_host *host, reach_host_edge_revea
 }
 
 void reach_host_set_pointer_observation(reach_host *host, reach_surface_id id,
-                                        reach_rect_f32 bounds, int32_t enabled)
+                                        const reach_rect_union *shape)
 {
     if (host == nullptr || host->input_source.ops.set_pointer_region == nullptr)
     {
         return;
     }
     (void)host->input_source.ops.set_pointer_region(host->input_source.source,
-                                                    static_cast<uint32_t>(id), bounds, enabled);
+                                                    static_cast<uint32_t>(id), shape);
 }
 
 static void reach_host_apply_bar_pointer_observation(reach_host *host, reach_surface_id id,
@@ -199,8 +199,13 @@ static void reach_host_apply_bar_pointer_observation(reach_host *host, reach_sur
     {
         return;
     }
-    reach_host_set_pointer_observation(host, id, result->pointer_observation_bounds,
-                                       result->pointer_observation_active);
+    reach_rect_union shape = {};
+    if (result->pointer_observation_active)
+    {
+        shape.rects[0] = result->pointer_observation_bounds;
+        shape.count = 1;
+    }
+    reach_host_set_pointer_observation(host, id, &shape);
 }
 
 reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surface_id id,
@@ -224,7 +229,7 @@ reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surfa
     }
     if (!reach_host_bar_reveal_enabled(desc))
     {
-        reach_host_set_pointer_observation(host, id, {}, 0);
+        reach_host_set_pointer_observation(host, id, nullptr);
         if (desc->definition->surface.bar_reveal.active_layer > 0)
         {
             reach_layout_set_layer_intent(&host->layout_manager, host->surface_participants[id],

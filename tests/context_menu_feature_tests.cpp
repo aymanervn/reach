@@ -229,6 +229,38 @@ static void test_menu_commands_execute_only_from_the_published_snapshot(void)
                 "power commands stay system actions and skip the item snapshot");
 }
 
+static void expect_hold_matches_shape(const reach_context_menu *menu, const reach_rect_union *shape,
+                                      reach_rect_f32 slot, float bar_edge_y, reach_rect_f32 area)
+{
+    reach_rect_f32 popup = reach_context_menu_state_ptr(menu)->bounds;
+    const float margin = 12.0f;
+    int32_t mismatch = 0;
+    int32_t beside_slot_held = 0;
+    for (float y = area.y; y < area.y + area.height; y += 1.0f)
+    {
+        for (float x = area.x; x < area.x + area.width; x += 1.0f)
+        {
+            int32_t in_popup = x >= popup.x - margin && x < popup.x + popup.width + margin &&
+                               y >= popup.y - margin && y < popup.y + popup.height + margin;
+            int32_t in_slot = x >= slot.x - margin && x < slot.x + slot.width + margin &&
+                              y >= slot.y - margin && y < slot.y + slot.height + margin;
+            float left = fminf(popup.x, slot.x);
+            float right = fmaxf(popup.x + popup.width, slot.x + slot.width);
+            int32_t in_corridor = x >= left - margin && x < right + margin &&
+                                  y >= popup.y + popup.height && y < bar_edge_y;
+            int32_t expected = in_popup || in_slot || in_corridor;
+            int32_t published = reach_rect_union_contains(shape, x, y);
+            int32_t held = reach_context_menu_window_list_holds_pointer(menu, x, y);
+            mismatch |= expected != published || published != held;
+            int32_t beside = y >= slot.y + slot.height + margin &&
+                             (x < slot.x - margin || x >= slot.x + slot.width + margin);
+            beside_slot_held |= beside && held;
+        }
+    }
+    expect_true(!mismatch, "every watched point holds the list and every other point releases it");
+    expect_true(!beside_slot_held, "the bar beside the item does not hold the list open");
+}
+
 static void test_window_list_holds_the_pointer_across_the_gap(void)
 {
     reach_context_menu *menu = nullptr;
@@ -284,29 +316,11 @@ static void test_window_list_holds_the_pointer_across_the_gap(void)
     expect_true(!reach_context_menu_window_list_holds_pointer(menu, 40.0f, 200.0f),
                 "the pointer well away from both dismisses the list");
 
-    /* Reach is told about the pointer leaving this band and nothing else, so anything the hold
-       test still accepts has to be inside it. A hole here is a window list that can never be
-       dismissed once the pointer is over another application. */
-    reach_rect_f32 watch = {};
-    expect_true(reach_context_menu_window_list_hover_bounds(menu, &watch),
-                "an open window list publishes a band for the platform to watch");
-    int32_t escaped = 0;
-    for (float sample_x = 200.0f; sample_x <= 700.0f; sample_x += 5.0f)
-    {
-        for (float sample_y = 700.0f; sample_y <= 1060.0f; sample_y += 5.0f)
-        {
-            if (!reach_context_menu_window_list_holds_pointer(menu, sample_x, sample_y))
-            {
-                continue;
-            }
-            if (sample_x < watch.x || sample_x > watch.x + watch.width || sample_y < watch.y ||
-                sample_y > watch.y + watch.height)
-            {
-                escaped = 1;
-            }
-        }
-    }
-    expect_true(!escaped, "every point that holds the list open lies inside the watched band");
+    reach_rect_union shape = {};
+    expect_true(reach_context_menu_window_list_hold_shape(menu, &shape),
+                "an open window list publishes the shape for the platform to watch");
+    expect_hold_matches_shape(menu, &shape, request.anchor_button, request.bar_edge_y,
+                              {200.0f, 600.0f, 500.0f, 480.0f});
 
     reach_context_menu_destroy(menu);
 }
@@ -698,6 +712,100 @@ static void test_preview_width_animation_retarget_and_reset(void)
     reach_window_tracking_destroy(windows);
 }
 
+static void test_rect_union_containment(void)
+{
+    reach_rect_union shape = {};
+    expect_true(!reach_rect_union_contains(&shape, 0.0f, 0.0f), "an empty union contains nothing");
+    expect_true(!reach_rect_union_contains(nullptr, 0.0f, 0.0f),
+                "a missing union contains nothing");
+    shape.rects[0] = {10.0f, 20.0f, 30.0f, 40.0f};
+    shape.rects[1] = {0.0f, 0.0f, 0.0f, 50.0f};
+    shape.rects[2] = {100.0f, 100.0f, 10.0f, 10.0f};
+    shape.count = 2;
+    expect_true(reach_rect_union_contains(&shape, 10.0f, 20.0f), "the near corner is inside");
+    expect_true(!reach_rect_union_contains(&shape, 40.0f, 30.0f), "the far x edge is outside");
+    expect_true(!reach_rect_union_contains(&shape, 20.0f, 60.0f), "the far y edge is outside");
+    expect_true(reach_rect_union_contains(&shape, 39.0f, 59.0f),
+                "the last interior point is inside");
+    expect_true(!reach_rect_union_contains(&shape, 0.0f, 10.0f), "a zero-width rect is empty");
+    expect_true(!reach_rect_union_contains(&shape, 105.0f, 105.0f),
+                "rects past the count are ignored");
+    shape.count = 3;
+    expect_true(reach_rect_union_contains(&shape, 105.0f, 105.0f), "counted rects are included");
+}
+
+static void test_window_list_shape_shrinks_when_reflow_settles(void)
+{
+    reset_preview_windows(3);
+    preview_frames[0] = {0, 0, 600, 1200};
+    preview_frames[2] = {0, 0, 2400, 900};
+    reach_window_manager_port port = {};
+    port.ops.window_count = preview_count;
+    port.ops.window_at = preview_at;
+    port.ops.frame_bounds = preview_frame;
+    reach_window_tracking *windows = nullptr;
+    reach_window_tracking_create(port, &windows);
+    reach_window_tracking_refresh(windows, nullptr);
+    reach_context_menu *menu = nullptr;
+    reach_context_menu_create(&menu);
+    reach_context_menu_attach_services(menu, windows, nullptr);
+    reach_menu_request request = {};
+    for (size_t index = 0; index < 3; ++index)
+    {
+        request.windows[index].window = index + 1;
+    }
+    reach_context_menu_open_context ctx = {};
+    ctx.theme = reach_theme_default();
+    ctx.monitor = {0, 0, 1920, 1080};
+    ctx.dpi_scale = 1.0f;
+    ctx.anchored = 1;
+    ctx.drop_direction = REACH_POPUP_DROP_UP;
+    ctx.anchor_button = {400, 1000, 40, 40};
+    ctx.bar_edge_y = 1000;
+    ctx.request = &request;
+    request.anchored = 1;
+    request.anchor_button = ctx.anchor_button;
+    request.bar_edge_y = ctx.bar_edge_y;
+    request.drop_direction = ctx.drop_direction;
+    request.window_count = 3;
+    reach_context_menu_open_window_list(menu, 0, &ctx);
+    float wide = reach_context_menu_state_ptr(menu)->bounds.width;
+    request.window_count = 1;
+    reach_context_menu_open_window_list(menu, 0, &ctx);
+    advance_preview_layout(menu, &ctx, 0.03);
+
+    reach_rect_union moving = {};
+    reach_context_menu_window_list_hold_shape(menu, &moving);
+    reach_feature_surface_geometry geometry = {};
+    reach_context_menu_capsule_ops()->surface_geometry(menu, &geometry);
+    expect_true(geometry.visible_bounds.width > wide * 0.5f,
+                "the wide envelope is kept while the reflow animates");
+
+    advance_preview_layout(menu, &ctx, 1.0);
+    reach_rect_f32 popup = reach_context_menu_state_ptr(menu)->bounds;
+    reach_context_menu_capsule_ops()->surface_geometry(menu, &geometry);
+    expect_near(geometry.visible_bounds.x, popup.x, 0.5f,
+                "the settled surface starts at the popup");
+    expect_near(geometry.visible_bounds.width, popup.width, 0.5f,
+                "the settled surface is as wide as the popup");
+    expect_true(popup.width < wide, "the settled popup is narrower than the wide one");
+
+    reach_rect_union settled = {};
+    reach_context_menu_window_list_hold_shape(menu, &settled);
+    expect_near(settled.rects[0].x, popup.x - 12.0f, 0.5f,
+                "the watched popup rect is the settled popup");
+    expect_near(settled.rects[0].width, popup.width + 24.0f, 0.5f,
+                "the watched popup rect no longer carries the wide envelope");
+    expect_true(settled.rects[0].width < moving.rects[0].width,
+                "the watched shape shrank after the reflow settled");
+
+    expect_hold_matches_shape(
+        menu, &settled, request.anchor_button, request.bar_edge_y,
+        {popup.x - 100.0f, popup.y - 60.0f, popup.width + 200.0f, popup.height + 200.0f});
+    reach_context_menu_destroy(menu);
+    reach_window_tracking_destroy(windows);
+}
+
 static float preview_screen_x(const reach_context_menu *menu, reach_window_id source)
 {
     for (size_t index = 0; index < reach_context_menu_thumbnail_count(menu); ++index)
@@ -809,5 +917,7 @@ int main(void)
     test_preview_width_animation_retarget_and_reset();
     test_preview_reflow_preserves_surviving_sources();
     test_capsule_owns_popup_pointer_policy();
+    test_rect_union_containment();
+    test_window_list_shape_shrinks_when_reflow_settles();
     return failures == 0 ? 0 : 1;
 }

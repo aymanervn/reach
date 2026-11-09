@@ -85,15 +85,18 @@ static void reach_host_route_dock_item_context_menu(void *user, const reach_menu
 }
 
 /* Reach only sees pointer moves over its own windows, so the window list also asks the platform
-   to watch the band it lives in. Leaving that band over a foreign window is the case that has no
-   other signal at all. */
+   to watch the exact shape it holds open. Leaving that shape over a foreign window is the case
+   that has no other signal at all. */
 static void reach_host_watch_window_list_pointer(reach_host *host)
 {
     reach_context_menu *menu =
         reach_host_feature_capsule<reach_context_menu>(host, REACH_SURFACE_ID_CONTEXT_MENU);
-    reach_rect_f32 bounds = {};
-    int32_t watching = reach_context_menu_window_list_hover_bounds(menu, &bounds);
-    reach_host_set_pointer_observation(host, REACH_SURFACE_ID_CONTEXT_MENU, bounds, watching);
+    reach_rect_union shape = {};
+    if (!reach_context_menu_window_list_hold_shape(menu, &shape))
+    {
+        shape.count = 0;
+    }
+    reach_host_set_pointer_observation(host, REACH_SURFACE_ID_CONTEXT_MENU, &shape);
 }
 
 static void reach_host_open_window_list(reach_host *host, const reach_menu_request *request)

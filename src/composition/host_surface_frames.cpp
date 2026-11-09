@@ -598,9 +598,12 @@ static void reach_host_sync_surface_pointer_observation(reach_host *host,
     const reach_feature_surface_ops *ops = desc->definition->surface_ops;
     if (ops->pointer_observation != nullptr)
     {
-        reach_rect_f32 bounds = {};
-        int32_t observing = ops->pointer_observation(desc->capsule, &bounds);
-        reach_host_set_pointer_observation(host, desc->definition->id, bounds, observing);
+        reach_rect_union shape = {};
+        if (!ops->pointer_observation(desc->capsule, &shape))
+        {
+            shape.count = 0;
+        }
+        reach_host_set_pointer_observation(host, desc->definition->id, &shape);
     }
 }
 

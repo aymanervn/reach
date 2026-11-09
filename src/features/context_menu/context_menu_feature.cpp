@@ -132,7 +132,22 @@ void reach_context_menu_force_close(reach_context_menu *menu)
 }
 
 /* The window list stays up while the pointer is anywhere in the band that joins it to the
-   control it hangs off, so it survives the gap the pointer crosses on the way over. */
+   control it hangs off, so it survives the gap the pointer crosses on the way over. The same
+   shape is what the platform watches, so what holds the list open is exactly what is observed. */
+int32_t reach_context_menu_window_list_hold_shape(const reach_context_menu *menu,
+                                                  reach_rect_union *out_shape)
+{
+    if (menu == nullptr || out_shape == nullptr || !menu->state.open ||
+        !menu->state.window_list_open || !menu->request.anchored)
+    {
+        return 0;
+    }
+    *out_shape = reach_context_menu_hover_shape(
+        menu->previews.envelope, menu->request.anchor_button, menu->request.bar_edge_y,
+        menu->state.drop_direction, menu->hover_margin);
+    return 1;
+}
+
 int32_t reach_context_menu_window_list_holds_pointer(const reach_context_menu *menu, float screen_x,
                                                      float screen_y)
 {
@@ -144,46 +159,9 @@ int32_t reach_context_menu_window_list_holds_pointer(const reach_context_menu *m
     {
         return 1;
     }
-    return reach_context_menu_hover_region_contains(
-        reach_context_menu_state_ptr(menu)->bounds, menu->request.anchor_button,
-        menu->request.bar_edge_y, menu->state.drop_direction, menu->hover_margin, screen_x,
-        screen_y);
-}
-
-/* The bounding band of the hold region above, so the pointer can be watched globally while the
-   pointer never enters a Reach window. */
-int32_t reach_context_menu_window_list_hover_bounds(const reach_context_menu *menu,
-                                                    reach_rect_f32 *out_bounds)
-{
-    if (menu == nullptr || out_bounds == nullptr || !menu->state.open ||
-        !menu->state.window_list_open || !menu->request.anchored)
-    {
-        return 0;
-    }
-
-    const reach_rect_f32 popup = menu->previews.envelope;
-    const reach_rect_f32 slot = menu->request.anchor_button;
-    const float margin = menu->hover_margin;
-    float left = popup.x < slot.x ? popup.x : slot.x;
-    float right =
-        popup.x + popup.width > slot.x + slot.width ? popup.x + popup.width : slot.x + slot.width;
-    float top = popup.y < slot.y ? popup.y : slot.y;
-    float bottom = popup.y + popup.height > slot.y + slot.height ? popup.y + popup.height
-                                                                 : slot.y + slot.height;
-    if (menu->request.bar_edge_y < top)
-    {
-        top = menu->request.bar_edge_y;
-    }
-    if (menu->request.bar_edge_y > bottom)
-    {
-        bottom = menu->request.bar_edge_y;
-    }
-
-    out_bounds->x = left - margin;
-    out_bounds->y = top - margin;
-    out_bounds->width = (right - left) + margin * 2.0f;
-    out_bounds->height = (bottom - top) + margin * 2.0f;
-    return 1;
+    reach_rect_union shape = {};
+    return reach_context_menu_window_list_hold_shape(menu, &shape) &&
+           reach_rect_union_contains(&shape, screen_x, screen_y);
 }
 
 size_t reach_context_menu_window_list_target(const reach_context_menu *menu)
@@ -521,32 +499,29 @@ void reach_context_menu_open_for_item(reach_context_menu *menu, size_t target_in
     reach_motion_set(&menu->hover, 0.0f);
 }
 
-int32_t reach_context_menu_hover_region_contains(reach_rect_f32 popup_bounds,
-                                                 reach_rect_f32 anchor_slot, float bar_edge_y,
-                                                 int32_t drop_direction, float margin, float x,
-                                                 float y)
+static reach_rect_f32 reach_context_menu_grow(reach_rect_f32 rect, float margin)
 {
-    if (x >= popup_bounds.x - margin && x <= popup_bounds.x + popup_bounds.width + margin &&
-        y >= popup_bounds.y - margin && y <= popup_bounds.y + popup_bounds.height + margin)
-    {
-        return 1;
-    }
+    return {rect.x - margin, rect.y - margin, rect.width + margin * 2.0f,
+            rect.height + margin * 2.0f};
+}
 
-    if (x >= anchor_slot.x - margin && x <= anchor_slot.x + anchor_slot.width + margin &&
-        y >= anchor_slot.y - margin && y <= anchor_slot.y + anchor_slot.height + margin)
-    {
-        return 1;
-    }
-
-    float corridor_left = popup_bounds.x < anchor_slot.x ? popup_bounds.x : anchor_slot.x;
-    float corridor_right = popup_bounds.x + popup_bounds.width > anchor_slot.x + anchor_slot.width
-                               ? popup_bounds.x + popup_bounds.width
-                               : anchor_slot.x + anchor_slot.width;
+reach_rect_union reach_context_menu_hover_shape(reach_rect_f32 popup_bounds,
+                                                reach_rect_f32 anchor_slot, float bar_edge_y,
+                                                int32_t drop_direction, float margin)
+{
+    float corridor_left = fminf(popup_bounds.x, anchor_slot.x);
+    float corridor_right =
+        fmaxf(popup_bounds.x + popup_bounds.width, anchor_slot.x + anchor_slot.width);
     float corridor_top =
         drop_direction == REACH_POPUP_DROP_DOWN ? bar_edge_y : popup_bounds.y + popup_bounds.height;
     float corridor_bottom = drop_direction == REACH_POPUP_DROP_DOWN ? popup_bounds.y : bar_edge_y;
-    return x >= corridor_left - margin && x <= corridor_right + margin &&
-           y >= corridor_top - margin && y <= corridor_bottom + margin;
+    reach_rect_union shape = {};
+    shape.rects[shape.count++] = reach_context_menu_grow(popup_bounds, margin);
+    shape.rects[shape.count++] = reach_context_menu_grow(anchor_slot, margin);
+    shape.rects[shape.count++] = {corridor_left - margin, corridor_top,
+                                  corridor_right - corridor_left + margin * 2.0f,
+                                  corridor_bottom - corridor_top};
+    return shape;
 }
 
 int32_t reach_context_menu_reanchor(reach_context_menu *menu,
@@ -931,6 +906,7 @@ static void reach_context_menu_capsule_tick(void *capsule, double delta_seconds,
     if (menu->layout_cleanup_pending && !reach_motion_active(&menu->reflow))
     {
         reach_context_menu_stop_preview_reflow(menu);
+        reach_context_menu_settle_previews(menu);
         out->redraw = out->request_update = 1;
     }
     int32_t popup_was_visible = reach_feature_transition_visible(&menu->popup_transition);
