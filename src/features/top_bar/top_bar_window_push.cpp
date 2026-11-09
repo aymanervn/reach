@@ -264,7 +264,8 @@ void reach_top_bar_window_push_apply(reach_top_bar_window_push *push,
 
     reach_top_bar_window_push_exclude(push, request->excluded_window);
 
-    if (!push->recovered && !push->captured && request->push_depth > 0.0f)
+    if (request->recover_maximized && !push->recovered && !push->captured &&
+        request->push_depth > 0.0f)
     {
         push->recovered = reach_top_bar_push_recover(push, request->monitor_bounds);
     }
