@@ -128,6 +128,34 @@ reach_host_surface_presentation_frame reach_host_surface_presentation_frame_comp
     return frame;
 }
 
+void reach_host_surface_presentation_extent(const reach_render_group *group,
+                                            reach_rect_f32 *translation_bounds, float *max_scale)
+{
+    if (group == nullptr || translation_bounds == nullptr || max_scale == nullptr)
+        return;
+    float maximum_scale = *max_scale > 1.0f ? *max_scale : 1.0f;
+    float minimum = 0.0f, maximum = 0.0f;
+    reach_motion scales[] = {group->scale, reach_render_group_y_scale(group)};
+    for (const reach_motion &scale : scales)
+        if (scale.generation != 0 && reach_motion_range(&scale, &minimum, &maximum) == REACH_OK)
+            maximum_scale = fmaxf(maximum_scale, fmaxf(fabsf(minimum), maximum));
+    auto cover = [&](const reach_motion &motion, float *origin, float *extent)
+    {
+        if (motion.generation == 0 || reach_motion_range(&motion, &minimum, &maximum) != REACH_OK)
+            return;
+        float low = *origin, high = *origin + *extent;
+        if (minimum >= low && maximum <= high)
+            return;
+        low = fminf(low, minimum);
+        high = fmaxf(high, maximum);
+        *origin = low;
+        *extent = high - low;
+    };
+    cover(group->x, &translation_bounds->x, &translation_bounds->width);
+    cover(group->y, &translation_bounds->y, &translation_bounds->height);
+    *max_scale = maximum_scale;
+}
+
 static void reach_host_register_edge_reveal_participant(reach_host *host,
                                                         reach_host_edge_reveal_runtime *runtime)
 {

@@ -767,6 +767,8 @@ reach_result reach_host_apply_window_state(reach_platform_window_port *window,
 reach_host_surface_presentation_frame reach_host_surface_presentation_frame_compute(
     reach_rect_f32 target_bounds, reach_rect_f32 envelope_bounds, reach_shadow_pad shadow_pad,
     reach_rect_f32 translation_bounds, float max_scale);
+void reach_host_surface_presentation_extent(const reach_render_group *group,
+                                            reach_rect_f32 *translation_bounds, float *max_scale);
 void reach_host_finish_surface_presentations(reach_host *host);
 reach_window_thumbnail_placement reach_host_native_overlay_placement(
     reach_window_thumbnail_placement placement, const reach_feature_surface_geometry *geometry,

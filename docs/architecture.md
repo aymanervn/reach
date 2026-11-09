@@ -623,8 +623,9 @@ and geometry consumers, and active clip motion participates in generic fallback 
 Root-presentation clipping remains unsupported. Rounded groups default to independent radius
 clamping on each axis. `clip_uniform_radius` selects circular corners whose shared radius follows
 the smaller animated dimension. An optional `clip_radius_motion` replaces the scalar radius,
-including an explicit zero, and shares the finite or repeating canonical owner. Its full range must
-be nonnegative; incompatible moving epochs are rejected. `reach_render_group_clip_radii_motion`
+including an explicit zero, and shares the finite or repeating canonical owner. Its endpoints must
+be nonnegative and overshoot below zero clamps; incompatible moving epochs are rejected.
+`reach_render_group_clip_radii_motion`
 supplies bounded radius curves to both compositors. `reach_render_group_clip_radii_at` samples the
 radius and clip dimensions directly for CPU masks and fitted solid paint, preserving scalar
 rounding at the event time. Native rectangular clips use hard edges and rounded clips use soft
@@ -817,6 +818,17 @@ and read through `reach_theme_motion_preset`. Springs `snappy`, `smooth`, `bounc
 multiplies response and duration by one time scale, and `reach_theme_stage_motion_scale` derives
 that scale from the persisted Stage duration relative to `stage_motion_reference_seconds`. Features
 migrate from their legacy per-feature seconds to presets incrementally.
+
+Every size, envelope, clip, raster allocation or budget derived from a motion uses
+`reach_motion_range`, never endpoints or the current sample, so spring overshoot stays inside it.
+Host presentation frames size the window from the scale range and the union of the declared
+translation bounds with the x/y ranges. Fitted solid fills grow their source to the range maximum;
+fitted images, width-text viewports, corner radii and popup extents clamp at their source or natural
+limits. Endpoints must still fit the declared source; only the excursion beyond them is absorbed.
+Bounded channels clamp by construction: `reach_render_unit_motion` limits opacity and tint to [0, 1]
+before native submission only when the range leaves it, and CPU sampling clamps the same channels,
+so monotone descriptors and settled frames are unchanged. Hit testing samples the event-time value.
+Code that rescales `from`/`to` directly must scale `spring_velocity` with them.
 
 Each retained submission samples initial native property values and compiles finite/repeating
 curves from one captured timestamp. Renderer-owned source sampling uses the same scoped policy.

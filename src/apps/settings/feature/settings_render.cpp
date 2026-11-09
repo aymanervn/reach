@@ -55,6 +55,7 @@ static void render_nav_selection_indicator(const reach_settings_render_input *in
     group.y = input->model->nav_selection;
     group.y.from *= pitch;
     group.y.to *= pitch;
+    group.y.spring_velocity *= pitch;
 
     reach_theme_accent accent = items[0].accent;
     for (size_t index = 0; index < available_count; ++index)

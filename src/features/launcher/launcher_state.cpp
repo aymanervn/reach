@@ -1356,6 +1356,7 @@ static void reach_launcher_capsule_surface_geometry(const void *capsule,
     out->presentation.group.y = launcher->surface_y;
     out->presentation.group.y.from *= launcher->surface_dpi_scale;
     out->presentation.group.y.to *= launcher->surface_dpi_scale;
+    out->presentation.group.y.spring_velocity *= launcher->surface_dpi_scale;
 }
 
 const reach_feature_capsule_ops *reach_launcher_capsule_ops(void)

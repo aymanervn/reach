@@ -289,6 +289,7 @@ extern "C"
     int32_t reach_render_group_equal(const reach_render_group *first,
                                      const reach_render_group *second);
     reach_color reach_render_group_tint_at(const reach_render_group *group, double now_seconds);
+    reach_motion reach_render_unit_motion(const reach_motion *motion);
     reach_motion reach_render_group_y_scale(const reach_render_group *group);
     reach_point_f32 reach_render_group_scale_at(const reach_render_group *group,
                                                 double now_seconds);
