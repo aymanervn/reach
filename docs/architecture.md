@@ -794,6 +794,22 @@ the native compiler approximates it with bounded cubic Hermite pieces, retaining
 boundaries and returning no native curve when its fixed segment budget is exhausted. Consumers
 must keep that fallback finite and preserve their own input, extents and source-lifetime policy.
 
+Canonical motion also carries a damped spring (`REACH_EASING_SPRING`): response period, damping
+ratio 0.5-1 (1 is the exact critically damped case) and initial velocity in absolute units.
+`reach_motion_spring_start_at` derives the finite duration from response and damping alone: the
+time at which the damped oscillator's decay envelope bounds displacement below 5e-6 of the
+amplitude `|from - to| + |velocity| / omega`. Every spring with the same parameters therefore shares
+one duration regardless of span or velocity, so same-epoch derivations compare durations exactly;
+the deadline snaps exactly to `to`, so completion and `wait_ms` are unchanged.
+`reach_motion_spring_to_at` and `reach_animation_manager_spring_to_at` retarget from any finite, repeating, mapped or clamped curve,
+preserving value and `reach_motion_velocity_at` at the event time. `reach_motion_spec` names either
+a spring or a legacy curve for later presets. Range, crossing, mapping, lookup, combination and
+clamp helpers treat the spring's raw domain as including its analytic extrema and split time at
+turns and raw boundary crossings, so overshoot is supported rather than assumed monotone. Native
+compilation uses adaptive cubic Hermite pieces with an analytic fourth-derivative bound, split at
+velocity zeros, within the existing 32-piece cap; exhausted budgets return no curve. Repeating
+springs and normalized products of zero-span springs are rejected without output mutation.
+
 Each retained submission samples initial native property values and compiles finite/repeating
 curves from one captured timestamp. Renderer-owned source sampling uses the same scoped policy.
 Presentation completion observes its deadline at the current time and scopes its settled property

@@ -142,6 +142,18 @@ void reach_animation_manager_animate_to_at(reach_animation_manager *manager, siz
                                      duration_seconds, easing, now_seconds);
 }
 
+void reach_animation_manager_spring_to_at(reach_animation_manager *manager, size_t track_id,
+                                          float to, float response_seconds, float damping,
+                                          double now_seconds)
+{
+    reach_animation_track *track = reach_animation_manager_track(manager, track_id);
+    if (track == nullptr)
+        return;
+    reach_motion_spring_to_at(&track->motion, to, response_seconds, damping, now_seconds);
+    track->value = reach_motion_value_at(&track->motion, now_seconds);
+    track->active = reach_motion_active_at(&track->motion, now_seconds);
+}
+
 void reach_animation_manager_reset(reach_animation_manager *manager, size_t track_id)
 {
     reach_animation_manager_set(manager, track_id, 0);

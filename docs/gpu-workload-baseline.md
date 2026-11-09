@@ -2112,3 +2112,42 @@ output paths are isolated; suite checks and tolerances are unchanged. The focuse
 also compiles independently in both configurations with unrelated image-material WIP excluded.
 Finite consumer fidelity, live/product behavior, actual resource cost and performance gates remain
 open. The separate rounded-fill cap experiment is private and has unresolved strict pixel failures.
+
+## 2026-11-09: Canonical spring motion
+
+`reach_motion` gains spring response, damping ratio and initial velocity. The x64 size probe
+reports it growing from 152 to 168 bytes, a retained group from 2400 to 2640 bytes and the
+fixed-capacity command buffer from 2670320 to 2724352 bytes (54032 bytes, 2.0%, per buffer). The
+settle deadline, completion and wait model are unchanged; no consumer uses springs yet.
+
+Native compilation is proven over a dense grid: spans 1-4000 units in both directions, response
+0.15-0.7 s, damping 0.5-1.0, initial velocity 0 or +/-0.5 of span per response period toward or
+away from the target, compiled at 0, 20 and 100 ms elapsed (12958 cases). Every case fits the
+32-piece cap: zero initial velocity peaks at 30 pieces and outward velocity at 32. Maximum sampled
+error against CPU sampling is 0.083 units, junction values/times are exact, and pieces are monotone
+within 0.00012 units. Larger amplitudes return no native curve and keep the finite CPU fallback.
+These are pure descriptor checks, not product appearance or total CPU/GPU/power acceptance.
+
+Settle tolerance fix (same date): the settle threshold is now 1.25e-5 of amplitude with no absolute
+term, the native error bound no longer widens with the deadline snap (a snap at or above the bound
+returns the CPU fallback), and a tail whose mapped residual is at most 0.01 units compiles as one
+piece. Re-proven over response 0.15-0.7 s step 0.05, damping 0.5-1.0 step 0.05, spans
+1/10/72/300/1000/2500/4000 both directions, velocity 0, +/-0.5 and +/-1 of span per response period,
+elapsed 0/16/100/300 ms (36862 cases) plus affine x1000/x4000 of a unit spring (10560 cases): peak
+32 pieces (outward velocity at span 4000), no fallbacks, maximum error 0.083 units, exact
+junctions, monotone within 0.0006 units. Longest settle is 2.60 s; response 0.3 s settles in 0.668 s
+(damping 1) and 0.670 s (0.85), response 0.5 s in 1.114 s and 1.117 s.
+
+Deterministic settle fix (same date): the duration is now a pure function of response and damping,
+solved once from the decay envelope (`(1 + wt)e^-wt` critically damped, the tighter of that and
+`e^-zwt / sqrt(1 - z^2)` under-damped) at 5e-6 of `|from - to| + |v0| / w`. Same-parameter springs
+whose velocities differ only by float rounding now share bit-identical durations: 660 of 660
+float-proportional pairs combine, min and max (previously 55). Adaptive pieces that would leave a
+sub-1e-7 s sliver split their interval in half instead, so slivers never force the CPU fallback.
+Re-proven over response 0.15-0.7 s step 0.025, damping 0.5-1.0 step 0.025, spans
+1/10/72/300/1000/2500/4000 both directions, velocity 0, +/-0.5 and +/-1 of span per response period,
+elapsed 0/16/100/200/300 ms (169050 cases): peak 32 pieces, no fallbacks, maximum error 0.086 units,
+exact junctions, monotone within 0.0007 units. A 0.7 ms elapsed sweep at spans +/-1000/4000 and
+velocity 0/+/-1 (655212 cases) also has no fallbacks. Affine x1000 of a unit spring snaps at most
+0.01 units. Longest settle is 2.75 s; response 0.3 s settles in 0.715 s (damping 1) and 0.722 s
+(0.85), response 0.5 s in 1.192 s and 1.203 s.
