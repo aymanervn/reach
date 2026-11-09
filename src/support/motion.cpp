@@ -381,6 +381,15 @@ reach_motion_spec reach_motion_spec_spring(float response_seconds, float damping
     return spec;
 }
 
+reach_motion_spec reach_motion_spec_scaled(reach_motion_spec spec, float time_scale)
+{
+    if (!(time_scale > 0) || !isfinite(time_scale))
+        return spec;
+    spec.response_seconds *= time_scale;
+    spec.duration_seconds *= time_scale;
+    return spec;
+}
+
 void reach_motion_start_spec_at(reach_motion *motion, float from, float to, float velocity,
                                 reach_motion_spec spec, double now_seconds)
 {
@@ -624,7 +633,9 @@ static bool reach_motion_same_epoch(const reach_motion &a, const reach_motion &b
                        : INFINITY;
     if (!normalized && a.spring_velocity != 0)
         drift = fmin(drift, mismatch / fabs(a.spring_velocity));
-    return drift <= fmax(.01, 4 * fmax(a_position, b_position));
+    double b_range =
+        fabs(b_displacement) + fabs(b.spring_velocity) * reach_spring_velocity_reach(b);
+    return drift <= fmax(fmin(.01, 1e-3 * b_range), 4 * fmax(a_position, b_position));
 }
 
 static bool reach_motion_raw_relation(const reach_motion &a, const reach_motion &b, double &ratio,

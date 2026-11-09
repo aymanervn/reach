@@ -1,3 +1,4 @@
+#include "reach/core/theme.h"
 #include "reach/support/util.h"
 #include "reach/support/motion.h"
 #include "reach/support/animation.h"
@@ -1511,6 +1512,112 @@ static void test_spring_native_compile_proof(void)
            "exhausted spring budgets keep the finite CPU fallback");
 }
 
+static void test_theme_motion_presets(void)
+{
+    struct expected_preset
+    {
+        reach_motion_preset preset;
+        reach_easing easing;
+        float response;
+        float damping;
+        double duration;
+    };
+    const expected_preset table[] = {
+        {REACH_MOTION_PRESET_SNAPPY, REACH_EASING_SPRING, .24f, 1, 0},
+        {REACH_MOTION_PRESET_SMOOTH, REACH_EASING_SPRING, .38f, 1, 0},
+        {REACH_MOTION_PRESET_BOUNCY, REACH_EASING_SPRING, .34f, .78f, 0},
+        {REACH_MOTION_PRESET_PRESS, REACH_EASING_SPRING, .16f, 1, 0},
+        {REACH_MOTION_PRESET_RELEASE, REACH_EASING_SPRING, .30f, .72f, 0},
+        {REACH_MOTION_PRESET_FADE_IN, REACH_EASING_EASE_OUT, 0, 0, .14},
+        {REACH_MOTION_PRESET_FADE_OUT, REACH_EASING_EASE_OUT, 0, 0, .11},
+        {REACH_MOTION_PRESET_MENU_FADE, REACH_EASING_EASE_OUT, 0, 0, .09},
+    };
+    expect(sizeof(table) / sizeof(table[0]) == REACH_MOTION_PRESET_COUNT,
+           "every motion preset has an expected value");
+    for (const expected_preset &entry : table)
+        for (reach_theme_mode mode : {REACH_THEME_MODE_DARK, REACH_THEME_MODE_LIGHT})
+        {
+            reach_motion_spec spec =
+                reach_theme_motion_preset(reach_theme_for_mode(mode), entry.preset);
+            expect(spec.easing == entry.easing && spec.response_seconds == entry.response &&
+                       spec.damping == entry.damping && spec.duration_seconds == entry.duration,
+                   "theme motion presets resolve to their named spec");
+        }
+    reach_motion_spec smooth =
+        reach_theme_motion_preset(reach_theme_default(), REACH_MOTION_PRESET_SMOOTH);
+    reach_motion_spec fallback = reach_theme_motion_preset(nullptr, REACH_MOTION_PRESET_COUNT);
+    expect(fallback.easing == smooth.easing &&
+               fallback.response_seconds == smooth.response_seconds &&
+               fallback.damping == smooth.damping,
+           "unknown presets and a missing theme fall back to smooth");
+}
+
+static void test_motion_preset_scaling(void)
+{
+    const reach_theme *theme = reach_theme_default();
+    reach_motion_spec bouncy = reach_theme_motion_preset(theme, REACH_MOTION_PRESET_BOUNCY);
+    reach_motion_spec fade = reach_theme_motion_preset(theme, REACH_MOTION_PRESET_FADE_OUT);
+    reach_motion_spec slow = reach_motion_spec_scaled(bouncy, 2);
+    reach_motion_spec quick = reach_motion_spec_scaled(fade, .5f);
+    expect(slow.easing == REACH_EASING_SPRING &&
+               slow.response_seconds == bouncy.response_seconds * 2 &&
+               slow.damping == bouncy.damping && quick.easing == fade.easing &&
+               quick.duration_seconds == fade.duration_seconds * .5f,
+           "time scale multiplies spring response and fade duration only");
+    for (float invalid : {0.f, -1.f, NAN, INFINITY})
+    {
+        reach_motion_spec same = reach_motion_spec_scaled(bouncy, invalid);
+        expect(same.response_seconds == bouncy.response_seconds && same.damping == bouncy.damping,
+               "invalid time scales leave presets unchanged");
+    }
+    reach_motion base = {}, scaled = {};
+    reach_motion_start_spec_at(&base, 0, 100, 0, bouncy, 1);
+    reach_motion_start_spec_at(&scaled, 0, 100, 0, slow, 1);
+    expect(fabs(scaled.duration_seconds - 2 * base.duration_seconds) <=
+               1e-6 * base.duration_seconds,
+           "scaled spring settle time stays derived by the engine");
+    expect(reach_theme_stage_motion_scale(theme, theme->stage_motion_reference_seconds) == 1 &&
+               fabsf(reach_theme_stage_motion_scale(theme, .345f) - .345f / .28f) < 1e-6f &&
+               reach_theme_stage_motion_scale(theme, 0) == 1 &&
+               reach_theme_stage_motion_scale(theme, -.2f) == 1 &&
+               reach_theme_stage_motion_scale(nullptr, .56f) == 2,
+           "the persisted Stage duration scales presets relative to its reference");
+}
+
+static void test_motion_presets_compile_natively(void)
+{
+    const reach_theme *theme = reach_theme_default();
+    size_t failures = 0, peak = 0;
+    for (int index = 0; index < REACH_MOTION_PRESET_COUNT; ++index)
+        for (float scale : {.5f, 1.f, .345f / .28f, 2.f})
+        {
+            reach_motion_spec spec = reach_motion_spec_scaled(
+                reach_theme_motion_preset(theme, (reach_motion_preset)index), scale);
+            for (float span : {1.f, 10.f, 72.f, 300.f, 1000.f, 2500.f, 4000.f})
+                for (int reverse : {0, 1})
+                    for (float boost : {0.f, .5f})
+                    {
+                        float from = reverse ? span : 0, to = reverse ? 0 : span;
+                        float velocity =
+                            spec.easing == REACH_EASING_SPRING
+                                ? boost * (to - from) * 6.2831853f / spec.response_seconds
+                                : 0;
+                        reach_motion motion = {};
+                        reach_motion_start_spec_at(&motion, from, to, velocity, spec, 10);
+                        for (double elapsed : {0., .016})
+                        {
+                            reach_motion_segment pieces[REACH_MOTION_MAX_SEGMENTS] = {};
+                            size_t count = reach_motion_compile_at(&motion, 10 + elapsed, pieces);
+                            peak = count > peak ? count : peak;
+                            failures += !(count > 0 && count <= REACH_MOTION_MAX_SEGMENTS &&
+                                          pieces[count - 1].end_value == to);
+                        }
+                    }
+        }
+    expect(failures == 0 && peak <= REACH_MOTION_MAX_SEGMENTS,
+           "every scaled motion preset compiles natively up to a 4000 span");
+}
+
 int main(void)
 {
     test_spring_sampling_and_settle();
@@ -1523,6 +1630,9 @@ int main(void)
     test_spring_epochs_ignore_velocity_rounding();
     test_spring_epochs_tolerate_coordinate_rounding();
     test_spring_native_compile_proof();
+    test_theme_motion_presets();
+    test_motion_preset_scaling();
+    test_motion_presets_compile_natively();
     test_quadratic_motion_geometry_and_compilation();
     test_quadratic_motion_extrema_crossings_and_rejection();
     test_ratio_motion_sampling_compilation_and_interruption();

@@ -85,6 +85,7 @@ extern "C"
                                    float damping, double now_seconds);
     reach_motion_spec reach_motion_spec_curve(double duration_seconds, reach_easing easing);
     reach_motion_spec reach_motion_spec_spring(float response_seconds, float damping);
+    reach_motion_spec reach_motion_spec_scaled(reach_motion_spec spec, float time_scale);
     void reach_motion_start_spec_at(reach_motion *motion, float from, float to, float velocity,
                                     reach_motion_spec spec, double now_seconds);
     void reach_motion_animate_spec_to_at(reach_motion *motion, float to, reach_motion_spec spec,

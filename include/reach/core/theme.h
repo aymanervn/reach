@@ -2,6 +2,7 @@
 #define REACH_THEME_H
 
 #include "reach/core/geometry.h"
+#include "reach/support/motion.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -51,6 +52,19 @@ extern "C"
         REACH_THEME_ACCENT_RED,
         REACH_THEME_ACCENT_COUNT,
     } reach_theme_accent;
+
+    typedef enum reach_motion_preset
+    {
+        REACH_MOTION_PRESET_SNAPPY = 0,
+        REACH_MOTION_PRESET_SMOOTH,
+        REACH_MOTION_PRESET_BOUNCY,
+        REACH_MOTION_PRESET_PRESS,
+        REACH_MOTION_PRESET_RELEASE,
+        REACH_MOTION_PRESET_FADE_IN,
+        REACH_MOTION_PRESET_FADE_OUT,
+        REACH_MOTION_PRESET_MENU_FADE,
+        REACH_MOTION_PRESET_COUNT,
+    } reach_motion_preset;
 
     typedef struct reach_theme
     {
@@ -215,6 +229,8 @@ extern "C"
         float stage_animation_seconds;
         float stage_close_hover_seconds;
         float stage_reflow_seconds;
+        reach_motion_spec motion_presets[REACH_MOTION_PRESET_COUNT];
+        float stage_motion_reference_seconds;
     } reach_theme;
 
     const reach_theme *reach_theme_default(void);
@@ -232,6 +248,9 @@ extern "C"
     float reach_theme_icon_size(const reach_theme *theme, float icon_box_size);
     float reach_theme_icon_box_corner_radius(const reach_theme *theme, float icon_box_size);
     float reach_theme_tray_slot_size(const reach_theme *theme, float dock_height);
+    reach_motion_spec reach_theme_motion_preset(const reach_theme *theme,
+                                                reach_motion_preset preset);
+    float reach_theme_stage_motion_scale(const reach_theme *theme, float stage_seconds);
 
 #ifdef __cplusplus
 }
