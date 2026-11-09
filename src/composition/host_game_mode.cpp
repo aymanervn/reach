@@ -37,7 +37,7 @@ static void reach_host_disable_bar_pointer_observations(reach_host *host)
         if (host->feature_runtimes[index].definition->surface.bar_reveal.ops != nullptr)
         {
             (void)host->input_source.ops.set_pointer_region(host->input_source.source,
-                                                            static_cast<uint32_t>(index), {}, 0);
+                                                            static_cast<uint32_t>(index), nullptr);
         }
     }
 }

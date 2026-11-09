@@ -1120,9 +1120,9 @@ static reach_result reach_context_menu_native_overlay_item(const void *capsule, 
     return result;
 }
 
-static int32_t reach_context_menu_pointer_observation(const void *capsule, reach_rect_f32 *out)
+static int32_t reach_context_menu_pointer_observation(const void *capsule, reach_rect_union *out)
 {
-    return reach_context_menu_window_list_hover_bounds(
+    return reach_context_menu_window_list_hold_shape(
         static_cast<const reach_context_menu *>(capsule), out);
 }
 

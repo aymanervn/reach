@@ -36,6 +36,36 @@ extern "C"
         float offset_y;
     } reach_transform_f32;
 
+#define REACH_RECT_UNION_CAPACITY 4
+
+    typedef struct reach_rect_union
+    {
+        reach_rect_f32 rects[REACH_RECT_UNION_CAPACITY];
+        uint32_t count;
+    } reach_rect_union;
+
+    static inline int32_t reach_rect_contains(reach_rect_f32 rect, float x, float y)
+    {
+        return rect.width > 0.0f && rect.height > 0.0f && x >= rect.x && x < rect.x + rect.width &&
+               y >= rect.y && y < rect.y + rect.height;
+    }
+
+    static inline int32_t reach_rect_union_contains(const reach_rect_union *shape, float x, float y)
+    {
+        if (shape == 0)
+        {
+            return 0;
+        }
+        for (uint32_t index = 0; index < shape->count && index < REACH_RECT_UNION_CAPACITY; ++index)
+        {
+            if (reach_rect_contains(shape->rects[index], x, y))
+            {
+                return 1;
+            }
+        }
+        return 0;
+    }
+
     static inline int32_t reach_rect_equal(reach_rect_f32 a, reach_rect_f32 b)
     {
         return fabsf(a.x - b.x) < 0.5f && fabsf(a.y - b.y) < 0.5f &&

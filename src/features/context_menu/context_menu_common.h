@@ -134,6 +134,7 @@ reach_result reach_context_menu_reflow_previews(reach_context_menu *menu,
 
 int32_t reach_context_menu_arrange_previews(reach_context_menu *menu,
                                             const reach_context_menu_open_context *ctx);
+int32_t reach_context_menu_settle_previews(reach_context_menu *menu);
 const uint16_t *reach_context_menu_preview_icon_path(const reach_context_menu *menu,
                                                      reach_window_id window);
 reach_result reach_context_menu_render_previews(reach_context_menu *menu,

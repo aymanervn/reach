@@ -317,7 +317,7 @@ typedef struct reach_feature_surface_ops
                                            reach_render_command_buffer *out_commands);
     int32_t (*layout_anchor)(const void *capsule, reach_feature_layout_anchor *out);
     const reach_feature_native_overlay_ops *native_overlay;
-    int32_t (*pointer_observation)(const void *capsule, reach_rect_f32 *out);
+    int32_t (*pointer_observation)(const void *capsule, reach_rect_union *out);
 } reach_feature_surface_ops;
 
 typedef struct reach_surface_spec
@@ -474,7 +474,7 @@ void reach_host_set_registered_surface_open(reach_host *host, reach_surface_id i
 void reach_host_close_registered_surface(reach_host *host, reach_surface_id id,
                                          reach_surface_close_intent intent);
 void reach_host_set_pointer_observation(reach_host *host, reach_surface_id id,
-                                        reach_rect_f32 bounds, int32_t enabled);
+                                        const reach_rect_union *shape);
 void reach_host_close_surfaces_on_persistent_press(reach_host *host);
 int32_t reach_host_layout_anchor_equal(const reach_feature_layout_anchor *left,
                                        const reach_feature_layout_anchor *right);
