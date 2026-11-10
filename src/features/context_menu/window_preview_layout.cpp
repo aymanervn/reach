@@ -379,6 +379,7 @@ static int32_t reach_context_menu_arrange_previews_as(reach_context_menu *menu,
     menu->request.anchored = ctx->anchored;
     menu->request.drop_direction = ctx->drop_direction;
     menu->hover_margin = 12.0f * scale;
+    reach_context_menu_anchor_presentation(menu);
     return changed;
 }
 
@@ -416,6 +417,7 @@ void reach_context_menu_open_window_list(reach_context_menu *menu, size_t target
     reach_context_menu_arrange_previews(menu, ctx);
     reach_feature_transition_configure(&menu->popup_transition, ctx->theme, menu->state.dpi_scale,
                                        ctx->drop_direction);
+    reach_context_menu_anchor_presentation(menu);
     menu->state.open = 1;
     reach_feature_transition_set_open(&menu->popup_transition, 1);
     reach_motion_set(&menu->hover, 0.0f);

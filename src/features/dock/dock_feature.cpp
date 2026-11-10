@@ -134,10 +134,6 @@ static reach_pressable_feedback_style reach_dock_pressable_feedback(reach_dock *
     {
         feedback.motion = &dock->press_feedback;
         feedback.pressed_value = 0.50f;
-        feedback.press_seconds = 0.055;
-        feedback.release_seconds = 0.055;
-        feedback.press_easing = REACH_EASING_EASE_IN_OUT;
-        feedback.release_easing = REACH_EASING_EASE_IN_OUT;
     }
     return feedback;
 }

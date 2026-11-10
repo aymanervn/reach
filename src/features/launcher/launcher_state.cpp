@@ -5,20 +5,15 @@
 #include <math.h>
 #include <new>
 
+#include "reach/features/common/presentation.h"
 #include "reach/features/common/section_reveal.h"
 #include "reach/core/blink.h"
-
-static const float REACH_LAUNCHER_SURFACE_OFFSET = 8.0f;
-static const float REACH_LAUNCHER_SURFACE_SCALE = 1.08f;
 
 struct reach_launcher
 {
     reach_motion results_expansion;
     double results_deadline;
-    reach_motion surface_y;
-    reach_motion surface_opacity;
-    reach_motion surface_scale;
-    double surface_deadline;
+    reach_feature_transition surface_transition;
     reach_blink caret;
     int32_t caret_retained;
     reach_launcher_state state;
@@ -28,101 +23,7 @@ struct reach_launcher
     uint16_t terminal_icon_ref[REACH_SEARCH_RESULT_PATH_CAPACITY];
     reach_launcher_layout pointer_layout;
     int32_t pointer_layout_valid;
-    double surface_open_seconds;
-    double surface_close_seconds;
-    float surface_dpi_scale;
-    int32_t surface_visible;
-    int32_t surface_target_open;
 };
-
-static int32_t reach_launcher_surface_animation_active(const reach_launcher *launcher)
-{
-    return launcher != nullptr && (reach_motion_active(&launcher->surface_y) ||
-                                   reach_motion_active(&launcher->surface_opacity) ||
-                                   reach_motion_active(&launcher->surface_scale));
-}
-
-static void reach_launcher_reset_surface_animation(reach_launcher *launcher)
-{
-    if (launcher == nullptr)
-    {
-        return;
-    }
-    launcher->surface_visible = 0;
-    launcher->surface_target_open = 0;
-    launcher->surface_deadline = 0.0;
-    reach_motion_set(&launcher->surface_y, REACH_LAUNCHER_SURFACE_OFFSET);
-    reach_motion_set(&launcher->surface_opacity, 0.0f);
-    reach_motion_set(&launcher->surface_scale, REACH_LAUNCHER_SURFACE_SCALE);
-}
-
-static void reach_launcher_configure_surface_animation(reach_launcher *launcher,
-                                                       const reach_theme *theme, float dpi_scale)
-{
-    if (launcher == nullptr)
-    {
-        return;
-    }
-    const reach_theme *resolved_theme = theme != nullptr ? theme : reach_theme_default();
-    launcher->surface_open_seconds = resolved_theme->surface_open_seconds;
-    launcher->surface_close_seconds = resolved_theme->surface_close_seconds;
-    launcher->surface_dpi_scale = dpi_scale > 0.0f ? dpi_scale : 1.0f;
-}
-
-static void reach_launcher_set_surface_animation_open(reach_launcher *launcher, int32_t open)
-{
-    if (launcher == nullptr)
-    {
-        return;
-    }
-    int32_t target_open = open ? 1 : 0;
-    double now = reach_motion_now_seconds();
-    launcher->surface_target_open = target_open;
-    if (target_open)
-    {
-        if (!launcher->surface_visible)
-        {
-            launcher->surface_visible = 1;
-            reach_motion_set(&launcher->surface_y, REACH_LAUNCHER_SURFACE_OFFSET);
-            reach_motion_set(&launcher->surface_opacity, 0.0f);
-            reach_motion_set(&launcher->surface_scale, REACH_LAUNCHER_SURFACE_SCALE);
-        }
-        reach_motion_animate_to_at(&launcher->surface_y, 0.0f, launcher->surface_open_seconds,
-                                   REACH_EASING_EASE_OUT, now);
-        reach_motion_animate_to_at(&launcher->surface_opacity, 1.0f, launcher->surface_open_seconds,
-                                   REACH_EASING_EASE_OUT, now);
-        reach_motion_animate_to_at(&launcher->surface_scale, 1.0f, launcher->surface_open_seconds,
-                                   REACH_EASING_EASE_OUT, now);
-    }
-    else if (launcher->surface_visible)
-    {
-        reach_motion_animate_to_at(&launcher->surface_y, REACH_LAUNCHER_SURFACE_OFFSET,
-                                   launcher->surface_close_seconds, REACH_EASING_EASE_IN, now);
-        reach_motion_animate_to_at(&launcher->surface_opacity, 0.0f,
-                                   launcher->surface_close_seconds, REACH_EASING_EASE_IN, now);
-        reach_motion_animate_to_at(&launcher->surface_scale, REACH_LAUNCHER_SURFACE_SCALE,
-                                   launcher->surface_close_seconds, REACH_EASING_EASE_IN, now);
-    }
-    launcher->surface_deadline = reach_motion_deadline(&launcher->surface_opacity);
-    double y_deadline = reach_motion_deadline(&launcher->surface_y);
-    double scale_deadline = reach_motion_deadline(&launcher->surface_scale);
-    if (y_deadline > launcher->surface_deadline)
-        launcher->surface_deadline = y_deadline;
-    if (scale_deadline > launcher->surface_deadline)
-        launcher->surface_deadline = scale_deadline;
-    if (launcher->surface_deadline == 0.0 && launcher->surface_visible)
-        launcher->surface_deadline = reach_motion_now_seconds();
-}
-
-static void reach_launcher_finish_surface_animation(reach_launcher *launcher)
-{
-    if (launcher == nullptr || launcher->surface_target_open || !launcher->surface_visible ||
-        reach_launcher_surface_animation_active(launcher))
-    {
-        return;
-    }
-    reach_launcher_reset_surface_animation(launcher);
-}
 
 static int32_t reach_launcher_results_attached(const reach_launcher_state *state)
 {
@@ -180,7 +81,8 @@ int32_t reach_launcher_arrange(reach_launcher *launcher, const reach_launcher_ar
     {
         return 0;
     }
-    reach_launcher_configure_surface_animation(launcher, ctx->theme, ctx->dpi_scale);
+    reach_feature_transition_configure(&launcher->surface_transition, ctx->theme, ctx->dpi_scale,
+                                       REACH_FEATURE_TRANSITION_FROM_ABOVE);
 
     float scale = ctx->dpi_scale > 0.0f ? ctx->dpi_scale : 1.0f;
     float border = reach_theme_border_thickness(
@@ -587,8 +489,8 @@ reach_result reach_launcher_create(reach_launcher **out_launcher)
     {
         return REACH_ERROR;
     }
-    reach_launcher_configure_surface_animation(launcher, reach_theme_default(), 1.0f);
-    reach_launcher_reset_surface_animation(launcher);
+    reach_feature_transition_init(&launcher->surface_transition, REACH_FEATURE_PRESENTATION_POPUP,
+                                  REACH_FEATURE_TRANSITION_FROM_ABOVE);
     reach_motion_set(&launcher->results_expansion, 0);
     reach_launcher_state_init(&launcher->state);
     *out_launcher = launcher;
@@ -681,7 +583,7 @@ int32_t reach_launcher_set_open(reach_launcher *launcher, int32_t open)
         (void)reach_launcher_close_state(&launcher->state);
         reach_blink_stop(&launcher->caret);
     }
-    reach_launcher_set_surface_animation_open(launcher, open);
+    (void)reach_feature_transition_set_open(&launcher->surface_transition, open);
     return 1;
 }
 
@@ -1000,7 +902,8 @@ static void reach_launcher_capsule_tick(void *capsule, double, reach_feature_tic
         out->relayout = 1;
         out->request_update = 1;
     }
-    int32_t surface_was_visible = launcher != nullptr && launcher->surface_visible;
+    int32_t surface_was_visible =
+        launcher != nullptr && reach_feature_transition_visible(&launcher->surface_transition);
     int32_t expansion_complete = 0;
     if (launcher != nullptr)
     {
@@ -1010,14 +913,10 @@ static void reach_launcher_capsule_tick(void *capsule, double, reach_feature_tic
             launcher->results_deadline = 0;
             expansion_complete = 1;
         }
-        if (launcher->surface_deadline > 0.0 &&
-            reach_motion_wait_ms(launcher->surface_deadline) == 0)
-        {
-            launcher->surface_deadline = 0.0;
-            reach_launcher_finish_surface_animation(launcher);
-        }
+        (void)reach_feature_transition_tick(&launcher->surface_transition, 0.0);
     }
-    int32_t surface_visible = launcher != nullptr && launcher->surface_visible;
+    int32_t surface_visible =
+        launcher != nullptr && reach_feature_transition_visible(&launcher->surface_transition);
     if (out != nullptr && (reach_launcher_update_caret(launcher) || expansion_complete ||
                            surface_was_visible != surface_visible))
         out->redraw = 1;
@@ -1034,7 +933,7 @@ static int32_t reach_launcher_capsule_is_open(const void *capsule)
 static int32_t reach_launcher_capsule_presentation_visible(const void *capsule)
 {
     const reach_launcher *launcher = static_cast<const reach_launcher *>(capsule);
-    return launcher != nullptr && launcher->surface_visible;
+    return launcher != nullptr && reach_feature_transition_visible(&launcher->surface_transition);
 }
 
 static int32_t reach_launcher_capsule_needs_frame(const void *)
@@ -1269,7 +1168,8 @@ static void reach_launcher_capsule_handle_pointer(void *capsule, const reach_poi
     float height = reach_motion_value_at(&body.height, now);
     auto opacity = reach_section_reveal_opacity(&launcher->results_expansion);
     float revealed = reach_motion_value_at(&opacity, now);
-    float slide = (1 - revealed) * reach_launcher_results_offset_dp * launcher->surface_dpi_scale;
+    float slide =
+        (1 - revealed) * reach_launcher_results_offset_dp * launcher->surface_transition.dpi_scale;
     layout.bounds.height = height;
     layout.search_results.height =
         revealed > 0 ? fmaxf(0, height - (layout.search_results.y - layout.bounds.y)) : 0;
@@ -1335,28 +1235,16 @@ static void reach_launcher_capsule_surface_geometry(const void *capsule,
     out->envelope_bounds = layout->envelope_bounds;
     out->has_input_bounds = 1;
     out->input_bounds = reach_launcher_body_motion(layout, &launcher->results_expansion);
-    out->presentation.center_y = reach_motion_affine(&out->input_bounds.height, .5f, 0);
-    out->deadline_seconds = launcher->surface_deadline;
+    reach_feature_transition_presentation(&launcher->surface_transition, out);
     if (launcher->results_deadline > 0 &&
         (out->deadline_seconds <= 0 || launcher->results_deadline < out->deadline_seconds))
         out->deadline_seconds = launcher->results_deadline;
-    out->wait_for_presentation = !launcher->surface_target_open;
     if (!launcher->caret_retained && launcher->state.model.open &&
         launcher->caret.deadline_seconds > 0.0 &&
         (out->deadline_seconds <= 0.0 || launcher->caret.deadline_seconds < out->deadline_seconds))
     {
         out->deadline_seconds = launcher->caret.deadline_seconds;
     }
-    out->presentation.retained = 1;
-    out->presentation.max_scale = REACH_LAUNCHER_SURFACE_SCALE;
-    out->presentation.translation_bounds = {
-        0.0f, 0.0f, 0.0f, REACH_LAUNCHER_SURFACE_OFFSET * launcher->surface_dpi_scale};
-    out->presentation.group.opacity = launcher->surface_opacity;
-    out->presentation.group.scale = launcher->surface_scale;
-    out->presentation.group.y = launcher->surface_y;
-    out->presentation.group.y.from *= launcher->surface_dpi_scale;
-    out->presentation.group.y.to *= launcher->surface_dpi_scale;
-    out->presentation.group.y.spring_velocity *= launcher->surface_dpi_scale;
 }
 
 const reach_feature_capsule_ops *reach_launcher_capsule_ops(void)

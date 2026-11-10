@@ -683,10 +683,6 @@ reach_quick_settings_pressable_feedback(reach_quick_settings *quick_settings)
     reach_pressable_feedback_style feedback = {};
     feedback.motion = quick_settings != nullptr ? &quick_settings->press_feedback : nullptr;
     feedback.pressed_value = 1.0f;
-    feedback.press_seconds = 0.055;
-    feedback.release_seconds = 0.10;
-    feedback.press_easing = REACH_EASING_EASE_IN_OUT;
-    feedback.release_easing = REACH_EASING_EASE_OUT;
     return feedback;
 }
 
@@ -1410,6 +1406,7 @@ reach_result reach_quick_settings_create(reach_quick_settings **out_quick_settin
         return REACH_ERROR;
     }
     reach_feature_transition_init(&quick_settings->popup_transition,
+                                  REACH_FEATURE_PRESENTATION_POPUP,
                                   REACH_FEATURE_TRANSITION_FROM_ABOVE);
     reach_pressable_init(&quick_settings->pressable);
     reach_quick_settings_model_init(&quick_settings->state.model);
@@ -1773,6 +1770,8 @@ void reach_quick_settings_refresh_layout(reach_quick_settings *quick_settings,
         state.surface_motion = screen;
     }
     state.notch_anchor_x = target.notch_anchor_x;
+    reach_feature_transition_set_trigger(&quick_settings->popup_transition, state.render_bounds,
+                                         target.notch_anchor_x);
     state.drop_direction = ctx->drop_direction;
     quick_settings->layout_theme = *ctx->theme;
     quick_settings->layout_dpi = ctx->dpi_scale;

@@ -126,6 +126,7 @@ reach_context_menu_hit_result reach_context_menu_hit_test_menu_items(const reach
 
 void reach_context_menu_stop_preview_reflow(reach_context_menu *menu);
 void reach_context_menu_reset_preview_layout(reach_context_menu *menu);
+void reach_context_menu_anchor_presentation(reach_context_menu *menu);
 reach_rect_f32 reach_context_menu_preview_bounds_at(const reach_context_menu *menu,
                                                     const reach_rect_motion *bounds, double now);
 reach_result reach_context_menu_reflow_previews(reach_context_menu *menu,

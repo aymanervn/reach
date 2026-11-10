@@ -218,11 +218,21 @@ void reach_context_menu_reset(reach_context_menu *menu)
     reach_feature_transition_reset(&menu->popup_transition);
 }
 
+void reach_context_menu_anchor_presentation(reach_context_menu *menu)
+{
+    reach_feature_transition_set_trigger(&menu->popup_transition,
+                                         menu->state.window_list_open && menu->layout_initialized
+                                             ? menu->previews.envelope
+                                             : menu->state.bounds,
+                                         menu->state.notch_anchor_x);
+}
+
 static void reach_context_menu_present(reach_context_menu *menu,
                                        const reach_context_menu_open_context *ctx)
 {
     reach_feature_transition_configure(&menu->popup_transition, ctx->theme, ctx->dpi_scale,
                                        ctx->drop_direction);
+    reach_context_menu_anchor_presentation(menu);
     menu->state.open = 1;
     (void)reach_feature_transition_set_open(&menu->popup_transition, 1);
 }
@@ -552,6 +562,7 @@ int32_t reach_context_menu_reanchor(reach_context_menu *menu,
     }
     reach_feature_transition_configure(&menu->popup_transition, ctx->theme, menu->state.dpi_scale,
                                        ctx->drop_direction);
+    reach_context_menu_anchor_presentation(menu);
     return changed || !reach_rect_equal(before, menu->state.bounds);
 }
 
@@ -1005,7 +1016,8 @@ reach_result reach_context_menu_create(reach_context_menu **out_menu)
     {
         return REACH_ERROR;
     }
-    reach_feature_transition_init(&menu->popup_transition, REACH_FEATURE_TRANSITION_FROM_BELOW);
+    reach_feature_transition_init(&menu->popup_transition, REACH_FEATURE_PRESENTATION_MENU,
+                                  REACH_FEATURE_TRANSITION_FROM_BELOW);
     reach_pressable_init(&menu->pressable);
     reach_context_menu_reset(menu);
     *out_menu = menu;

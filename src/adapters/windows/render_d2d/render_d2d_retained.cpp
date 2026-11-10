@@ -1821,12 +1821,13 @@ reach_result reach_d2d_presentation_complete(reach_render_backend *backend, uint
         backend->scene_presentation.opacity.generation &&
         reach_motion_value_at(&backend->scene_presentation.opacity, now_seconds) <= 0;
     if (reach_motion_active_at(&backend->scene_presentation.opacity, now_seconds) ||
-        reach_motion_active_at(&backend->scene_presentation.x, now_seconds) ||
-        reach_motion_active_at(&backend->scene_presentation.y, now_seconds) ||
-        reach_motion_active_at(&backend->scene_presentation.scale, now_seconds) ||
-        reach_motion_active_at(&backend->scene_presentation.scale_y, now_seconds) ||
-        (!transparent && (reach_motion_active_at(&backend->scene_center_x, now_seconds) ||
-                          reach_motion_active_at(&backend->scene_center_y, now_seconds))))
+        (!transparent &&
+         (reach_motion_active_at(&backend->scene_presentation.x, now_seconds) ||
+          reach_motion_active_at(&backend->scene_presentation.y, now_seconds) ||
+          reach_motion_active_at(&backend->scene_presentation.scale, now_seconds) ||
+          reach_motion_active_at(&backend->scene_presentation.scale_y, now_seconds) ||
+          reach_motion_active_at(&backend->scene_center_x, now_seconds) ||
+          reach_motion_active_at(&backend->scene_center_y, now_seconds))))
         return REACH_OK;
     if (backend->reconciled_presentation_generation == generation)
     {

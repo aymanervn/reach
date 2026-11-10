@@ -2008,6 +2008,793 @@ static void test_close_handoff_readiness_waits_for_observed_restore(void)
                 "a later snapshot with the target restored releases the handoff");
 }
 
+static reach_host presentation_render_host;
+static int presentation_render_failures;
+static size_t presentation_render_count;
+
+static int32_t presentation_root_compiles(const reach_render_command_buffer *commands,
+                                          double now_seconds)
+{
+    const reach_motion *motions[] = {&commands->presentation.opacity, &commands->presentation.scale,
+                                     &commands->presentation.y, &commands->presentation_center_x,
+                                     &commands->presentation_center_y};
+    reach_motion_segment segments[REACH_MOTION_MAX_SEGMENTS];
+    for (const reach_motion *motion : motions)
+    {
+        if (motion->generation != 0 && reach_motion_active_at(motion, now_seconds) &&
+            reach_motion_compile_at(motion, now_seconds, segments) == 0)
+            return 0;
+    }
+    return 1;
+}
+
+static reach_result validating_execute(reach_render_backend *backend,
+                                       const reach_render_command_buffer *commands)
+{
+    (void)backend;
+    ++presentation_render_count;
+    if (commands == nullptr || commands->group_count > REACH_MAX_RENDER_GROUPS ||
+        commands->count > REACH_MAX_RENDER_COMMANDS ||
+        reach_render_command_buffer_validate_groups(commands) != REACH_OK ||
+        !commands->has_presentation || commands->presentation_center_x.generation == 0 ||
+        commands->presentation_center_y.generation == 0 ||
+        !presentation_root_compiles(commands, reach_motion_now_seconds()))
+        ++presentation_render_failures;
+    return REACH_OK;
+}
+
+static void render_presented_surface(reach_host *host, reach_surface_id id,
+                                     reach_feature_surface_context ctx, const char *label)
+{
+    reach_feature_runtime *runtime = &host->feature_runtimes[id];
+    const reach_feature_definition *definition = runtime->definition;
+    (void)definition->surface_ops->arrange(runtime->capsule, &ctx);
+    reach_feature_surface_geometry geometry = {};
+    definition->capsule_ops->surface_geometry(runtime->capsule, &geometry);
+    expect_true(geometry.presentation.retained && geometry.visible_bounds.width > 0.0f &&
+                    geometry.visible_bounds.height > 0.0f,
+                label);
+    reach_rect_f32 translation = geometry.presentation.translation_bounds;
+    float max_scale = geometry.presentation.max_scale;
+    reach_host_surface_presentation_extent(&geometry.presentation.group, &translation, &max_scale);
+    reach_host_surface_presentation_frame frame = reach_host_surface_presentation_frame_compute(
+        geometry.visible_bounds, geometry.envelope_bounds, reach_host_surface_shadow_pad(host, id),
+        translation, max_scale);
+    ctx.visible_bounds = geometry.visible_bounds;
+    ctx.content_rect = frame.content_rect;
+    ctx.render_transform = frame.render_transform;
+    ctx.content_transform_active = 1;
+    ctx.retained_supported = 1;
+
+    auto storage = std::make_unique<reach_render_command_buffer>();
+    reach_render_command_buffer *commands = storage.get();
+    reach_render_command_buffer_clear(commands);
+    reach_result result =
+        definition->surface_ops->append_render_commands(runtime->capsule, &ctx, commands);
+    expect_true(result == REACH_OK, label);
+    commands->has_presentation = 1;
+    commands->presentation = geometry.presentation.group;
+    reach_render_command_buffer_set_content_transform(commands, ctx.content_rect,
+                                                      ctx.render_transform);
+    commands->presentation.bounds = commands->content_rect;
+    commands->presentation_center_x =
+        reach_motion_affine(&geometry.presentation.center_x, ctx.render_transform.scale_x,
+                            ctx.render_transform.offset_x);
+    commands->presentation_center_y =
+        reach_motion_affine(&geometry.presentation.center_y, ctx.render_transform.scale_y,
+                            ctx.render_transform.offset_y);
+
+    int before = presentation_render_failures;
+    if (definition->surface.popup_chrome)
+    {
+        reach_surface_runtime surface = {};
+        surface.renderer.backend = reinterpret_cast<reach_render_backend *>(1);
+        surface.renderer.ops.begin_frame = fake_begin_frame;
+        surface.renderer.ops.end_frame = fake_end_frame;
+        surface.renderer.ops.execute = validating_execute;
+        result =
+            reach_host_render_popup_surface(host, id, &surface, geometry.visible_bounds,
+                                            geometry.notch_anchor_x, geometry.notch_side, commands);
+    }
+    else
+    {
+        result = validating_execute(nullptr, commands);
+    }
+    expect_true(result == REACH_OK && presentation_render_failures == before, label);
+}
+
+static void tick_presented_surface(reach_host *host, reach_surface_id id, double seconds)
+{
+    reach_test_motion_clock_advance(seconds);
+    reach_feature_runtime *runtime = &host->feature_runtimes[id];
+    reach_feature_tick_result tick = {};
+    runtime->definition->capsule_ops->tick(runtime->capsule, seconds, &tick);
+}
+
+template <typename Open, typename Close>
+static void render_presentation_phases(reach_host *host, reach_surface_id id,
+                                       const reach_feature_surface_context &ctx, Open open,
+                                       Close close, const char *label)
+{
+    open();
+    render_presented_surface(host, id, ctx, label);
+    tick_presented_surface(host, id, 0.05);
+    render_presented_surface(host, id, ctx, label);
+    close();
+    tick_presented_surface(host, id, 0.04);
+    render_presented_surface(host, id, ctx, label);
+    open();
+    render_presented_surface(host, id, ctx, label);
+    tick_presented_surface(host, id, 0.6);
+    render_presented_surface(host, id, ctx, label);
+    close();
+    render_presented_surface(host, id, ctx, label);
+    tick_presented_surface(host, id, 0.6);
+    tick_presented_surface(host, id, 0.6);
+}
+
+static size_t fake_switcher_window_count(const reach_window_manager *manager)
+{
+    (void)manager;
+    return REACH_MAX_OPEN_WINDOWS;
+}
+
+static reach_result fake_switcher_window_at(const reach_window_manager *manager, size_t index,
+                                            reach_window_snapshot *out_window)
+{
+    (void)manager;
+    if (index >= REACH_MAX_OPEN_WINDOWS || out_window == nullptr)
+        return REACH_ERROR;
+    *out_window = {};
+    out_window->id = 5000 + index;
+    out_window->visible = 1;
+    for (size_t at = 0; at < 48; ++at)
+        out_window->title[at] = (uint16_t)('a' + (index + at) % 26);
+    return REACH_OK;
+}
+
+struct presentation_contexts
+{
+    reach_feature_surface_context base;
+    reach_feature_surface_context top;
+    reach_feature_surface_context dock;
+};
+
+static presentation_contexts make_presentation_contexts(float dpi, reach_rect_f32 monitor)
+{
+    presentation_contexts contexts = {};
+    reach_feature_surface_context &base = contexts.base;
+    base.theme = reach_theme_default();
+    base.monitor_bounds = monitor;
+    base.available_bounds = monitor;
+    base.dpi_scale = dpi;
+    base.icon_size_px = (int32_t)(32.0f * dpi);
+    base.text_measure = {reinterpret_cast<void *>(1), fake_stats_measure_text};
+    base.transition_visible = 1;
+    base.bounds_valid = 1;
+
+    reach_feature_surface_context &top = contexts.top;
+    top = base;
+    top.anchor_valid = 1;
+    top.anchor_button = {monitor.x + monitor.width - 48.0f * dpi, monitor.y + 4.0f * dpi,
+                         32.0f * dpi, 24.0f * dpi};
+    top.anchor_bar_edge_y = monitor.y + 32.0f * dpi;
+    top.anchor_bar_height = 32.0f * dpi;
+    top.anchor_direction = REACH_POPUP_DROP_DOWN;
+
+    reach_feature_surface_context &dock = contexts.dock;
+    dock = base;
+    dock.anchor_valid = 1;
+    dock.anchor_bounds = {monitor.x + monitor.width * 0.25f,
+                          monitor.y + monitor.height - 64.0f * dpi, monitor.width * 0.5f,
+                          56.0f * dpi};
+    dock.anchor_button = {monitor.x + 8.0f * dpi, dock.anchor_bounds.y + 8.0f * dpi, 40.0f * dpi,
+                          40.0f * dpi};
+    dock.anchor_bar_edge_y = dock.anchor_bounds.y;
+    dock.anchor_bar_height = 56.0f * dpi;
+    dock.anchor_direction = REACH_POPUP_DROP_UP;
+    return contexts;
+}
+
+static void test_shared_presentations_render_worst_case(void)
+{
+    reach_host *host = &presentation_render_host;
+    presentation_render_count = 0;
+    reach_host_init_feature_registry(host);
+    expect_true(reach_host_create_registered_features(host) == REACH_OK,
+                "registered presentation consumers are available");
+    reach_host_init_layout(host);
+
+    reach_quick_settings *quick_settings =
+        reach_host_feature_capsule<reach_quick_settings>(host, REACH_SURFACE_ID_QUICK_SETTINGS);
+    reach_audio_volume_session_list sessions = {};
+    sessions.count = REACH_AUDIO_VOLUME_MAX_SESSIONS;
+    for (size_t index = 0; index < sessions.count; ++index)
+    {
+        sessions.sessions[index].level = 0.5f;
+        sessions.sessions[index].process_id = (uint32_t)(1000 + index);
+        sessions.sessions[index].icon_id = (uint64_t)(9000 + index);
+        for (size_t at = 0; at < 40; ++at)
+            sessions.sessions[index].label[at] = (uint16_t)('A' + (index + at) % 26);
+        sessions.sessions[index].session_instance_id[0] = (uint16_t)('a' + index % 26);
+        sessions.sessions[index].session_instance_id[1] = (uint16_t)('a' + index / 26);
+    }
+    reach_quick_settings_apply_sessions(quick_settings, &sessions);
+
+    reach_battery *battery =
+        reach_host_feature_capsule<reach_battery>(host, REACH_SURFACE_ID_BATTERY);
+    reach_top_bar *top_bar = reach_host_feature_capsule<reach_top_bar>(host, REACH_SURFACE_ID_TRAY);
+    reach_context_menu *menu =
+        reach_host_feature_capsule<reach_context_menu>(host, REACH_SURFACE_ID_CONTEXT_MENU);
+    reach_launcher *launcher =
+        reach_host_feature_capsule<reach_launcher>(host, REACH_SURFACE_ID_LAUNCHER);
+    reach_clipboard_feature *clipboard =
+        reach_host_feature_capsule<reach_clipboard_feature>(host, REACH_SURFACE_ID_CLIPBOARD);
+    reach_system_hud *hud =
+        reach_host_feature_capsule<reach_system_hud>(host, REACH_SURFACE_ID_SYSTEM_HUD);
+
+    reach_window_manager_port switcher_port = {};
+    switcher_port.ops.window_count = fake_switcher_window_count;
+    switcher_port.ops.window_at = fake_switcher_window_at;
+    switcher_port.ops.frame_bounds = fake_preview_frame_bounds;
+    reach_window_tracking *switcher_windows = nullptr;
+    expect_true(reach_window_tracking_create(switcher_port, &switcher_windows) == REACH_OK,
+                "Switcher has the maximum window count");
+    (void)reach_window_tracking_refresh(switcher_windows, nullptr);
+    reach_switcher *switcher =
+        reach_host_feature_capsule<reach_switcher>(host, REACH_SURFACE_ID_SWITCHER);
+    reach_switcher_attach_services(switcher, nullptr, switcher_windows);
+    const reach_feature_capsule_ops *switcher_ops =
+        host->feature_runtimes[REACH_SURFACE_ID_SWITCHER].definition->capsule_ops;
+    auto switch_event = [&](reach_ui_event_type type)
+    {
+        reach_ui_event event = {};
+        event.type = type;
+        reach_capsule_event_result result = {};
+        switcher_ops->handle_event(switcher, &event, &result);
+    };
+
+    uint32_t power_commands[REACH_CONTEXT_MENU_MAX_ITEMS] = {};
+    uint32_t power_icons[REACH_CONTEXT_MENU_MAX_ITEMS] = {};
+    size_t power_count = 0;
+    reach_context_menu_build_power_commands(power_commands, power_icons, &power_count);
+    uint32_t item_commands[REACH_CONTEXT_MENU_MAX_ITEMS] = {};
+    for (size_t index = 0; index < REACH_CONTEXT_MENU_MAX_ITEMS; ++index)
+        item_commands[index] = power_commands[index % (power_count > 0 ? power_count : 1)];
+    reach_menu_request request = {};
+    request.command_count = REACH_CONTEXT_MENU_MAX_ITEMS;
+    static const uint16_t app_name[] = {'A', 'n', ' ', 'e', 'x', 't', 'r', 'e', 'm', 'e', 'l',
+                                        'y', ' ', 'l', 'o', 'n', 'g', ' ', 'a', 'p', 'p', 0};
+
+    const float dpis[] = {1.0f, 1.25f, 1.5f, 2.0f};
+    const reach_rect_f32 monitors[] = {{0.0f, 0.0f, 3840.0f, 2160.0f},
+                                       {-1920.0f, 0.0f, 1920.0f, 1080.0f},
+                                       {0.0f, 0.0f, 360.0f, 280.0f}};
+    for (float dpi : dpis)
+    {
+        for (reach_rect_f32 monitor : monitors)
+        {
+            host->layout_dpi_scale = dpi;
+            presentation_contexts contexts = make_presentation_contexts(dpi, monitor);
+            const reach_feature_surface_context &base = contexts.base;
+            const reach_feature_surface_context &top = contexts.top;
+            const reach_feature_surface_context &dock = contexts.dock;
+
+            for (const reach_feature_surface_context *anchor : {&top, &dock})
+            {
+                render_presentation_phases(
+                    host, REACH_SURFACE_ID_QUICK_SETTINGS, *anchor,
+                    [&] { (void)reach_quick_settings_set_open(quick_settings, 1); },
+                    [&] { (void)reach_quick_settings_set_open(quick_settings, 0); },
+                    "Quick Settings renders every presentation phase");
+                render_presentation_phases(
+                    host, REACH_SURFACE_ID_BATTERY, *anchor,
+                    [&] { (void)reach_battery_set_open(battery, 1); },
+                    [&] { (void)reach_battery_set_open(battery, 0); },
+                    "Battery renders every presentation phase");
+                render_presentation_phases(
+                    host, REACH_SURFACE_ID_TRAY, *anchor,
+                    [&] { (void)reach_top_bar_set_tray_popup_open(top_bar, 1); },
+                    [&] { (void)reach_top_bar_set_tray_popup_open(top_bar, 0); },
+                    "the tray popup renders every presentation phase");
+                reach_context_menu_open_context open = {};
+                open.theme = base.theme;
+                open.monitor = monitor;
+                open.dpi_scale = dpi;
+                open.anchor_button = anchor->anchor_button;
+                open.bar_edge_y = anchor->anchor_bar_edge_y;
+                open.drop_direction = anchor->anchor_direction;
+                open.anchored = 1;
+                open.item_commands = item_commands;
+                open.item_count = REACH_CONTEXT_MENU_MAX_ITEMS;
+                open.request = &request;
+                render_presentation_phases(
+                    host, REACH_SURFACE_ID_CONTEXT_MENU, *anchor,
+                    [&] { reach_context_menu_open_for_item(menu, 0, &open); },
+                    [&] { (void)reach_context_menu_set_open(menu, 0); },
+                    "the context menu renders every presentation phase");
+            }
+            render_presentation_phases(
+                host, REACH_SURFACE_ID_LAUNCHER, base,
+                [&] { (void)reach_launcher_set_open(launcher, 1); },
+                [&] { (void)reach_launcher_set_open(launcher, 0); },
+                "Launcher renders every presentation phase");
+            render_presentation_phases(
+                host, REACH_SURFACE_ID_CLIPBOARD, base,
+                [&] { (void)reach_clipboard_set_open(clipboard, 1); },
+                [&] { (void)reach_clipboard_set_open(clipboard, 0); },
+                "Clipboard renders every presentation phase");
+            render_presentation_phases(
+                host, REACH_SURFACE_ID_SYSTEM_HUD, dock,
+                [&] { reach_system_hud_show_app_removed(hud, app_name); },
+                [&] { tick_presented_surface(host, REACH_SURFACE_ID_SYSTEM_HUD, 2.9); },
+                "System HUD renders every presentation phase");
+            render_presentation_phases(
+                host, REACH_SURFACE_ID_SWITCHER, base,
+                [&] { switch_event(REACH_UI_EVENT_APP_SWITCH_BEGIN); },
+                [&] { switch_event(REACH_UI_EVENT_APP_SWITCH_CANCEL); },
+                "Switcher renders every presentation phase");
+        }
+    }
+    expect_true(presentation_render_count == 4 * 3 * 12 * 6,
+                "every consumer renders every phase at every DPI and monitor width");
+    reach_host_destroy_registered_features(host);
+    reach_window_tracking_destroy(switcher_windows);
+}
+
+static reach_result fake_tray_refresh(reach_tray_provider *provider)
+{
+    (void)provider;
+    return REACH_OK;
+}
+
+static int32_t fake_tray_needs_refresh(const reach_tray_provider *provider)
+{
+    (void)provider;
+    return 0;
+}
+
+static size_t fake_tray_item_count(const reach_tray_provider *provider)
+{
+    (void)provider;
+    return REACH_MAX_TRAY_ITEMS;
+}
+
+static reach_result fake_tray_item_at(const reach_tray_provider *provider, size_t index,
+                                      reach_tray_item *out_item)
+{
+    (void)provider;
+    if (index >= REACH_MAX_TRAY_ITEMS || out_item == nullptr)
+        return REACH_ERROR;
+    *out_item = {};
+    out_item->id = (uint32_t)(100 + index);
+    out_item->icon_id = index % 3 == 0 ? 0 : (uint64_t)(7000 + index);
+    for (size_t at = 0; at < 100; ++at)
+        out_item->title[at] = (uint16_t)('A' + (index + at) % 26);
+    return REACH_OK;
+}
+
+static reach_result fake_tray_activate(reach_tray_provider *provider, uint32_t item_id,
+                                       reach_tray_action action)
+{
+    (void)provider;
+    (void)item_id;
+    (void)action;
+    return REACH_OK;
+}
+
+static reach_result fake_tray_cancel_menu(reach_tray_provider *provider)
+{
+    (void)provider;
+    return REACH_OK;
+}
+
+static int32_t fake_tray_take_retired(reach_tray_provider *provider, uint64_t *out_icon_id)
+{
+    (void)provider;
+    (void)out_icon_id;
+    return 0;
+}
+
+static void fake_tray_release_retired(reach_tray_provider *provider, uint64_t icon_id)
+{
+    (void)provider;
+    (void)icon_id;
+}
+
+static void fake_tray_destroy(reach_tray_provider *provider)
+{
+    (void)provider;
+}
+
+static reach_tray_provider_port fake_full_tray_port(void)
+{
+    reach_tray_provider_port port = {};
+    port.provider = reinterpret_cast<reach_tray_provider *>(1);
+    port.ops.refresh = fake_tray_refresh;
+    port.ops.needs_refresh = fake_tray_needs_refresh;
+    port.ops.item_count = fake_tray_item_count;
+    port.ops.item_at = fake_tray_item_at;
+    port.ops.activate = fake_tray_activate;
+    port.ops.cancel_active_menu = fake_tray_cancel_menu;
+    port.ops.take_retired_icon = fake_tray_take_retired;
+    port.ops.release_retired_icon = fake_tray_release_retired;
+    port.ops.destroy = fake_tray_destroy;
+    return port;
+}
+
+static size_t fake_dock_window_count(const reach_window_manager *manager)
+{
+    (void)manager;
+    return REACH_MAX_DOCK_RUNNING_APPS;
+}
+
+static reach_result fake_dock_window_at(const reach_window_manager *manager, size_t index,
+                                        reach_window_snapshot *out_window)
+{
+    (void)manager;
+    if (index >= REACH_MAX_DOCK_RUNNING_APPS || out_window == nullptr)
+        return REACH_ERROR;
+    *out_window = {};
+    out_window->id = 9000 + index;
+    out_window->visible = 1;
+    char path[64] = {};
+    snprintf(path, sizeof(path), "C:\\running\\app_%zu.exe", index);
+    uint16_t runtime_path[260] = {};
+    reach_copy_ascii_to_utf16(runtime_path, 260, path);
+    reach_application_identity_add_runtime_path(&out_window->identity, runtime_path);
+    reach_copy_ascii_to_utf16(out_window->title, 260, "window");
+    return REACH_OK;
+}
+
+static void render_flat_surface(reach_host *host, reach_surface_id id,
+                                reach_feature_surface_context ctx, const char *label)
+{
+    reach_feature_runtime *runtime = &host->feature_runtimes[id];
+    const reach_feature_definition *definition = runtime->definition;
+    (void)definition->surface_ops->arrange(runtime->capsule, &ctx);
+    reach_feature_surface_geometry geometry = {};
+    definition->capsule_ops->surface_geometry(runtime->capsule, &geometry);
+    ctx.visible_bounds = geometry.visible_bounds;
+    ctx.render_bounds = {0.0f, 0.0f, geometry.visible_bounds.width, geometry.visible_bounds.height};
+    ctx.retained_supported = 1;
+
+    auto storage = std::make_unique<reach_render_command_buffer>();
+    reach_render_command_buffer *commands = storage.get();
+    reach_render_command_buffer_clear(commands);
+    reach_result result =
+        definition->surface_ops->append_render_commands(runtime->capsule, &ctx, commands);
+    expect_true(result == REACH_OK, label);
+    expect_true(commands->group_count <= REACH_MAX_RENDER_GROUPS &&
+                    commands->count <= REACH_MAX_RENDER_COMMANDS &&
+                    reach_render_command_buffer_validate_groups(commands) == REACH_OK,
+                label);
+}
+
+static reach_pointer_event make_pointer_event(reach_pointer_event_kind kind,
+                                              reach_pointer_coordinate_space space, float x,
+                                              float y)
+{
+    reach_pointer_event event = {};
+    event.kind = kind;
+    event.coordinate_space = space;
+    event.x = (int32_t)x;
+    event.y = (int32_t)y;
+    event.button = REACH_POINTER_BUTTON_PRIMARY;
+    event.surface_relation = REACH_POINTER_SURFACE_INSIDE;
+    return event;
+}
+
+static void send_pointer(const reach_feature_capsule_ops *ops, void *capsule,
+                         const reach_pointer_event &event)
+{
+    reach_capsule_pointer_result result = {};
+    ops->handle_pointer(capsule, &event, &result);
+}
+
+static size_t find_press_targets(const reach_feature_capsule_ops *ops, void *capsule,
+                                 reach_rect_f32 area, reach_pointer_coordinate_space space,
+                                 float step, reach_pointer_event *out, size_t max)
+{
+    size_t found = 0;
+    for (float y = ceilf(area.y); y <= area.y + area.height; y += step)
+    {
+        for (float x = ceilf(area.x); x <= area.x + area.width; x += step)
+        {
+            reach_pointer_event down = make_pointer_event(REACH_POINTER_EVENT_DOWN, space, x, y);
+            send_pointer(ops, capsule, down);
+            if (!ops->pointer_sequence_active(capsule))
+                continue;
+            send_pointer(ops, capsule, make_pointer_event(REACH_POINTER_EVENT_CANCEL, space, x, y));
+            int32_t distinct = 1;
+            for (size_t index = 0; index < found; ++index)
+            {
+                if (fabsf((float)out[index].x - x) < step * 4.0f &&
+                    fabsf((float)out[index].y - y) < step * 4.0f)
+                    distinct = 0;
+            }
+            if (distinct)
+            {
+                out[found++] = down;
+                if (found == max)
+                    return found;
+            }
+        }
+    }
+    return found;
+}
+
+template <typename Render, typename Tick>
+static void render_press_cycles(const reach_feature_capsule_ops *ops, void *capsule,
+                                reach_pointer_coordinate_space space,
+                                const reach_pointer_event &down, Render render, Tick tick)
+{
+    reach_pointer_event away =
+        make_pointer_event(REACH_POINTER_EVENT_MOVE, space, -100000.0f, -100000.0f);
+    reach_pointer_event release = away;
+    release.kind = REACH_POINTER_EVENT_UP;
+
+    send_pointer(ops, capsule, down);
+    render();
+    tick(0.03);
+    render();
+    send_pointer(ops, capsule, away);
+    render();
+    for (double seconds : {0.02, 0.03, 0.05, 0.08, 0.15, 0.5})
+    {
+        tick(seconds);
+        render();
+    }
+    send_pointer(ops, capsule, release);
+    tick(0.6);
+
+    send_pointer(ops, capsule, down);
+    tick(0.05);
+    render();
+    send_pointer(ops, capsule, release);
+    render();
+    tick(0.04);
+    render();
+    send_pointer(ops, capsule, down);
+    render();
+    tick(0.02);
+    render();
+    send_pointer(ops, capsule, release);
+    render();
+    for (double seconds : {0.03, 0.06, 0.12, 0.5})
+    {
+        tick(seconds);
+        render();
+    }
+}
+
+template <typename Open, typename Render>
+static void render_pressed_surface(reach_host *host, reach_surface_id id, Open open, Render render,
+                                   float step, const char *label)
+{
+    reach_feature_runtime *runtime = &host->feature_runtimes[id];
+    const reach_feature_capsule_ops *ops = runtime->definition->capsule_ops;
+    open();
+    tick_presented_surface(host, id, 0.6);
+    render();
+    reach_feature_surface_geometry geometry = {};
+    ops->surface_geometry(runtime->capsule, &geometry);
+    int32_t local = runtime->definition->surface.cls == REACH_SURFACE_CLASS_POPUP;
+    reach_pointer_coordinate_space space =
+        local ? REACH_POINTER_COORDINATE_SURFACE_LOCAL : REACH_POINTER_COORDINATE_SCREEN;
+    reach_rect_f32 area = local ? reach_rect_f32{0.0f, 0.0f, geometry.visible_bounds.width,
+                                                 geometry.visible_bounds.height}
+                                : geometry.visible_bounds;
+    reach_pointer_event targets[3] = {};
+    size_t count = find_press_targets(ops, runtime->capsule, area, space, step, targets, 3);
+    expect_true(count > 0, label);
+    for (size_t index = 0; index < count; ++index)
+    {
+        render_press_cycles(ops, runtime->capsule, space, targets[index], render,
+                            [&](double seconds) { tick_presented_surface(host, id, seconds); });
+    }
+}
+
+static void test_max_items_and_pressed_states_render_worst_case(void)
+{
+    reach_host *host = &presentation_render_host;
+    presentation_render_count = 0;
+    presentation_render_failures = 0;
+    reach_host_init_feature_registry(host);
+    expect_true(reach_host_create_registered_features(host) == REACH_OK,
+                "registered presentation consumers are available for the maximum-item scenario");
+    reach_host_init_layout(host);
+
+    reach_tray_service *tray_service = nullptr;
+    expect_true(reach_tray_service_create(fake_full_tray_port(), &tray_service) == REACH_OK,
+                "the maximum tray is available");
+    reach_top_bar *top_bar = reach_host_feature_capsule<reach_top_bar>(host, REACH_SURFACE_ID_TRAY);
+    reach_top_bar_attach_services(top_bar, nullptr, nullptr, nullptr, nullptr, nullptr,
+                                  tray_service);
+    expect_true(reach_top_bar_refresh_tray(top_bar) == REACH_OK &&
+                    reach_top_bar_tray_item_count(top_bar) == REACH_MAX_TRAY_ITEMS,
+                "the tray holds its maximum item count");
+
+    reach_clipboard_feature *clipboard =
+        reach_host_feature_capsule<reach_clipboard_feature>(host, REACH_SURFACE_ID_CLIPBOARD);
+    for (size_t index = 0; index < REACH_CLIPBOARD_MAX_ITEMS; ++index)
+    {
+        reach_clipboard_item item = {};
+        item.id = (uint64_t)(index + 1);
+        item.content_hash = (uint64_t)(index + 1) * 2654435761u;
+        item.kind = index % 4 == 0 ? REACH_CLIPBOARD_ITEM_IMAGE : REACH_CLIPBOARD_ITEM_TEXT;
+        item.thumbnail_id = item.kind == REACH_CLIPBOARD_ITEM_IMAGE ? 8000 + index : 0;
+        item.image_width = 640;
+        item.image_height = 480;
+        for (size_t at = 0; at < 120; ++at)
+            item.preview[at] = (uint16_t)('a' + (index + at) % 26);
+        reach_clipboard_insert_outcome outcome = {};
+        reach_clipboard_insert_captured(clipboard, item, &outcome);
+    }
+    expect_true(reach_clipboard_item_count(clipboard) == REACH_CLIPBOARD_MAX_ITEMS,
+                "Clipboard holds its maximum item count");
+
+    reach_launcher *launcher =
+        reach_host_feature_capsule<reach_launcher>(host, REACH_SURFACE_ID_LAUNCHER);
+    static reach_search_candidate candidates[REACH_SEARCH_MAX_RESULTS];
+    for (size_t index = 0; index < REACH_SEARCH_MAX_RESULTS; ++index)
+    {
+        candidates[index] = {};
+        for (size_t at = 0; at < REACH_SEARCH_RESULT_NAME_CAPACITY - 1; ++at)
+            candidates[index].name[at] = (uint16_t)('a' + (index + at) % 26);
+        for (size_t at = 0; at < REACH_SEARCH_RESULT_PATH_CAPACITY - 1; ++at)
+            candidates[index].path[at] = (uint16_t)('a' + (index * 3 + at) % 26);
+        candidates[index].kind = (reach_search_result_kind)(index % 7);
+    }
+    static const uint16_t query[] = {'a', 0};
+    auto open_launcher = [&]
+    {
+        (void)reach_launcher_set_open(launcher, 1);
+        (void)reach_launcher_set_query(launcher, query);
+        (void)reach_launcher_set_results(launcher, candidates, REACH_SEARCH_MAX_RESULTS);
+    };
+
+    reach_dock *dock = reach_host_feature_capsule<reach_dock>(host, REACH_SURFACE_ID_DOCK);
+    static reach_pinned_app_model pins[REACH_MAX_PINNED_APPS];
+    for (size_t index = 0; index < REACH_MAX_PINNED_APPS; ++index)
+    {
+        char path[64] = {};
+        snprintf(path, sizeof(path), "C:\\pins\\pin_%zu.exe", index);
+        pins[index].id = (uint32_t)(index + 1);
+        pins[index].application.launch.kind = REACH_APPLICATION_LAUNCH_EXECUTABLE;
+        reach_copy_ascii_to_utf16(pins[index].application.launch.path, 260, path);
+        uint16_t runtime_path[260] = {};
+        reach_copy_ascii_to_utf16(runtime_path, 260, path);
+        reach_application_identity_add_runtime_path(&pins[index].application.identity,
+                                                    runtime_path);
+    }
+    reach_window_manager_port dock_port = {};
+    dock_port.ops.window_count = fake_dock_window_count;
+    dock_port.ops.window_at = fake_dock_window_at;
+    dock_port.ops.frame_bounds = fake_preview_frame_bounds;
+    reach_window_tracking *dock_windows = nullptr;
+    expect_true(reach_window_tracking_create(dock_port, &dock_windows) == REACH_OK,
+                "the Dock has the maximum running window count");
+    (void)reach_window_tracking_refresh(dock_windows, nullptr);
+    reach_dock_attach_services(dock, nullptr, dock_windows);
+    reach_dock_apply_pinned_apps(dock, pins, REACH_MAX_PINNED_APPS);
+
+    reach_quick_settings *quick_settings =
+        reach_host_feature_capsule<reach_quick_settings>(host, REACH_SURFACE_ID_QUICK_SETTINGS);
+    reach_audio_volume_session_list sessions = {};
+    sessions.count = REACH_AUDIO_VOLUME_MAX_SESSIONS;
+    for (size_t index = 0; index < sessions.count; ++index)
+    {
+        sessions.sessions[index].level = 0.5f;
+        sessions.sessions[index].process_id = (uint32_t)(1000 + index);
+        sessions.sessions[index].icon_id = (uint64_t)(9000 + index);
+        for (size_t at = 0; at < 40; ++at)
+            sessions.sessions[index].label[at] = (uint16_t)('A' + (index + at) % 26);
+        sessions.sessions[index].session_instance_id[0] = (uint16_t)('a' + index % 26);
+        sessions.sessions[index].session_instance_id[1] = (uint16_t)('a' + index / 26);
+    }
+    reach_quick_settings_apply_sessions(quick_settings, &sessions);
+    reach_battery *battery =
+        reach_host_feature_capsule<reach_battery>(host, REACH_SURFACE_ID_BATTERY);
+    (void)reach_battery_set_power(battery, 50, 0);
+
+    reach_feature_runtime *top_bar_runtime = &host->feature_runtimes[REACH_SURFACE_ID_TOP_BAR];
+    const float dpis[] = {1.0f, 1.25f, 1.5f, 2.0f};
+    const reach_rect_f32 monitors[] = {{0.0f, 0.0f, 3840.0f, 2160.0f},
+                                       {-1920.0f, 0.0f, 1920.0f, 1080.0f},
+                                       {0.0f, 0.0f, 360.0f, 280.0f}};
+    for (float dpi : dpis)
+    {
+        for (reach_rect_f32 monitor : monitors)
+        {
+            host->layout_dpi_scale = dpi;
+            presentation_contexts contexts = make_presentation_contexts(dpi, monitor);
+            const reach_feature_surface_context &base = contexts.base;
+            (void)top_bar_runtime->definition->surface_ops->arrange(top_bar_runtime->capsule,
+                                                                    &base);
+            expect_true(monitor.width < 1000.0f || reach_top_bar_tray_overflow_start(top_bar) ==
+                                                       REACH_TOP_BAR_TRAY_INLINE_ICONS,
+                        "the maximum tray overflows into the dropdown");
+
+            for (const reach_feature_surface_context *anchor : {&contexts.top, &contexts.dock})
+            {
+                render_presentation_phases(
+                    host, REACH_SURFACE_ID_TRAY, *anchor,
+                    [&] { (void)reach_top_bar_set_tray_popup_open(top_bar, 1); },
+                    [&] { (void)reach_top_bar_set_tray_popup_open(top_bar, 0); },
+                    "the maximum tray renders every presentation phase");
+                render_pressed_surface(
+                    host, REACH_SURFACE_ID_TRAY,
+                    [&] { (void)reach_top_bar_set_tray_popup_open(top_bar, 1); },
+                    [&]
+                    {
+                        render_presented_surface(host, REACH_SURFACE_ID_TRAY, *anchor,
+                                                 "the maximum tray renders while pressed");
+                    },
+                    6.0f, "the tray popup has pressable items");
+                (void)reach_top_bar_set_tray_popup_open(top_bar, 0);
+                tick_presented_surface(host, REACH_SURFACE_ID_TRAY, 0.6);
+
+                render_pressed_surface(
+                    host, REACH_SURFACE_ID_QUICK_SETTINGS,
+                    [&] { (void)reach_quick_settings_set_open(quick_settings, 1); },
+                    [&]
+                    {
+                        render_presented_surface(host, REACH_SURFACE_ID_QUICK_SETTINGS, *anchor,
+                                                 "Quick Settings renders while pressed");
+                    },
+                    6.0f, "Quick Settings has pressable controls");
+                (void)reach_quick_settings_set_open(quick_settings, 0);
+                tick_presented_surface(host, REACH_SURFACE_ID_QUICK_SETTINGS, 0.6);
+
+                render_pressed_surface(
+                    host, REACH_SURFACE_ID_BATTERY,
+                    [&] { (void)reach_battery_set_open(battery, 1); },
+                    [&]
+                    {
+                        render_presented_surface(host, REACH_SURFACE_ID_BATTERY, *anchor,
+                                                 "Battery renders while pressed");
+                    },
+                    6.0f, "Battery has a pressable saver row");
+                (void)reach_battery_set_open(battery, 0);
+                tick_presented_surface(host, REACH_SURFACE_ID_BATTERY, 0.6);
+            }
+
+            render_presentation_phases(
+                host, REACH_SURFACE_ID_CLIPBOARD, base,
+                [&] { (void)reach_clipboard_set_open(clipboard, 1); },
+                [&] { (void)reach_clipboard_set_open(clipboard, 0); },
+                "the full Clipboard renders every presentation phase");
+            render_presentation_phases(
+                host, REACH_SURFACE_ID_LAUNCHER, base, open_launcher,
+                [&] { (void)reach_launcher_set_open(launcher, 0); },
+                "the full Launcher renders every presentation phase");
+
+            render_pressed_surface(
+                host, REACH_SURFACE_ID_TOP_BAR, [] {},
+                [&]
+                {
+                    render_flat_surface(host, REACH_SURFACE_ID_TOP_BAR, base,
+                                        "the Top Bar renders while pressed");
+                },
+                6.0f, "the Top Bar has pressable controls");
+            render_pressed_surface(
+                host, REACH_SURFACE_ID_DOCK, [] {},
+                [&]
+                {
+                    render_flat_surface(host, REACH_SURFACE_ID_DOCK, base,
+                                        "the full Dock renders while pressed");
+                },
+                1.0f, "the Dock has pressable items");
+        }
+    }
+    expect_true(presentation_render_failures == 0, "every worst-case render stays valid");
+    expect_true(presentation_render_count > 0, "the maximum-item scenario rendered");
+    reach_host_destroy_registered_features(host);
+    reach_window_tracking_destroy(dock_windows);
+    reach_tray_service_destroy(tray_service);
+}
+
 int main(void)
 {
     test_close_handoff_readiness_waits_for_observed_restore();
@@ -2043,6 +2830,8 @@ int main(void)
     test_switcher_publishes_arranged_surface_geometry();
     test_system_stats_change_repaints_without_relayout();
     test_feature_tick_redraw_marks_only_its_own_surface();
+    test_shared_presentations_render_worst_case();
+    test_max_items_and_pressed_states_render_worst_case();
 
     if (failures != 0)
     {

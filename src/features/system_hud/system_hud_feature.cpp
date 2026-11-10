@@ -8,8 +8,6 @@
 static const double REACH_SYSTEM_HUD_LIFETIME_SECONDS = 1.5;
 static const double REACH_SYSTEM_HUD_APP_REMOVED_LIFETIME_SECONDS =
     REACH_SYSTEM_HUD_LIFETIME_SECONDS * 2.0;
-static const double REACH_SYSTEM_HUD_DEFAULT_OPEN_SECONDS = 0.16;
-static const double REACH_SYSTEM_HUD_DEFAULT_CLOSE_SECONDS = 0.12;
 static const float REACH_SYSTEM_HUD_MEDIA_COVER_WIDTH = 100.0f;
 static const size_t REACH_SYSTEM_HUD_APP_NAME_MAX_CHARACTERS = 8;
 
@@ -30,16 +28,7 @@ static void reach_system_hud_begin_show(reach_system_hud *hud, reach_system_hud_
     hud->state.kind = kind;
     hud->state.open = 1;
     hud->state.deadline_seconds = reach_motion_now_seconds() + reach_system_hud_lifetime(hud);
-    reach_motion_animate_to(&hud->opacity, 1.0f, hud->open_seconds, REACH_EASING_EASE_OUT);
-}
-
-static void reach_system_hud_begin_close(reach_system_hud *hud, double remaining_seconds)
-{
-    if (hud == nullptr || !hud->state.open || hud->opacity.to <= 0.0f)
-    {
-        return;
-    }
-    reach_motion_animate_to(&hud->opacity, 0.0f, remaining_seconds, REACH_EASING_EASE_IN);
+    (void)reach_feature_transition_set_open(&hud->transition, 1);
 }
 
 const reach_system_hud_state *reach_system_hud_state_ptr(const reach_system_hud *hud)
@@ -148,7 +137,7 @@ void reach_system_hud_force_close(reach_system_hud *hud)
     hud->state.open = 0;
     hud->state.kind = REACH_SYSTEM_HUD_NONE;
     hud->state.deadline_seconds = 0.0;
-    reach_motion_set(&hud->opacity, 0.0f);
+    reach_feature_transition_reset(&hud->transition);
 }
 
 void reach_system_hud_reset(reach_system_hud *hud)
@@ -158,9 +147,7 @@ void reach_system_hud_reset(reach_system_hud *hud)
         return;
     }
     hud->state = {};
-    hud->open_seconds = REACH_SYSTEM_HUD_DEFAULT_OPEN_SECONDS;
-    hud->close_seconds = REACH_SYSTEM_HUD_DEFAULT_CLOSE_SECONDS;
-    reach_motion_set(&hud->opacity, 0.0f);
+    reach_feature_transition_reset(&hud->transition);
 }
 
 static void reach_system_hud_capsule_reset(void *capsule)
@@ -181,7 +168,7 @@ static void reach_system_hud_capsule_tick(void *capsule, double delta_seconds,
         return;
     }
 
-    (void)delta_seconds;
+    (void)reach_feature_transition_tick(&hud->transition, delta_seconds);
     double now = reach_motion_now_seconds();
     if (now >= hud->state.deadline_seconds)
     {
@@ -190,10 +177,11 @@ static void reach_system_hud_capsule_tick(void *capsule, double delta_seconds,
         return;
     }
 
-    double close_start = hud->state.deadline_seconds - hud->close_seconds;
-    if (now >= close_start && hud->opacity.to > 0.0f)
+    double close_start =
+        hud->state.deadline_seconds - reach_feature_transition_exit_seconds(&hud->transition);
+    if (now >= close_start && hud->transition.target_open)
     {
-        reach_system_hud_begin_close(hud, hud->state.deadline_seconds - now);
+        (void)reach_feature_transition_set_open(&hud->transition, 0);
         out->redraw = 1;
     }
 }
@@ -225,13 +213,14 @@ static void reach_system_hud_capsule_surface_geometry(const void *capsule,
     }
     out->visible_bounds = hud->state.layout.bounds;
     out->envelope_bounds = hud->state.layout.bounds;
-    out->deadline_seconds =
-        hud->state.open
-            ? hud->state.deadline_seconds - (hud->opacity.to > 0.0f ? hud->close_seconds : 0.0)
-            : 0.0;
-    out->presentation.retained = 1;
-    out->presentation.max_scale = 1.0f;
-    out->presentation.group.opacity = hud->opacity;
+    reach_feature_transition_presentation(&hud->transition, out);
+    out->wait_for_presentation = 0;
+    out->deadline_seconds = hud->state.open
+                                ? hud->state.deadline_seconds -
+                                      (hud->transition.target_open
+                                           ? reach_feature_transition_exit_seconds(&hud->transition)
+                                           : 0.0)
+                                : 0.0;
 }
 
 const reach_feature_capsule_ops *reach_system_hud_capsule_ops(void)
@@ -262,6 +251,8 @@ reach_result reach_system_hud_create(reach_system_hud **out_hud)
     {
         return REACH_ERROR;
     }
+    reach_feature_transition_init(&hud->transition, REACH_FEATURE_PRESENTATION_POPUP,
+                                  REACH_FEATURE_TRANSITION_FROM_BELOW);
     reach_system_hud_reset(hud);
     *out_hud = hud;
     return REACH_OK;
@@ -366,7 +357,7 @@ int32_t reach_system_hud_arrange(reach_system_hud *hud, const reach_system_hud_a
     int32_t changed = !reach_system_hud_rect_equal(hud->state.layout.bounds, next.bounds) ||
                       !reach_system_hud_rect_equal(hud->state.layout.fill, next.fill);
     hud->state.layout = next;
-    hud->open_seconds = ctx->theme->surface_open_seconds;
-    hud->close_seconds = ctx->theme->surface_close_seconds;
+    reach_feature_transition_configure(&hud->transition, ctx->theme, ctx->dpi_scale,
+                                       REACH_FEATURE_TRANSITION_FROM_BELOW);
     return changed;
 }

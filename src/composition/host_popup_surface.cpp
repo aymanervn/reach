@@ -41,6 +41,8 @@ reach_result reach_host_render_popup_surface(reach_host *host, reach_surface_id 
         {
             reach_render_command_buffer_set_content_transform(
                 commands, content_commands->content_rect, content_commands->content_transform);
+            commands->presentation_center_x = content_commands->presentation_center_x;
+            commands->presentation_center_y = content_commands->presentation_center_y;
         }
         for (size_t index = 0; index < content_commands->count; ++index)
         {

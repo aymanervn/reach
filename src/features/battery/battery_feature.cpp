@@ -10,10 +10,6 @@ static reach_pressable_feedback_style reach_battery_pressable_feedback(reach_bat
     reach_pressable_feedback_style feedback = {};
     feedback.motion = battery != nullptr ? &battery->press_feedback : nullptr;
     feedback.pressed_value = 1.0f;
-    feedback.press_seconds = 0.055;
-    feedback.release_seconds = 0.10;
-    feedback.press_easing = REACH_EASING_EASE_IN_OUT;
-    feedback.release_easing = REACH_EASING_EASE_IN_OUT;
     return feedback;
 }
 
@@ -296,6 +292,8 @@ void reach_battery_open(reach_battery *battery, const reach_battery_open_context
     reach_battery_place(&battery->state, ctx);
     reach_feature_transition_configure(&battery->popup_transition, ctx->theme, ctx->dpi_scale,
                                        ctx->drop_direction);
+    reach_feature_transition_set_trigger(&battery->popup_transition, battery->state.bounds,
+                                         battery->state.notch_anchor_x);
     battery->state.open = 1;
     (void)reach_feature_transition_set_open(&battery->popup_transition, 1);
 }
@@ -309,6 +307,8 @@ void reach_battery_relayout(reach_battery *battery, const reach_battery_open_con
     reach_battery_place(&battery->state, ctx);
     reach_feature_transition_configure(&battery->popup_transition, ctx->theme, ctx->dpi_scale,
                                        ctx->drop_direction);
+    reach_feature_transition_set_trigger(&battery->popup_transition, battery->state.bounds,
+                                         battery->state.notch_anchor_x);
 }
 
 static void reach_battery_capsule_reset(void *capsule)
@@ -555,7 +555,8 @@ reach_result reach_battery_create(reach_battery **out_battery)
     {
         return REACH_ERROR;
     }
-    reach_feature_transition_init(&battery->popup_transition, REACH_FEATURE_TRANSITION_FROM_ABOVE);
+    reach_feature_transition_init(&battery->popup_transition, REACH_FEATURE_PRESENTATION_POPUP,
+                                  REACH_FEATURE_TRANSITION_FROM_ABOVE);
     reach_pressable_init(&battery->pressable);
     reach_battery_reset(battery);
     *out_battery = battery;

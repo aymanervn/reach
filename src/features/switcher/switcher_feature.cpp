@@ -299,7 +299,7 @@ reach_result reach_switcher_create(reach_switcher **out_switcher)
     {
         return REACH_ERROR;
     }
-    reach_feature_transition_init(&switcher->surface_transition,
+    reach_feature_transition_init(&switcher->surface_transition, REACH_FEATURE_PRESENTATION_POPUP,
                                   REACH_FEATURE_TRANSITION_FROM_BELOW);
     *out_switcher = switcher;
     return REACH_OK;
