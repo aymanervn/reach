@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include <chrono>
+#include <memory>
 #include <thread>
 
 static int failures;
@@ -241,9 +242,142 @@ static void test_switcher_fits_variable_width_previews_and_keeps_selection_visib
     fake_count = 2;
 }
 
+static size_t worst_case_count = REACH_MAX_OPEN_WINDOWS;
+
+static size_t worst_case_window_count(const reach_window_manager *manager)
+{
+    (void)manager;
+    return worst_case_count;
+}
+
+static reach_result worst_case_window_at(const reach_window_manager *manager, size_t index,
+                                         reach_window_snapshot *out_window)
+{
+    (void)manager;
+    if (index >= worst_case_count || out_window == nullptr)
+        return REACH_INVALID_ARGUMENT;
+    *out_window = {};
+    out_window->id = 7000 + index;
+    out_window->visible = 1;
+    out_window->minimized = index % 3 == 1;
+    for (size_t at = 0; at < 200; ++at)
+        out_window->title[at] = (uint16_t)('a' + (index + at) % 26);
+    return REACH_OK;
+}
+
+static reach_result worst_case_frame_bounds(const reach_window_manager *manager,
+                                            reach_window_id window, reach_rect_f32 *out)
+{
+    (void)manager;
+    float aspect = 0.4f + (float)((window - 7000) % 7) * 0.5f;
+    *out = {0.0f, 0.0f, 900.0f * aspect, 900.0f};
+    return REACH_OK;
+}
+
+static void test_switcher_worst_case_navigation_and_overshoot_render_within_budget(void)
+{
+    reach_window_manager_port port = {};
+    port.ops.window_count = worst_case_window_count;
+    port.ops.window_at = worst_case_window_at;
+    port.ops.frame_bounds = worst_case_frame_bounds;
+    reach_window_tracking *windows = nullptr;
+    expect_true(reach_window_tracking_create(port, &windows) == REACH_OK,
+                "worst-case tracking is created");
+    reach_switcher *switcher = nullptr;
+    expect_true(reach_switcher_create(&switcher) == REACH_OK, "worst-case Switcher is created");
+    if (windows == nullptr || switcher == nullptr)
+    {
+        reach_switcher_destroy(switcher);
+        reach_window_tracking_destroy(windows);
+        return;
+    }
+    reach_switcher_attach_services(switcher, nullptr, windows);
+    auto storage = std::make_unique<reach_render_command_buffer>();
+    reach_switcher_render_context render = {};
+    render.theme = reach_theme_default();
+    render.icon_size_px = 64;
+    int32_t all_ok = 1;
+    auto send = [&](reach_ui_event_type type)
+    {
+        reach_ui_event event = {};
+        event.type = type;
+        reach_capsule_event_result result = {};
+        reach_switcher_capsule_ops()->handle_event(switcher, &event, &result);
+    };
+    const float dpis[] = {1.0f, 1.25f, 1.5f, 2.0f};
+    const reach_rect_f32 monitors[] = {{0.0f, 0.0f, 3840.0f, 2160.0f},
+                                       {0.0f, 0.0f, 360.0f, 280.0f}};
+    for (float dpi : dpis)
+    {
+        for (reach_rect_f32 monitor : monitors)
+        {
+            reach_switcher_arrange_context arrange = {};
+            arrange.theme = reach_theme_default();
+            arrange.monitor_bounds = monitor;
+            arrange.dpi_scale = dpi;
+            arrange.transition_visible = 1;
+            arrange.bounds_valid = 1;
+            auto frame = [&]
+            {
+                (void)reach_switcher_arrange(switcher, &arrange);
+                reach_result result =
+                    reach_switcher_append_render_commands(switcher, &render, storage.get());
+                if (result != REACH_OK || storage->group_count > REACH_MAX_RENDER_GROUPS ||
+                    storage->count > REACH_MAX_RENDER_COMMANDS ||
+                    reach_render_command_buffer_validate_groups(storage.get()) != REACH_OK)
+                    all_ok = 0;
+            };
+            auto overshoot = [&]
+            {
+                auto start = std::chrono::steady_clock::now();
+                while (std::chrono::steady_clock::now() - start < std::chrono::milliseconds(420))
+                {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(15));
+                    frame();
+                }
+            };
+            worst_case_count = REACH_MAX_OPEN_WINDOWS;
+            (void)reach_window_tracking_refresh(windows, nullptr);
+            send(REACH_UI_EVENT_APP_SWITCH_BEGIN);
+            frame();
+            send(REACH_UI_EVENT_APP_SWITCH_PREVIOUS);
+            frame();
+            overshoot();
+            for (size_t step = 0; step < REACH_MAX_OPEN_WINDOWS + 4; ++step)
+            {
+                send(REACH_UI_EVENT_APP_SWITCH_NEXT);
+                frame();
+            }
+            for (size_t step = 0; step < 6; ++step)
+            {
+                send(REACH_UI_EVENT_APP_SWITCH_PREVIOUS);
+                frame();
+            }
+            for (size_t step = 0; step < 3; ++step)
+                send(REACH_UI_EVENT_APP_SWITCH_NEXT);
+            frame();
+            overshoot();
+            worst_case_count = 5;
+            (void)reach_window_tracking_refresh(windows, nullptr);
+            reach_feature_tick_result tick = {};
+            reach_switcher_notify_windows_changed(switcher, &tick);
+            frame();
+            send(REACH_UI_EVENT_APP_SWITCH_NEXT);
+            frame();
+            send(REACH_UI_EVENT_APP_SWITCH_CANCEL);
+            frame();
+        }
+    }
+    expect_true(all_ok, "worst-case Switcher navigation renders within the render budget");
+    reach_switcher_destroy(switcher);
+    reach_window_tracking_destroy(windows);
+    worst_case_count = REACH_MAX_OPEN_WINDOWS;
+}
+
 int main(void)
 {
     test_switcher_presents_immediately_and_closes_before_activation();
     test_switcher_fits_variable_width_previews_and_keeps_selection_visible();
+    test_switcher_worst_case_navigation_and_overshoot_render_within_budget();
     return failures == 0 ? 0 : 1;
 }

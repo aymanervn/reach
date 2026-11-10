@@ -419,8 +419,13 @@ and activity are CPU presentation state: pending activity survives until a sampl
 endpoint, then stops. `reach_animation_manager_motion` exposes the same intent for retained rendering
 without GPU readback. Settings samples all finite scalar families at one update timestamp. Loader,
 scroll and native choreography timing remain separate migration responsibilities.
-Switcher fitting uses canonical retained motion directly; one endpoint deadline retires its
-width descriptor without periodic capsule redraw or scalar-manager sampling.
+Switcher fitting uses canonical retained motion directly with the `smooth` spring; one endpoint
+deadline retires its width descriptor without periodic capsule redraw or scalar-manager sampling.
+One selection pill, parented to a body-center anchor that follows the width and clips to the
+body's rounded interior, retargets its springs to the selected card's settled slot, keeping value
+and velocity: one-slot moves use `bouncy`, wraps and longer jumps `smooth`; its position is never
+clamped.
+Card labels ride their card's motion; the Switcher has no fixed durations.
 
 Canonical motion supports continuous piecewise affine mappings, preserving epoch, easing and
 generation. `reach_motion_hinge` constructs two slopes meeting at one center; `reach_motion_peak`
@@ -1263,7 +1268,7 @@ own geometry: the Dock and the Launcher each compute their layout inside `arrang
 pass. Launcher's results expansion still uses the scalar manager. Popup capsules, Launcher,
 Clipboard, Switcher and System HUD embed the shared `features/common/presentation` transition and
 choose only a style: popup scales 0.94 to 1 with a 6dp offset toward its anchor, and menu (Context
-Menu) scales 0.98 to 1 without offset. Scale and offset use the `snappy` spring and opacity the
+Menu and Switcher, anchored at the Switcher's center) scales 0.98 to 1 without offset. Scale and offset use the `snappy` spring and opacity the
 style's fade; close retargets to a smaller rest (0.97 and 4dp for popups) with an ease-out fade.
 Open and close retarget every channel from its current value and velocity, and completion and
 visibility end at the opacity deadline rather than the spring tail. A capsule supplies its anchor
