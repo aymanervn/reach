@@ -727,7 +727,11 @@ timer or reporting worker is added. Retained-surface bytes are an estimate, not 
 system CPU/GPU, power and presentation latency require independent measurement. See
 `docs/gpu-workload-baseline.md`.
 
-Shared pressable feedback publishes absolute-time motion through a single motion pointer. Battery retains one fixed
+Shared pressable feedback publishes absolute-time motion through a single motion pointer. Press
+retargets with the theme `press` spring and release with the `release` spring, whose slight
+overshoot past rest is clamped by bounded tint and opacity channels; every retarget, including a
+context latch, starts from the current value and velocity. Feedback styles carry only the motion
+and pressed amount, never timing. Battery retains one fixed
 saver-row overlay through `reach_ui_feedback_render`; Quick Settings uses the same primitive for
 its current pressed target, including output-row scissoring. Press and release events publish an
 opacity descriptor. Each capsule owns capture and original-target activation, resets feedback on
@@ -927,8 +931,8 @@ does not request frames. Dock insertion/removal fitting and Now Playing width ch
 CPU layout; unaffected item and control groups reuse their rasterized content. Bar reveal and
 Stage's native thumbnail synchronization keep their existing CPU geometry paths.
 
-Shared popup transitions, Launcher presentation, and System HUD publish a retained surface
-presentation and an absolute lifecycle deadline. The generic runtime applies the presentation to
+Shared popup transitions, used by Launcher and System HUD as well as the popups, publish a
+retained surface presentation and an absolute lifecycle deadline. The generic runtime applies the presentation to
 the complete scene, including backdrop, chrome, and shadows, inside a stable native envelope.
 Both host hit testing and native input regions sample the same motion on pointer events.
 Optional canonical root scale-center motions preserve a moving physical pivot inside that stable
@@ -940,8 +944,8 @@ buffer, rather than in every group; ordinary presentations keep the content-boun
 
 Windows Composition uses scoped-batch completion keyed to the current presentation generation.
 Completion waits for canonical root motions, including scale-center movement while visible.
-A fully transparent root can retire a remaining center after its other root motions finish, so an
-invisible pivot cannot extend close latency. Suspension stops both center bindings.
+A fully transparent root retires its remaining translation, scale and center motions once opacity
+finishes, so an invisible spring tail cannot extend close latency. Suspension stops both center bindings.
 Changing any root motion retires old completion
 ownership and aggregates the current remaining curves. A hidden or occluded target can defer its
 animation callback: after the canonical deadline, the adapter submits final properties once, awaits
@@ -1256,12 +1260,18 @@ masquerade as an uninstalled app. Composition removes that pin 500 milliseconds 
 notification, while the HUD keeps its copied display text for the rest of its independent lifetime.
 Per-frame layout resolves in dependency order in `reach_host_update`, and every capsule owns its
 own geometry: the Dock and the Launcher each compute their layout inside `arrange` during the frame
-pass. Capsules also own feature-specific presentation animation. Launcher keeps its offset,
-opacity, and proportional scale as `reach_motion` descriptors; its results expansion still uses
-the scalar manager. Related presentation properties share one absolute event timestamp. Popup
-capsules, Clipboard, and Switcher embed the shared
-`features/common/presentation` transition, which owns direction, timing, reversal, and close
-visibility. Their geometry publishes only generic presentation values;
+pass. Launcher's results expansion still uses the scalar manager. Popup capsules, Launcher,
+Clipboard, Switcher and System HUD embed the shared `features/common/presentation` transition and
+choose only a style: popup scales 0.94 to 1 with a 6dp offset toward its anchor, and menu (Context
+Menu) scales 0.98 to 1 without offset. Scale and offset use the `snappy` spring and opacity the
+style's fade; close retargets to a smaller rest (0.97 and 4dp for popups) with an ease-out fade.
+Open and close retarget every channel from its current value and velocity, and completion and
+visibility end at the opacity deadline rather than the spring tail. A capsule supplies its anchor
+in surface coordinates with `reach_feature_transition_set_anchor`, or its trigger x through
+`reach_feature_transition_set_trigger`; otherwise the anchor is the center of the edge facing its
+direction. The anchor is published as the canonical root scale center. System HUD keeps its own
+lifetime and starts the exit fade so that it ends on the lifetime deadline. Geometry publishes only
+generic presentation values;
 composition applies managed opacity to the complete rendered command buffer and, for scaled
 presentation, maintains a stable maximum envelope plus matching render and pointer transforms.
 Capsules whose close presentation outlives `is_open` expose that lifetime through

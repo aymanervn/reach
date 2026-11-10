@@ -19,10 +19,6 @@ extern "C"
     {
         reach_motion *motion;
         float pressed_value;
-        double press_seconds;
-        double release_seconds;
-        reach_easing press_easing;
-        reach_easing release_easing;
     } reach_pressable_feedback_style;
 
     typedef struct reach_pressable

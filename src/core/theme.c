@@ -69,8 +69,8 @@
     .tray_slot_size_ratio = 0.605f, .bar_separator_dot_size = 4.0f, .bar_separator_dot_gap = 9.0f, \
     .now_playing_width = 220.0f, .now_playing_padding = 9.0f, .now_playing_gap = 6.0f,             \
     .now_playing_control_gap = 8.0f, .now_playing_play_button_width = 20.0f,                       \
-    .now_playing_prev_next_button_width = 13.2f, .surface_open_seconds = 0.16f,                    \
-    .surface_close_seconds = 0.12f, .bar_reveal_seconds = 0.25f, .stage_animation_seconds = 0.28f, \
+    .now_playing_prev_next_button_width = 13.2f, .surface_close_seconds = 0.12f,                   \
+    .bar_reveal_seconds = 0.25f, .stage_animation_seconds = 0.28f,                                 \
     .stage_close_hover_seconds = 0.14f, .stage_reflow_seconds = 0.34f
 
 #define REACH_THEME_SPRING(response, damping) {REACH_EASING_SPRING, (response), (damping), 0.0}

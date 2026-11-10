@@ -1,6 +1,8 @@
 #include "reach/features/common/pressable.h"
+#include "reach/core/theme.h"
 #include "reach/features/common/draggable.h"
 
+#include <math.h>
 #include <stdio.h>
 
 static int failures = 0;
@@ -19,10 +21,6 @@ static reach_pressable_feedback_style feedback_style(reach_motion *motion)
     reach_pressable_feedback_style style = {};
     style.motion = motion;
     style.pressed_value = 0.5f;
-    style.press_seconds = 0.055;
-    style.release_seconds = 0.055;
-    style.press_easing = REACH_EASING_EASE_IN_OUT;
-    style.release_easing = REACH_EASING_EASE_IN_OUT;
     return style;
 }
 
@@ -179,6 +177,46 @@ static void test_release_requires_the_pressed_button(void)
     expect_true(result.capture == -1, "the pressed button release gives up pointer capture");
 }
 
+static void test_press_release_retargets_preserve_velocity(void)
+{
+    reach_motion motion = {};
+    reach_pressable_feedback_style feedback = feedback_style(&motion);
+    reach_pressable pressable = {};
+    reach_pressable_init(&pressable);
+    reach_pressable_result result = {};
+    reach_pressable_press(&pressable, REACH_POINTER_BUTTON_PRIMARY, 29, 6, &feedback, &result);
+    expect_true(
+        motion.easing == REACH_EASING_SPRING &&
+            motion.spring_response ==
+                reach_theme_motion_preset(nullptr, REACH_MOTION_PRESET_PRESS).response_seconds,
+        "press feedback uses the press spring");
+    motion.started_seconds -= 0.03;
+    reach_motion pressing = motion;
+    reach_pressable_release(&pressable, REACH_POINTER_BUTTON_PRIMARY, 29, &feedback, &result);
+    double at = motion.started_seconds;
+    expect_true(motion.easing == REACH_EASING_SPRING &&
+                    motion.spring_damping ==
+                        reach_theme_motion_preset(nullptr, REACH_MOTION_PRESET_RELEASE).damping,
+                "release feedback uses the release spring");
+    expect_true(fabsf(motion.from - reach_motion_value_at(&pressing, at)) < 1e-4f &&
+                    fabsf(reach_motion_velocity_at(&motion, at) -
+                          reach_motion_velocity_at(&pressing, at)) < 1e-3f &&
+                    reach_motion_velocity_at(&pressing, at) > 0.1f,
+                "a release mid-press continues from the current value and velocity");
+    float minimum = 0.0f, maximum = 0.0f;
+    expect_true(reach_motion_range(&motion, &minimum, &maximum) == REACH_OK && minimum < 0.0f,
+                "release overshoots slightly past rest");
+
+    motion.started_seconds -= 0.02;
+    reach_motion releasing = motion;
+    reach_pressable_press(&pressable, REACH_POINTER_BUTTON_PRIMARY, 29, 6, &feedback, &result);
+    at = motion.started_seconds;
+    expect_true(fabsf(motion.from - reach_motion_value_at(&releasing, at)) < 1e-4f &&
+                    fabsf(reach_motion_velocity_at(&motion, at) -
+                          reach_motion_velocity_at(&releasing, at)) < 1e-3f,
+                "a rapid second tap continues the release without a jerk");
+}
+
 static void test_draggable_starts_only_after_threshold(void)
 {
     reach_draggable draggable = {};
@@ -235,6 +273,7 @@ int main(void)
     test_drag_start_disarms_before_release();
     test_cancel_clears_feedback_and_capture();
     test_release_requires_the_pressed_button();
+    test_press_release_retargets_preserve_velocity();
     test_draggable_starts_only_after_threshold();
     test_draggable_end_reports_and_clears_state();
     test_horizontal_reorder_uses_neighbor_thresholds();

@@ -192,9 +192,12 @@ int main()
         expect_close(geometry.envelope_bounds.height, expansion_layout.envelope_bounds.height);
     failed += expect(geometry.presentation.retained == 1);
     failed += expect_close(geometry.presentation.group.opacity.from, 0.0f);
-    failed += expect_close(geometry.presentation.group.y.from, 8.0f);
-    failed += expect_close(geometry.presentation.group.scale.from, 1.08f);
-    failed += expect_close(geometry.presentation.max_scale, 1.08f);
+    failed += expect_close(geometry.presentation.group.y.from, -6.0f);
+    failed += expect_close(geometry.presentation.group.scale.from, 0.94f);
+    failed += expect_close(geometry.presentation.max_scale, 1.0f);
+    failed += expect_close(reach_motion_value(&geometry.presentation.center_x),
+                           geometry.visible_bounds.width * 0.5f);
+    failed += expect_close(reach_motion_value(&geometry.presentation.center_y), 0.0f);
 
     reach_feature_tick_result tick = {};
     reach_test_motion_clock_advance(0.08);
@@ -208,8 +211,8 @@ int main()
     float offset = reach_motion_value_at(&geometry.presentation.group.y, middle);
     float scale = reach_motion_value_at(&geometry.presentation.group.scale, middle);
     failed += expect(opacity > 0.0f && opacity < 1.0f);
-    failed += expect(offset > 0.0f && offset < 8.0f);
-    failed += expect(scale > 1.0f && scale < 1.08f);
+    failed += expect(offset < 0.0f && offset > -6.0f);
+    failed += expect(scale > 0.94f && scale < 1.0f);
     failed += expect(tick.redraw == 0);
     tick = {};
     reach_test_motion_clock_advance(0.16);
@@ -268,8 +271,8 @@ int main()
     capsule_ops->tick(capsule, 0.06, &tick);
     capsule_ops->surface_geometry(capsule, &geometry);
     failed += expect_close(geometry.presentation.group.opacity.to, 0.0f);
-    failed += expect_close(geometry.presentation.group.y.to, 8.0f);
-    failed += expect_close(geometry.presentation.group.scale.to, 1.08f);
+    failed += expect_close(geometry.presentation.group.y.to, -4.0f);
+    failed += expect_close(geometry.presentation.group.scale.to, 0.97f);
     tick = {};
     reach_test_motion_clock_advance(0.12);
     capsule_ops->tick(capsule, 0.12, &tick);

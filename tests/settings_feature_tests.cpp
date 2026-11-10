@@ -2,8 +2,10 @@
 #include "reach/apps/settings/settings.h"
 #include "reach/features/common/ui_controls.h"
 
+#include <chrono>
 #include <memory>
 #include <stdio.h>
+#include <thread>
 
 static int failures = 0;
 static void expect_true(int value, const char *message)
@@ -577,8 +579,6 @@ static void test_button_press_feedback(void)
     reach_pressable_feedback_style feedback = {};
     feedback.motion = &model->button_press_feedback;
     feedback.pressed_value = 1.0f;
-    feedback.release_seconds = 0.18;
-    feedback.release_easing = REACH_EASING_EASE_OUT;
     reach_pressable_result result = {};
     reach_pressable_press(&model->button_pressable, REACH_POINTER_BUTTON_PRIMARY,
                           REACH_SETTINGS_HIT_POWER_APPLY, REACH_SETTINGS_HIT_POWER_APPLY, &feedback,
@@ -727,6 +727,118 @@ static void test_radio_toggle_animations(void)
                 "Bluetooth radio toggle animates between states");
 }
 
+static void render_settings_page(reach_settings_model *model, reach_rect_f32 bounds, float dpi,
+                                 const char *message)
+{
+    reach_settings_layout layout =
+        reach_settings_layout_for_bounds(bounds, reach_theme_default(), dpi, model);
+    reach_settings_render_input input = {};
+    input.theme = reach_theme_default();
+    input.model = model;
+    input.layout = &layout;
+    input.dpi_scale = dpi;
+    input.text_alignment_leading = REACH_TEXT_ALIGNMENT_LEADING;
+    input.retained_supported = 1;
+    std::unique_ptr<reach_render_command_buffer> commands(new reach_render_command_buffer());
+    reach_render_command_buffer_clear(commands.get());
+    reach_result result = reach_settings_build_render_commands(&input, commands.get());
+    expect_true(result == REACH_OK && commands->group_count <= REACH_MAX_RENDER_GROUPS &&
+                    commands->count <= REACH_MAX_RENDER_COMMANDS &&
+                    reach_render_command_buffer_validate_groups(commands.get()) == REACH_OK,
+                message);
+}
+
+static void render_settings_press(reach_settings_model *model, reach_rect_f32 bounds, float dpi,
+                                  uint64_t target, size_t feedback_index, int32_t timed)
+{
+    reach_pressable_feedback_style feedback = {};
+    feedback.motion = &model->button_press_feedback;
+    feedback.pressed_value = 1.0f;
+    reach_pressable_result result = {};
+    const char *message = "a pressed Settings button renders within the render budget";
+    reach_pressable_press(&model->button_pressable, REACH_POINTER_BUTTON_PRIMARY, target,
+                          feedback_index, &feedback, &result);
+    render_settings_page(model, bounds, dpi, message);
+    reach_pressable_release(&model->button_pressable, REACH_POINTER_BUTTON_PRIMARY,
+                            REACH_PRESSABLE_TARGET_NONE, &feedback, &result);
+    for (int step = 0; step < (timed ? 8 : 1); ++step)
+    {
+        render_settings_page(model, bounds, dpi, message);
+        if (timed)
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    reach_pressable_press(&model->button_pressable, REACH_POINTER_BUTTON_PRIMARY, target,
+                          feedback_index, &feedback, &result);
+    render_settings_page(model, bounds, dpi, message);
+    reach_pressable_release(&model->button_pressable, REACH_POINTER_BUTTON_PRIMARY,
+                            REACH_PRESSABLE_TARGET_NONE, &feedback, &result);
+    render_settings_page(model, bounds, dpi, message);
+    reach_pressable_settle_feedback(&model->button_pressable, &feedback);
+}
+
+static void test_pressed_buttons_render_worst_case(void)
+{
+    std::unique_ptr<reach_settings_model> model(new reach_settings_model());
+    reach_settings_model_init(model.get());
+
+    std::unique_ptr<reach_installed_app_list> apps(new reach_installed_app_list());
+    apps->count = REACH_INSTALLED_APP_MAX_ENTRIES;
+    for (size_t index = 0; index < apps->count; ++index)
+    {
+        for (size_t at = 0; at < REACH_INSTALLED_APP_NAME_CAPACITY - 1; ++at)
+        {
+            apps->entries[index].display_name[at] = (uint16_t)('a' + (index + at) % 26);
+            apps->entries[index].publisher[at] = (uint16_t)('a' + (index * 7 + at) % 26);
+        }
+        apps->entries[index].can_open = 1;
+        apps->entries[index].can_uninstall = 1;
+        apps->entries[index].can_manage = 1;
+    }
+    reach_settings_model_apply_installed_apps(model.get(), apps.get());
+
+    std::unique_ptr<reach_windows_update_list> updates(
+        new reach_windows_update_list(sample_updates(REACH_WINDOWS_UPDATE_MAX_UPDATES)));
+    reach_settings_model_apply_update_scan(model.get(), updates.get(), 0);
+
+    const float dpis[] = {1.0f, 1.25f, 1.5f, 2.0f};
+    const reach_rect_f32 windows[] = {{0.0f, 0.0f, 1280.0f, 800.0f}, {0.0f, 0.0f, 420.0f, 300.0f}};
+    for (float dpi : dpis)
+    {
+        for (reach_rect_f32 bounds : windows)
+        {
+            for (int page = REACH_SETTINGS_PAGE_WIFI; page <= REACH_SETTINGS_PAGE_APPLICATIONS;
+                 ++page)
+            {
+                reach_settings_model_select_page(model.get(), (reach_settings_page)page);
+                for (int hit = REACH_SETTINGS_HIT_NAV_ITEM;
+                     hit <= REACH_SETTINGS_HIT_DIAGNOSTICS_OPEN; ++hit)
+                {
+                    if (hit == REACH_SETTINGS_HIT_APPLICATION_UNINSTALL)
+                        continue;
+                    render_settings_press(model.get(), bounds, dpi, (uint64_t)hit, (size_t)hit, 0);
+                }
+                const int timed_hits[] = {
+                    REACH_SETTINGS_HIT_WIFI_SCAN,        REACH_SETTINGS_HIT_BLUETOOTH_SCAN,
+                    REACH_SETTINGS_HIT_ACCOUNT_PASSWORD, REACH_SETTINGS_HIT_STARTUP_TOGGLE,
+                    REACH_SETTINGS_HIT_POWER_APPLY,      REACH_SETTINGS_HIT_DISPLAY_THEME,
+                    REACH_SETTINGS_HIT_UPDATE_REFRESH,   REACH_SETTINGS_HIT_APPLICATION_UNINSTALL};
+                int timed_hit = timed_hits[page];
+                if (timed_hit != REACH_SETTINGS_HIT_APPLICATION_UNINSTALL)
+                    render_settings_press(model.get(), bounds, dpi, (uint64_t)timed_hit,
+                                          (size_t)timed_hit, 1);
+                for (size_t index : {(size_t)0, apps->count - 1})
+                {
+                    uint64_t target =
+                        ((uint64_t)REACH_SETTINGS_HIT_APPLICATION_UNINSTALL << 32) | index;
+                    render_settings_press(model.get(), bounds, dpi, target, (size_t)target,
+                                          timed_hit == REACH_SETTINGS_HIT_APPLICATION_UNINSTALL &&
+                                              index == 0);
+                }
+            }
+        }
+    }
+}
+
 int main(void)
 {
     test_policy();
@@ -749,5 +861,6 @@ int main(void)
     test_bluetooth_radio_stops_scan();
     test_installed_apps_loader();
     test_radio_toggle_animations();
+    test_pressed_buttons_render_worst_case();
     return failures == 0 ? 0 : 1;
 }

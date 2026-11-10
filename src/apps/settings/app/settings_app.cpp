@@ -1923,8 +1923,6 @@ static reach_pressable_feedback_style reach_settings_pressable_feedback(reach_se
     reach_pressable_feedback_style feedback = {};
     feedback.motion = app != nullptr ? &app->model.button_press_feedback : nullptr;
     feedback.pressed_value = 1.0f;
-    feedback.release_seconds = 0.18;
-    feedback.release_easing = REACH_EASING_EASE_OUT;
     if (app != nullptr)
         reach_pressable_settle_feedback(&app->model.button_pressable, &feedback);
     return feedback;

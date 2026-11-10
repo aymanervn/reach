@@ -741,7 +741,9 @@ static void test_preview_width_animation_retarget_and_reset(void)
     advance_preview_layout(menu, &ctx, 0.03);
     float closing = reach_context_menu_state_ptr(menu)->bounds.width;
     reach_context_menu_set_open(menu, 0);
-    advance_preview_layout(menu, &ctx, ctx.theme->surface_close_seconds * 0.5);
+    advance_preview_layout(
+        menu, &ctx,
+        reach_theme_motion_preset(ctx.theme, REACH_MOTION_PRESET_MENU_FADE).duration_seconds * 0.5);
     expect_near(reach_context_menu_state_ptr(menu)->bounds.width, closing, 0.01f,
                 "close presentation freezes the current width");
     reach_context_menu_force_close(menu);
@@ -940,7 +942,9 @@ static void test_preview_reflow_preserves_surviving_sources(void)
     advance_preview_layout(menu, &ctx, 0.04);
     float closing = preview_screen_x(menu, 3);
     reach_context_menu_set_open(menu, 0);
-    advance_preview_layout(menu, &ctx, ctx.theme->surface_close_seconds * 0.5);
+    advance_preview_layout(
+        menu, &ctx,
+        reach_theme_motion_preset(ctx.theme, REACH_MOTION_PRESET_MENU_FADE).duration_seconds * 0.5);
     expect_near(preview_screen_x(menu, 3), closing, 0.01f,
                 "closing freezes the currently arranged preview position");
     reach_context_menu_force_close(menu);

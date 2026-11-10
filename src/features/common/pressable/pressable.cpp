@@ -1,5 +1,9 @@
 #include "reach/features/common/pressable.h"
 
+#include <math.h>
+
+#include "reach/core/theme.h"
+
 static int32_t reach_pressable_feedback_valid(const reach_pressable_feedback_style *feedback)
 {
     return feedback != nullptr && feedback->motion != nullptr;
@@ -14,8 +18,7 @@ static void reach_pressable_result_init(reach_pressable_result *out)
     }
 }
 
-static int32_t reach_pressable_feedback_animate(reach_pressable *pressable, float target,
-                                                double seconds, reach_easing easing,
+static int32_t reach_pressable_feedback_animate(reach_pressable *pressable, int32_t pressed,
                                                 const reach_pressable_feedback_style *feedback)
 {
     if (pressable == nullptr || pressable->feedback_index == REACH_PRESSABLE_FEEDBACK_NONE ||
@@ -23,14 +26,11 @@ static int32_t reach_pressable_feedback_animate(reach_pressable *pressable, floa
     {
         return 0;
     }
-    if (seconds <= 0.0)
-    {
-        reach_motion_set(feedback->motion, target);
-    }
-    else
-    {
-        reach_motion_animate_to(feedback->motion, target, seconds, easing);
-    }
+    reach_motion_animate_spec_to_at(
+        feedback->motion, pressed ? feedback->pressed_value : 0.0f,
+        reach_theme_motion_preset(nullptr, pressed ? REACH_MOTION_PRESET_PRESS
+                                                   : REACH_MOTION_PRESET_RELEASE),
+        reach_motion_now_seconds());
     return 1;
 }
 
@@ -91,10 +91,7 @@ void reach_pressable_press(reach_pressable *pressable, reach_pointer_button butt
     pressable->activation_blocked = 0;
     pressable->feedback_latched = 0;
     pressable->feedback_index = feedback_index;
-    int32_t redraw = reach_pressable_feedback_animate(
-        pressable, feedback != nullptr ? feedback->pressed_value : 0.0f,
-        feedback != nullptr ? feedback->press_seconds : 0.0,
-        feedback != nullptr ? feedback->press_easing : REACH_EASING_EASE_IN_OUT, feedback);
+    int32_t redraw = reach_pressable_feedback_animate(pressable, 1, feedback);
     if (out != nullptr)
     {
         out->redraw = redraw;
@@ -112,9 +109,7 @@ static void reach_pressable_release_feedback(reach_pressable *pressable,
         return;
     }
     pressable->feedback_latched = 0;
-    int32_t redraw = reach_pressable_feedback_animate(
-        pressable, 0.0f, feedback != nullptr ? feedback->release_seconds : 0.0,
-        feedback != nullptr ? feedback->release_easing : REACH_EASING_EASE_IN_OUT, feedback);
+    int32_t redraw = reach_pressable_feedback_animate(pressable, 0, feedback);
     if (out != nullptr)
     {
         out->redraw |= redraw;
@@ -205,9 +200,7 @@ int32_t reach_pressable_latch_feedback(reach_pressable *pressable,
     }
     pressable->armed = 0;
     pressable->feedback_latched = 1;
-    return reach_pressable_feedback_animate(pressable,
-                                            feedback != nullptr ? feedback->pressed_value : 0.0f,
-                                            0.0, REACH_EASING_EASE_IN_OUT, feedback);
+    return reach_pressable_feedback_animate(pressable, 1, feedback);
 }
 
 int32_t reach_pressable_clear_latched_feedback(reach_pressable *pressable,
@@ -218,9 +211,7 @@ int32_t reach_pressable_clear_latched_feedback(reach_pressable *pressable,
         return 0;
     }
     pressable->feedback_latched = 0;
-    return reach_pressable_feedback_animate(
-        pressable, 0.0f, feedback != nullptr ? feedback->release_seconds : 0.0,
-        feedback != nullptr ? feedback->release_easing : REACH_EASING_EASE_IN_OUT, feedback);
+    return reach_pressable_feedback_animate(pressable, 0, feedback);
 }
 
 void reach_pressable_settle_feedback(reach_pressable *pressable,
@@ -229,7 +220,7 @@ void reach_pressable_settle_feedback(reach_pressable *pressable,
     if (pressable == nullptr || pressable->feedback_index == REACH_PRESSABLE_FEEDBACK_NONE ||
         pressable->tracking || pressable->armed || pressable->feedback_latched ||
         !reach_pressable_feedback_valid(feedback) || reach_motion_active(feedback->motion) ||
-        reach_motion_value(feedback->motion) > 0.001f)
+        fabsf(reach_motion_value(feedback->motion)) > 0.001f)
     {
         return;
     }

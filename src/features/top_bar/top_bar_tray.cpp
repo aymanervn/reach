@@ -46,10 +46,6 @@ static reach_pressable_feedback_style reach_top_bar_tray_feedback(reach_top_bar 
                           ? &top_bar->tray_popup->press_feedback
                           : nullptr;
     feedback.pressed_value = 0.50f;
-    feedback.press_seconds = 0.055;
-    feedback.release_seconds = 0.055;
-    feedback.press_easing = REACH_EASING_EASE_IN_OUT;
-    feedback.release_easing = REACH_EASING_EASE_IN_OUT;
     return feedback;
 }
 
@@ -245,7 +241,7 @@ reach_result reach_top_bar_tray_popup_create(reach_top_bar_tray_popup **out_popu
     {
         return REACH_ERROR;
     }
-    reach_feature_transition_init(&(*out_popup)->popup_transition,
+    reach_feature_transition_init(&(*out_popup)->popup_transition, REACH_FEATURE_PRESENTATION_POPUP,
                                   REACH_FEATURE_TRANSITION_FROM_ABOVE);
     reach_pressable_init(&(*out_popup)->pressable);
     return REACH_OK;
@@ -377,6 +373,8 @@ void reach_top_bar_layout_tray_popup(reach_top_bar *top_bar, const reach_theme *
         ceilf(content_height + notch_height + border_thickness * 2.0f), 8.0f * scale);
 
     reach_rect_f32 bounds = popup->placement.bounds;
+    reach_feature_transition_set_trigger(&popup->popup_transition, bounds,
+                                         popup->placement.notch_anchor_x);
     reach_rect_f32 surface_bounds = {0.0f, 0.0f, bounds.width, bounds.height};
     reach_rect_f32 content_bounds = reach_theme_border_content_rect(theme, scale, surface_bounds);
     float grid_height = (float)rows * slot_size + (float)(rows - 1) * gap;

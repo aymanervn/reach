@@ -223,7 +223,6 @@ extern "C"
         float now_playing_control_gap;
         float now_playing_play_button_width;
         float now_playing_prev_next_button_width;
-        float surface_open_seconds;
         float surface_close_seconds;
         float bar_reveal_seconds;
         float stage_animation_seconds;
