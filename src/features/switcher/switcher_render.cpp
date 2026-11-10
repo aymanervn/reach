@@ -25,16 +25,7 @@ static void reach_switcher_label_for_window(uint16_t *out_label, size_t out_coun
     }
 }
 
-static reach_result reach_switcher_fill(reach_render_command_buffer *commands, uint64_t id,
-                                        const reach_rect_motion &bounds, float width, float height,
-                                        float radius, reach_color color)
-{
-    reach_render_group source = {};
-    source.id = id;
-    source.parent_id = 1;
-    source.bounds = {0, 0, fmaxf(1, ceilf(width)), fmaxf(1, ceilf(height))};
-    return reach_render_push_rect_motion(commands, &source, &bounds, radius, color);
-}
+static const uint64_t REACH_SWITCHER_SELECTION_ANCHOR_ID = 2;
 
 reach_result reach_switcher_append_render_commands(reach_switcher *switcher,
                                                    const reach_switcher_render_context *ctx,
@@ -64,31 +55,44 @@ reach_result reach_switcher_append_render_commands(reach_switcher *switcher,
             theme->bar_border, &theme->popup_shadow, scale, 8, body.id);
     if (result != REACH_OK)
         return result;
-    float selected_inset = REACH_SWITCHER_SELECTION_INSET * scale;
+    if (layout.has_selection)
+    {
+        float minimum = 0, width = 0, height = 0;
+        if (reach_motion_range(&layout.selection.width, &minimum, &width) != REACH_OK ||
+            reach_motion_range(&layout.selection.height, &minimum, &height) != REACH_OK)
+            return REACH_INVALID_ARGUMENT;
+        reach_render_group anchor = {};
+        anchor.id = REACH_SWITCHER_SELECTION_ANCHOR_ID;
+        anchor.parent_id = body.id;
+        anchor.bounds = body.bounds;
+        anchor.x = reach_motion_affine(&layout.body.width, .5f, -layout.envelope.width * .5f);
+        anchor.has_clip = 1;
+        anchor.clip = anchor.bounds;
+        anchor.clip_radius = fmaxf(0, theme->radius_large * scale - border);
+        reach_motion_set(&anchor.clip_insets[REACH_RENDER_CLIP_LEFT], border);
+        anchor.clip_insets[REACH_RENDER_CLIP_RIGHT] =
+            reach_motion_affine(&layout.body.width, -1, anchor.bounds.width + border);
+        reach_motion_set(&anchor.clip_insets[REACH_RENDER_CLIP_TOP], border);
+        anchor.clip_insets[REACH_RENDER_CLIP_BOTTOM] =
+            reach_motion_affine(&layout.body.height, -1, anchor.bounds.height + border);
+        result = reach_render_command_buffer_begin_group(out_commands, &anchor);
+        reach_render_command_buffer_end_group(out_commands);
+        reach_render_group pill = {};
+        pill.id = anchor.id + 1;
+        pill.parent_id = anchor.id;
+        pill.bounds = {0, 0, fmaxf(1, ceilf(width)), fmaxf(1, ceilf(height))};
+        if (result == REACH_OK)
+            result = reach_render_push_rect_motion(out_commands, &pill, &layout.selection,
+                                                   theme->radius_small * scale,
+                                                   theme->switcher_selection_background);
+        if (result != REACH_OK)
+            return result;
+    }
     for (size_t index = 0; index < layout.count; ++index)
     {
         const auto &card = layout.cards[index];
         const auto *window =
             reach_window_tracking_window_by_id(reach_switcher_windows(switcher), card.window);
-        if (card.selected)
-        {
-            reach_rect_motion selected = card.preview_motion;
-            selected.x = reach_motion_affine(&selected.x, 1, -selected_inset);
-            selected.y = reach_motion_affine(&selected.y, 1, -selected_inset);
-            selected.width = reach_motion_affine(&selected.width, 1, selected_inset * 2);
-            selected.height = reach_motion_affine(&selected.height, 1, selected_inset * 2);
-            result = reach_switcher_fill(
-                out_commands, card.render_id, selected, card.preview.width + selected_inset * 2,
-                card.preview.height + selected_inset * 2, theme->radius_small * scale,
-                theme->switcher_selection_background);
-            if (result != REACH_OK)
-                return result;
-        }
-        result = reach_switcher_fill(out_commands, card.render_id + 2, card.preview_motion,
-                                     card.preview.width, card.preview.height, 0,
-                                     theme->switcher_background);
-        if (result != REACH_OK)
-            return result;
         if (!card.preview_visible && window != nullptr)
         {
             const auto *runtime_path =

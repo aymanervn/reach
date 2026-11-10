@@ -19,6 +19,8 @@ typedef struct reach_switcher_layout
     size_t count;
     float scale;
     reach_rect_motion body;
+    reach_rect_motion selection;
+    int32_t has_selection;
     reach_rect_f32 envelope;
 } reach_switcher_layout;
 

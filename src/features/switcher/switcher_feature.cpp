@@ -35,6 +35,8 @@ typedef struct reach_switcher_window_context
 struct reach_switcher
 {
     reach_motion width;
+    reach_rect_motion selection;
+    size_t selection_slot;
     reach_rect_f32 monitor;
     float border;
     int32_t layout_initialized;
@@ -299,7 +301,7 @@ reach_result reach_switcher_create(reach_switcher **out_switcher)
     {
         return REACH_ERROR;
     }
-    reach_feature_transition_init(&switcher->surface_transition, REACH_FEATURE_PRESENTATION_POPUP,
+    reach_feature_transition_init(&switcher->surface_transition, REACH_FEATURE_PRESENTATION_MENU,
                                   REACH_FEATURE_TRANSITION_FROM_BELOW);
     *out_switcher = switcher;
     return REACH_OK;
@@ -534,12 +536,37 @@ static void reach_switcher_retarget_width(reach_switcher *switcher,
     }
     else if (switcher->state.open && fabsf(switcher->width.to - target) >= .5f)
     {
-        reach_motion_animate_to_at(&switcher->width, target, .18, REACH_EASING_EASE_IN_OUT, now);
+        reach_motion_animate_spec_to_at(
+            &switcher->width, target,
+            reach_theme_motion_preset(ctx->theme, REACH_MOTION_PRESET_SMOOTH), now);
         switcher->width_cleanup_pending = 1;
     }
     else if (switcher->state.open && !reach_motion_active_at(&switcher->width, now) &&
              switcher->width.to != target)
         reach_motion_set(&switcher->width, target);
+}
+
+static void reach_switcher_retarget_selection(reach_switcher *switcher,
+                                              const reach_switcher_arrange_context *ctx,
+                                              reach_rect_f32 target, size_t slot, int32_t cut,
+                                              double now)
+{
+    reach_motion *channels[] = {&switcher->selection.x, &switcher->selection.y,
+                                &switcher->selection.width, &switcher->selection.height};
+    const float targets[] = {target.x, target.y, target.width, target.height};
+    int32_t settle = cut || !ctx->transition_visible || switcher->selection.width.generation == 0;
+    size_t distance = slot > switcher->selection_slot ? slot - switcher->selection_slot
+                                                      : switcher->selection_slot - slot;
+    reach_motion_spec spring = reach_theme_motion_preset(
+        ctx->theme, distance == 1 ? REACH_MOTION_PRESET_BOUNCY : REACH_MOTION_PRESET_SMOOTH);
+    switcher->selection_slot = slot;
+    for (size_t index = 0; index < 4; ++index)
+    {
+        if (settle)
+            reach_motion_set(channels[index], targets[index]);
+        else if (channels[index]->to != targets[index])
+            reach_motion_animate_spec_to_at(channels[index], targets[index], spring, now);
+    }
 }
 
 const reach_switcher_layout *reach_switcher_card_layout(const reach_switcher *switcher)
@@ -609,6 +636,11 @@ static int32_t reach_switcher_update_layout(reach_switcher *switcher,
             !reach_motion_equal(&card->preview_motion.height, &previous->preview_motion.height) ||
             card->selected != previous->selected;
     }
+    changed |= layout->has_selection != switcher->layout.has_selection ||
+               !reach_motion_equal(&layout->selection.x, &switcher->layout.selection.x) ||
+               !reach_motion_equal(&layout->selection.y, &switcher->layout.selection.y) ||
+               !reach_motion_equal(&layout->selection.width, &switcher->layout.selection.width) ||
+               !reach_motion_equal(&layout->selection.height, &switcher->layout.selection.height);
     if (membership_changed)
     {
         ++switcher->preview_generation;
@@ -736,6 +768,7 @@ int32_t reach_switcher_arrange(reach_switcher *switcher, const reach_switcher_ar
     else
         reach_motion_set(&fit, 1);
     float prefix = 0;
+    reach_rect_f32 selection = {};
     for (size_t visible = 0; visible < layout.count; ++visible)
     {
         size_t index = start + visible;
@@ -760,8 +793,32 @@ int32_t reach_switcher_arrange(reach_switcher *switcher, const reach_switcher_ar
         }
         card->preview_visible = preview_visible[index];
         card->selected = index == state->selected_index;
+        if (card->selected)
+        {
+            float settled_fit =
+                row_width > 0
+                    ? fminf(fmaxf((target.width - (padding + border) * 2) / row_width, 0), 1)
+                    : 1;
+            float inset = REACH_SWITCHER_SELECTION_INSET * scale;
+            selection.x = settled_fit * (prefix - row_width * .5f) - inset;
+            selection.y = border + padding + height * (1 - settled_fit) * .5f - inset;
+            selection.width = widths[index] * settled_fit + inset * 2;
+            selection.height = height * settled_fit + inset * 2;
+            layout.has_selection = 1;
+        }
         prefix += widths[index] + gap;
     }
+    REACH_ASSERT(layout.count == 0 || layout.has_selection);
+    if (layout.has_selection)
+    {
+        reach_switcher_retarget_selection(switcher, ctx, selection, state->selected_index, cut,
+                                          now);
+        layout.selection = switcher->selection;
+        layout.selection.x =
+            reach_motion_affine(&switcher->selection.x, 1, layout.envelope.width * .5f);
+    }
+    reach_feature_transition_set_anchor(&switcher->surface_transition, layout.envelope.width * .5f,
+                                        layout.envelope.height * .5f);
     switcher->monitor = ctx->monitor_bounds;
     switcher->border = border;
     switcher->layout_initialized = 1;
