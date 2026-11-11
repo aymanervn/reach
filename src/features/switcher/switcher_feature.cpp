@@ -1,6 +1,7 @@
 #include "reach/features/switcher.h"
 #include "reach/core/typography.h"
 #include "reach/features/common/presentation.h"
+#include "reach/features/common/selection_pill.h"
 #include "reach/features/common/window_preview_layout.h"
 
 #include "switcher_common.h"
@@ -35,8 +36,7 @@ typedef struct reach_switcher_window_context
 struct reach_switcher
 {
     reach_motion width;
-    reach_rect_motion selection;
-    size_t selection_slot;
+    reach_selection_pill selection;
     reach_rect_f32 monitor;
     float border;
     int32_t layout_initialized;
@@ -546,29 +546,6 @@ static void reach_switcher_retarget_width(reach_switcher *switcher,
         reach_motion_set(&switcher->width, target);
 }
 
-static void reach_switcher_retarget_selection(reach_switcher *switcher,
-                                              const reach_switcher_arrange_context *ctx,
-                                              reach_rect_f32 target, size_t slot, int32_t cut,
-                                              double now)
-{
-    reach_motion *channels[] = {&switcher->selection.x, &switcher->selection.y,
-                                &switcher->selection.width, &switcher->selection.height};
-    const float targets[] = {target.x, target.y, target.width, target.height};
-    int32_t settle = cut || !ctx->transition_visible || switcher->selection.width.generation == 0;
-    size_t distance = slot > switcher->selection_slot ? slot - switcher->selection_slot
-                                                      : switcher->selection_slot - slot;
-    reach_motion_spec spring = reach_theme_motion_preset(
-        ctx->theme, distance == 1 ? REACH_MOTION_PRESET_BOUNCY : REACH_MOTION_PRESET_SMOOTH);
-    switcher->selection_slot = slot;
-    for (size_t index = 0; index < 4; ++index)
-    {
-        if (settle)
-            reach_motion_set(channels[index], targets[index]);
-        else if (channels[index]->to != targets[index])
-            reach_motion_animate_spec_to_at(channels[index], targets[index], spring, now);
-    }
-}
-
 const reach_switcher_layout *reach_switcher_card_layout(const reach_switcher *switcher)
 {
     return switcher != nullptr ? &switcher->layout : nullptr;
@@ -811,11 +788,17 @@ int32_t reach_switcher_arrange(reach_switcher *switcher, const reach_switcher_ar
     REACH_ASSERT(layout.count == 0 || layout.has_selection);
     if (layout.has_selection)
     {
-        reach_switcher_retarget_selection(switcher, ctx, selection, state->selected_index, cut,
-                                          now);
-        layout.selection = switcher->selection;
+        int32_t settle =
+            cut || !ctx->transition_visible || switcher->selection.rect.width.generation == 0;
+        reach_selection_pill_retarget(&switcher->selection, ctx->theme, selection,
+                                      state->selected_index,
+                                      settle ? REACH_SELECTION_PILL_SET
+                                             : reach_selection_pill_mode_for_distance(
+                                                   switcher->selection.slot, state->selected_index),
+                                      now);
+        layout.selection = switcher->selection.rect;
         layout.selection.x =
-            reach_motion_affine(&switcher->selection.x, 1, layout.envelope.width * .5f);
+            reach_motion_affine(&switcher->selection.rect.x, 1, layout.envelope.width * .5f);
     }
     reach_feature_transition_set_anchor(&switcher->surface_transition, layout.envelope.width * .5f,
                                         layout.envelope.height * .5f);

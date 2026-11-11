@@ -50,12 +50,13 @@ extern "C"
     void reach_quick_settings_tile_state_motions(const reach_quick_settings *quick_settings,
                                                  reach_motion *out_network,
                                                  reach_motion *out_bluetooth);
-    void
-    reach_quick_settings_row_motions(const reach_quick_settings *quick_settings,
-                                     reach_quick_settings_output_device_row_motion
-                                         out_output_devices[REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES],
-                                     reach_quick_settings_app_volume_row_motion
-                                         out_app_volumes[REACH_AUDIO_VOLUME_MAX_SESSIONS]);
+    void reach_quick_settings_row_motions(
+        const reach_quick_settings *quick_settings,
+        reach_keyed_row out_output_motions[REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES],
+        reach_quick_settings_output_device_row
+            out_output_devices[REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES],
+        reach_keyed_row out_app_motions[REACH_AUDIO_VOLUME_MAX_SESSIONS],
+        reach_quick_settings_app_volume_row out_app_volumes[REACH_AUDIO_VOLUME_MAX_SESSIONS]);
     reach_quick_settings_layout reach_quick_settings_layout_for_sections_scaled(
         reach_rect_f32 content_bounds, const reach_theme *theme,
         const reach_quick_settings_model *model, float output_devices_span, float app_volumes_span,

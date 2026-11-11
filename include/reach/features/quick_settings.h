@@ -3,6 +3,7 @@
 
 #include "reach/core/render_commands.h"
 #include "reach/core/theme.h"
+#include "reach/features/common/keyed_rows.h"
 #include "reach/features/feature_capsule.h"
 #include "reach/ports/audio_volume.h"
 #include "reach/ports/system_controls.h"
@@ -117,32 +118,17 @@ extern "C"
         reach_rect_f32 expand_button_icon;
     } reach_quick_settings_layout;
 
-    typedef enum reach_quick_settings_row_lifecycle
+    typedef struct reach_quick_settings_output_device_row
     {
-        REACH_QUICK_SETTINGS_ROW_EMPTY = 0,
-        REACH_QUICK_SETTINGS_ROW_LIVE,
-        REACH_QUICK_SETTINGS_ROW_RETIRING
-    } reach_quick_settings_row_lifecycle;
-
-    typedef struct reach_quick_settings_output_device_row_motion
-    {
-        int32_t lifecycle;
-        size_t index;
         int32_t separator;
         reach_audio_output_device device;
-        reach_motion y;
-        reach_motion opacity;
-    } reach_quick_settings_output_device_row_motion;
+    } reach_quick_settings_output_device_row;
 
-    typedef struct reach_quick_settings_app_volume_row_motion
+    typedef struct reach_quick_settings_app_volume_row
     {
-        int32_t lifecycle;
-        size_t index;
         int32_t separator;
         reach_audio_volume_session session;
-        reach_motion y;
-        reach_motion opacity;
-    } reach_quick_settings_app_volume_row_motion;
+    } reach_quick_settings_app_volume_row;
 
     typedef struct reach_quick_settings_render_input
     {
@@ -156,10 +142,11 @@ extern "C"
         reach_motion app_volumes_span;
         reach_motion output_devices_opacity;
         reach_motion app_volumes_opacity;
-        reach_quick_settings_output_device_row_motion
-            output_device_row_motions[REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES];
-        reach_quick_settings_app_volume_row_motion
-            app_volume_row_motions[REACH_AUDIO_VOLUME_MAX_SESSIONS];
+        reach_keyed_row output_device_row_motions[REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES];
+        reach_quick_settings_output_device_row
+            output_device_row_items[REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES];
+        reach_keyed_row app_volume_row_motions[REACH_AUDIO_VOLUME_MAX_SESSIONS];
+        reach_quick_settings_app_volume_row app_volume_row_items[REACH_AUDIO_VOLUME_MAX_SESSIONS];
         reach_motion network_tile_state;
         reach_motion bluetooth_tile_state;
         reach_rect_motion surface_motion;
