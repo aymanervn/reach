@@ -27,6 +27,8 @@ void reach_launcher_set_retained_supported(reach_launcher *launcher, int32_t sup
 reach_motion reach_launcher_caret_opacity(const reach_launcher *launcher);
 reach_motion reach_launcher_body_height_motion(const reach_launcher *launcher);
 reach_motion reach_launcher_results_opacity_motion(const reach_launcher *launcher);
+void reach_launcher_fill_row_render_input(const reach_launcher *launcher,
+                                          reach_launcher_render_input *input);
 
 static inline reach_rect_motion reach_launcher_body_motion(const reach_launcher_layout *layout,
                                                            const reach_motion *height)

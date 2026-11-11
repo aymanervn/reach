@@ -56,8 +56,6 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
     const reach_launcher_layout *layout = input->layout;
     reach_render_command_buffer_clear(out_commands);
     float launcher_radius = layout->search_box.height * 0.5f;
-    float row_selected_inset_x = reach_launcher_scale(input, 6.0f);
-    float row_selected_inset_y = reach_launcher_scale(input, 5.0f);
     float row_selected_radius = reach_launcher_scale(input, theme->radius_small);
     float row_icon_size = reach_launcher_scale(input, 32.0f);
     float row_icon_x = reach_launcher_scale(input, 16.0f);
@@ -73,7 +71,10 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
     float row_path_height = reach_launcher_scale(input, 20.0f);
     float row_path_size = reach_launcher_scale(input, REACH_TEXT_SIZE_SMALL);
     int32_t error_row_visible = reach_launcher_error_row_visible(model);
-    int32_t results_attached = model->result_count > 0 || error_row_visible ? 1 : 0;
+    int32_t rows_held = 0;
+    for (size_t slot = 0; input->rows != nullptr && slot < REACH_LAUNCHER_ROW_CAPACITY; ++slot)
+        rows_held |= input->rows[slot].lifecycle != REACH_KEYED_ROW_EMPTY;
+    int32_t results_attached = model->result_count > 0 || error_row_visible || rows_held ? 1 : 0;
     auto bounds = reach_launcher_body_motion(layout, &input->body_height);
     float border_thickness = reach_theme_border_thickness(theme, input->dpi_scale);
     reach_result result = reach_ui_motion_background_render(
@@ -172,6 +173,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
         content.bounds.height =
             ceilf(viewport.bounds.y + viewport.bounds.height) - content.bounds.y;
         reach_motion opacity = input->results_opacity;
+        reach_motion_set(&content.y, -(float)input->row_start * input->row_pitch);
         result = reach_render_command_buffer_begin_group(out_commands, &content);
         reach_render_command_buffer_end_group(out_commands);
         if (result != REACH_OK)
@@ -182,8 +184,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
             return reach_render_retain_commands(out_commands, first, id, content.id, &opacity,
                                                 &stationary);
         };
-        size_t visible_count = reach_launcher_visible_result_count(model);
-        float row_height = reach_launcher_scale(input, 56.0f);
+        float row_height = input->row_pitch;
 
         if (layout->search_result_scrollbar_track.height > 0.0f)
         {
@@ -197,50 +198,44 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
                 return result;
         }
 
-        size_t start = reach_launcher_model_result_scroll_offset(model);
-        if (start > model->result_count)
+        if (input->has_selection)
         {
-            start = model->result_count;
-        }
-        size_t end = start + visible_count;
-        if (end > model->result_count)
-        {
-            end = model->result_count;
+            float minimum = 0, width = 0, height = 0;
+            if (reach_motion_range(&input->selection.width, &minimum, &width) != REACH_OK ||
+                reach_motion_range(&input->selection.height, &minimum, &height) != REACH_OK)
+                return REACH_INVALID_ARGUMENT;
+            reach_render_group pill = {};
+            pill.id = UINT64_C(0x2900000000060020);
+            pill.parent_id = content.id;
+            pill.bounds = {0, 0, fmaxf(1, ceilf(width)), fmaxf(1, ceilf(height))};
+            pill.opacity = opacity;
+            result = reach_render_push_rect_motion(out_commands, &pill, &input->selection,
+                                                   row_selected_radius,
+                                                   theme->launcher_row_selected_background);
+            if (result != REACH_OK)
+                return result;
         }
 
-        for (size_t index = start; index < end && index < REACH_SEARCH_MAX_RESULTS; ++index)
+        for (size_t slot = 0; input->rows != nullptr && input->row_results != nullptr &&
+                              slot < REACH_LAUNCHER_ROW_CAPACITY;
+             ++slot)
         {
-            size_t visible_index = index - start;
+            const reach_keyed_row &row = input->rows[slot];
+            if (row.lifecycle == REACH_KEYED_ROW_EMPTY)
+                continue;
+            const reach_launcher_result &row_result = input->row_results[slot];
             float row_x = layout->search_result_items.x - layout->bounds.x;
-            float row_y = layout->search_result_items.y - layout->bounds.y +
-                          row_height * (float)visible_index;
+            float row_y = layout->search_result_items.y - layout->bounds.y + row.y.to;
             float row_width = layout->search_result_items.width;
-            int32_t selected = index == model->selected_result_index;
-            uint64_t row_id = UINT64_C(0x2900000000050000) + index * 8;
+            int32_t selected = row.lifecycle == REACH_KEYED_ROW_LIVE &&
+                               input->row_start + row.index == model->selected_result_index;
+            uint64_t row_id = UINT64_C(0x2900000000050000) + slot * 8;
             size_t first = out_commands->count;
-
-            if (selected)
-            {
-                command = {};
-                command.type = REACH_RENDER_COMMAND_RECT;
-                command.rect.x = row_x + row_selected_inset_x;
-                command.rect.y = row_y + row_selected_inset_y;
-                command.rect.width = row_width - row_selected_inset_x * 2.0f;
-                command.rect.height = row_height - row_selected_inset_y * 2.0f;
-                command.color = theme->launcher_row_selected_background;
-                command.radius = row_selected_radius;
-                reach_render_command_buffer_push(out_commands, &command);
-                result = retain(first, row_id);
-                if (result != REACH_OK)
-                    return result;
-            }
-            first = out_commands->count;
 
             float icon_size = row_icon_size;
             float icon_x = row_x + row_icon_x;
             float icon_y = row_y + row_icon_y;
-            uint64_t icon_id =
-                input->result_icon_ids != nullptr ? input->result_icon_ids[index] : 0;
+            uint64_t icon_id = input->row_icon_ids != nullptr ? input->row_icon_ids[slot] : 0;
 
             if (icon_id != 0)
             {
@@ -274,7 +269,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
                 command.rect.width = icon_size;
                 command.rect.height = icon_size;
                 command.color = theme->launcher_row_icon_glyph;
-                command.icon_id = reach_launcher_fallback_icon(model->results[index].visual_kind);
+                command.icon_id = reach_launcher_fallback_icon(row_result.visual_kind);
                 reach_render_command_buffer_push(out_commands, &command);
             }
 
@@ -290,7 +285,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
             command.text_weight = REACH_TEXT_WEIGHT_SEMIBOLD;
             command.text_alignment = input->text_alignment_leading;
             command.text_ellipsis = 1;
-            reach_copy_utf16(command.text, 260, model->results[index].title);
+            reach_copy_utf16(command.text, 260, row_result.title);
             reach_render_command_buffer_push(out_commands, &command);
 
             command = {};
@@ -303,9 +298,11 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
             command.text_size = row_path_size;
             command.text_alignment = input->text_alignment_leading;
             command.text_ellipsis = 1;
-            reach_copy_utf16(command.text, 260, model->results[index].subtitle);
+            reach_copy_utf16(command.text, 260, row_result.subtitle);
             reach_render_command_buffer_push(out_commands, &command);
-            result = retain(first, row_id + 1);
+            reach_motion offset = reach_motion_affine(&row.y, 1, -row.y.to);
+            result = reach_render_retain_commands(out_commands, first, row_id + 1, content.id,
+                                                  &row.opacity, &offset);
             if (result != REACH_OK)
                 return result;
         }
@@ -372,7 +369,6 @@ reach_result reach_launcher_append_render_commands(reach_launcher *launcher,
     size_t icon_end = reach_launcher_model_result_scroll_offset(&state->model) +
                       REACH_SEARCH_VISIBLE_RESULTS + icon_overscan_rows;
 
-    uint64_t result_icon_ids[REACH_SEARCH_MAX_RESULTS] = {};
     for (size_t index = icon_start;
          index < icon_end && index < state->model.result_count && index < REACH_SEARCH_MAX_RESULTS;
          ++index)
@@ -380,8 +376,7 @@ reach_result reach_launcher_append_render_commands(reach_launcher *launcher,
         const uint16_t *path = state->model.results[index].icon_path;
         if (path[0] != 0)
         {
-            result_icon_ids[index] =
-                reach_icon_service_get(reach_launcher_icons(launcher), path, 32);
+            (void)reach_icon_service_get(reach_launcher_icons(launcher), path, 32);
         }
     }
 
@@ -389,7 +384,15 @@ reach_result reach_launcher_append_render_commands(reach_launcher *launcher,
     input.theme = ctx->theme;
     input.model = &state->model;
     input.layout = ctx->layout;
-    input.result_icon_ids = result_icon_ids;
+    reach_launcher_fill_row_render_input(launcher, &input);
+    uint64_t row_icon_ids[REACH_LAUNCHER_ROW_CAPACITY] = {};
+    for (size_t slot = 0; slot < REACH_LAUNCHER_ROW_CAPACITY; ++slot)
+    {
+        const uint16_t *path = input.row_results[slot].icon_path;
+        if (input.rows[slot].lifecycle != REACH_KEYED_ROW_EMPTY && path[0] != 0)
+            row_icon_ids[slot] = reach_icon_service_get(reach_launcher_icons(launcher), path, 32);
+    }
+    input.row_icon_ids = row_icon_ids;
     input.dpi_scale = ctx->dpi_scale;
     input.text_alignment_leading = REACH_TEXT_ALIGNMENT_LEADING;
     input.caret_index = state->launcher_text_edit.caret;

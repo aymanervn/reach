@@ -17,6 +17,18 @@ struct reach_launcher
     reach_motion_spec height_spec;
     reach_motion_spec fade_in_spec;
     reach_motion_spec fade_out_spec;
+    reach_theme theme;
+    float dpi_scale;
+    float row_pitch;
+    reach_keyed_row rows[REACH_LAUNCHER_ROW_CAPACITY];
+    reach_launcher_result row_results[REACH_LAUNCHER_ROW_CAPACITY];
+    reach_selection_pill selection;
+    int32_t selection_valid;
+    uint32_t results_revision;
+    uint32_t synced_revision;
+    size_t synced_scroll;
+    size_t synced_selected;
+    float synced_pitch;
     reach_feature_transition surface_transition;
     reach_blink caret;
     int32_t caret_retained;
@@ -50,6 +62,7 @@ static void reach_launcher_load_motion_specs(reach_launcher *launcher, const rea
     launcher->height_spec = reach_theme_motion_preset(theme, REACH_MOTION_PRESET_SMOOTH);
     launcher->fade_in_spec = reach_theme_motion_preset(theme, REACH_MOTION_PRESET_FADE_IN);
     launcher->fade_out_spec = reach_theme_motion_preset(theme, REACH_MOTION_PRESET_FADE_OUT);
+    launcher->theme = *theme;
 }
 
 static int32_t reach_launcher_results_animated(const reach_launcher *launcher)
@@ -66,6 +79,146 @@ static void reach_launcher_refresh_results_deadline(reach_launcher *launcher)
     if (reach_motion_active(&launcher->results_opacity))
         launcher->results_deadline =
             fmax(launcher->results_deadline, reach_motion_deadline(&launcher->results_opacity));
+    if (reach_keyed_rows_active(launcher->rows, REACH_LAUNCHER_ROW_CAPACITY))
+        launcher->results_deadline =
+            fmax(launcher->results_deadline,
+                 reach_keyed_rows_deadline(launcher->rows, REACH_LAUNCHER_ROW_CAPACITY));
+    const reach_motion *selection[] = {&launcher->selection.rect.x, &launcher->selection.rect.y,
+                                       &launcher->selection.rect.width,
+                                       &launcher->selection.rect.height};
+    for (const reach_motion *motion : selection)
+    {
+        if (reach_motion_active(motion))
+            launcher->results_deadline =
+                fmax(launcher->results_deadline, reach_motion_deadline(motion));
+    }
+}
+
+struct reach_launcher_row_match
+{
+    const reach_launcher *launcher;
+    size_t start;
+};
+
+static int32_t reach_launcher_row_same(const void *context, size_t slot, size_t item_index)
+{
+    const reach_launcher_row_match *match = static_cast<const reach_launcher_row_match *>(context);
+    const reach_launcher_result &held = match->launcher->row_results[slot];
+    const reach_launcher_result &item =
+        match->launcher->state.model.results[match->start + item_index];
+    if (held.action != item.action)
+        return 0;
+    if (item.action != REACH_LAUNCHER_RESULT_OPEN_SEARCH)
+        return 1;
+    return reach_utf16_equal(held.payload.search.path, item.payload.search.path) &&
+           reach_utf16_equal(held.payload.search.arguments, item.payload.search.arguments) &&
+           reach_utf16_equal(held.payload.search.app_user_model_id,
+                             item.payload.search.app_user_model_id);
+}
+
+static int32_t reach_launcher_rows_held(const reach_launcher *launcher)
+{
+    for (const reach_keyed_row &row : launcher->rows)
+    {
+        if (row.lifecycle != REACH_KEYED_ROW_EMPTY)
+            return 1;
+    }
+    return 0;
+}
+
+static reach_rect_f32 reach_launcher_selection_rect(const reach_launcher *launcher)
+{
+    const reach_launcher_layout &layout = launcher->pointer_layout;
+    float scale = launcher->dpi_scale;
+    reach_rect_f32 rect = {};
+    rect.x = layout.search_result_items.x - layout.bounds.x + 6.0f * scale;
+    rect.y = layout.search_result_items.y - layout.bounds.y +
+             (float)launcher->state.model.selected_result_index * launcher->row_pitch +
+             5.0f * scale;
+    rect.width = fmaxf(0.0f, layout.search_result_items.width - 12.0f * scale);
+    rect.height = fmaxf(0.0f, launcher->row_pitch - 10.0f * scale);
+    return rect;
+}
+
+static void reach_launcher_sync_rows(reach_launcher *launcher)
+{
+    if (launcher == nullptr || !launcher->pointer_layout_valid || launcher->row_pitch <= 0.0f)
+        return;
+    const reach_launcher_model &model = launcher->state.model;
+    size_t start = reach_launcher_model_result_scroll_offset(&model);
+    if (start > model.result_count)
+        start = model.result_count;
+    size_t count = reach_launcher_visible_result_count(&model);
+    if (count > model.result_count - start)
+        count = model.result_count - start;
+    if (count > REACH_LAUNCHER_ROW_CAPACITY)
+        count = REACH_LAUNCHER_ROW_CAPACITY;
+    int32_t results_changed = launcher->synced_revision != launcher->results_revision;
+    int32_t pitch_changed = launcher->synced_pitch != launcher->row_pitch;
+    int32_t scroll_changed = launcher->synced_scroll != start;
+    int32_t selected_changed = launcher->synced_selected != model.selected_result_index;
+    if (!results_changed && !pitch_changed && !scroll_changed && !selected_changed)
+        return;
+    double now = reach_motion_now_seconds();
+    int32_t animated = !pitch_changed && reach_launcher_results_animated(launcher);
+    reach_keyed_row_change changes[REACH_KEYED_ROWS_MAX_CHANGES(REACH_LAUNCHER_ROW_CAPACITY)];
+    (void)reach_keyed_rows_release_settled(launcher->rows, REACH_LAUNCHER_ROW_CAPACITY, changes,
+                                           REACH_LAUNCHER_ROW_CAPACITY);
+    if (results_changed || pitch_changed || scroll_changed)
+    {
+        float targets[REACH_LAUNCHER_ROW_CAPACITY] = {};
+        for (size_t index = 0; index < count; ++index)
+            targets[index] = (float)(start + index) * launcher->row_pitch;
+        reach_launcher_row_match match = {launcher, start};
+        reach_keyed_rows_sync_input input = {};
+        input.count = count;
+        input.targets = targets;
+        input.same = reach_launcher_row_same;
+        input.context = &match;
+        input.animate = animated && results_changed;
+        input.theme = &launcher->theme;
+        input.now_seconds = now;
+        (void)reach_keyed_rows_sync(launcher->rows, REACH_LAUNCHER_ROW_CAPACITY, &input, changes,
+                                    REACH_KEYED_ROWS_MAX_CHANGES(REACH_LAUNCHER_ROW_CAPACITY));
+        for (size_t slot = 0; slot < REACH_LAUNCHER_ROW_CAPACITY; ++slot)
+        {
+            const reach_keyed_row &row = launcher->rows[slot];
+            if (row.lifecycle == REACH_KEYED_ROW_LIVE && start + row.index < model.result_count)
+                launcher->row_results[slot] = model.results[start + row.index];
+        }
+    }
+    if (model.result_count > 0)
+    {
+        reach_selection_pill_mode mode = REACH_SELECTION_PILL_SET;
+        if (animated && launcher->selection_valid)
+            mode = results_changed ? REACH_SELECTION_PILL_JUMP
+                                   : reach_selection_pill_mode_for_distance(
+                                         launcher->synced_selected, model.selected_result_index);
+        reach_selection_pill_retarget(&launcher->selection, &launcher->theme,
+                                      reach_launcher_selection_rect(launcher),
+                                      model.selected_result_index, mode, now);
+        launcher->selection_valid = 1;
+    }
+    else if (!reach_launcher_rows_held(launcher))
+        launcher->selection_valid = 0;
+    launcher->synced_revision = launcher->results_revision;
+    launcher->synced_pitch = launcher->row_pitch;
+    launcher->synced_scroll = start;
+    launcher->synced_selected = model.selected_result_index;
+    reach_launcher_refresh_results_deadline(launcher);
+}
+
+void reach_launcher_fill_row_render_input(const reach_launcher *launcher,
+                                          reach_launcher_render_input *input)
+{
+    if (launcher == nullptr || input == nullptr)
+        return;
+    input->rows = launcher->rows;
+    input->row_results = launcher->row_results;
+    input->row_start = launcher->synced_scroll;
+    input->row_pitch = launcher->row_pitch;
+    input->selection = launcher->selection.rect;
+    input->has_selection = launcher->selection_valid;
 }
 
 static void reach_launcher_sync_results_opacity(reach_launcher *launcher, int32_t was_attached)
@@ -76,6 +229,7 @@ static void reach_launcher_sync_results_opacity(reach_launcher *launcher, int32_
     }
     int32_t attached = reach_launcher_results_attached(&launcher->state);
     float target = attached ? 1.0f : 0.0f;
+    launcher->results_revision += 1;
     if (!reach_launcher_results_animated(launcher))
         reach_motion_set(&launcher->results_opacity, target);
     else if (attached != was_attached || launcher->results_opacity.to != target)
@@ -161,7 +315,10 @@ int32_t reach_launcher_arrange(reach_launcher *launcher, const reach_launcher_ar
     int32_t animate = reach_launcher_results_animated(launcher) &&
                       reach_rect_equal(launcher->pointer_layout.search_box, layout.search_box);
     reach_launcher_set_pointer_context(launcher, &layout);
+    launcher->dpi_scale = scale;
+    launcher->row_pitch = 56.0f * scale;
     reach_launcher_sync_body_height(launcher, layout.bounds.height, animate);
+    reach_launcher_sync_rows(launcher);
     return changed;
 }
 
@@ -647,6 +804,10 @@ void reach_launcher_surface_hidden(reach_launcher *launcher)
     reach_motion_set(&launcher->results_opacity, 0);
     if (launcher->pointer_layout_valid)
         reach_motion_set(&launcher->body_height, launcher->pointer_layout.search_box.height);
+    for (reach_keyed_row &row : launcher->rows)
+        row = {};
+    launcher->selection_valid = 0;
+    launcher->synced_pitch = 0.0f;
     launcher->results_deadline = 0;
 }
 
@@ -927,6 +1088,7 @@ static void reach_launcher_capsule_reset(void *capsule)
         reach_motion_set(&launcher->results_opacity,
                          reach_launcher_results_attached(&launcher->state) ? 1.0f : 0.0f);
         reach_motion_set(&launcher->body_height, launcher->body_height.to);
+        launcher->synced_pitch = 0.0f;
         launcher->results_deadline = 0;
     }
 }
@@ -963,7 +1125,12 @@ static void reach_launcher_capsule_tick(void *capsule, double, reach_feature_tic
         {
             reach_motion_set(&launcher->body_height, launcher->body_height.to);
             reach_motion_set(&launcher->results_opacity, launcher->results_opacity.to);
-            launcher->results_deadline = 0;
+            reach_keyed_row_change released[REACH_LAUNCHER_ROW_CAPACITY];
+            (void)reach_keyed_rows_release_settled(launcher->rows, REACH_LAUNCHER_ROW_CAPACITY,
+                                                   released, REACH_LAUNCHER_ROW_CAPACITY);
+            if (launcher->state.model.result_count == 0 && !reach_launcher_rows_held(launcher))
+                launcher->selection_valid = 0;
+            reach_launcher_refresh_results_deadline(launcher);
             expansion_complete = 1;
         }
         (void)reach_feature_transition_tick(&launcher->surface_transition, 0.0);
@@ -1152,6 +1319,8 @@ static void reach_launcher_capsule_handle_event(void *capsule, const reach_ui_ev
                                   : reach_launcher_select_next_result_state(&launcher->state);
         if (result == REACH_OK)
         {
+            if (launcher->synced_revision == launcher->results_revision)
+                reach_launcher_sync_rows(launcher);
             out->handled = 1;
             out->redraw = 1;
             out->relayout = 1;
@@ -1259,6 +1428,8 @@ static void reach_launcher_capsule_handle_pointer(void *capsule, const reach_poi
     default:
         return;
     }
+    if (launcher->synced_revision == launcher->results_revision)
+        reach_launcher_sync_rows(launcher);
     reach_launcher_capsule_apply_event_result(launcher, &event_result, out);
 }
 
