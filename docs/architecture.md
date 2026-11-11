@@ -424,8 +424,24 @@ deadline retires its width descriptor without periodic capsule redraw or scalar-
 One selection pill, parented to a body-center anchor that follows the width and clips to the
 body's rounded interior, retargets its springs to the selected card's settled slot, keeping value
 and velocity: one-slot moves use `bouncy`, wraps and longer jumps `smooth`; its position is never
-clamped.
+clamped. The Switcher drives it through the shared selection pill with
+`reach_selection_pill_mode_for_distance`.
 Card labels ride their card's motion; the Switcher has no fixed durations.
+
+Two shared list-motion helpers live in `features/common` and read only theme motion presets.
+`reach/features/common/keyed_rows.h` keeps identity-keyed row motion over a caller-supplied
+fixed-capacity pool of `reach_keyed_row` entries (lifecycle, index, `y`, `opacity`); identity is a
+caller `same(context, slot, item)` callback and payload stays in a caller-owned per-slot array.
+`reach_keyed_rows_sync` takes caller target positions: survivors retarget `y` with `smooth` from
+value and velocity, inserts start at opacity 0 and `fade_in`, removals `fade_out` in place, a
+returning identity revives its retiring entry, and a full pool makes an insert wait without
+eviction; with `animate` off it sets everything without motion. It reports allocated, revived and
+released slots so the feature can copy or free payload and icons; `_release_settled`, `_active`
+and `_deadline` cover cleanup and presentation deadlines.
+`reach/features/common/selection_pill.h` owns one `reach_rect_motion` plus its slot;
+`reach_selection_pill_retarget` uses `bouncy` for `STEP`, `smooth` for `JUMP` and sets without
+motion for `SET`, retargeting only changed channels from value and velocity, and
+`reach_selection_pill_mode_for_distance` encodes the adjacent-step, otherwise-jump rule.
 
 Canonical motion supports continuous piecewise affine mappings, preserving epoch, easing and
 generation. `reach_motion_hinge` constructs two slopes meeting at one center; `reach_motion_peak`
@@ -1354,7 +1370,7 @@ channels stay in bounds and best match independent springs. Revealed content is 
 section's bottom clip inset follows that spring, the clip carries the section's uniform corner
 radius so its bottom corners stay rounded at every height, and its parent opacity fades with
 `fade_in`/`fade_out` while individual paint leaves preserve overlapping alpha. Device and app rows
-keep motion keyed by device or session id in a pool capped at the list maximum: survivors retarget
+use the shared keyed rows, keyed by device or session id in a pool capped at the list maximum: survivors retarget
 their y with `smooth`, inserts fade in at their slot once a pool entry is free, and removals fade
 out with `fade_out` and are released with their held icon. When every section motion has settled,
 the capsule tick restarts both spans as settled motions, so the section frame, which is sized from

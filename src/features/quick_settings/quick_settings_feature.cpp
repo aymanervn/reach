@@ -687,9 +687,11 @@ struct reach_quick_settings
     reach_motion press_feedback;
     reach_motion network_tile_state;
     reach_motion bluetooth_tile_state;
-    reach_quick_settings_output_device_row_motion
-        output_device_rows[REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES];
-    reach_quick_settings_app_volume_row_motion app_volume_rows[REACH_AUDIO_VOLUME_MAX_SESSIONS];
+    reach_keyed_row output_device_rows[REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES];
+    reach_quick_settings_output_device_row
+        output_device_items[REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES];
+    reach_keyed_row app_volume_rows[REACH_AUDIO_VOLUME_MAX_SESSIONS];
+    reach_quick_settings_app_volume_row app_volume_items[REACH_AUDIO_VOLUME_MAX_SESSIONS];
     reach_quick_settings_action press_action;
     reach_quick_settings_state state;
 
@@ -766,25 +768,25 @@ static const uint16_t (&reach_quick_settings_row_key(const reach_audio_volume_se
     [REACH_AUDIO_VOLUME_SESSION_KEY_CAPACITY] { return item.session_instance_id; }
 
 static reach_audio_output_device &reach_quick_settings_row_item(
-    reach_quick_settings_output_device_row_motion &row)
+    reach_quick_settings_output_device_row &row)
 {
     return row.device;
 }
 
 static reach_audio_volume_session &
-reach_quick_settings_row_item(reach_quick_settings_app_volume_row_motion &row)
+reach_quick_settings_row_item(reach_quick_settings_app_volume_row &row)
 {
     return row.session;
 }
 
 static const reach_audio_output_device &
-reach_quick_settings_row_item(const reach_quick_settings_output_device_row_motion &row)
+reach_quick_settings_row_item(const reach_quick_settings_output_device_row &row)
 {
     return row.device;
 }
 
 static const reach_audio_volume_session &
-reach_quick_settings_row_item(const reach_quick_settings_app_volume_row_motion &row)
+reach_quick_settings_row_item(const reach_quick_settings_app_volume_row &row)
 {
     return row.session;
 }
@@ -803,176 +805,127 @@ static bool reach_quick_settings_row_keys_equal(const uint16_t (&first)[Capacity
     return true;
 }
 
-template <typename Row, size_t Capacity>
-static int32_t reach_quick_settings_rows_active(const Row (&rows)[Capacity])
+template <typename Item, typename Payload> struct reach_quick_settings_row_identity
 {
-    for (const Row &row : rows)
-    {
-        if (row.lifecycle != REACH_QUICK_SETTINGS_ROW_EMPTY &&
-            (reach_motion_active(&row.y) || reach_motion_active(&row.opacity)))
-            return 1;
-    }
-    return 0;
+    const Payload *payloads;
+    const Item *items;
+};
+
+template <typename Item, typename Payload>
+static int32_t reach_quick_settings_row_same(const void *context, size_t slot, size_t item_index)
+{
+    const auto *identity =
+        static_cast<const reach_quick_settings_row_identity<Item, Payload> *>(context);
+    return reach_quick_settings_row_keys_equal(
+        reach_quick_settings_row_key(reach_quick_settings_row_item(identity->payloads[slot])),
+        reach_quick_settings_row_key(identity->items[item_index]));
 }
 
-template <typename Row, size_t Capacity>
-static double reach_quick_settings_rows_deadline(const Row (&rows)[Capacity])
+template <typename Payload>
+static void reach_quick_settings_release_row(reach_quick_settings *quick_settings, Payload *payload,
+                                             int32_t previous_lifecycle)
 {
-    double deadline = 0;
-    for (const Row &row : rows)
-    {
-        if (row.lifecycle != REACH_QUICK_SETTINGS_ROW_EMPTY)
-            deadline = fmax(
-                deadline, fmax(reach_motion_deadline(&row.y), reach_motion_deadline(&row.opacity)));
-    }
-    return deadline;
-}
-
-template <typename Row>
-static void reach_quick_settings_release_row(reach_quick_settings *quick_settings, Row *row)
-{
-    if (row->lifecycle == REACH_QUICK_SETTINGS_ROW_RETIRING)
+    if (previous_lifecycle == REACH_KEYED_ROW_RETIRING)
         reach_quick_settings_retire_render_icon(quick_settings,
-                                                reach_quick_settings_row_item(*row).icon_id);
-    *row = {};
+                                                reach_quick_settings_row_item(*payload).icon_id);
+    *payload = {};
 }
 
-template <typename Row, size_t Capacity>
+template <typename Payload, size_t Capacity>
 static int32_t reach_quick_settings_release_settled_rows(reach_quick_settings *quick_settings,
-                                                         Row (&rows)[Capacity])
+                                                         reach_keyed_row (&rows)[Capacity],
+                                                         Payload (&payloads)[Capacity])
 {
-    int32_t released = 0;
-    for (Row &row : rows)
-    {
-        if (row.lifecycle == REACH_QUICK_SETTINGS_ROW_RETIRING &&
-            !reach_motion_active(&row.opacity))
-        {
-            reach_quick_settings_release_row(quick_settings, &row);
-            released = 1;
-        }
-    }
-    return released;
+    reach_keyed_row_change changes[Capacity];
+    size_t count = reach_keyed_rows_release_settled(rows, Capacity, changes, Capacity);
+    for (size_t index = 0; index < count; ++index)
+        reach_quick_settings_release_row(quick_settings, &payloads[changes[index].slot],
+                                         changes[index].previous_lifecycle);
+    return count > 0;
 }
 
-template <typename Row, size_t Capacity>
-static size_t reach_quick_settings_allocate_row(const Row (&rows)[Capacity], const bool *claimed)
-{
-    for (size_t slot = 0; slot < Capacity; ++slot)
-    {
-        if (!claimed[slot] && rows[slot].lifecycle == REACH_QUICK_SETTINGS_ROW_EMPTY)
-            return slot;
-    }
-    return Capacity;
-}
-
-template <typename Row, typename Item, size_t Capacity>
+template <typename Payload, typename Item, size_t Capacity>
 static void reach_quick_settings_sync_rows(reach_quick_settings *quick_settings,
-                                           Row (&rows)[Capacity], const Item *items, size_t count,
-                                           float row_height, int32_t animate, double now_seconds)
+                                           reach_keyed_row (&rows)[Capacity],
+                                           Payload (&payloads)[Capacity], const Item *items,
+                                           size_t count, float row_height, int32_t animate,
+                                           double now_seconds)
 {
     count = count < Capacity ? count : Capacity;
-    reach_motion_spec smooth = reach_theme_motion_preset(
-        reach_quick_settings_motion_theme(quick_settings), REACH_MOTION_PRESET_SMOOTH);
-    size_t slots[Capacity] = {};
-    bool claimed[Capacity] = {};
-    const int32_t passes[] = {REACH_QUICK_SETTINGS_ROW_LIVE, REACH_QUICK_SETTINGS_ROW_RETIRING};
+    float targets[Capacity] = {};
     for (size_t index = 0; index < count; ++index)
+        targets[index] = (float)index * row_height;
+    reach_quick_settings_row_identity<Item, Payload> identity = {payloads, items};
+    reach_keyed_rows_sync_input input = {};
+    input.count = count;
+    input.targets = targets;
+    input.same = reach_quick_settings_row_same<Item, Payload>;
+    input.context = &identity;
+    input.animate = animate;
+    input.theme = reach_quick_settings_motion_theme(quick_settings);
+    input.now_seconds = now_seconds;
+    reach_keyed_row_change changes[REACH_KEYED_ROWS_MAX_CHANGES(Capacity)];
+    size_t change_count = reach_keyed_rows_sync(rows, Capacity, &input, changes,
+                                                REACH_KEYED_ROWS_MAX_CHANGES(Capacity));
+    for (size_t index = 0; index < change_count; ++index)
     {
-        slots[index] = Capacity;
-        for (int32_t lifecycle : passes)
-        {
-            for (size_t slot = 0; slot < Capacity && slots[index] == Capacity; ++slot)
-            {
-                if (!claimed[slot] && rows[slot].lifecycle == lifecycle &&
-                    reach_quick_settings_row_keys_equal(
-                        reach_quick_settings_row_key(reach_quick_settings_row_item(rows[slot])),
-                        reach_quick_settings_row_key(items[index])))
-                {
-                    slots[index] = slot;
-                    claimed[slot] = true;
-                }
-            }
-        }
+        const reach_keyed_row_change &change = changes[index];
+        Payload &payload = payloads[change.slot];
+        if (change.kind == REACH_KEYED_ROW_RELEASED)
+            reach_quick_settings_release_row(quick_settings, &payload, change.previous_lifecycle);
+        else if (change.kind == REACH_KEYED_ROW_REVIVED &&
+                 reach_quick_settings_row_item(payload).icon_id != items[change.index].icon_id)
+            reach_quick_settings_retire_render_icon(quick_settings,
+                                                    reach_quick_settings_row_item(payload).icon_id);
     }
     for (size_t slot = 0; slot < Capacity; ++slot)
     {
-        Row &row = rows[slot];
-        if (claimed[slot] || row.lifecycle == REACH_QUICK_SETTINGS_ROW_EMPTY)
+        if (rows[slot].lifecycle != REACH_KEYED_ROW_LIVE)
             continue;
-        if (!animate)
-            reach_quick_settings_release_row(quick_settings, &row);
-        else if (row.lifecycle == REACH_QUICK_SETTINGS_ROW_LIVE)
-        {
-            row.lifecycle = REACH_QUICK_SETTINGS_ROW_RETIRING;
-            reach_quick_settings_fade_to(quick_settings, &row.opacity, 0, now_seconds);
-        }
-    }
-    for (size_t index = 0; index < count; ++index)
-    {
-        size_t slot = slots[index];
-        float target = (float)index * row_height;
-        if (slot == Capacity)
-        {
-            slot = reach_quick_settings_allocate_row(rows, claimed);
-            REACH_ASSERT(slot < Capacity || animate);
-            if (slot == Capacity)
-                continue;
-            claimed[slot] = true;
-            rows[slot] = {};
-            reach_motion_set(&rows[slot].y, target);
-            reach_motion_set(&rows[slot].opacity, animate ? 0.0f : 1.0f);
-        }
-        Row &row = rows[slot];
-        if (row.lifecycle == REACH_QUICK_SETTINGS_ROW_RETIRING &&
-            reach_quick_settings_row_item(row).icon_id != items[index].icon_id)
-            reach_quick_settings_retire_render_icon(quick_settings,
-                                                    reach_quick_settings_row_item(row).icon_id);
-        row.lifecycle = REACH_QUICK_SETTINGS_ROW_LIVE;
-        row.index = index;
-        row.separator = index + 1 < count;
-        reach_quick_settings_row_item(row) = items[index];
-        if (!animate)
-        {
-            reach_motion_set(&row.y, target);
-            reach_motion_set(&row.opacity, 1.0f);
-            continue;
-        }
-        reach_quick_settings_fade_to(quick_settings, &row.opacity, 1, now_seconds);
-        if (row.y.to != target)
-            reach_motion_animate_spec_to_at(&row.y, target, smooth, now_seconds);
+        size_t index = rows[slot].index;
+        payloads[slot].separator = index + 1 < count;
+        reach_quick_settings_row_item(payloads[slot]) = items[index];
     }
 }
 
-template <typename Row, typename Item, size_t Capacity>
-static void reach_quick_settings_export_rows(const Row (&rows)[Capacity], const Item *items,
-                                             size_t count, Row *out)
+template <typename Payload, typename Item, size_t Capacity>
+static void reach_quick_settings_export_rows(const reach_keyed_row (&rows)[Capacity],
+                                             const Payload (&payloads)[Capacity], const Item *items,
+                                             size_t count, reach_keyed_row *out_rows,
+                                             Payload *out_payloads)
 {
     for (size_t slot = 0; slot < Capacity; ++slot)
     {
-        out[slot] = rows[slot];
+        out_rows[slot] = rows[slot];
+        out_payloads[slot] = payloads[slot];
         size_t index = rows[slot].index;
-        if (rows[slot].lifecycle == REACH_QUICK_SETTINGS_ROW_LIVE && index < count &&
+        if (rows[slot].lifecycle == REACH_KEYED_ROW_LIVE && index < count &&
             reach_quick_settings_row_keys_equal(
-                reach_quick_settings_row_key(reach_quick_settings_row_item(rows[slot])),
+                reach_quick_settings_row_key(reach_quick_settings_row_item(payloads[slot])),
                 reach_quick_settings_row_key(items[index])))
-            reach_quick_settings_row_item(out[slot]) = items[index];
+            reach_quick_settings_row_item(out_payloads[slot]) = items[index];
     }
 }
 
 void reach_quick_settings_row_motions(
     const reach_quick_settings *quick_settings,
-    reach_quick_settings_output_device_row_motion
+    reach_keyed_row out_output_motions[REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES],
+    reach_quick_settings_output_device_row
         out_output_devices[REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES],
-    reach_quick_settings_app_volume_row_motion out_app_volumes[REACH_AUDIO_VOLUME_MAX_SESSIONS])
+    reach_keyed_row out_app_motions[REACH_AUDIO_VOLUME_MAX_SESSIONS],
+    reach_quick_settings_app_volume_row out_app_volumes[REACH_AUDIO_VOLUME_MAX_SESSIONS])
 {
-    if (quick_settings == nullptr || out_output_devices == nullptr || out_app_volumes == nullptr)
+    if (quick_settings == nullptr || out_output_motions == nullptr ||
+        out_output_devices == nullptr || out_app_motions == nullptr || out_app_volumes == nullptr)
         return;
     const reach_quick_settings_model &model = quick_settings->state.model;
     reach_quick_settings_export_rows(quick_settings->output_device_rows,
+                                     quick_settings->output_device_items,
                                      model.output_devices.devices, model.output_devices.count,
-                                     out_output_devices);
-    reach_quick_settings_export_rows(quick_settings->app_volume_rows, model.sessions.sessions,
-                                     model.sessions.count, out_app_volumes);
+                                     out_output_motions, out_output_devices);
+    reach_quick_settings_export_rows(quick_settings->app_volume_rows,
+                                     quick_settings->app_volume_items, model.sessions.sessions,
+                                     model.sessions.count, out_app_motions, out_app_volumes);
 }
 
 static int32_t reach_quick_settings_output_shown(const reach_quick_settings *quick_settings)
@@ -999,11 +952,12 @@ static void reach_quick_settings_sync_output_rows(reach_quick_settings *quick_se
 {
     const reach_quick_settings_model &model = quick_settings->state.model;
     reach_quick_settings_sync_rows(
-        quick_settings, quick_settings->output_device_rows, model.output_devices.devices,
-        model.output_devices.count,
+        quick_settings, quick_settings->output_device_rows, quick_settings->output_device_items,
+        model.output_devices.devices, model.output_devices.count,
         reach_quick_settings_metrics_for_scale(dpi_scale).output_device_row_height,
         animate && reach_quick_settings_output_shown(quick_settings), reach_motion_now_seconds());
-    if (reach_quick_settings_rows_active(quick_settings->output_device_rows))
+    if (reach_keyed_rows_active(quick_settings->output_device_rows,
+                                REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES))
         quick_settings->section_cleanup_pending = 1;
 }
 
@@ -1012,11 +966,11 @@ static void reach_quick_settings_sync_app_rows(reach_quick_settings *quick_setti
 {
     const reach_quick_settings_model &model = quick_settings->state.model;
     reach_quick_settings_sync_rows(
-        quick_settings, quick_settings->app_volume_rows, model.sessions.sessions,
-        model.sessions.count,
+        quick_settings, quick_settings->app_volume_rows, quick_settings->app_volume_items,
+        model.sessions.sessions, model.sessions.count,
         reach_quick_settings_metrics_for_scale(dpi_scale).app_volume_row_height,
         animate && reach_quick_settings_apps_shown(quick_settings), reach_motion_now_seconds());
-    if (reach_quick_settings_rows_active(quick_settings->app_volume_rows))
+    if (reach_keyed_rows_active(quick_settings->app_volume_rows, REACH_AUDIO_VOLUME_MAX_SESSIONS))
         quick_settings->section_cleanup_pending = 1;
 }
 
@@ -1029,8 +983,10 @@ static int32_t reach_quick_settings_sections_active(const reach_quick_settings *
            reach_motion_active(&state.app_volumes_span) ||
            reach_motion_active(&state.output_devices_opacity) ||
            reach_motion_active(&state.app_volumes_opacity) ||
-           reach_quick_settings_rows_active(quick_settings->output_device_rows) ||
-           reach_quick_settings_rows_active(quick_settings->app_volume_rows);
+           reach_keyed_rows_active(quick_settings->output_device_rows,
+                                   REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES) ||
+           reach_keyed_rows_active(quick_settings->app_volume_rows,
+                                   REACH_AUDIO_VOLUME_MAX_SESSIONS);
 }
 
 static void reach_quick_settings_snap_sections(reach_quick_settings *quick_settings,
@@ -1303,14 +1259,16 @@ static void reach_quick_settings_capsule_tick(void *capsule, double delta_second
     reach_feature_tick_result changes = {};
     reach_quick_settings_process_changes(quick_settings, &changes);
     if (quick_settings != nullptr && reach_quick_settings_release_settled_rows(
-                                         quick_settings, quick_settings->output_device_rows))
+                                         quick_settings, quick_settings->output_device_rows,
+                                         quick_settings->output_device_items))
     {
         reach_quick_settings_sync_output_rows(quick_settings, quick_settings->layout_dpi,
                                               reach_quick_settings_rows_animate(quick_settings));
         changes.redraw = 1;
     }
     if (quick_settings != nullptr &&
-        reach_quick_settings_release_settled_rows(quick_settings, quick_settings->app_volume_rows))
+        reach_quick_settings_release_settled_rows(quick_settings, quick_settings->app_volume_rows,
+                                                  quick_settings->app_volume_items))
     {
         reach_quick_settings_sync_app_rows(quick_settings, quick_settings->layout_dpi,
                                            reach_quick_settings_rows_animate(quick_settings));
@@ -1405,8 +1363,10 @@ static void reach_quick_settings_capsule_surface_geometry(const void *capsule,
             out->deadline_seconds = fmax(out->deadline_seconds, reach_motion_deadline(motion));
         out->deadline_seconds =
             fmax(out->deadline_seconds,
-                 fmax(reach_quick_settings_rows_deadline(quick_settings->output_device_rows),
-                      reach_quick_settings_rows_deadline(quick_settings->app_volume_rows)));
+                 fmax(reach_keyed_rows_deadline(quick_settings->output_device_rows,
+                                                REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES),
+                      reach_keyed_rows_deadline(quick_settings->app_volume_rows,
+                                                REACH_AUDIO_VOLUME_MAX_SESSIONS)));
     }
 }
 
@@ -1839,13 +1799,15 @@ static void reach_quick_settings_retire_render_icon(reach_quick_settings *quick_
     }
 }
 
-template <typename Row, size_t Capacity>
-static bool reach_quick_settings_rows_hold_icon(const Row (&rows)[Capacity], uint64_t icon_id)
+template <typename Payload, size_t Capacity>
+static bool reach_quick_settings_rows_hold_icon(const reach_keyed_row (&rows)[Capacity],
+                                                const Payload (&payloads)[Capacity],
+                                                uint64_t icon_id)
 {
-    for (const Row &row : rows)
+    for (size_t slot = 0; slot < Capacity; ++slot)
     {
-        if (row.lifecycle == REACH_QUICK_SETTINGS_ROW_RETIRING &&
-            reach_quick_settings_row_item(row).icon_id == icon_id)
+        if (rows[slot].lifecycle == REACH_KEYED_ROW_RETIRING &&
+            reach_quick_settings_row_item(payloads[slot]).icon_id == icon_id)
             return true;
     }
     return false;
@@ -1870,8 +1832,10 @@ static void reach_quick_settings_retire_audio_render_icons(reach_quick_settings 
     for (size_t index = 0; index < count; ++index)
     {
         if (!reach_quick_settings_rows_hold_icon(quick_settings->output_device_rows,
+                                                 quick_settings->output_device_items,
                                                  icon_ids[index]) &&
-            !reach_quick_settings_rows_hold_icon(quick_settings->app_volume_rows, icon_ids[index]))
+            !reach_quick_settings_rows_hold_icon(quick_settings->app_volume_rows,
+                                                 quick_settings->app_volume_items, icon_ids[index]))
             reach_quick_settings_retire_render_icon(quick_settings, icon_ids[index]);
     }
 }

@@ -936,16 +936,17 @@ reach_quick_settings_build_render_commands(const reach_quick_settings_render_inp
         for (size_t slot = 0; result == REACH_OK && slot < REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES;
              ++slot)
         {
-            const reach_quick_settings_output_device_row_motion &row =
-                input->output_device_row_motions[slot];
-            if (row.lifecycle == REACH_QUICK_SETTINGS_ROW_EMPTY)
+            const reach_keyed_row &row = input->output_device_row_motions[slot];
+            const reach_quick_settings_output_device_row &item =
+                input->output_device_row_items[slot];
+            if (row.lifecycle == REACH_KEYED_ROW_EMPTY)
                 continue;
             reach_quick_settings_output_device_row_layout layout =
                 reach_quick_settings_output_device_row_layout_at(
                     output_panel, output_panel.y + row.y.to, input->dpi_scale);
             first_command = commands->count;
             result = reach_quick_settings_push_output_device_row_commands(
-                &row.device, &layout, row.separator, &input->theme, commands, &metrics,
+                &item.device, &layout, item.separator, &input->theme, commands, &metrics,
                 &input->text_measure);
             REACH_ASSERT(commands->count - first_command <= REACH_QUICK_SETTINGS_OUTPUT_ROW_GROUPS);
             reach_motion offset = reach_motion_affine(&row.y, 1, -row.y.to);
@@ -1014,16 +1015,16 @@ reach_quick_settings_build_render_commands(const reach_quick_settings_render_inp
             reach_render_retain_commands(commands, first_command, 300, 4, &opaque, &stationary);
         for (size_t slot = 0; result == REACH_OK && slot < REACH_AUDIO_VOLUME_MAX_SESSIONS; ++slot)
         {
-            const reach_quick_settings_app_volume_row_motion &row =
-                input->app_volume_row_motions[slot];
-            if (row.lifecycle == REACH_QUICK_SETTINGS_ROW_EMPTY)
+            const reach_keyed_row &row = input->app_volume_row_motions[slot];
+            const reach_quick_settings_app_volume_row &item = input->app_volume_row_items[slot];
+            if (row.lifecycle == REACH_KEYED_ROW_EMPTY)
                 continue;
             reach_quick_settings_app_volume_row_layout layout =
                 reach_quick_settings_app_volume_row_layout_at(app_panel, app_panel.y + row.y.to,
-                                                              row.session.level, input->dpi_scale);
+                                                              item.session.level, input->dpi_scale);
             first_command = commands->count;
             result = reach_quick_settings_push_app_volume_row_commands(
-                &row.session, &layout, row.separator, &input->theme, commands, &metrics,
+                &item.session, &layout, item.separator, &input->theme, commands, &metrics,
                 &input->text_measure);
             REACH_ASSERT(commands->count - first_command <= REACH_QUICK_SETTINGS_APP_ROW_GROUPS);
             reach_motion offset = reach_motion_affine(&row.y, 1, -row.y.to);
@@ -1077,7 +1078,8 @@ reach_result reach_quick_settings_append_render_commands(
     input.output_devices_opacity = state->output_devices_opacity;
     input.app_volumes_opacity = state->app_volumes_opacity;
     reach_quick_settings_row_motions(quick_settings, input.output_device_row_motions,
-                                     input.app_volume_row_motions);
+                                     input.output_device_row_items, input.app_volume_row_motions,
+                                     input.app_volume_row_items);
     reach_quick_settings_tile_state_motions(quick_settings, &input.network_tile_state,
                                             &input.bluetooth_tile_state);
     input.press_feedback_target = reach_quick_settings_press_feedback_target(quick_settings);
