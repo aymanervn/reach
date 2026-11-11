@@ -6,13 +6,17 @@
 #include <new>
 
 #include "reach/features/common/presentation.h"
-#include "reach/features/common/section_reveal.h"
 #include "reach/core/blink.h"
+#include "reach/support/util.h"
 
 struct reach_launcher
 {
-    reach_motion results_expansion;
+    reach_motion body_height;
+    reach_motion results_opacity;
     double results_deadline;
+    reach_motion_spec height_spec;
+    reach_motion_spec fade_in_spec;
+    reach_motion_spec fade_out_spec;
     reach_feature_transition surface_transition;
     reach_blink caret;
     int32_t caret_retained;
@@ -31,29 +35,65 @@ static int32_t reach_launcher_results_attached(const reach_launcher_state *state
                                 (state->model.search_error && state->model.query_length > 0));
 }
 
-reach_motion reach_launcher_results_motion(const reach_launcher *launcher)
+reach_motion reach_launcher_body_height_motion(const reach_launcher *launcher)
 {
-    return launcher != nullptr ? launcher->results_expansion : reach_motion{};
+    return launcher != nullptr ? launcher->body_height : reach_motion{};
 }
 
-static void reach_launcher_sync_results_expansion(reach_launcher *launcher, int32_t was_attached)
+reach_motion reach_launcher_results_opacity_motion(const reach_launcher *launcher)
+{
+    return launcher != nullptr ? launcher->results_opacity : reach_motion{};
+}
+
+static void reach_launcher_load_motion_specs(reach_launcher *launcher, const reach_theme *theme)
+{
+    launcher->height_spec = reach_theme_motion_preset(theme, REACH_MOTION_PRESET_SMOOTH);
+    launcher->fade_in_spec = reach_theme_motion_preset(theme, REACH_MOTION_PRESET_FADE_IN);
+    launcher->fade_out_spec = reach_theme_motion_preset(theme, REACH_MOTION_PRESET_FADE_OUT);
+}
+
+static int32_t reach_launcher_results_animated(const reach_launcher *launcher)
+{
+    return launcher->state.model.open && launcher->pointer_layout_valid &&
+           reach_feature_transition_visible(&launcher->surface_transition);
+}
+
+static void reach_launcher_refresh_results_deadline(reach_launcher *launcher)
+{
+    launcher->results_deadline = 0;
+    if (reach_motion_active(&launcher->body_height))
+        launcher->results_deadline = reach_motion_deadline(&launcher->body_height);
+    if (reach_motion_active(&launcher->results_opacity))
+        launcher->results_deadline =
+            fmax(launcher->results_deadline, reach_motion_deadline(&launcher->results_opacity));
+}
+
+static void reach_launcher_sync_results_opacity(reach_launcher *launcher, int32_t was_attached)
 {
     if (launcher == nullptr)
     {
         return;
     }
     int32_t attached = reach_launcher_results_attached(&launcher->state);
-    if (attached && !was_attached)
-    {
-        reach_motion_start(&launcher->results_expansion, 0, 1, REACH_SECTION_REVEAL_SECONDS,
-                           REACH_EASING_EASE_OUT);
-        launcher->results_deadline = reach_motion_deadline(&launcher->results_expansion);
-    }
-    else if (!attached)
-    {
-        reach_motion_set(&launcher->results_expansion, 0);
-        launcher->results_deadline = 0;
-    }
+    float target = attached ? 1.0f : 0.0f;
+    if (!reach_launcher_results_animated(launcher))
+        reach_motion_set(&launcher->results_opacity, target);
+    else if (attached != was_attached || launcher->results_opacity.to != target)
+        reach_motion_animate_spec_to_at(&launcher->results_opacity, target,
+                                        attached ? launcher->fade_in_spec : launcher->fade_out_spec,
+                                        reach_motion_now_seconds());
+    reach_launcher_refresh_results_deadline(launcher);
+}
+
+static void reach_launcher_sync_body_height(reach_launcher *launcher, float target, int32_t animate)
+{
+    REACH_ASSERT(isfinite(target) && target >= 0.0f);
+    if (!animate || launcher->body_height.generation == 0)
+        reach_motion_set(&launcher->body_height, target);
+    else if (launcher->body_height.to != target)
+        reach_motion_animate_spec_to_at(&launcher->body_height, target, launcher->height_spec,
+                                        reach_motion_now_seconds());
+    reach_launcher_refresh_results_deadline(launcher);
 }
 
 uint32_t reach_launcher_search_generation(const reach_launcher *launcher)
@@ -83,6 +123,8 @@ int32_t reach_launcher_arrange(reach_launcher *launcher, const reach_launcher_ar
     }
     reach_feature_transition_configure(&launcher->surface_transition, ctx->theme, ctx->dpi_scale,
                                        REACH_FEATURE_TRANSITION_FROM_ABOVE);
+    reach_launcher_load_motion_specs(launcher,
+                                     ctx->theme != nullptr ? ctx->theme : reach_theme_default());
 
     float scale = ctx->dpi_scale > 0.0f ? ctx->dpi_scale : 1.0f;
     float border = reach_theme_border_thickness(
@@ -116,7 +158,10 @@ int32_t reach_launcher_arrange(reach_launcher *launcher, const reach_launcher_ar
 
     int32_t changed = !launcher->pointer_layout_valid ||
                       !reach_rect_equal(launcher->pointer_layout.bounds, layout.bounds);
+    int32_t animate = reach_launcher_results_animated(launcher) &&
+                      reach_rect_equal(launcher->pointer_layout.search_box, layout.search_box);
     reach_launcher_set_pointer_context(launcher, &layout);
+    reach_launcher_sync_body_height(launcher, layout.bounds.height, animate);
     return changed;
 }
 
@@ -491,7 +536,9 @@ reach_result reach_launcher_create(reach_launcher **out_launcher)
     }
     reach_feature_transition_init(&launcher->surface_transition, REACH_FEATURE_PRESENTATION_POPUP,
                                   REACH_FEATURE_TRANSITION_FROM_ABOVE);
-    reach_motion_set(&launcher->results_expansion, 0);
+    reach_launcher_load_motion_specs(launcher, reach_theme_default());
+    reach_motion_set(&launcher->body_height, 0);
+    reach_motion_set(&launcher->results_opacity, 0);
     reach_launcher_state_init(&launcher->state);
     *out_launcher = launcher;
     return REACH_OK;
@@ -597,6 +644,10 @@ void reach_launcher_surface_hidden(reach_launcher *launcher)
     reach_launcher_clear_query(launcher);
     (void)reach_launcher_clear_results(launcher);
     reach_launcher_reset_text_edit(launcher);
+    reach_motion_set(&launcher->results_opacity, 0);
+    if (launcher->pointer_layout_valid)
+        reach_motion_set(&launcher->body_height, launcher->pointer_layout.search_box.height);
+    launcher->results_deadline = 0;
 }
 
 reach_result reach_launcher_set_query(reach_launcher *launcher, const uint16_t *query)
@@ -615,7 +666,7 @@ reach_result reach_launcher_set_results(reach_launcher *launcher,
     reach_result result = reach_launcher_set_results_state(&launcher->state, results, count);
     if (result == REACH_OK)
     {
-        reach_launcher_sync_results_expansion(launcher, was_attached);
+        reach_launcher_sync_results_opacity(launcher, was_attached);
     }
     return result;
 }
@@ -630,7 +681,7 @@ reach_result reach_launcher_clear_results(reach_launcher *launcher)
     reach_result result = reach_launcher_clear_results_state(&launcher->state);
     if (result == REACH_OK)
     {
-        reach_launcher_sync_results_expansion(launcher, was_attached);
+        reach_launcher_sync_results_opacity(launcher, was_attached);
     }
     return result;
 }
@@ -641,7 +692,7 @@ void reach_launcher_set_search_error(reach_launcher *launcher, int32_t error)
     {
         int32_t was_attached = reach_launcher_results_attached(&launcher->state);
         launcher->state.model.search_error = error ? 1 : 0;
-        reach_launcher_sync_results_expansion(launcher, was_attached);
+        reach_launcher_sync_results_opacity(launcher, was_attached);
     }
 }
 
@@ -851,7 +902,7 @@ void reach_launcher_handle_text_event(reach_launcher *launcher, const reach_ui_e
             int32_t was_attached = reach_launcher_results_attached(&launcher->state);
             (void)reach_launcher_set_terminal_command_result_state(&launcher->state, edit->text + 1,
                                                                    launcher->terminal_icon_ref);
-            reach_launcher_sync_results_expansion(launcher, was_attached);
+            reach_launcher_sync_results_opacity(launcher, was_attached);
         }
         else
         {
@@ -873,8 +924,9 @@ static void reach_launcher_capsule_reset(void *capsule)
     {
         reach_pressable_reset(&launcher->state.pressable, nullptr);
         launcher->pointer_layout_valid = 0;
-        reach_motion_set(&launcher->results_expansion,
-                         reach_launcher_results_attached(&launcher->state) ? 1 : 0);
+        reach_motion_set(&launcher->results_opacity,
+                         reach_launcher_results_attached(&launcher->state) ? 1.0f : 0.0f);
+        reach_motion_set(&launcher->body_height, launcher->body_height.to);
         launcher->results_deadline = 0;
     }
 }
@@ -909,7 +961,8 @@ static void reach_launcher_capsule_tick(void *capsule, double, reach_feature_tic
     {
         if (launcher->results_deadline > 0 && reach_motion_wait_ms(launcher->results_deadline) == 0)
         {
-            reach_motion_set(&launcher->results_expansion, launcher->results_expansion.to);
+            reach_motion_set(&launcher->body_height, launcher->body_height.to);
+            reach_motion_set(&launcher->results_opacity, launcher->results_opacity.to);
             launcher->results_deadline = 0;
             expansion_complete = 1;
         }
@@ -1164,18 +1217,11 @@ static void reach_launcher_capsule_handle_pointer(void *capsule, const reach_poi
 
     auto layout = launcher->pointer_layout;
     double now = reach_motion_now_seconds();
-    auto body = reach_launcher_body_motion(&layout, &launcher->results_expansion);
-    float height = reach_motion_value_at(&body.height, now);
-    auto opacity = reach_section_reveal_opacity(&launcher->results_expansion);
-    float revealed = reach_motion_value_at(&opacity, now);
-    float slide =
-        (1 - revealed) * reach_launcher_results_offset_dp * launcher->surface_transition.dpi_scale;
+    float height = reach_motion_value_at(&launcher->body_height, now);
+    float revealed = reach_motion_value_at(&launcher->results_opacity, now);
     layout.bounds.height = height;
     layout.search_results.height =
         revealed > 0 ? fmaxf(0, height - (layout.search_results.y - layout.bounds.y)) : 0;
-    layout.search_result_items.y += slide;
-    layout.search_result_scrollbar_track.y += slide;
-    layout.search_result_scrollbar_thumb.y += slide;
     reach_launcher_event_context ctx = {};
     ctx.layout = &layout;
     reach_launcher_event_result event_result = {};
@@ -1232,9 +1278,13 @@ static void reach_launcher_capsule_surface_geometry(const void *capsule,
 
     const reach_launcher_layout *layout = &launcher->pointer_layout;
     out->visible_bounds = layout->bounds;
+    float minimum_height = 0, maximum_height = 0;
+    if (reach_motion_range(&launcher->body_height, &minimum_height, &maximum_height) == REACH_OK &&
+        maximum_height > out->visible_bounds.height)
+        out->visible_bounds.height = maximum_height;
     out->envelope_bounds = layout->envelope_bounds;
     out->has_input_bounds = 1;
-    out->input_bounds = reach_launcher_body_motion(layout, &launcher->results_expansion);
+    out->input_bounds = reach_launcher_body_motion(layout, &launcher->body_height);
     reach_feature_transition_presentation(&launcher->surface_transition, out);
     if (launcher->results_deadline > 0 &&
         (out->deadline_seconds <= 0 || launcher->results_deadline < out->deadline_seconds))

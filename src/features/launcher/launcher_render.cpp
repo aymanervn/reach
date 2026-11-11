@@ -4,7 +4,6 @@
 
 #include "reach/core/typography.h"
 #include "reach/features/common/scrollbar_render.h"
-#include "reach/features/common/section_reveal.h"
 #include "reach/features/common/ui_controls.h"
 
 #include <math.h>
@@ -75,7 +74,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
     float row_path_size = reach_launcher_scale(input, REACH_TEXT_SIZE_SMALL);
     int32_t error_row_visible = reach_launcher_error_row_visible(model);
     int32_t results_attached = model->result_count > 0 || error_row_visible ? 1 : 0;
-    auto bounds = reach_launcher_body_motion(layout, &input->results_expansion);
+    auto bounds = reach_launcher_body_motion(layout, &input->body_height);
     float border_thickness = reach_theme_border_thickness(theme, input->dpi_scale);
     reach_result result = reach_ui_motion_background_render(
         out_commands, &bounds, launcher_radius, border_thickness, theme->launcher_search_background,
@@ -131,19 +130,34 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
 
     if (results_attached)
     {
+        float envelope_height = fmaxf(layout->envelope_bounds.height, layout->bounds.height);
+        reach_render_group interior = {};
+        interior.id = UINT64_C(0x2900000000040012);
+        interior.bounds = {0.0f, 0.0f, layout->bounds.width, envelope_height};
+        interior.clip = interior.bounds;
+        interior.has_clip = 1;
+        interior.clip_radius = fmaxf(0, launcher_radius - border_thickness);
+        interior.clip_uniform_radius = interior.clip_radius > 0.0f ? 1 : 0;
+        reach_motion_set(&interior.clip_insets[REACH_RENDER_CLIP_LEFT], border_thickness);
+        reach_motion_set(&interior.clip_insets[REACH_RENDER_CLIP_TOP], border_thickness);
+        reach_motion_set(&interior.clip_insets[REACH_RENDER_CLIP_RIGHT], border_thickness);
+        interior.clip_insets[REACH_RENDER_CLIP_BOTTOM] =
+            reach_motion_affine(&bounds.height, -1, envelope_height + border_thickness);
+        result = reach_render_command_buffer_begin_group(out_commands, &interior);
+        reach_render_command_buffer_end_group(out_commands);
+        if (result != REACH_OK)
+            return result;
         reach_rect_f32 results_clip = {};
         results_clip.x = 0.0f;
         results_clip.y = layout->search_results.y - layout->bounds.y;
         results_clip.width = layout->bounds.width;
-        results_clip.height = fmaxf(0, layout->bounds.height - results_clip.y);
+        results_clip.height = fmaxf(1, envelope_height - results_clip.y);
         reach_render_group viewport = {};
         viewport.id = UINT64_C(0x2900000000040010);
+        viewport.parent_id = interior.id;
         viewport.bounds = results_clip;
-        viewport.bounds.height = fmaxf(1, viewport.bounds.height);
         viewport.clip = results_clip;
         viewport.has_clip = 1;
-        viewport.clip_insets[REACH_RENDER_CLIP_BOTTOM] =
-            reach_motion_affine(&bounds.height, -1, layout->bounds.height);
         result = reach_render_command_buffer_begin_group(out_commands, &viewport);
         reach_render_command_buffer_end_group(out_commands);
         if (result != REACH_OK)
@@ -157,9 +171,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
         content.bounds.width = ceilf(viewport.bounds.x + viewport.bounds.width) - content.bounds.x;
         content.bounds.height =
             ceilf(viewport.bounds.y + viewport.bounds.height) - content.bounds.y;
-        auto opacity = reach_section_reveal_opacity(&input->results_expansion);
-        float slide = reach_launcher_scale(input, reach_launcher_results_offset_dp);
-        content.y = reach_motion_affine(&opacity, -slide, slide);
+        reach_motion opacity = input->results_opacity;
         result = reach_render_command_buffer_begin_group(out_commands, &content);
         reach_render_command_buffer_end_group(out_commands);
         if (result != REACH_OK)
@@ -386,7 +398,8 @@ reach_result reach_launcher_append_render_commands(reach_launcher *launcher,
     input.caret_opacity = reach_launcher_caret_opacity(launcher);
     reach_text_edit_selection_range(&state->launcher_text_edit, &input.selection_start,
                                     &input.selection_end);
-    input.results_expansion = reach_launcher_results_motion(launcher);
+    input.body_height = reach_launcher_body_height_motion(launcher);
+    input.results_opacity = reach_launcher_results_opacity_motion(launcher);
 
     return reach_launcher_build_render_commands(&input, out_commands);
 }

@@ -153,6 +153,12 @@ int main()
     failed += expect(reach_launcher_set_query(capsule, query) == REACH_OK);
     failed += expect(state->model.query_length == 5);
 
+    reach_launcher_arrange_context arrange = {};
+    arrange.theme = reach_theme_default();
+    arrange.monitor_bounds = {0.0f, 0.0f, 1480.0f, 900.0f};
+    arrange.dpi_scale = 1.0f;
+    failed += expect(reach_launcher_arrange(capsule, &arrange) == 1);
+
     reach_search_candidate results[2] = {};
     results[0].name[0] = 'a';
     results[0].kind = REACH_SEARCH_RESULT_APP;
@@ -166,10 +172,6 @@ int main()
     failed += expect(state->model.result_count == 2);
     failed += expect(state->model.selected_result_index == 0);
 
-    reach_launcher_arrange_context arrange = {};
-    arrange.theme = reach_theme_default();
-    arrange.monitor_bounds = {0.0f, 0.0f, 1480.0f, 900.0f};
-    arrange.dpi_scale = 1.0f;
     failed += expect(reach_launcher_arrange(capsule, &arrange) == 1);
 
     reach_ui_layout_input layout_input = {};
