@@ -3,8 +3,6 @@
 
 #include "reach/features/launcher.h"
 
-static constexpr float reach_launcher_results_offset_dp = 4.0f;
-
 reach_launcher_state *reach_launcher_state_mut(reach_launcher *launcher);
 void reach_launcher_set_pointer_context(reach_launcher *launcher,
                                         const reach_launcher_layout *layout);
@@ -27,15 +25,15 @@ reach_icon_service *reach_launcher_icons(reach_launcher *launcher);
 uint32_t reach_launcher_search_generation(const reach_launcher *launcher);
 void reach_launcher_set_retained_supported(reach_launcher *launcher, int32_t supported);
 reach_motion reach_launcher_caret_opacity(const reach_launcher *launcher);
-reach_motion reach_launcher_results_motion(const reach_launcher *launcher);
+reach_motion reach_launcher_body_height_motion(const reach_launcher *launcher);
+reach_motion reach_launcher_results_opacity_motion(const reach_launcher *launcher);
 
 static inline reach_rect_motion reach_launcher_body_motion(const reach_launcher_layout *layout,
-                                                           const reach_motion *progress)
+                                                           const reach_motion *height)
 {
     reach_rect_motion bounds = {};
     reach_motion_set(&bounds.width, layout->bounds.width);
-    bounds.height = reach_motion_affine(progress, layout->bounds.height - layout->search_box.height,
-                                        layout->search_box.height);
+    bounds.height = *height;
     return bounds;
 }
 
