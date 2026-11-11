@@ -1346,11 +1346,23 @@ sample the same descriptor. Battery, Quick Settings and tray popup press feedbac
 absolute-time motion into retained opacity layers. Those feedback effects no longer own scalar
 tracks or capsule frame demand. The shared pressable scalar bridge has been removed.
 Quick Settings's output-device/app-volume reveals, following-row movement and title/chevron
-crossfades now publish retained motion. Each section parent shares its fade and slide while
-individual paint leaves preserve overlapping alpha. Source layout is stable; pointer events sample
-current geometry and slide before hit testing. One deadline retires closing section content, and
-force-close clears motion. Popup height and section progress now share one absolute-time layout
-curve. The capsule owns shared fixed-cap chrome, a moving body, a clipped viewport and a scroll
+crossfades now publish retained motion. Popup height, both sections' pixel spans and expansions and
+the scroll limit are quadratic views of one theme `smooth` spring (`reach_motion_multiply`/`reach_motion_combine`):
+every retarget starts each channel at its current value and velocity and ends it at its settled
+target, which alone carries the saturation limit. The spring's start rate is the candidate whose
+channels stay in bounds and best match independent springs. Revealed content is not slid: each
+section's bottom clip inset follows that spring, the clip carries the section's uniform corner
+radius so its bottom corners stay rounded at every height, and its parent opacity fades with
+`fade_in`/`fade_out` while individual paint leaves preserve overlapping alpha. Device and app rows
+keep motion keyed by device or session id in a pool capped at the list maximum: survivors retarget
+their y with `smooth`, inserts fade in at their slot once a pool entry is free, and removals fade
+out with `fade_out` and are released with their held icon. When every section motion has settled,
+the capsule tick restarts both spans as settled motions, so the section frame, which is sized from
+the span range while it moves, returns to its settled size. Network and Bluetooth
+tiles retain background, icon-background and foreground coverage tint between their off and on
+colors on `fade_in`/`fade_out`. Source layout is stable; pointer events sample current geometry
+before hit testing. One deadline retires closing section content, and force-close clears motion.
+The capsule owns shared fixed-cap chrome, a moving body, a clipped viewport and a scroll
 parent inside a stable session envelope. Wheel intent updates the scroll clamp; section source
 extent changes reconcile it even when the final collapsed height is unchanged. Environment changes
 cut old geometry and reopen resets scroll intent. The height manager, sampled render values and

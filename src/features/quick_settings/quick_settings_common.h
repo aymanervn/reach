@@ -47,10 +47,25 @@ extern "C"
     uint64_t reach_quick_settings_press_feedback_target(const reach_quick_settings *quick_settings);
     reach_motion
     reach_quick_settings_press_feedback_motion(const reach_quick_settings *quick_settings);
-    reach_quick_settings_layout reach_quick_settings_layout_for_expansion_scaled(
+    void reach_quick_settings_tile_state_motions(const reach_quick_settings *quick_settings,
+                                                 reach_motion *out_network,
+                                                 reach_motion *out_bluetooth);
+    void
+    reach_quick_settings_row_motions(const reach_quick_settings *quick_settings,
+                                     reach_quick_settings_output_device_row_motion
+                                         out_output_devices[REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES],
+                                     reach_quick_settings_app_volume_row_motion
+                                         out_app_volumes[REACH_AUDIO_VOLUME_MAX_SESSIONS]);
+    reach_quick_settings_layout reach_quick_settings_layout_for_sections_scaled(
         reach_rect_f32 content_bounds, const reach_theme *theme,
-        const reach_quick_settings_model *model, float output_devices_expansion,
-        float app_volumes_expansion, float dpi_scale);
+        const reach_quick_settings_model *model, float output_devices_span, float app_volumes_span,
+        float dpi_scale);
+    reach_quick_settings_output_device_row_layout
+    reach_quick_settings_output_device_row_layout_at(reach_rect_f32 panel, float top,
+                                                     float dpi_scale);
+    reach_quick_settings_app_volume_row_layout
+    reach_quick_settings_app_volume_row_layout_at(reach_rect_f32 panel, float top, float level,
+                                                  float dpi_scale);
 #ifdef __cplusplus
 }
 #endif

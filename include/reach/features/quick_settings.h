@@ -117,6 +117,33 @@ extern "C"
         reach_rect_f32 expand_button_icon;
     } reach_quick_settings_layout;
 
+    typedef enum reach_quick_settings_row_lifecycle
+    {
+        REACH_QUICK_SETTINGS_ROW_EMPTY = 0,
+        REACH_QUICK_SETTINGS_ROW_LIVE,
+        REACH_QUICK_SETTINGS_ROW_RETIRING
+    } reach_quick_settings_row_lifecycle;
+
+    typedef struct reach_quick_settings_output_device_row_motion
+    {
+        int32_t lifecycle;
+        size_t index;
+        int32_t separator;
+        reach_audio_output_device device;
+        reach_motion y;
+        reach_motion opacity;
+    } reach_quick_settings_output_device_row_motion;
+
+    typedef struct reach_quick_settings_app_volume_row_motion
+    {
+        int32_t lifecycle;
+        size_t index;
+        int32_t separator;
+        reach_audio_volume_session session;
+        reach_motion y;
+        reach_motion opacity;
+    } reach_quick_settings_app_volume_row_motion;
+
     typedef struct reach_quick_settings_render_input
     {
         reach_quick_settings_model model;
@@ -125,6 +152,16 @@ extern "C"
         float dpi_scale;
         reach_motion output_devices_expansion;
         reach_motion app_volumes_expansion;
+        reach_motion output_devices_span;
+        reach_motion app_volumes_span;
+        reach_motion output_devices_opacity;
+        reach_motion app_volumes_opacity;
+        reach_quick_settings_output_device_row_motion
+            output_device_row_motions[REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES];
+        reach_quick_settings_app_volume_row_motion
+            app_volume_row_motions[REACH_AUDIO_VOLUME_MAX_SESSIONS];
+        reach_motion network_tile_state;
+        reach_motion bluetooth_tile_state;
         reach_rect_motion surface_motion;
         reach_motion scroll_motion;
         reach_rect_f32 render_bounds;
@@ -209,6 +246,10 @@ extern "C"
         reach_rect_f32 content_bounds;
         reach_motion output_devices_expansion;
         reach_motion app_volumes_expansion;
+        reach_motion output_devices_span;
+        reach_motion app_volumes_span;
+        reach_motion output_devices_opacity;
+        reach_motion app_volumes_opacity;
         reach_rect_motion surface_motion;
         reach_motion scroll_motion;
         reach_rect_f32 render_bounds;

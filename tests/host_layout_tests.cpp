@@ -2011,6 +2011,7 @@ static void test_close_handoff_readiness_waits_for_observed_restore(void)
 static reach_host presentation_render_host;
 static int presentation_render_failures;
 static size_t presentation_render_count;
+static size_t presentation_max_groups;
 
 static int32_t presentation_root_compiles(const reach_render_command_buffer *commands,
                                           double now_seconds)
@@ -2033,6 +2034,8 @@ static reach_result validating_execute(reach_render_backend *backend,
 {
     (void)backend;
     ++presentation_render_count;
+    if (commands != nullptr && commands->group_count > presentation_max_groups)
+        presentation_max_groups = commands->group_count;
     if (commands == nullptr || commands->group_count > REACH_MAX_RENDER_GROUPS ||
         commands->count > REACH_MAX_RENDER_COMMANDS ||
         reach_render_command_buffer_validate_groups(commands) != REACH_OK ||
@@ -2795,6 +2798,220 @@ static void test_max_items_and_pressed_states_render_worst_case(void)
     reach_tray_service_destroy(tray_service);
 }
 
+static void test_quick_settings_section_motion_renders_worst_case(void)
+{
+    reach_host *host = &presentation_render_host;
+    presentation_render_count = 0;
+    presentation_render_failures = 0;
+    presentation_max_groups = 0;
+    reach_host_init_feature_registry(host);
+    expect_true(reach_host_create_registered_features(host) == REACH_OK,
+                "registered features are available for Quick Settings section motion");
+    reach_host_init_layout(host);
+
+    reach_quick_settings *quick_settings =
+        reach_host_feature_capsule<reach_quick_settings>(host, REACH_SURFACE_ID_QUICK_SETTINGS);
+    reach_audio_volume_session_list sessions = {};
+    sessions.count = REACH_AUDIO_VOLUME_MAX_SESSIONS;
+    for (size_t index = 0; index < sessions.count; ++index)
+    {
+        sessions.sessions[index].level = (float)(index + 1) / (float)sessions.count;
+        sessions.sessions[index].muted = (int32_t)(index % 2);
+        sessions.sessions[index].process_id = (uint32_t)(1000 + index);
+        sessions.sessions[index].icon_id = index % 3 == 0 ? 0 : (uint64_t)(9000 + index);
+        for (size_t at = 0; at < 40; ++at)
+            sessions.sessions[index].label[at] = (uint16_t)('A' + (index + at) % 26);
+        sessions.sessions[index].session_instance_id[0] = (uint16_t)('a' + index % 26);
+        sessions.sessions[index].session_instance_id[1] = (uint16_t)('a' + index / 26);
+    }
+    reach_audio_output_device_list devices = {};
+    devices.count = REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES;
+    for (size_t index = 0; index < devices.count; ++index)
+    {
+        reach_audio_output_device &device = devices.devices[index];
+        device.is_default = index == 0;
+        device.icon_id = index % 2 == 0 ? 0 : (uint64_t)(8000 + index);
+        device.device_id[0] = (uint16_t)('a' + index);
+        size_t at = 0;
+        for (; at < 30; ++at)
+            device.label[at] = (uint16_t)('A' + (index + at) % 26);
+        device.label[at++] = ' ';
+        device.label[at++] = '(';
+        for (size_t tail = 0; tail < 30; ++tail)
+            device.label[at++] = (uint16_t)('a' + (index + tail) % 26);
+        device.label[at++] = ')';
+    }
+    reach_audio_volume_session_list shifted_sessions = sessions;
+    reach_audio_output_device_list shifted_devices = devices;
+    for (size_t index = 0; index < REACH_AUDIO_VOLUME_MAX_SESSIONS; ++index)
+    {
+        shifted_sessions.sessions[index] = sessions.sessions[(index + 5) % sessions.count];
+        shifted_sessions.sessions[index].session_instance_id[0] =
+            index % 2 == 0 ? (uint16_t)('A' + index)
+                           : sessions.sessions[index].session_instance_id[0];
+        shifted_devices.devices[index] = devices.devices[(index + 7) % devices.count];
+        shifted_devices.devices[index].device_id[0] =
+            index % 3 == 0 ? (uint16_t)('A' + index) : devices.devices[index].device_id[0];
+    }
+    reach_network_state network = {};
+    network.kind = REACH_NETWORK_KIND_WIFI;
+    network.signal_strength = 3;
+    for (size_t at = 0; at < 40; ++at)
+        network.label[at] = (uint16_t)('a' + at % 26);
+    reach_bluetooth_state bluetooth = {};
+    bluetooth.available = 1;
+    reach_brightness_state brightness = {};
+    brightness.available = 1;
+    brightness.level = 0.4f;
+    auto set_system = [&](int32_t active)
+    {
+        network.connected = active;
+        bluetooth.enabled = active;
+        reach_quick_settings_system_apply_result applied = {};
+        reach_quick_settings_apply_system_states(quick_settings, &network, &bluetooth, &brightness,
+                                                 1, 0, &applied);
+    };
+
+    const float dpis[] = {1.0f, 1.25f, 1.5f, 2.0f};
+    const reach_rect_f32 monitors[] = {{0.0f, 0.0f, 3840.0f, 2160.0f},
+                                       {-1920.0f, 0.0f, 1920.0f, 1080.0f},
+                                       {0.0f, 0.0f, 360.0f, 280.0f}};
+    const reach_surface_id id = REACH_SURFACE_ID_QUICK_SETTINGS;
+    const reach_feature_capsule_ops *ops = host->feature_runtimes[id].definition->capsule_ops;
+    void *capsule = host->feature_runtimes[id].capsule;
+    const char *label = "Quick Settings renders section motion within budget";
+    for (float dpi : dpis)
+    {
+        for (reach_rect_f32 monitor : monitors)
+        {
+            host->layout_dpi_scale = dpi;
+            presentation_contexts contexts = make_presentation_contexts(dpi, monitor);
+            for (const reach_feature_surface_context *anchor : {&contexts.top, &contexts.dock})
+            {
+                auto render = [&] { render_presented_surface(host, id, *anchor, label); };
+                auto step = [&](double seconds)
+                {
+                    tick_presented_surface(host, id, seconds);
+                    uint64_t retired[2 * (REACH_AUDIO_VOLUME_MAX_SESSIONS +
+                                          REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES)];
+                    (void)reach_quick_settings_take_retired_render_icons(
+                        quick_settings, retired, sizeof(retired) / sizeof(retired[0]));
+                    render();
+                };
+                reach_quick_settings_apply_sessions(quick_settings, &sessions);
+                reach_quick_settings_apply_output_devices(quick_settings, &devices);
+                set_system(0);
+                (void)reach_quick_settings_set_open(quick_settings, 1);
+                render();
+                step(0.6);
+                (void)reach_quick_settings_toggle_expanded(quick_settings);
+                set_system(1);
+                render();
+                step(0.06);
+                (void)reach_quick_settings_toggle_output_devices(quick_settings);
+                render();
+                step(0.03);
+                reach_quick_settings_apply_sessions(quick_settings, &shifted_sessions);
+                reach_quick_settings_apply_output_devices(quick_settings, &shifted_devices);
+                render();
+                step(0.03);
+                reach_quick_settings_apply_sessions(quick_settings, &sessions);
+                reach_quick_settings_apply_output_devices(quick_settings, &devices);
+                render();
+                step(0.03);
+                (void)reach_quick_settings_toggle_output_devices(quick_settings);
+                set_system(0);
+                render();
+                step(0.02);
+                (void)reach_quick_settings_toggle_expanded(quick_settings);
+                render();
+                for (size_t frame = 0; frame < 15; ++frame)
+                    step(0.016);
+                step(0.6);
+                (void)reach_quick_settings_toggle_output_devices(quick_settings);
+                for (size_t frame = 0; frame < 10; ++frame)
+                    step(0.016);
+                (void)reach_quick_settings_toggle_expanded(quick_settings);
+                set_system(1);
+                for (size_t frame = 0; frame < 10; ++frame)
+                    step(0.016);
+                (void)reach_quick_settings_set_open(quick_settings, 0);
+                render();
+                tick_presented_surface(host, id, 0.6);
+                tick_presented_surface(host, id, 0.6);
+                if (reach_quick_settings_state_ptr(quick_settings)->model.expanded)
+                    (void)reach_quick_settings_toggle_expanded(quick_settings);
+                if (reach_quick_settings_state_ptr(quick_settings)->model.output_devices_expanded)
+                    (void)reach_quick_settings_toggle_output_devices(quick_settings);
+
+                (void)reach_quick_settings_set_open(quick_settings, 1);
+                (void)reach_quick_settings_toggle_expanded(quick_settings);
+                render();
+                step(0.6);
+                reach_feature_surface_geometry geometry = {};
+                ops->surface_geometry(capsule, &geometry);
+                reach_pointer_event press = {};
+                expect_true(find_press_targets(ops, capsule,
+                                               {0.0f, 0.0f, geometry.visible_bounds.width,
+                                                geometry.visible_bounds.height},
+                                               REACH_POINTER_COORDINATE_SURFACE_LOCAL, 6.0f, &press,
+                                               1) == 1,
+                            "Quick Settings has a control to hold pressed during list churn");
+                send_pointer(ops, capsule, press);
+                reach_audio_volume_session_list replaced_sessions = sessions;
+                for (size_t index = 0; index + 1 < sessions.count; ++index)
+                    replaced_sessions.sessions[index] = sessions.sessions[index + 1];
+                replaced_sessions.sessions[sessions.count - 1].session_instance_id[0] = 'Z';
+                reach_quick_settings_apply_sessions(quick_settings, &replaced_sessions);
+                (void)reach_quick_settings_toggle_output_devices(quick_settings);
+                step(0.004);
+                reach_audio_volume_session_list no_sessions = {};
+                reach_quick_settings_apply_sessions(quick_settings, &no_sessions);
+                step(0.004);
+                for (size_t removed = 1; removed < devices.count; ++removed)
+                {
+                    reach_audio_output_device_list churned = devices;
+                    for (size_t index = 0; index < churned.count; ++index)
+                    {
+                        size_t source = index + removed;
+                        reach_audio_output_device &device = churned.devices[index];
+                        device = devices.devices[source % devices.count];
+                        if (source >= devices.count)
+                            device.device_id[0] = (uint16_t)('A' + source - devices.count);
+                        device.is_default = index == 0;
+                    }
+                    reach_quick_settings_apply_output_devices(quick_settings, &churned);
+                    step(0.004);
+                }
+                for (size_t frame = 0; frame < 6; ++frame)
+                    step(0.016);
+                send_pointer(ops, capsule,
+                             make_pointer_event(REACH_POINTER_EVENT_UP,
+                                                REACH_POINTER_COORDINATE_SURFACE_LOCAL, -100000.0f,
+                                                -100000.0f));
+                step(0.6);
+                (void)reach_quick_settings_set_open(quick_settings, 0);
+                render();
+                tick_presented_surface(host, id, 0.6);
+                tick_presented_surface(host, id, 0.6);
+                if (reach_quick_settings_state_ptr(quick_settings)->model.expanded)
+                    (void)reach_quick_settings_toggle_expanded(quick_settings);
+                if (reach_quick_settings_state_ptr(quick_settings)->model.output_devices_expanded)
+                    (void)reach_quick_settings_toggle_output_devices(quick_settings);
+            }
+        }
+    }
+    expect_true(presentation_render_failures == 0,
+                "every Quick Settings section-motion render stays valid");
+    expect_true(presentation_render_count == 4 * 3 * 2 * 77,
+                "Quick Settings renders every section-motion step at every DPI and monitor");
+    const size_t largest_rows = (size_t)REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES * 5 +
+                                (size_t)REACH_AUDIO_VOLUME_MAX_SESSIONS * 7;
+    expect_true(presentation_max_groups >= largest_rows + 27,
+                "Quick Settings rendered every row at its largest in both sections while pressed");
+    reach_host_destroy_registered_features(host);
+}
+
 int main(void)
 {
     test_close_handoff_readiness_waits_for_observed_restore();
@@ -2832,6 +3049,7 @@ int main(void)
     test_feature_tick_redraw_marks_only_its_own_surface();
     test_shared_presentations_render_worst_case();
     test_max_items_and_pressed_states_render_worst_case();
+    test_quick_settings_section_motion_renders_worst_case();
 
     if (failures != 0)
     {
