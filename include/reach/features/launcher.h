@@ -8,6 +8,8 @@
 #include "reach/core/ui_layout.h"
 #include "reach/core/theme.h"
 #include "reach/core/ui_events.h"
+#include "reach/features/common/keyed_rows.h"
+#include "reach/features/common/selection_pill.h"
 #include "reach/features/common/text_edit.h"
 #include "reach/features/common/pressable.h"
 #include "reach/features/feature_capsule.h"
@@ -18,6 +20,8 @@
 extern "C"
 {
 #endif
+
+#define REACH_LAUNCHER_ROW_CAPACITY 16
 
     typedef struct reach_launcher_state reach_launcher_state;
 
@@ -65,7 +69,13 @@ extern "C"
         const reach_launcher_model *model;
         const reach_launcher_layout *layout;
 
-        const uint64_t *result_icon_ids;
+        const reach_keyed_row *rows;
+        const reach_launcher_result *row_results;
+        const uint64_t *row_icon_ids;
+        size_t row_start;
+        float row_pitch;
+        reach_rect_motion selection;
+        int32_t has_selection;
         float dpi_scale;
         int32_t text_alignment_leading;
 
