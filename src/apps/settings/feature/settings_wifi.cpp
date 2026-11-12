@@ -4,8 +4,6 @@
 
 #include <string.h>
 
-#define REACH_SETTINGS_WIFI_ROW_ANIMATION_SECONDS 0.18
-
 const uint16_t *reach_settings_wifi_page_title(void)
 {
     return (const uint16_t *)u"Wi-Fi";
@@ -71,7 +69,7 @@ void reach_settings_model_set_wifi_radio(reach_settings_model *model, reach_wifi
     }
     else if (model->wifi_radio_toggle.to != target)
     {
-        reach_motion_animate_to(&model->wifi_radio_toggle, target, 0.18, REACH_EASING_EASE_OUT);
+        reach_settings_animate(&model->wifi_radio_toggle, target, REACH_MOTION_PRESET_BOUNCY);
     }
 }
 
@@ -83,9 +81,9 @@ int32_t reach_settings_model_toggle_wifi_radio(reach_settings_model *model)
     }
     model->wifi_radio =
         model->wifi_radio == REACH_WIFI_RADIO_ON ? REACH_WIFI_RADIO_OFF : REACH_WIFI_RADIO_ON;
-    reach_motion_animate_to(&model->wifi_radio_toggle,
-                            model->wifi_radio == REACH_WIFI_RADIO_ON ? 1.0f : 0.0f, 0.18,
-                            REACH_EASING_EASE_OUT);
+    reach_settings_animate(&model->wifi_radio_toggle,
+                           model->wifi_radio == REACH_WIFI_RADIO_ON ? 1.0f : 0.0f,
+                           REACH_MOTION_PRESET_BOUNCY);
     return 1;
 }
 
@@ -131,9 +129,8 @@ void reach_settings_model_apply_wifi(reach_settings_model *model, reach_wifi_rad
         float target = reach_settings_wifi_track_target(model->wifi_expanded_row, index);
         if (reach_animation_manager_target(&model->wifi_row_animations, index) != target)
         {
-            reach_animation_manager_animate_to(&model->wifi_row_animations, index, target,
-                                               REACH_SETTINGS_WIFI_ROW_ANIMATION_SECONDS,
-                                               REACH_EASING_EASE_IN_OUT);
+            reach_settings_track_to(&model->wifi_row_animations, index, target,
+                                    REACH_MOTION_PRESET_SMOOTH);
         }
     }
 }
@@ -224,9 +221,8 @@ void reach_settings_model_wifi_expand_row(reach_settings_model *model, int32_t r
         float target = reach_settings_wifi_track_target(row, index);
         if (reach_animation_manager_target(&model->wifi_row_animations, index) != target)
         {
-            reach_animation_manager_animate_to(&model->wifi_row_animations, index, target,
-                                               REACH_SETTINGS_WIFI_ROW_ANIMATION_SECONDS,
-                                               REACH_EASING_EASE_IN_OUT);
+            reach_settings_track_to(&model->wifi_row_animations, index, target,
+                                    REACH_MOTION_PRESET_SMOOTH);
         }
     }
 }

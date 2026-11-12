@@ -26,8 +26,8 @@ int32_t reach_settings_model_select_top_bar_style(reach_settings_model *model,
         return 0;
     }
     model->top_bar_style = style;
-    reach_motion_animate_to(&model->top_bar_style_selection, (float)style, 0.18,
-                            REACH_EASING_EASE_OUT);
+    reach_settings_animate(&model->top_bar_style_selection, (float)style,
+                           REACH_MOTION_PRESET_FADE_IN);
     return 1;
 }
 
@@ -58,8 +58,8 @@ int32_t reach_settings_model_toggle_top_bar_mode(reach_settings_model *model)
     model->top_bar_mode = model->top_bar_mode == REACH_CONFIG_TOP_BAR_MODE_STATIC
                               ? REACH_CONFIG_TOP_BAR_MODE_DYNAMIC
                               : REACH_CONFIG_TOP_BAR_MODE_STATIC;
-    reach_motion_animate_to(&model->top_bar_mode_toggle,
-                            model->top_bar_mode == REACH_CONFIG_TOP_BAR_MODE_DYNAMIC ? 1.0f : 0.0f,
-                            0.18, REACH_EASING_EASE_OUT);
+    reach_settings_animate(&model->top_bar_mode_toggle,
+                           model->top_bar_mode == REACH_CONFIG_TOP_BAR_MODE_DYNAMIC ? 1.0f : 0.0f,
+                           REACH_MOTION_PRESET_BOUNCY);
     return 1;
 }

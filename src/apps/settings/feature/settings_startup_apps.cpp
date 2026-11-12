@@ -63,8 +63,8 @@ void reach_settings_model_set_startup_enabled(reach_settings_model *model, size_
         return;
     }
     model->startup_apps.entries[index].enabled = enabled ? 1 : 0;
-    reach_motion_animate_to(&model->startup_toggles[index], enabled ? 1.0f : 0.0f, 0.18,
-                            REACH_EASING_EASE_OUT);
+    reach_settings_animate(&model->startup_toggles[index], enabled ? 1.0f : 0.0f,
+                           REACH_MOTION_PRESET_BOUNCY);
 }
 
 int32_t reach_settings_model_startup_enabled(const reach_settings_model *model, size_t index)

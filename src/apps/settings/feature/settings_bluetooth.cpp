@@ -2,8 +2,6 @@
 
 #include "reach/support/util.h"
 
-#define REACH_SETTINGS_BLUETOOTH_ROW_ANIMATION_SECONDS 0.18
-
 const uint16_t *reach_settings_bluetooth_page_title(void)
 {
     return (const uint16_t *)u"Bluetooth";
@@ -82,9 +80,8 @@ void reach_settings_model_apply_bluetooth(reach_settings_model *model,
                 : 0.0f;
         if (reach_animation_manager_target(&model->bluetooth_row_animations, index) != target)
         {
-            reach_animation_manager_animate_to(&model->bluetooth_row_animations, index, target,
-                                               REACH_SETTINGS_BLUETOOTH_ROW_ANIMATION_SECONDS,
-                                               REACH_EASING_EASE_IN_OUT);
+            reach_settings_track_to(&model->bluetooth_row_animations, index, target,
+                                    REACH_MOTION_PRESET_SMOOTH);
         }
     }
 }
@@ -128,8 +125,7 @@ void reach_settings_model_set_bluetooth_radio(reach_settings_model *model,
     }
     else if (model->bluetooth_radio_toggle.to != target)
     {
-        reach_motion_animate_to(&model->bluetooth_radio_toggle, target, 0.18,
-                                REACH_EASING_EASE_OUT);
+        reach_settings_animate(&model->bluetooth_radio_toggle, target, REACH_MOTION_PRESET_BOUNCY);
     }
 }
 
@@ -142,8 +138,8 @@ int32_t reach_settings_model_toggle_bluetooth_radio(reach_settings_model *model)
     reach_bluetooth_state state = model->bluetooth_radio;
     state.enabled = state.enabled ? 0 : 1;
     reach_settings_model_apply_bluetooth_radio(model, state);
-    reach_motion_animate_to(&model->bluetooth_radio_toggle, state.enabled ? 1.0f : 0.0f, 0.18,
-                            REACH_EASING_EASE_OUT);
+    reach_settings_animate(&model->bluetooth_radio_toggle, state.enabled ? 1.0f : 0.0f,
+                           REACH_MOTION_PRESET_BOUNCY);
     return 1;
 }
 
@@ -211,9 +207,8 @@ void reach_settings_model_bluetooth_expand_row(reach_settings_model *model, int3
         float target = row >= 0 && (size_t)row == index ? 1.0f : 0.0f;
         if (reach_animation_manager_target(&model->bluetooth_row_animations, index) != target)
         {
-            reach_animation_manager_animate_to(&model->bluetooth_row_animations, index, target,
-                                               REACH_SETTINGS_BLUETOOTH_ROW_ANIMATION_SECONDS,
-                                               REACH_EASING_EASE_IN_OUT);
+            reach_settings_track_to(&model->bluetooth_row_animations, index, target,
+                                    REACH_MOTION_PRESET_SMOOTH);
         }
     }
 }
