@@ -231,8 +231,11 @@ void reach_dock_drag_end(reach_dock *dock, const reach_dock_interaction_context 
     {
         float target_x = reach_dock_slot_box_x(ctx->theme, ctx->layout, target_index);
 
-        reach_motion_start(&state->drag.snap, state->drag.x, target_x, 0.12,
-                           REACH_EASING_EASE_IN_OUT);
+        reach_motion_start_spec_at(
+            &state->drag.snap, state->drag.x, target_x, 0.0f,
+            reach_theme_motion_preset(ctx->theme != nullptr ? ctx->theme : reach_theme_default(),
+                                      REACH_MOTION_PRESET_SNAPPY),
+            reach_motion_now_seconds());
     }
     else
     {
