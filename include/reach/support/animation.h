@@ -36,8 +36,6 @@ extern "C"
     void reach_animation_manager_start_at(reach_animation_manager *manager, size_t track_id,
                                           float from, float to, double duration_seconds,
                                           reach_easing easing, double now_seconds);
-    void reach_animation_manager_animate_to(reach_animation_manager *manager, size_t track_id,
-                                            float to, double duration_seconds, reach_easing easing);
     void reach_animation_manager_animate_to_at(reach_animation_manager *manager, size_t track_id,
                                                float to, double duration_seconds,
                                                reach_easing easing, double now_seconds);

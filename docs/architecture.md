@@ -247,8 +247,8 @@ generic host transition: its fullscreen surface remains fixed to the monitor whi
 the capsule's elapsed-time progress animates app tiles. Desktop uses a separate track at 35% of
 the configured Stage duration, so it settles substantially earlier without depending on a fixed
 millisecond delay. Closing an individual window from its tile gives that departing tile a dedicated
-opacity track lasting one third of `stage_reflow_seconds`; the surviving tiles keep the full reflow
-duration, so this does not change Stage open/close timing or grid rearrangement. It never calls the
+opacity track on the theme `fade_out` preset; the surviving tiles reflow on `smooth`, so this does
+not change Stage open/close timing or grid rearrangement. It never calls the
 thumbnail port — it
 publishes a read-only placement list
 (`reach_stage_thumbnail_count` / `reach_stage_thumbnail_at`) that composition drives
@@ -274,7 +274,8 @@ its public route callback, preserving the popup transition for the same owner. C
 resolves card placements, hit regions, anchor, DPI and pointer corridor together. An optional
 surface-ops pointer-observation hook lets the generic frame path update the event-driven watch
 after arrangement. Ordinary command and power menus keep their existing row presentation.
-Dock preview width and membership reflow share one capsule-owned 180ms canonical layout epoch.
+Dock preview width and membership reflow share one capsule-owned canonical layout epoch driven by
+the theme `smooth` spring.
 Target packing remains CPU policy; body/notch placement, proportional equal-height cards and gaps,
 header fills, borders, close controls and independent width-text viewports retain that intent.
 Survivors capture their screen X at the exact retarget timestamp; the shared same-epoch constraints
@@ -484,7 +485,7 @@ The two scalar managers, sampling functions and application frame predicates are
 Windows system/application theme choices reuse the same primitive with constant intent. Shared
 Settings control ids preserve the four-subsource allocation used by toggles and selectors.
 
-Settings Power option colors own five canonical 220ms ease-out descriptors and one earliest visible
+Settings Power option colors own five canonical `fade_in` descriptors and one earliest visible
 cleanup deadline. Selection retains its previous reset-on-selection policy. Shared selection-item
 rendering retains opaque outer/inner coverage and separately tinted label ink. Custom backgrounds
 reuse bounded canonical piecewise mapping for the existing nested color mixes; custom textbox ink
@@ -841,8 +842,24 @@ and read through `reach_theme_motion_preset`. Springs `snappy`, `smooth`, `bounc
 `release` store only response and damping, so their settle time stays derived by the engine; the
 `fade_in`, `fade_out` and `menu_fade` ease-out curves store a duration. `reach_motion_spec_scaled`
 multiplies response and duration by one time scale, and `reach_theme_stage_motion_scale` derives
-that scale from the persisted Stage duration relative to `stage_motion_reference_seconds`. Features
-migrate from their legacy per-feature seconds to presets incrementally.
+that scale from the persisted Stage duration relative to `stage_motion_reference_seconds`.
+
+Every feature transition reads a preset; no feature owns a literal duration or easing for a
+transition, and the clock-reading fixed-curve entry points (`reach_motion_start`,
+`reach_motion_animate_to`, `reach_animation_manager_animate_to`) are removed. The preset per event:
+popup and panel geometry, list survivors, resizes, bar reveal, Dock slots and Stage tiles use
+`smooth`; compact bar widths, tray reorder and drag snaps use `snappy`; one-step selection pills,
+toggle knobs and the adjacent Settings sidebar step use `bouncy`; hover, tint and content opacity use
+`fade_in`/`fade_out`; presses use `press`/`release`. Bounce never appears on popups, panels, Stage,
+the Top Bar or opacity. Stage open and close scale `smooth` so it settles in exactly the persisted
+Stage duration; `reach_theme_stage_motion_scale` is not used by Stage yet. Scalar tracks sampled on
+the CPU (`reach_animation_manager`: Stage, Dock slots, bar reveal, Top Bar widths, Clipboard height,
+Settings rows) carry the same presets through `reach_animation_manager_spring_to_at`. Drag gestures
+feed `reach_drag_velocity` (`features/common/draggable`) with the value they display and hand its
+release velocity to the snap spring. Documented exceptions, which are periodic effects or holds
+rather than transitions: caret blink, the shared loader cycle, the now-playing marquee and the HUD
+lifetime. Scroll motion is not migrated: `core/scrollbar`, Clipboard scroll and Quick Settings
+scroll keep their existing behaviour until one shared scroll component replaces them.
 
 Every size, envelope, clip, raster allocation or budget derived from a motion uses
 `reach_motion_range`, never endpoints or the current sample, so spring overshoot stays inside it.
@@ -895,7 +912,7 @@ sources or over-budget expansions use renderer-owned source sampling through the
 port until the finite descriptors settle. Image and text expansions share the existing 128MiB and
 layer budgets. Source changes invalidate their bitmap, while hide/retirement removes fit ownership
 and sampling. No fields are added to the render command/group/buffer for this capability.
-Clipboard item width now owns one canonical 160ms ease-out motion and one cleanup deadline.
+Clipboard item width now owns one canonical `smooth` motion and one cleanup deadline.
 Endpoint layout stays authoritative; pointer operations sample a separate current-width snapshot.
 Normal scrollbar-gutter changes retain fixed-radius item borders, independent hover paint, close
 controls, image crops, custom preview line variants and scrollbar placement. Stable item source

@@ -829,9 +829,11 @@ static void test_departing_tile_fades_three_times_faster_than_reflow(void)
     expect_true(result.action.kind == REACH_FEATURE_ACTION_CLOSE_WINDOW,
                 "the Stage close button starts a window departure");
     reach_feature_tick_result tick = {};
-    reach_test_motion_clock_advance((double)reach_theme_default()->stage_reflow_seconds / 3.0);
-    reach_stage_capsule_ops()->tick(
-        stage, (double)reach_theme_default()->stage_reflow_seconds / 3.0, &tick);
+    double departure_seconds =
+        reach_theme_motion_preset(reach_theme_default(), REACH_MOTION_PRESET_FADE_OUT)
+            .duration_seconds;
+    reach_test_motion_clock_advance(departure_seconds);
+    reach_stage_capsule_ops()->tick(stage, departure_seconds, &tick);
     const reach_stage_state *state = reach_stage_state_ptr(stage);
     expect_near(state->tiles[0].presence, 0.0f,
                 "a closed Stage window finishes fading after one third of reflow");

@@ -310,12 +310,6 @@ void reach_motion_set(reach_motion *motion, float value)
     }
 }
 
-void reach_motion_start(reach_motion *motion, float from, float to, double duration_seconds,
-                        reach_easing easing)
-{
-    reach_motion_start_at(motion, from, to, duration_seconds, easing, reach_motion_now_seconds());
-}
-
 void reach_motion_start_at(reach_motion *motion, float from, float to, double duration_seconds,
                            reach_easing easing, double now_seconds)
 {
@@ -407,12 +401,6 @@ void reach_motion_animate_spec_to_at(reach_motion *motion, float to, reach_motio
         reach_motion_spring_to_at(motion, to, spec.response_seconds, spec.damping, now_seconds);
     else
         reach_motion_animate_to_at(motion, to, spec.duration_seconds, spec.easing, now_seconds);
-}
-
-void reach_motion_animate_to(reach_motion *motion, float to, double duration_seconds,
-                             reach_easing easing)
-{
-    reach_motion_animate_to_at(motion, to, duration_seconds, easing, reach_motion_now_seconds());
 }
 
 void reach_motion_animate_to_at(reach_motion *motion, float to, double duration_seconds,

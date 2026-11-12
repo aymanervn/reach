@@ -71,8 +71,6 @@ extern "C"
     int32_t reach_motion_equal(const reach_motion *first, const reach_motion *second);
     double reach_motion_now_seconds(void);
     void reach_motion_set(reach_motion *motion, float value);
-    void reach_motion_start(reach_motion *motion, float from, float to, double duration_seconds,
-                            reach_easing easing);
     void reach_motion_start_at(reach_motion *motion, float from, float to, double duration_seconds,
                                reach_easing easing, double now_seconds);
     void reach_motion_repeat_at(reach_motion *motion, float from, float to, double travel_seconds,
@@ -90,8 +88,6 @@ extern "C"
                                     reach_motion_spec spec, double now_seconds);
     void reach_motion_animate_spec_to_at(reach_motion *motion, float to, reach_motion_spec spec,
                                          double now_seconds);
-    void reach_motion_animate_to(reach_motion *motion, float to, double duration_seconds,
-                                 reach_easing easing);
     void reach_motion_animate_to_at(reach_motion *motion, float to, double duration_seconds,
                                     reach_easing easing, double now_seconds);
     reach_motion reach_motion_affine(const reach_motion *motion, float multiplier, float offset);
