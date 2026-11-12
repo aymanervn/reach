@@ -142,9 +142,8 @@ reach_result reach_stage_open(reach_stage *stage, reach_rect_f32 monitor_bounds,
 
     if (reach_stage_has_apps(state))
     {
-        reach_animation_manager_start(&stage->animations, REACH_STAGE_ANIMATION_PROGRESS, 0.0f,
-                                      1.0f, (double)state->animation_seconds,
-                                      REACH_EASING_EASE_OUT);
+        reach_stage_track_start(stage, REACH_STAGE_ANIMATION_PROGRESS, 0.0f, 1.0f,
+                                reach_stage_presentation_spec(state->animation_seconds, 1.0f));
     }
     else
     {
@@ -153,9 +152,10 @@ reach_result reach_stage_open(reach_stage *stage, reach_rect_f32 monitor_bounds,
     }
     if (reach_stage_has_desktop(state))
     {
-        reach_animation_manager_start(
-            &stage->animations, REACH_STAGE_ANIMATION_DESKTOP_PROGRESS, 0.0f, 1.0f,
-            reach_stage_desktop_animation_seconds(state->animation_seconds), REACH_EASING_EASE_OUT);
+        reach_stage_track_start(
+            stage, REACH_STAGE_ANIMATION_DESKTOP_PROGRESS, 0.0f, 1.0f,
+            reach_stage_presentation_spec(state->animation_seconds,
+                                          (float)REACH_STAGE_DESKTOP_ANIMATION_FACTOR));
     }
     else
     {
@@ -233,14 +233,13 @@ void reach_stage_start_reflow(reach_stage *stage)
     reach_stage_rebuild_layout(stage);
 
     state->reflow = 0.0f;
-    reach_animation_manager_start(&stage->animations, REACH_STAGE_ANIMATION_REFLOW, 0.0f, 1.0f,
-                                  reach_stage_reflow_seconds(), REACH_EASING_EASE_IN_OUT);
+    reach_stage_track_start(stage, REACH_STAGE_ANIMATION_REFLOW, 0.0f, 1.0f,
+                            reach_stage_motion_preset(REACH_MOTION_PRESET_SMOOTH));
     state->departure_progress = has_departing ? 0.0f : 1.0f;
     if (has_departing)
     {
-        reach_animation_manager_start(&stage->animations, REACH_STAGE_ANIMATION_DEPARTURE, 0.0f,
-                                      1.0f, reach_stage_departure_seconds(),
-                                      REACH_EASING_EASE_IN_OUT);
+        reach_stage_track_start(stage, REACH_STAGE_ANIMATION_DEPARTURE, 0.0f, 1.0f,
+                                reach_stage_motion_preset(REACH_MOTION_PRESET_FADE_OUT));
     }
     else
     {
@@ -356,13 +355,13 @@ void reach_stage_begin_close(reach_stage *stage)
     reach_pressable_reset(&stage->pressable, nullptr);
     stage->pressable_generation = 0;
     stage->state.has_hover = 0;
-    reach_motion_animate_to(&stage->close_hover, 0.0f, reach_stage_close_hover_seconds(),
-                            REACH_EASING_EASE_OUT);
+    reach_motion_animate_spec_to_at(&stage->close_hover, 0.0f,
+                                    reach_stage_motion_preset(REACH_MOTION_PRESET_FADE_OUT),
+                                    reach_motion_now_seconds());
     if (reach_stage_has_apps(&stage->state))
     {
-        reach_animation_manager_animate_to(&stage->animations, REACH_STAGE_ANIMATION_PROGRESS, 0.0f,
-                                           (double)stage->state.animation_seconds,
-                                           REACH_EASING_EASE_OUT);
+        reach_stage_track_to(stage, REACH_STAGE_ANIMATION_PROGRESS, 0.0f,
+                             reach_stage_presentation_spec(stage->state.animation_seconds, 1.0f));
     }
     else
     {
@@ -370,10 +369,10 @@ void reach_stage_begin_close(reach_stage *stage)
     }
     if (reach_stage_has_desktop(&stage->state))
     {
-        reach_animation_manager_animate_to(
-            &stage->animations, REACH_STAGE_ANIMATION_DESKTOP_PROGRESS, 0.0f,
-            reach_stage_desktop_animation_seconds(stage->state.animation_seconds),
-            REACH_EASING_EASE_OUT);
+        reach_stage_track_to(
+            stage, REACH_STAGE_ANIMATION_DESKTOP_PROGRESS, 0.0f,
+            reach_stage_presentation_spec(stage->state.animation_seconds,
+                                          (float)REACH_STAGE_DESKTOP_ANIMATION_FACTOR));
     }
     else
     {
@@ -494,9 +493,8 @@ static int32_t reach_stage_update_closing_windows(reach_stage *stage,
         state->close_phase = REACH_STAGE_CLOSE_MOVING;
         state->close_aligned_committed = 0;
         state->retarget_progress = 1.0f;
-        reach_animation_manager_start(&stage->animations, REACH_STAGE_ANIMATION_RETARGET, 1.0f,
-                                      0.0f, reach_theme_default()->surface_close_seconds,
-                                      REACH_EASING_EASE_OUT);
+        reach_stage_track_start(stage, REACH_STAGE_ANIMATION_RETARGET, 1.0f, 0.0f,
+                                reach_stage_motion_preset(REACH_MOTION_PRESET_FADE_OUT));
     }
     else if (presentation_changed && state->close_phase == REACH_STAGE_CLOSE_ALIGNED)
     {
@@ -678,9 +676,8 @@ static void reach_stage_capsule_reset(void *capsule)
 static void reach_stage_begin_reveal(reach_stage *stage)
 {
     stage->state.close_phase = REACH_STAGE_CLOSE_REVEALING;
-    reach_animation_manager_animate_to(&stage->animations, REACH_STAGE_ANIMATION_BACKDROP, 0.0f,
-                                       reach_theme_default()->surface_close_seconds,
-                                       REACH_EASING_EASE_OUT);
+    reach_stage_track_to(stage, REACH_STAGE_ANIMATION_BACKDROP, 0.0f,
+                         reach_stage_motion_preset(REACH_MOTION_PRESET_FADE_OUT));
 }
 
 static void reach_stage_capsule_presentation_committed(void *capsule, reach_result result,

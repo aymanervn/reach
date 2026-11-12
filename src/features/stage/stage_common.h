@@ -8,26 +8,28 @@
 #include "reach/support/animation.h"
 
 #define REACH_STAGE_DESKTOP_ANIMATION_FACTOR 0.35
-#define REACH_STAGE_DEPARTURE_ANIMATION_FACTOR (1.0 / 3.0)
 
 static inline float reach_stage_animation_seconds_default(void)
 {
     return reach_theme_default()->stage_animation_seconds;
 }
 
-static inline double reach_stage_close_hover_seconds(void)
+static inline reach_motion_spec reach_stage_motion_preset(reach_motion_preset preset)
 {
-    return (double)reach_theme_default()->stage_close_hover_seconds;
+    return reach_theme_motion_preset(reach_theme_default(), preset);
 }
 
-static inline double reach_stage_reflow_seconds(void)
+static inline reach_motion_spec reach_stage_presentation_spec(float animation_seconds, float factor)
 {
-    return (double)reach_theme_default()->stage_reflow_seconds;
-}
-
-static inline double reach_stage_departure_seconds(void)
-{
-    return reach_stage_reflow_seconds() * REACH_STAGE_DEPARTURE_ANIMATION_FACTOR;
+    reach_motion_spec spec = reach_stage_motion_preset(REACH_MOTION_PRESET_SMOOTH);
+    float seconds =
+        animation_seconds > 0.0f ? animation_seconds : reach_stage_animation_seconds_default();
+    reach_motion natural = {};
+    reach_motion_start_spec_at(&natural, 0.0f, 1.0f, 0.0f, spec, 0.0);
+    if (!(natural.duration_seconds > 0.0) || !(seconds * factor > 0.0f))
+        return spec;
+    return reach_motion_spec_scaled(spec,
+                                    (float)((double)(seconds * factor) / natural.duration_seconds));
 }
 
 enum
@@ -40,11 +42,6 @@ enum
     REACH_STAGE_ANIMATION_RETARGET,
     REACH_STAGE_ANIMATION_COUNT
 };
-
-static inline double reach_stage_desktop_animation_seconds(float animation_seconds)
-{
-    return (double)animation_seconds * REACH_STAGE_DESKTOP_ANIMATION_FACTOR;
-}
 
 struct reach_stage
 {
@@ -63,6 +60,25 @@ struct reach_stage
 
 reach_rect_f32 reach_stage_interpolate_rect(reach_rect_f32 from, reach_rect_f32 to, float factor);
 void reach_stage_rebuild_layout(reach_stage *stage);
+
+static inline void reach_stage_track_to(reach_stage *stage, size_t track, float target,
+                                        reach_motion_spec spec)
+{
+    double now = reach_motion_now_seconds();
+    if (spec.easing == REACH_EASING_SPRING)
+        reach_animation_manager_spring_to_at(&stage->animations, track, target,
+                                             spec.response_seconds, spec.damping, now);
+    else
+        reach_animation_manager_animate_to_at(&stage->animations, track, target,
+                                              spec.duration_seconds, spec.easing, now);
+}
+
+static inline void reach_stage_track_start(reach_stage *stage, size_t track, float from, float to,
+                                           reach_motion_spec spec)
+{
+    reach_animation_manager_set(&stage->animations, track, from);
+    reach_stage_track_to(stage, track, to, spec);
+}
 void reach_stage_apply_progress(reach_stage *stage);
 void reach_stage_start_reflow(reach_stage *stage);
 void reach_stage_settle_reflow(reach_stage *stage);
