@@ -33,6 +33,8 @@ struct reach_launcher
     uint32_t results_revision;
     uint32_t synced_revision;
     size_t synced_scroll;
+    size_t synced_first;
+    reach_scroll_view scroll;
     size_t synced_selected;
     float synced_pitch;
     reach_feature_transition surface_transition;
@@ -126,6 +128,9 @@ static void reach_launcher_refresh_results_deadline(reach_launcher *launcher)
     if (reach_motion_active(&launcher->results_opacity))
         launcher->results_deadline =
             fmax(launcher->results_deadline, reach_motion_deadline(&launcher->results_opacity));
+    if (reach_scroll_view_active(&launcher->scroll))
+        launcher->results_deadline =
+            fmax(launcher->results_deadline, reach_scroll_view_deadline(&launcher->scroll));
     if (reach_keyed_rows_active(launcher->rows, REACH_LAUNCHER_ROW_CAPACITY))
         launcher->results_deadline =
             fmax(launcher->results_deadline,
@@ -211,18 +216,30 @@ static void reach_launcher_sync_rows(reach_launcher *launcher)
     reach_keyed_row_change changes[REACH_KEYED_ROWS_MAX_CHANGES(REACH_LAUNCHER_ROW_CAPACITY)];
     (void)reach_keyed_rows_release_settled(launcher->rows, REACH_LAUNCHER_ROW_CAPACITY, changes,
                                            REACH_LAUNCHER_ROW_CAPACITY);
-    if (results_changed || pitch_changed || scroll_changed)
+    reach_scroll_view_mode scroll_mode = REACH_SCROLL_VIEW_SET;
+    if (animated && (results_changed || selected_changed))
+        scroll_mode = REACH_SCROLL_VIEW_GLIDE;
+    else if (animated && !launcher->state.launcher_scrollbar_drag.active)
+        scroll_mode = REACH_SCROLL_VIEW_WHEEL;
+    (void)reach_scroll_view_retarget(&launcher->scroll, &launcher->theme,
+                                     (float)start * launcher->row_pitch, scroll_mode, now);
+    reach_scroll_view_window window =
+        reach_scroll_view_item_window(&launcher->scroll, launcher->row_pitch, model.result_count,
+                                      count, 1, REACH_LAUNCHER_ROW_CAPACITY - 4);
+    size_t first = window.first;
+    if (results_changed || pitch_changed || scroll_changed || first != launcher->synced_first)
     {
+        count = window.count;
         float targets[REACH_LAUNCHER_ROW_CAPACITY] = {};
         for (size_t index = 0; index < count; ++index)
-            targets[index] = (float)(start + index) * launcher->row_pitch;
-        reach_launcher_row_match match = {launcher, start};
+            targets[index] = (float)(first + index) * launcher->row_pitch;
+        reach_launcher_row_match match = {launcher, first};
         reach_keyed_rows_sync_input input = {};
         input.count = count;
         input.targets = targets;
         input.same = reach_launcher_row_same;
         input.context = &match;
-        input.animate = animated && results_changed;
+        input.animate = animated;
         input.theme = &launcher->theme;
         input.now_seconds = now;
         (void)reach_keyed_rows_sync(launcher->rows, REACH_LAUNCHER_ROW_CAPACITY, &input, changes,
@@ -230,10 +247,12 @@ static void reach_launcher_sync_rows(reach_launcher *launcher)
         for (size_t slot = 0; slot < REACH_LAUNCHER_ROW_CAPACITY; ++slot)
         {
             const reach_keyed_row &row = launcher->rows[slot];
-            if (row.lifecycle == REACH_KEYED_ROW_LIVE && start + row.index < model.result_count)
-                launcher->row_results[slot] = model.results[start + row.index];
+            if (row.lifecycle == REACH_KEYED_ROW_LIVE && first + row.index < model.result_count)
+                launcher->row_results[slot] = model.results[first + row.index];
         }
+        launcher->synced_first = first;
     }
+    first = launcher->synced_first;
     if (model.result_count > 0)
     {
         reach_selection_pill_mode mode = REACH_SELECTION_PILL_SET;
@@ -252,7 +271,7 @@ static void reach_launcher_sync_rows(reach_launcher *launcher)
     {
         const reach_keyed_row &row = launcher->rows[slot];
         int32_t selected = row.lifecycle == REACH_KEYED_ROW_LIVE &&
-                           start + row.index == model.selected_result_index;
+                           first + row.index == model.selected_result_index;
         if (row.lifecycle == REACH_KEYED_ROW_EMPTY || !animated)
             reach_motion_set(&launcher->row_selected[slot], selected ? 1.0f : 0.0f);
         else
@@ -272,8 +291,20 @@ void reach_launcher_fill_row_render_input(const reach_launcher *launcher,
         return;
     input->rows = launcher->rows;
     input->row_results = launcher->row_results;
-    input->row_start = launcher->synced_scroll;
+    input->row_start = launcher->synced_first;
     input->row_pitch = launcher->row_pitch;
+    input->content_offset = reach_scroll_view_content_offset(&launcher->scroll);
+    reach_motion_set(&input->scrollbar_thumb_offset, 0.0f);
+    const reach_launcher_layout &layout = launcher->pointer_layout;
+    float travel =
+        layout.search_result_scrollbar_track.height - layout.search_result_scrollbar_thumb.height;
+    float maximum = launcher->state.model.result_scrollbar.maximum * launcher->row_pitch;
+    if (launcher->pointer_layout_valid && travel > 0.0f && maximum > 0.0f)
+    {
+        float ratio = travel / maximum;
+        input->scrollbar_thumb_offset = reach_motion_affine(
+            &launcher->scroll.offset, ratio, -ratio * reach_scroll_view_target(&launcher->scroll));
+    }
     input->selection = launcher->selection.rect;
     input->has_selection = launcher->selection_valid;
     input->row_selected = launcher->row_selected;
@@ -874,6 +905,8 @@ void reach_launcher_surface_hidden(reach_launcher *launcher)
         reach_motion_set(&launcher->body_height, launcher->pointer_layout.search_box.height);
     for (reach_keyed_row &row : launcher->rows)
         row = {};
+    reach_scroll_view_init(&launcher->scroll);
+    launcher->synced_first = 0;
     launcher->selection_valid = 0;
     launcher->hover_valid = 0;
     reach_motion_set(&launcher->hover_opacity, 0);
@@ -1197,6 +1230,7 @@ static void reach_launcher_capsule_tick(void *capsule, double, reach_feature_tic
         {
             reach_motion_set(&launcher->body_height, launcher->body_height.to);
             reach_motion_set(&launcher->results_opacity, launcher->results_opacity.to);
+            reach_scroll_view_settle(&launcher->scroll);
             reach_keyed_row_change released[REACH_LAUNCHER_ROW_CAPACITY];
             (void)reach_keyed_rows_release_settled(launcher->rows, REACH_LAUNCHER_ROW_CAPACITY,
                                                    released, REACH_LAUNCHER_ROW_CAPACITY);

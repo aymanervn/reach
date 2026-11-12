@@ -185,7 +185,10 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
         content.bounds.height =
             ceilf(viewport.bounds.y + viewport.bounds.height) - content.bounds.y;
         reach_motion opacity = input->results_opacity;
-        reach_motion_set(&content.y, -(float)input->row_start * input->row_pitch);
+        if (input->content_offset.generation != 0)
+            content.y = input->content_offset;
+        else
+            reach_motion_set(&content.y, 0.0f);
         result = reach_render_command_buffer_begin_group(out_commands, &content);
         reach_render_command_buffer_end_group(out_commands);
         if (result != REACH_OK)
@@ -205,7 +208,18 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
                                                   layout->search_result_scrollbar_thumb,
                                                   layout->bounds, theme->launcher_scrollbar_track,
                                                   theme->launcher_scrollbar_thumb, out_commands);
+            reach_render_command thumb = out_commands->commands[out_commands->count - 1];
+            out_commands->count -= 1;
             result = retain(first, UINT64_C(0x2900000000060000));
+            if (result != REACH_OK)
+                return result;
+            first = out_commands->count;
+            reach_render_command_buffer_push(out_commands, &thumb);
+            reach_motion thumb_offset = input->scrollbar_thumb_offset;
+            if (thumb_offset.generation == 0)
+                reach_motion_set(&thumb_offset, 0.0f);
+            result = reach_render_retain_commands(out_commands, first, UINT64_C(0x2900000000060001),
+                                                  viewport.id, &opacity, &thumb_offset);
             if (result != REACH_OK)
                 return result;
         }
