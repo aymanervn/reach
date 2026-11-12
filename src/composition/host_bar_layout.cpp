@@ -255,8 +255,8 @@ reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surfa
     request.force_hidden = host->window_manipulation.relevant;
     request.hold_open = reach_host_popup_open(host);
     request.excluded_window = host->window_manipulation.active_window;
-    request.reveal_seconds =
-        (host->theme != nullptr ? host->theme : reach_theme_default())->bar_reveal_seconds;
+    request.reveal = reach_theme_motion_preset(
+        host->theme != nullptr ? host->theme : reach_theme_default(), REACH_MOTION_PRESET_SMOOTH);
     request.reveal_span_inset = desc->definition->surface.bar_reveal.span_start_inset_dp *
                                 reach_host_layout_dpi_scale(host);
     request.shadow_clearance = reach_host_bar_protected_clearance(host, desc);

@@ -43,7 +43,6 @@ struct reach_top_bar_metrics
     float pill_padding;
 
     float glyph_advance_ratio;
-    double width_animation_seconds;
 
     float clock_gap;
     float clock_time_text_size;
@@ -99,7 +98,6 @@ static constexpr reach_top_bar_metrics reach_top_bar_make_metrics()
     metrics.pill_padding = 10.0f;
 
     metrics.glyph_advance_ratio = 0.62f;
-    metrics.width_animation_seconds = 0.22;
 
     metrics.clock_gap = 9.0f;
     metrics.clock_time_text_size = REACH_TEXT_SIZE_MEDIUM;

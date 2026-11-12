@@ -53,6 +53,13 @@ int32_t reach_top_bar_apply_config(reach_top_bar *top_bar, reach_config_top_bar_
     return changed;
 }
 
+static void reach_top_bar_load_motion_specs(reach_top_bar *top_bar, const reach_theme *theme)
+{
+    top_bar->snappy_spec = reach_theme_motion_preset(theme, REACH_MOTION_PRESET_SNAPPY);
+    top_bar->fade_in_spec = reach_theme_motion_preset(theme, REACH_MOTION_PRESET_FADE_IN);
+    top_bar->fade_out_spec = reach_theme_motion_preset(theme, REACH_MOTION_PRESET_FADE_OUT);
+}
+
 reach_result reach_top_bar_create(reach_top_bar **out_top_bar)
 {
     if (out_top_bar == nullptr)
@@ -61,6 +68,8 @@ reach_result reach_top_bar_create(reach_top_bar **out_top_bar)
     }
 
     reach_top_bar *top_bar = new (std::nothrow) reach_top_bar();
+    if (top_bar != nullptr)
+        reach_top_bar_load_motion_specs(top_bar, reach_theme_default());
     if (top_bar == nullptr)
     {
         return REACH_ERROR;
@@ -496,9 +505,14 @@ static float reach_top_bar_resolve_animated_width(reach_top_bar *top_bar, size_t
     if (*target_store != target)
     {
         *target_store = target;
-        reach_animation_manager_animate_to(&top_bar->manager, track, target,
-                                           reach_top_bar_metrics_values.width_animation_seconds,
-                                           REACH_EASING_EASE_IN_OUT);
+        const reach_motion_spec &spec = top_bar->snappy_spec;
+        double now = reach_motion_now_seconds();
+        if (spec.easing == REACH_EASING_SPRING)
+            reach_animation_manager_spring_to_at(&top_bar->manager, track, target,
+                                                 spec.response_seconds, spec.damping, now);
+        else
+            reach_animation_manager_animate_to_at(&top_bar->manager, track, target,
+                                                  spec.duration_seconds, spec.easing, now);
     }
 
     float width = reach_animation_manager_value(&top_bar->manager, track);
@@ -516,6 +530,7 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
     {
         return;
     }
+    reach_top_bar_load_motion_specs(top_bar, ctx->theme);
 
     const reach_top_bar_metrics &metrics = reach_top_bar_metrics_values;
     const reach_top_bar_style_profile profile =

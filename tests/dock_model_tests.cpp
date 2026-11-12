@@ -649,7 +649,7 @@ static void test_dock_trespass_uses_current_horizontal_span(void)
     reach_bar_visibility_request request = {};
     request.shown_bounds = {400.0f, 1016.0f, 200.0f, 64.0f};
     request.monitor_bounds = {0.0f, 0.0f, 1000.0f, 1080.0f};
-    request.reveal_seconds = 0.25f;
+    request.reveal = reach_motion_spec_curve(0.25, REACH_EASING_EASE_IN_OUT);
     const reach_bar_reveal_ops *ops = reach_dock_reveal_ops();
     reach_bar_visibility_result result = ops->update_visibility(dock, &request);
     expect_true(!result.reveal_edge_shown,

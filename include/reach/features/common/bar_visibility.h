@@ -40,7 +40,7 @@ extern "C"
         int32_t hold_open;
         uintptr_t excluded_window;
         float reveal_span_inset;
-        float reveal_seconds;
+        reach_motion_spec reveal;
         float shadow_clearance;
     } reach_bar_visibility_request;
 
