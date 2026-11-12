@@ -180,8 +180,11 @@ void reach_stage_handle_pointer(void *capsule, const reach_pointer_event *event,
             state->close_hover_index = close_index;
         }
         if (close_changed)
-            reach_motion_animate_to(&stage->close_hover, close_target,
-                                    reach_stage_close_hover_seconds(), REACH_EASING_EASE_OUT);
+            reach_motion_animate_spec_to_at(
+                &stage->close_hover, close_target,
+                reach_stage_motion_preset(close_target > 0.0f ? REACH_MOTION_PRESET_FADE_IN
+                                                              : REACH_MOTION_PRESET_FADE_OUT),
+                reach_motion_now_seconds());
 
         out->handled = 1;
         out->redraw |= changed || close_changed;
@@ -236,8 +239,9 @@ void reach_stage_handle_pointer(void *capsule, const reach_pointer_event *event,
             out->action.index = index;
             out->action.window = state->tiles[index].window;
             reach_stage_depart_tile(stage, index);
-            reach_motion_animate_to(&stage->close_hover, 0.0f, reach_stage_close_hover_seconds(),
-                                    REACH_EASING_EASE_OUT);
+            reach_motion_animate_spec_to_at(&stage->close_hover, 0.0f,
+                                            reach_stage_motion_preset(REACH_MOTION_PRESET_FADE_OUT),
+                                            reach_motion_now_seconds());
             return;
         }
 
@@ -272,8 +276,9 @@ void reach_stage_handle_pointer(void *capsule, const reach_pointer_event *event,
         out->redraw |= state->has_hover;
         state->has_hover = 0;
         out->redraw |= stage->close_hover.to != 0.0f || reach_motion_active(&stage->close_hover);
-        reach_motion_animate_to(&stage->close_hover, 0.0f, reach_stage_close_hover_seconds(),
-                                REACH_EASING_EASE_OUT);
+        reach_motion_animate_spec_to_at(&stage->close_hover, 0.0f,
+                                        reach_stage_motion_preset(REACH_MOTION_PRESET_FADE_OUT),
+                                        reach_motion_now_seconds());
         return;
     }
 
