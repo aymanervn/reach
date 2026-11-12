@@ -193,7 +193,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
         reach_motion stationary = {};
         auto retain = [&](size_t first, uint64_t id)
         {
-            return reach_render_retain_commands(out_commands, first, id, content.id, &opacity,
+            return reach_render_retain_commands(out_commands, first, id, viewport.id, &opacity,
                                                 &stationary);
         };
         float row_height = input->row_pitch;
