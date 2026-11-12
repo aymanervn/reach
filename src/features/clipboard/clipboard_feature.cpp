@@ -265,6 +265,9 @@ struct reach_clipboard_feature
     reach_animation_track animation_tracks[REACH_CLIPBOARD_ANIMATION_COUNT];
     reach_motion item_width;
     double item_width_deadline;
+    reach_motion_spec smooth_spec;
+    reach_motion_spec fade_in_spec;
+    reach_motion_spec fade_out_spec;
     float layout_scale;
     float layout_border;
     reach_motion hover[REACH_CLIPBOARD_MAX_ITEMS];
@@ -390,6 +393,14 @@ reach_clipboard_feature_input_layout(const reach_clipboard_feature *clipboard, d
 static float reach_clipboard_feature_animate_height(reach_clipboard_feature *clipboard,
                                                     float target, int32_t *out_active);
 
+static void reach_clipboard_feature_load_motion_specs(reach_clipboard_feature *clipboard,
+                                                      const reach_theme *theme)
+{
+    clipboard->smooth_spec = reach_theme_motion_preset(theme, REACH_MOTION_PRESET_SMOOTH);
+    clipboard->fade_in_spec = reach_theme_motion_preset(theme, REACH_MOTION_PRESET_FADE_IN);
+    clipboard->fade_out_spec = reach_theme_motion_preset(theme, REACH_MOTION_PRESET_FADE_OUT);
+}
+
 static int32_t reach_clipboard_rect_equal(reach_rect_f32 a, reach_rect_f32 b)
 {
     return fabsf(a.x - b.x) < 0.5f && fabsf(a.y - b.y) < 0.5f && fabsf(a.width - b.width) < 0.5f &&
@@ -413,6 +424,7 @@ int32_t reach_clipboard_feature_relayout(reach_clipboard_feature *clipboard,
     const reach_theme *resolved_theme = theme != nullptr ? theme : reach_theme_default();
     reach_feature_transition_configure(&clipboard->surface_transition, resolved_theme, dpi_scale,
                                        REACH_FEATURE_TRANSITION_FROM_BELOW);
+    reach_clipboard_feature_load_motion_specs(clipboard, resolved_theme);
     float border_thickness = reach_theme_border_thickness(resolved_theme, dpi_scale);
     reach_clipboard_state *state = &clipboard->state;
     reach_clipboard_layout previous_layout = state->layout;
@@ -436,8 +448,8 @@ int32_t reach_clipboard_feature_relayout(reach_clipboard_feature *clipboard,
     }
     else if (width_changed)
     {
-        reach_motion_animate_to_at(&clipboard->item_width, target_layout.item_width, .16,
-                                   REACH_EASING_EASE_OUT, now);
+        reach_motion_animate_spec_to_at(&clipboard->item_width, target_layout.item_width,
+                                        clipboard->smooth_spec, now);
         clipboard->item_width_deadline = reach_motion_deadline(&clipboard->item_width);
     }
     clipboard->layout_scale = dpi_scale;
@@ -759,6 +771,7 @@ reach_result reach_clipboard_feature_create(reach_clipboard_feature **out_clipbo
     }
     reach_animation_manager_init(&clipboard->animations, clipboard->animation_tracks,
                                  REACH_CLIPBOARD_ANIMATION_COUNT);
+    reach_clipboard_feature_load_motion_specs(clipboard, reach_theme_default());
     reach_feature_transition_init(&clipboard->surface_transition, REACH_FEATURE_PRESENTATION_POPUP,
                                   REACH_FEATURE_TRANSITION_FROM_BELOW);
     reach_pressable_init(&clipboard->state.pressable);
@@ -908,8 +921,8 @@ static void reach_clipboard_feature_sync_hover(reach_clipboard_feature *clipboar
         {
             clipboard->hover[index] = previous[previous_index];
             clipboard->hover_group_ids[index] = previous_groups[previous_index];
-            reach_motion_animate_to_at(&clipboard->hover[index], 0, 0.10, REACH_EASING_EASE_OUT,
-                                       now);
+            reach_motion_animate_spec_to_at(&clipboard->hover[index], 0, clipboard->fade_out_spec,
+                                            now);
         }
         else
         {
@@ -931,7 +944,7 @@ void reach_clipboard_feature_collapse_all_hover(reach_clipboard_feature *clipboa
     reach_clipboard_feature_sync_hover(clipboard);
     double now = reach_motion_now_seconds();
     for (auto &hover : clipboard->hover)
-        reach_motion_animate_to_at(&hover, 0, 0.10, REACH_EASING_EASE_OUT, now);
+        reach_motion_animate_spec_to_at(&hover, 0, clipboard->fade_out_spec, now);
 }
 
 void reach_clipboard_feature_move_hover(reach_clipboard_feature *clipboard, size_t previous,
@@ -942,10 +955,10 @@ void reach_clipboard_feature_move_hover(reach_clipboard_feature *clipboard, size
     reach_clipboard_feature_sync_hover(clipboard);
     double now = reach_motion_now_seconds();
     if (previous < REACH_CLIPBOARD_MAX_ITEMS)
-        reach_motion_animate_to_at(&clipboard->hover[previous], 0, 0.12, REACH_EASING_EASE_OUT,
-                                   now);
+        reach_motion_animate_spec_to_at(&clipboard->hover[previous], 0, clipboard->fade_out_spec,
+                                        now);
     if (next < REACH_CLIPBOARD_MAX_ITEMS)
-        reach_motion_animate_to_at(&clipboard->hover[next], 1, 0.14, REACH_EASING_EASE_OUT, now);
+        reach_motion_animate_spec_to_at(&clipboard->hover[next], 1, clipboard->fade_in_spec, now);
 }
 
 void reach_clipboard_feature_clear_hover(reach_clipboard_feature *clipboard, size_t previous)
@@ -953,7 +966,8 @@ void reach_clipboard_feature_clear_hover(reach_clipboard_feature *clipboard, siz
     if (clipboard != nullptr && previous < REACH_CLIPBOARD_MAX_ITEMS)
     {
         reach_clipboard_feature_sync_hover(clipboard);
-        reach_motion_animate_to(&clipboard->hover[previous], 0, 0.12, REACH_EASING_EASE_OUT);
+        reach_motion_animate_spec_to_at(&clipboard->hover[previous], 0, clipboard->fade_out_spec,
+                                        reach_motion_now_seconds());
     }
 }
 
@@ -996,8 +1010,14 @@ static float reach_clipboard_feature_animate_height(reach_clipboard_feature *cli
 
     if (fabsf(reach_animation_manager_target(&clipboard->animations, track_id) - target) >= 0.5f)
     {
-        reach_animation_manager_animate_to(&clipboard->animations, track_id, target, 0.16,
-                                           REACH_EASING_EASE_OUT);
+        const reach_motion_spec &spec = clipboard->smooth_spec;
+        double now = reach_motion_now_seconds();
+        if (spec.easing == REACH_EASING_SPRING)
+            reach_animation_manager_spring_to_at(&clipboard->animations, track_id, target,
+                                                 spec.response_seconds, spec.damping, now);
+        else
+            reach_animation_manager_animate_to_at(&clipboard->animations, track_id, target,
+                                                  spec.duration_seconds, spec.easing, now);
     }
 
     if (reach_animation_manager_active(&clipboard->animations, track_id))
