@@ -123,13 +123,6 @@ void reach_animation_manager_start_at(reach_animation_manager *manager, size_t t
     track->active = reach_motion_active_at(&track->motion, now_seconds);
 }
 
-void reach_animation_manager_animate_to(reach_animation_manager *manager, size_t track_id, float to,
-                                        double duration_seconds, reach_easing easing)
-{
-    reach_animation_manager_animate_to_at(manager, track_id, to, duration_seconds, easing,
-                                          reach_motion_now_seconds());
-}
-
 void reach_animation_manager_animate_to_at(reach_animation_manager *manager, size_t track_id,
                                            float to, double duration_seconds, reach_easing easing,
                                            double now_seconds)

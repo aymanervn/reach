@@ -223,11 +223,7 @@ extern "C"
         float now_playing_control_gap;
         float now_playing_play_button_width;
         float now_playing_prev_next_button_width;
-        float surface_close_seconds;
-        float bar_reveal_seconds;
         float stage_animation_seconds;
-        float stage_close_hover_seconds;
-        float stage_reflow_seconds;
         reach_motion_spec motion_presets[REACH_MOTION_PRESET_COUNT];
         float stage_motion_reference_seconds;
     } reach_theme;
