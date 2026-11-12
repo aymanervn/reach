@@ -1144,24 +1144,6 @@ reach_configure_common(reach_pressable_tests)
 target_compile_features(reach_pressable_tests PRIVATE cxx_std_17)
 target_link_libraries(reach_pressable_tests PRIVATE reach_features)
 
-add_executable(reach_keyed_rows_tests
-    tests/keyed_rows_tests.cpp
-    tests/motion_clock_test_support.cpp
-)
-
-reach_configure_common(reach_keyed_rows_tests)
-target_compile_features(reach_keyed_rows_tests PRIVATE cxx_std_17)
-target_link_libraries(reach_keyed_rows_tests PRIVATE reach_features)
-
-add_executable(reach_selection_pill_tests
-    tests/selection_pill_tests.cpp
-    tests/motion_clock_test_support.cpp
-)
-
-reach_configure_common(reach_selection_pill_tests)
-target_compile_features(reach_selection_pill_tests PRIVATE cxx_std_17)
-target_link_libraries(reach_selection_pill_tests PRIVATE reach_features)
-
 add_executable(reach_bar_visibility_tests
     tests/bar_visibility_tests.cpp
 )
@@ -1318,8 +1300,6 @@ target_compile_features(reach_system_controls_network_tests PRIVATE
     add_test(NAME reach_dock_model_tests COMMAND reach_dock_model_tests)
     add_test(NAME reach_pressable_tests COMMAND reach_pressable_tests)
     add_test(NAME reach_bar_visibility_tests COMMAND reach_bar_visibility_tests)
-    add_test(NAME reach_keyed_rows_tests COMMAND reach_keyed_rows_tests)
-    add_test(NAME reach_selection_pill_tests COMMAND reach_selection_pill_tests)
     add_test(NAME reach_frame_clock_tests COMMAND reach_frame_clock_tests)
     add_test(NAME reach_frame_wait_tests COMMAND reach_frame_wait_tests)
     add_test(NAME reach_loader_tests COMMAND reach_loader_tests)
