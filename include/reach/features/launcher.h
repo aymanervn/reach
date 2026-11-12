@@ -9,6 +9,7 @@
 #include "reach/core/theme.h"
 #include "reach/core/ui_events.h"
 #include "reach/features/common/keyed_rows.h"
+#include "reach/features/common/scroll_view.h"
 #include "reach/features/common/selection_pill.h"
 #include "reach/features/common/text_edit.h"
 #include "reach/features/common/pressable.h"
@@ -74,6 +75,8 @@ extern "C"
         const uint64_t *row_icon_ids;
         size_t row_start;
         float row_pitch;
+        reach_motion content_offset;
+        reach_motion scrollbar_thumb_offset;
         reach_rect_motion selection;
         int32_t has_selection;
         const reach_motion *row_selected;
