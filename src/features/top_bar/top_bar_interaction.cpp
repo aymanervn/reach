@@ -246,8 +246,8 @@ static void reach_top_bar_move_tray_item(reach_top_bar *top_bar, size_t source, 
         }
         float start_x = reach_top_bar_tray_x_snapshot_find(
             &snapshot, top_bar->state.tray_items[index].id, target_x);
-        reach_motion_start(&top_bar->tray_x[index], start_x, target_x, 0.12,
-                           REACH_EASING_EASE_IN_OUT);
+        reach_motion_start_spec_at(&top_bar->tray_x[index], start_x, target_x, 0,
+                                   top_bar->snappy_spec, reach_motion_now_seconds());
     }
 }
 
@@ -278,9 +278,9 @@ static int32_t reach_top_bar_tray_drag_end(reach_top_bar *top_bar)
     size_t index = reach_top_bar_inline_tray_index(top_bar, top_bar->tray_drag.item_id);
     if (moved && index < top_bar->state.layout.tray_icon_count)
     {
-        reach_motion_start(&top_bar->tray_drag.snap, top_bar->tray_drag.x,
-                           top_bar->state.layout.tray_icons[index].x, 0.12,
-                           REACH_EASING_EASE_IN_OUT);
+        reach_motion_start_spec_at(&top_bar->tray_drag.snap, top_bar->tray_drag.x,
+                                   top_bar->state.layout.tray_icons[index].x, 0,
+                                   top_bar->snappy_spec, reach_motion_now_seconds());
     }
     else
     {
@@ -588,8 +588,9 @@ void reach_top_bar_pointer_move(reach_top_bar *top_bar, int32_t local_x, int32_t
     }
 
     state->power_hovered = hovered;
-    reach_motion_animate_to(&top_bar->power_hover, hovered ? 1.0f : 0.0f, 0.18,
-                            REACH_EASING_EASE_IN_OUT);
+    reach_motion_animate_spec_to_at(&top_bar->power_hover, hovered ? 1.0f : 0.0f,
+                                    hovered ? top_bar->fade_in_spec : top_bar->fade_out_spec,
+                                    reach_motion_now_seconds());
     out->handled = 1;
     out->redraw = 1;
 }
@@ -626,6 +627,7 @@ void reach_top_bar_pointer_leave(reach_top_bar *top_bar, reach_top_bar_event_res
     }
 
     state->power_hovered = 0;
-    reach_motion_animate_to(&top_bar->power_hover, 0.0f, 0.18, REACH_EASING_EASE_IN_OUT);
+    reach_motion_animate_spec_to_at(&top_bar->power_hover, 0.0f, top_bar->fade_out_spec,
+                                    reach_motion_now_seconds());
     out->redraw = 1;
 }

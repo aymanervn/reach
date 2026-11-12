@@ -220,10 +220,15 @@ reach_bar_visibility_result reach_bar_update_visibility(reach_bar_visibility_sta
     if (state->target_hidden != target_hidden)
     {
         state->target_hidden = target_hidden;
-        double reveal_seconds =
-            request->reveal_seconds > 0.0f ? (double)request->reveal_seconds : 0.25;
-        reach_animation_manager_animate_to(manager, y_track, target_y, reveal_seconds,
-                                           REACH_EASING_EASE_IN_OUT);
+        double now = reach_motion_now_seconds();
+        if (request->reveal.easing == REACH_EASING_SPRING)
+            reach_animation_manager_spring_to_at(manager, y_track, target_y,
+                                                 request->reveal.response_seconds,
+                                                 request->reveal.damping, now);
+        else
+            reach_animation_manager_animate_to_at(manager, y_track, target_y,
+                                                  request->reveal.duration_seconds,
+                                                  request->reveal.easing, now);
     }
     else if (fabsf(reach_animation_manager_target(manager, y_track) - target_y) >= 0.01f)
     {

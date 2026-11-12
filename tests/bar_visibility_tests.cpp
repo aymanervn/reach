@@ -22,7 +22,7 @@ static reach_bar_visibility_request base_request(void)
     request.monitor_bounds = {0.0f, 0.0f, 1000.0f, 800.0f};
     request.pointer = {500, 20};
     request.pointer_valid = 1;
-    request.reveal_seconds = 0.25f;
+    request.reveal = reach_motion_spec_curve(0.25, REACH_EASING_EASE_IN_OUT);
     return request;
 }
 
