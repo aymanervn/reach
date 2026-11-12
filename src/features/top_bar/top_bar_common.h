@@ -15,6 +15,7 @@ typedef struct reach_top_bar_tray_drag_state
     float grab_offset_x;
     float x;
     reach_motion snap;
+    reach_drag_velocity velocity;
 } reach_top_bar_tray_drag_state;
 
 #define REACH_TOP_BAR_STATS_SLOT_COUNT 4

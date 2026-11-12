@@ -38,6 +38,18 @@ extern "C"
     int32_t reach_draggable_tracking(const reach_draggable *draggable);
     int32_t reach_draggable_moved(const reach_draggable *draggable);
 
+    typedef struct reach_drag_velocity
+    {
+        float value;
+        float velocity;
+        double seconds;
+        int32_t valid;
+    } reach_drag_velocity;
+
+    void reach_drag_velocity_reset(reach_drag_velocity *tracker, float value, double now_seconds);
+    void reach_drag_velocity_sample(reach_drag_velocity *tracker, float value, double now_seconds);
+    float reach_drag_velocity_release(const reach_drag_velocity *tracker, double now_seconds);
+
     size_t reach_horizontal_reorder_target(const reach_rect_f32 *slots, size_t count,
                                            size_t current_index, float dragged_x,
                                            float neighbor_threshold_ratio);

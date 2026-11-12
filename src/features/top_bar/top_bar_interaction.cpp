@@ -264,6 +264,8 @@ static void reach_top_bar_tray_drag_begin(reach_top_bar *top_bar, size_t index, 
     top_bar->tray_drag.item_id = top_bar->state.tray_items[index].id;
     top_bar->tray_drag.x = item_x;
     top_bar->tray_drag.grab_offset_x = (float)x - top_bar->tray_drag.x;
+    reach_drag_velocity_reset(&top_bar->tray_drag.velocity, top_bar->tray_drag.x,
+                              reach_motion_now_seconds());
     reach_motion_set(&top_bar->tray_drag.snap, top_bar->tray_drag.x);
 }
 
@@ -278,9 +280,11 @@ static int32_t reach_top_bar_tray_drag_end(reach_top_bar *top_bar)
     size_t index = reach_top_bar_inline_tray_index(top_bar, top_bar->tray_drag.item_id);
     if (moved && index < top_bar->state.layout.tray_icon_count)
     {
+        double now = reach_motion_now_seconds();
         reach_motion_start_spec_at(&top_bar->tray_drag.snap, top_bar->tray_drag.x,
-                                   top_bar->state.layout.tray_icons[index].x, 0,
-                                   top_bar->snappy_spec, reach_motion_now_seconds());
+                                   top_bar->state.layout.tray_icons[index].x,
+                                   reach_drag_velocity_release(&top_bar->tray_drag.velocity, now),
+                                   top_bar->snappy_spec, now);
     }
     else
     {
@@ -567,6 +571,8 @@ void reach_top_bar_pointer_move(reach_top_bar *top_bar, int32_t local_x, int32_t
             float min_x = state->layout.tray_icons[0].x;
             float max_x = state->layout.tray_icons[state->layout.tray_icon_count - 1].x;
             top_bar->tray_drag.x = wanted_x < min_x ? min_x : wanted_x > max_x ? max_x : wanted_x;
+            reach_drag_velocity_sample(&top_bar->tray_drag.velocity, top_bar->tray_drag.x,
+                                       reach_motion_now_seconds());
             size_t current = reach_top_bar_inline_tray_index(top_bar, top_bar->tray_drag.item_id);
             size_t target = reach_horizontal_reorder_target(state->layout.tray_icons,
                                                             state->layout.tray_icon_count, current,
