@@ -3,8 +3,6 @@
 
 #include <new>
 
-static const double REACH_CONTEXT_MENU_CLOSE_HOVER_SECONDS = 0.14;
-
 void reach_context_menu_build_power_commands(uint32_t *out_commands, uint32_t *out_icon_ids,
                                              size_t *out_count)
 {
@@ -232,6 +230,7 @@ static void reach_context_menu_present(reach_context_menu *menu,
 {
     reach_feature_transition_configure(&menu->popup_transition, ctx->theme, ctx->dpi_scale,
                                        ctx->drop_direction);
+    reach_context_menu_load_motion_specs(menu, ctx->theme);
     reach_context_menu_anchor_presentation(menu);
     menu->state.open = 1;
     (void)reach_feature_transition_set_open(&menu->popup_transition, 1);
@@ -249,8 +248,10 @@ int32_t reach_context_menu_set_close_hovered(reach_context_menu *menu, size_t in
         return 0;
     }
     menu->state.close_hovered_index = index;
-    reach_motion_animate_to(&menu->close_hover, index < menu->state.item_count ? 1.0f : 0.0f,
-                            REACH_CONTEXT_MENU_CLOSE_HOVER_SECONDS, REACH_EASING_EASE_OUT);
+    int32_t close_hovered = index < menu->state.item_count;
+    reach_motion_animate_spec_to_at(&menu->close_hover, close_hovered ? 1.0f : 0.0f,
+                                    close_hovered ? menu->fade_in_spec : menu->fade_out_spec,
+                                    reach_motion_now_seconds());
     return 1;
 }
 
@@ -265,8 +266,9 @@ int32_t reach_context_menu_set_hovered(reach_context_menu *menu, size_t index)
     menu->state.hovered_index = index;
     if (is_hovered != was_hovered)
     {
-        reach_motion_animate_to(&menu->hover, is_hovered ? 1.0f : 0.0f, 0.18,
-                                REACH_EASING_EASE_IN_OUT);
+        reach_motion_animate_spec_to_at(&menu->hover, is_hovered ? 1.0f : 0.0f,
+                                        is_hovered ? menu->fade_in_spec : menu->fade_out_spec,
+                                        reach_motion_now_seconds());
     }
     return 1;
 }
@@ -562,6 +564,7 @@ int32_t reach_context_menu_reanchor(reach_context_menu *menu,
     }
     reach_feature_transition_configure(&menu->popup_transition, ctx->theme, menu->state.dpi_scale,
                                        ctx->drop_direction);
+    reach_context_menu_load_motion_specs(menu, ctx->theme);
     reach_context_menu_anchor_presentation(menu);
     return changed || !reach_rect_equal(before, menu->state.bounds);
 }
@@ -1012,6 +1015,8 @@ reach_result reach_context_menu_create(reach_context_menu **out_menu)
         return REACH_INVALID_ARGUMENT;
     }
     reach_context_menu *menu = new (std::nothrow) reach_context_menu();
+    if (menu != nullptr)
+        reach_context_menu_load_motion_specs(menu, nullptr);
     if (menu == nullptr)
     {
         return REACH_ERROR;

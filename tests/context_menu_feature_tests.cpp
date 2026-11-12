@@ -477,7 +477,7 @@ static void test_preview_geometry_and_paging_across_dpi(void)
                                  40, 40};
             ctx.bar_edge_y = ctx.anchor_button.y;
             reach_context_menu_open_window_list(menu, 0, &ctx);
-            advance_preview_layout(menu, &ctx, 0.2);
+            advance_preview_layout(menu, &ctx, 0.8);
             expect_true(reach_context_menu_state_ptr(menu)->item_count == REACH_MENU_MAX_WINDOWS,
                         "preview capacity is independent of command capacity");
             bool seen[REACH_MENU_MAX_WINDOWS] = {};
@@ -485,7 +485,7 @@ static void test_preview_geometry_and_paging_across_dpi(void)
             size_t pages = 0;
             do
             {
-                advance_preview_layout(menu, &ctx, 0.2);
+                advance_preview_layout(menu, &ctx, 0.8);
                 const reach_context_menu_state *state = reach_context_menu_state_ptr(menu);
                 expect_true(state->bounds.x >= monitor.x && state->bounds.y >= monitor.y &&
                                 state->bounds.x + state->bounds.width <=
@@ -728,7 +728,7 @@ static void test_preview_width_animation_retarget_and_reset(void)
     reach_context_menu_open_window_list(menu, 3, &ctx);
     expect_near(reach_context_menu_state_ptr(menu)->bounds.width, shrinking, 0.01f,
                 "a second interruption preserves continuity");
-    advance_preview_layout(menu, &ctx, 0.2);
+    advance_preview_layout(menu, &ctx, 0.8);
     float wide = reach_context_menu_state_ptr(menu)->bounds.width;
     expect_true(wide > expanding, "animation reaches the full row width");
     expect_preview_animation_geometry(menu);
@@ -909,7 +909,7 @@ static void test_preview_reflow_preserves_surviving_sources(void)
     ctx.bar_edge_y = 1000;
     ctx.request = &request;
     reach_context_menu_open_window_list(menu, 0, &ctx);
-    advance_preview_layout(menu, &ctx, 0.2);
+    advance_preview_layout(menu, &ctx, 0.8);
     float initial = preview_screen_x(menu, 3);
     reach_context_menu_window_list_remove(menu, 2);
     expect_near(preview_screen_x(menu, 3), initial, 0.01f,
@@ -931,7 +931,7 @@ static void test_preview_reflow_preserves_surviving_sources(void)
     reach_context_menu_reanchor(menu, &ctx);
     expect_near(preview_screen_x(menu, 3), moving, 0.01f,
                 "arranging twice without ticking does not advance or restart reflow");
-    for (size_t frame = 0; frame < 12; ++frame)
+    for (size_t frame = 0; frame < 48; ++frame)
     {
         advance_preview_layout(menu, &ctx, 0.016);
         expect_preview_animation_geometry(menu);
@@ -956,7 +956,7 @@ static void test_preview_reflow_preserves_surviving_sources(void)
     ctx.dpi_scale = 1.5f;
     reach_context_menu_reanchor(menu, &ctx);
     float constrained = preview_screen_x(menu, 3);
-    advance_preview_layout(menu, &ctx, 0.2);
+    advance_preview_layout(menu, &ctx, 0.8);
     expect_near(preview_screen_x(menu, 3), constrained, 0.01f,
                 "a DPI cut clears stale reflow origins and width motion");
     expect_preview_animation_geometry(menu);

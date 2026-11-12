@@ -9,7 +9,6 @@ static constexpr float reach_preview_gap_dp = 12.0f;
 static constexpr float reach_preview_header_dp = 24.0f;
 static constexpr float reach_preview_header_gap_dp = 8.0f;
 static constexpr float reach_preview_margin_dp = 16.0f;
-static constexpr double reach_preview_width_seconds = 0.18;
 
 void reach_context_menu_attach_services(reach_context_menu *menu, reach_window_tracking *windows,
                                         reach_icon_service *icons)
@@ -106,6 +105,7 @@ static int32_t reach_context_menu_arrange_previews_as(reach_context_menu *menu,
         available_height = fmaxf(1.0f, fminf(available_height, ctx->monitor.height));
     }
     float scale = ctx->dpi_scale > 0.0f ? ctx->dpi_scale : 1.0f;
+    reach_context_menu_load_motion_specs(menu, ctx->theme);
     float base_border = reach_theme_border_thickness(ctx->theme, 1.0f);
     scale = fminf(scale, ctx->monitor.width / (2.0f * (reach_preview_margin_dp +
                                                        reach_preview_padding_dp + base_border) +
@@ -252,8 +252,7 @@ static int32_t reach_context_menu_arrange_previews_as(reach_context_menu *menu,
     else if (state->open && restart)
     {
         float current = reach_motion_value_at(&menu->width, now);
-        reach_motion_start_at(&menu->reflow, 0, 1, reach_preview_width_seconds,
-                              REACH_EASING_EASE_IN_OUT, now);
+        reach_motion_start_spec_at(&menu->reflow, 0, 1, 0, menu->smooth_spec, now);
         menu->width = reach_motion_affine(&menu->reflow, target_width - current, current);
         menu->layout_cleanup_pending = 1;
     }

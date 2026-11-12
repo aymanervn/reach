@@ -102,6 +102,9 @@ struct reach_context_menu
     uint64_t next_card_id = UINT64_C(0x10000);
     reach_motion hover;
     reach_motion close_hover;
+    reach_motion_spec smooth_spec;
+    reach_motion_spec fade_in_spec;
+    reach_motion_spec fade_out_spec;
     reach_motion reflow;
     reach_feature_transition popup_transition;
     reach_pressable pressable;
@@ -127,6 +130,15 @@ reach_context_menu_hit_result reach_context_menu_hit_test_menu_items(const reach
 void reach_context_menu_stop_preview_reflow(reach_context_menu *menu);
 void reach_context_menu_reset_preview_layout(reach_context_menu *menu);
 void reach_context_menu_anchor_presentation(reach_context_menu *menu);
+
+static inline void reach_context_menu_load_motion_specs(reach_context_menu *menu,
+                                                        const reach_theme *theme)
+{
+    const reach_theme *resolved = theme != nullptr ? theme : reach_theme_default();
+    menu->smooth_spec = reach_theme_motion_preset(resolved, REACH_MOTION_PRESET_SMOOTH);
+    menu->fade_in_spec = reach_theme_motion_preset(resolved, REACH_MOTION_PRESET_FADE_IN);
+    menu->fade_out_spec = reach_theme_motion_preset(resolved, REACH_MOTION_PRESET_FADE_OUT);
+}
 reach_rect_f32 reach_context_menu_preview_bounds_at(const reach_context_menu *menu,
                                                     const reach_rect_motion *bounds, double now);
 reach_result reach_context_menu_reflow_previews(reach_context_menu *menu,
