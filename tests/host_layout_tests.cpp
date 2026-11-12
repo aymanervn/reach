@@ -3012,6 +3012,131 @@ static void test_quick_settings_section_motion_renders_worst_case(void)
     reach_host_destroy_registered_features(host);
 }
 
+static void test_launcher_result_motion_renders_worst_case(void)
+{
+    reach_host *host = &presentation_render_host;
+    presentation_render_count = 0;
+    presentation_render_failures = 0;
+    presentation_max_groups = 0;
+    reach_host_init_feature_registry(host);
+    expect_true(reach_host_create_registered_features(host) == REACH_OK,
+                "registered features are available for Launcher result motion");
+    reach_host_init_layout(host);
+
+    reach_launcher *launcher =
+        reach_host_feature_capsule<reach_launcher>(host, REACH_SURFACE_ID_LAUNCHER);
+    static reach_search_candidate full[REACH_SEARCH_MAX_RESULTS];
+    static reach_search_candidate shifted[REACH_SEARCH_MAX_RESULTS];
+    static reach_search_candidate disjoint[4][REACH_SEARCH_MAX_RESULTS];
+    for (size_t index = 0; index < REACH_SEARCH_MAX_RESULTS; ++index)
+    {
+        full[index] = {};
+        for (size_t at = 0; at < REACH_SEARCH_RESULT_NAME_CAPACITY - 1; ++at)
+            full[index].name[at] = (uint16_t)('a' + (index + at) % 26);
+        full[index].path[0] = (uint16_t)('a' + index % 26);
+        full[index].path[1] = (uint16_t)('a' + index / 26);
+        for (size_t at = 2; at < REACH_SEARCH_RESULT_PATH_CAPACITY - 1; ++at)
+            full[index].path[at] = (uint16_t)('a' + (index * 3 + at) % 26);
+        full[index].kind = (reach_search_result_kind)(index % 7);
+    }
+    for (size_t index = 0; index < REACH_SEARCH_MAX_RESULTS; ++index)
+    {
+        shifted[index] = full[(index + 3) % REACH_SEARCH_MAX_RESULTS];
+        if (index % 3 == 0)
+            shifted[index].path[0] = (uint16_t)('A' + index % 26);
+        for (size_t set = 0; set < 4; ++set)
+        {
+            disjoint[set][index] = full[index];
+            disjoint[set][index].path[0] = (uint16_t)('0' + set);
+        }
+    }
+    static const uint16_t query[] = {'a', 0};
+
+    const float dpis[] = {1.0f, 1.25f, 1.5f, 2.0f};
+    const reach_rect_f32 monitors[] = {{0.0f, 0.0f, 3840.0f, 2160.0f},
+                                       {-1920.0f, 0.0f, 1920.0f, 1080.0f},
+                                       {0.0f, 0.0f, 360.0f, 280.0f}};
+    const size_t counts[] = {REACH_SEARCH_MAX_RESULTS, 3, REACH_SEARCH_MAX_RESULTS, 1, 0, 5};
+    const reach_surface_id id = REACH_SURFACE_ID_LAUNCHER;
+    const reach_feature_capsule_ops *ops = host->feature_runtimes[id].definition->capsule_ops;
+    void *capsule = host->feature_runtimes[id].capsule;
+    const char *label = "the Launcher renders result motion within budget";
+    for (float dpi : dpis)
+    {
+        for (reach_rect_f32 monitor : monitors)
+        {
+            host->layout_dpi_scale = dpi;
+            presentation_contexts contexts = make_presentation_contexts(dpi, monitor);
+            auto render = [&] { render_presented_surface(host, id, contexts.base, label); };
+            auto step = [&](double seconds)
+            {
+                tick_presented_surface(host, id, seconds);
+                render();
+            };
+            (void)reach_launcher_set_open(launcher, 1);
+            (void)reach_launcher_set_query(launcher, query);
+            render();
+            step(0.3);
+            (void)reach_launcher_set_results(launcher, full, REACH_SEARCH_MAX_RESULTS);
+            render();
+            step(0.03);
+            for (size_t round = 0; round < 12; ++round)
+            {
+                (void)reach_launcher_set_results(launcher, round % 2 == 0 ? shifted : full,
+                                                 counts[round % 6]);
+                step(0.03);
+            }
+            (void)reach_launcher_set_results(launcher, full, REACH_SEARCH_MAX_RESULTS);
+            step(0.02);
+            for (size_t press_count = 0; press_count < 8; ++press_count)
+            {
+                reach_ui_event key = {};
+                key.type = REACH_UI_EVENT_ARROW_DOWN;
+                reach_capsule_event_result handled = {};
+                ops->handle_event(capsule, &key, &handled);
+                step(0.02);
+            }
+            reach_feature_surface_geometry geometry = {};
+            ops->surface_geometry(capsule, &geometry);
+            reach_pointer_event press = {};
+            expect_true(find_press_targets(ops, capsule,
+                                           {0.0f, 0.0f, geometry.visible_bounds.width,
+                                            geometry.visible_bounds.height},
+                                           REACH_POINTER_COORDINATE_SURFACE_LOCAL, 6.0f, &press,
+                                           1) == 1,
+                        "the Launcher has a row to hold pressed during result churn");
+            send_pointer(ops, capsule, press);
+            render();
+            for (size_t set = 0; set < 4; ++set)
+            {
+                (void)reach_launcher_set_results(launcher, disjoint[set], REACH_SEARCH_MAX_RESULTS);
+                step(0.004);
+            }
+            (void)reach_launcher_set_results(launcher, full, REACH_SEARCH_MAX_RESULTS);
+            step(0.004);
+            for (size_t frame = 0; frame < 6; ++frame)
+                step(0.016);
+            send_pointer(ops, capsule,
+                         make_pointer_event(REACH_POINTER_EVENT_UP,
+                                            REACH_POINTER_COORDINATE_SURFACE_LOCAL, -100000.0f,
+                                            -100000.0f));
+            step(0.6);
+            (void)reach_launcher_set_open(launcher, 0);
+            render();
+            tick_presented_surface(host, id, 0.6);
+            tick_presented_surface(host, id, 0.6);
+            reach_launcher_surface_hidden(launcher);
+        }
+    }
+    expect_true(presentation_render_failures == 0,
+                "every Launcher result-motion render stays valid");
+    expect_true(presentation_render_count == 4 * 3 * 39,
+                "the Launcher renders every result-motion step at every DPI and monitor");
+    expect_true(presentation_max_groups >= REACH_LAUNCHER_ROW_CAPACITY * 4 + 15,
+                "the Launcher rendered a full row pool with its highlight, hover and press");
+    reach_host_destroy_registered_features(host);
+}
+
 int main(void)
 {
     test_close_handoff_readiness_waits_for_observed_restore();
@@ -3050,6 +3175,7 @@ int main(void)
     test_shared_presentations_render_worst_case();
     test_max_items_and_pressed_states_render_worst_case();
     test_quick_settings_section_motion_renders_worst_case();
+    test_launcher_result_motion_renders_worst_case();
 
     if (failures != 0)
     {

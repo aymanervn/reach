@@ -116,8 +116,12 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
             return result;
     }
 
-    if (model->query[0] == 0)
+    if (input->search_icon_opacity.generation == 0
+            ? model->query[0] == 0
+            : input->search_icon_opacity.to > 0.0f ||
+                  reach_motion_active(&input->search_icon_opacity))
     {
+        size_t first = out_commands->count;
         command = {};
         command.type = REACH_RENDER_COMMAND_VECTOR_ICON;
         command.rect.x = layout->search_icon.x - layout->bounds.x;
@@ -127,6 +131,14 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
         command.icon_id = REACH_VECTOR_ICON_SEARCH;
         command.color = theme->launcher_search_icon;
         reach_render_command_buffer_push(out_commands, &command);
+        if (input->search_icon_opacity.generation != 0)
+        {
+            reach_motion fixed = {};
+            result = reach_render_retain_commands(out_commands, first, UINT64_C(0x2900000000030010),
+                                                  0, &input->search_icon_opacity, &fixed);
+            if (result != REACH_OK)
+                return result;
+        }
     }
 
     if (results_attached)
@@ -216,6 +228,30 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
                 return result;
         }
 
+        float highlight_x =
+            layout->search_result_items.x - layout->bounds.x + reach_launcher_scale(input, 6.0f);
+        float highlight_y =
+            layout->search_result_items.y - layout->bounds.y + reach_launcher_scale(input, 5.0f);
+        float highlight_width =
+            fmaxf(1, layout->search_result_items.width - reach_launcher_scale(input, 12.0f));
+        float highlight_height = fmaxf(1, row_height - reach_launcher_scale(input, 10.0f));
+        if (input->has_hover)
+        {
+            reach_rect_f32 hover = {highlight_x,
+                                    highlight_y + (float)input->hover_index * row_height,
+                                    highlight_width, highlight_height};
+            reach_render_group placement = {};
+            placement.bounds = hover;
+            placement.parent_id = content.id;
+            result = reach_ui_feedback_render(
+                out_commands, UINT64_C(0x2900000000060030), hover, row_selected_radius,
+                reach_theme_color_alpha(theme->launcher_row_selected_background,
+                                        theme->launcher_row_selected_background.a * 0.5f),
+                &input->hover_opacity, &placement);
+            if (result != REACH_OK)
+                return result;
+        }
+
         for (size_t slot = 0; input->rows != nullptr && input->row_results != nullptr &&
                               slot < REACH_LAUNCHER_ROW_CAPACITY;
              ++slot)
@@ -286,7 +322,33 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
             command.text_alignment = input->text_alignment_leading;
             command.text_ellipsis = 1;
             reach_copy_utf16(command.text, 260, row_result.title);
-            reach_render_command_buffer_push(out_commands, &command);
+            reach_motion offset = reach_motion_affine(&row.y, 1, -row.y.to);
+            if (input->row_selected != nullptr && input->row_selected[slot].generation != 0)
+            {
+                reach_render_group title = {};
+                title.id = row_id + 6;
+                title.parent_id = content.id;
+                if (!reach_render_retained_command_bounds(&command, &title.bounds))
+                    return REACH_INVALID_ARGUMENT;
+                title.opacity = row.opacity;
+                title.y = offset;
+                reach_ui_color_feedback_apply(&title, theme->launcher_row_title,
+                                              theme->launcher_row_title_selected,
+                                              &input->row_selected[slot]);
+                command.color = {1.0f, 1.0f, 1.0f, 1.0f};
+                result = reach_render_retain_commands(out_commands, first, row_id + 1, content.id,
+                                                      &row.opacity, &offset);
+                if (result == REACH_OK)
+                    result = reach_render_command_buffer_begin_group(out_commands, &title);
+                if (result == REACH_OK)
+                    result = reach_render_command_buffer_push(out_commands, &command);
+                reach_render_command_buffer_end_group(out_commands);
+                if (result != REACH_OK)
+                    return result;
+                first = out_commands->count;
+            }
+            else
+                reach_render_command_buffer_push(out_commands, &command);
 
             command = {};
             command.type = REACH_RENDER_COMMAND_TEXT;
@@ -300,9 +362,24 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
             command.text_ellipsis = 1;
             reach_copy_utf16(command.text, 260, row_result.subtitle);
             reach_render_command_buffer_push(out_commands, &command);
-            reach_motion offset = reach_motion_affine(&row.y, 1, -row.y.to);
-            result = reach_render_retain_commands(out_commands, first, row_id + 1, content.id,
+            result = reach_render_retain_commands(out_commands, first, row_id + 7, content.id,
                                                   &row.opacity, &offset);
+            if (result != REACH_OK)
+                return result;
+        }
+
+        if (input->has_press)
+        {
+            reach_rect_f32 press = {highlight_x,
+                                    highlight_y + (float)input->press_index * row_height,
+                                    highlight_width, highlight_height};
+            reach_render_group placement = {};
+            placement.bounds = press;
+            placement.parent_id = content.id;
+            reach_color overlay = {0.0f, 0.0f, 0.0f, 0.12f};
+            result = reach_ui_feedback_render(out_commands, UINT64_C(0x2900000000060031), press,
+                                              row_selected_radius, overlay, &input->press_feedback,
+                                              &placement);
             if (result != REACH_OK)
                 return result;
         }

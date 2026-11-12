@@ -984,13 +984,22 @@ blinking uses native retained opacity when supported and deadlines in fallback. 
 composition sample the same finite group contract
 in a duration-limited CPU fallback; repeating marquee motion remains static there.
 
-Launcher owns canonical result-expansion intent and one endpoint cleanup deadline. Compact shared
-backgrounds preserve its collapsed pill; a stationary viewport and translated per-paint sources
-retain result content and preserve overlap alpha. Stable row namespaces isolate selection and
-scroll changes. Event-time input uses the same clipped body and slide; unrevealed content cannot
-activate. Its root scale center follows half the animated body height, preserving overlapping
-opening and results motion. The scalar manager, periodic result frame demand and baked reveal
-geometry are removed. The shared sampled fallback consumes the same command descriptors.
+Launcher owns one canonical pixel body-height motion (theme `smooth`) and one endpoint cleanup
+deadline. Every attach, detach and result-count change retargets it from its current value and
+velocity; chrome, the results clip, input bounds and published geometry are views of it, and the
+published visible bounds cover its range until it settles. Results are clipped to the rounded body
+interior (`clip_radius` with a uniform radius, bottom inset riding the height), with a stationary
+rectangular viewport below the search field. Result content is not slid: it fades with
+`fade_in`/`fade_out`. Rows are keyed by result identity through the shared
+`features/common/keyed_rows` pool (sixteen slots, each holding its own result copy so a retiring
+row still draws): survivors retarget with `smooth`, inserts fade in at their slot and removals fade
+out in place. Rows and the selection live in one content frame offset by the stepped scroll
+position. Selection is one shared `features/common/selection_pill`: a one-row step uses `bouncy`,
+larger jumps and result-set changes use `smooth`. The selected title crossfades through a retained
+tint, a hover tint and the shared press overlay sit in the same content frame, and the search glyph
+fades with the query. Event-time input samples the same height motion; unrevealed content cannot
+activate. Scroll motion is deliberately absent: scrolling stays stepped until the shared scroll
+component exists. The shared sampled fallback consumes the same command descriptors.
 
 Text-dependent layout consumes `reach_text_measure_port`. The DirectWrite renderer supplies the
 implementation with the same font family, size, and weight used for drawing; features retain only
@@ -1281,7 +1290,7 @@ masquerade as an uninstalled app. Composition removes that pin 500 milliseconds 
 notification, while the HUD keeps its copied display text for the rest of its independent lifetime.
 Per-frame layout resolves in dependency order in `reach_host_update`, and every capsule owns its
 own geometry: the Dock and the Launcher each compute their layout inside `arrange` during the frame
-pass. Launcher's results expansion still uses the scalar manager. Popup capsules, Launcher,
+pass. Popup capsules, Launcher,
 Clipboard, Switcher and System HUD embed the shared `features/common/presentation` transition and
 choose only a style: popup scales 0.94 to 1 with a 6dp offset toward its anchor, and menu (Context
 Menu and Switcher, anchored at the Switcher's center) scales 0.98 to 1 without offset. Scale and offset use the `snappy` spring and opacity the

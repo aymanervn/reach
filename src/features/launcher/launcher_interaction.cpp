@@ -149,8 +149,8 @@ void reach_launcher_pointer_down(reach_launcher *launcher, int32_t x, int32_t y,
     if (target != REACH_PRESSABLE_TARGET_NONE)
     {
         reach_pressable_result pressable = {};
-        reach_pressable_press(&state->pressable, button, target, REACH_PRESSABLE_FEEDBACK_NONE,
-                              nullptr, &pressable);
+        reach_pressable_feedback_style feedback = reach_launcher_pressable_feedback(launcher);
+        reach_pressable_press(&state->pressable, button, target, hit.index, &feedback, &pressable);
         reach_launcher_apply_pressable_result(&pressable, out);
         out->handled = 1;
     }
@@ -178,9 +178,10 @@ void reach_launcher_pointer_up(reach_launcher *launcher, int32_t x, int32_t y,
 
     reach_launcher_hit_result hit = reach_launcher_hit_test(&state->model, ctx->layout, x, y);
     reach_pressable_result pressable = {};
+    reach_pressable_feedback_style feedback = reach_launcher_pressable_feedback(launcher);
     reach_pressable_release(&state->pressable, button,
                             reach_launcher_pressable_target(launcher, state, ctx, hit, button),
-                            nullptr, &pressable);
+                            &feedback, &pressable);
     reach_launcher_apply_pressable_result(&pressable, out);
     if (pressable.activated)
     {
@@ -278,7 +279,8 @@ void reach_launcher_pointer_cancel(reach_launcher *launcher, reach_launcher_even
         return;
     }
     reach_pressable_result pressable = {};
-    reach_pressable_cancel(&reach_launcher_state_mut(launcher)->pressable, nullptr, &pressable);
+    reach_pressable_feedback_style feedback = reach_launcher_pressable_feedback(launcher);
+    reach_pressable_cancel(&reach_launcher_state_mut(launcher)->pressable, &feedback, &pressable);
     reach_launcher_apply_pressable_result(&pressable, out);
     reach_launcher_scrollbar_release(launcher, out);
 }
