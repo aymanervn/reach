@@ -128,6 +128,7 @@ static void reach_dock_drag_begin(reach_dock *dock, size_t index, int32_t x, int
     state->drag.grab_offset_x = (float)x - (ctx->layout->bounds.x + box_x);
 
     state->drag.x = box_x;
+    reach_drag_velocity_reset(&state->drag.velocity, box_x, reach_motion_now_seconds());
     reach_motion_set(&state->drag.snap, state->drag.x);
 }
 
@@ -177,6 +178,7 @@ void reach_dock_drag_update(reach_dock *dock, int32_t x, int32_t y,
         state->drag.x = next_drag_x;
         out->redraw = 1;
     }
+    reach_drag_velocity_sample(&state->drag.velocity, state->drag.x, reach_motion_now_seconds());
 
     float dragged_box_x = state->drag.x;
 
@@ -231,11 +233,13 @@ void reach_dock_drag_end(reach_dock *dock, const reach_dock_interaction_context 
     {
         float target_x = reach_dock_slot_box_x(ctx->theme, ctx->layout, target_index);
 
+        double now = reach_motion_now_seconds();
         reach_motion_start_spec_at(
-            &state->drag.snap, state->drag.x, target_x, 0.0f,
+            &state->drag.snap, state->drag.x, target_x,
+            reach_drag_velocity_release(&state->drag.velocity, now),
             reach_theme_motion_preset(ctx->theme != nullptr ? ctx->theme : reach_theme_default(),
                                       REACH_MOTION_PRESET_SNAPPY),
-            reach_motion_now_seconds());
+            now);
     }
     else
     {

@@ -270,6 +270,7 @@ extern "C"
         float grab_offset_x;
         float x;
         reach_motion snap;
+        reach_drag_velocity velocity;
     } reach_dock_drag_state;
 
     typedef struct reach_dock_state

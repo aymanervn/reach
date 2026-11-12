@@ -1,5 +1,9 @@
 #include "reach/features/common/draggable.h"
 
+#include "reach/support/util.h"
+
+#include <math.h>
+
 static void reach_draggable_result_init(reach_draggable_result *out)
 {
     if (out != nullptr)
@@ -80,6 +84,52 @@ int32_t reach_draggable_tracking(const reach_draggable *draggable)
 int32_t reach_draggable_moved(const reach_draggable *draggable)
 {
     return draggable != nullptr && draggable->moved;
+}
+
+static const double REACH_DRAG_VELOCITY_STALE_SECONDS = 0.1;
+static const float REACH_DRAG_VELOCITY_LIMIT = 4000.0f;
+
+void reach_drag_velocity_reset(reach_drag_velocity *tracker, float value, double now_seconds)
+{
+    if (tracker == nullptr)
+        return;
+    tracker->value = value;
+    tracker->velocity = 0.0f;
+    tracker->seconds = now_seconds;
+    tracker->valid = 1;
+}
+
+void reach_drag_velocity_sample(reach_drag_velocity *tracker, float value, double now_seconds)
+{
+    if (tracker == nullptr)
+        return;
+    REACH_ASSERT(isfinite(value));
+    if (!tracker->valid)
+    {
+        reach_drag_velocity_reset(tracker, value, now_seconds);
+        return;
+    }
+    double elapsed = now_seconds - tracker->seconds;
+    if (elapsed <= 0.0)
+    {
+        tracker->value = value;
+        return;
+    }
+    float instant = (float)((double)(value - tracker->value) / elapsed);
+    float blend = elapsed >= REACH_DRAG_VELOCITY_STALE_SECONDS ? 1.0f : 0.6f;
+    float velocity = tracker->velocity + (instant - tracker->velocity) * blend;
+    tracker->velocity =
+        fmaxf(-REACH_DRAG_VELOCITY_LIMIT, fminf(REACH_DRAG_VELOCITY_LIMIT, velocity));
+    tracker->value = value;
+    tracker->seconds = now_seconds;
+}
+
+float reach_drag_velocity_release(const reach_drag_velocity *tracker, double now_seconds)
+{
+    if (tracker == nullptr || !tracker->valid ||
+        now_seconds - tracker->seconds >= REACH_DRAG_VELOCITY_STALE_SECONDS)
+        return 0.0f;
+    return tracker->velocity;
 }
 
 size_t reach_horizontal_reorder_target(const reach_rect_f32 *slots, size_t count,

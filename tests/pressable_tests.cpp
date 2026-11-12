@@ -252,6 +252,27 @@ static void test_draggable_end_reports_and_clears_state(void)
                 "drag end clears reusable gesture state");
 }
 
+static void test_drag_velocity_tracks_recent_motion_only(void)
+{
+    reach_drag_velocity tracker = {};
+    reach_drag_velocity_reset(&tracker, 100.0f, 10.0);
+    expect_true(reach_drag_velocity_release(&tracker, 10.0) == 0.0f,
+                "a drag that never moved releases with no velocity");
+    for (int step = 1; step <= 10; ++step)
+        reach_drag_velocity_sample(&tracker, 100.0f + 8.0f * (float)step, 10.0 + 0.008 * step);
+    float moving = reach_drag_velocity_release(&tracker, 10.08);
+    expect_true(moving > 900.0f && moving < 1100.0f,
+                "steady drag motion releases near its speed in pixels per second");
+    reach_drag_velocity_sample(&tracker, 180.0f, 10.088);
+    reach_drag_velocity_sample(&tracker, 180.0f, 10.096);
+    expect_true(reach_drag_velocity_release(&tracker, 10.096) < moving,
+                "a value pinned at a bound loses velocity");
+    expect_true(reach_drag_velocity_release(&tracker, 10.3) == 0.0f,
+                "a pause before release drops the velocity");
+    reach_drag_velocity_sample(&tracker, -100000.0f, 10.301);
+    expect_true(reach_drag_velocity_release(&tracker, 10.301) >= -4000.0f, "velocity is bounded");
+}
+
 static void test_horizontal_reorder_uses_neighbor_thresholds(void)
 {
     reach_rect_f32 slots[3] = {
@@ -275,6 +296,7 @@ int main(void)
     test_release_requires_the_pressed_button();
     test_press_release_retargets_preserve_velocity();
     test_draggable_starts_only_after_threshold();
+    test_drag_velocity_tracks_recent_motion_only();
     test_draggable_end_reports_and_clears_state();
     test_horizontal_reorder_uses_neighbor_thresholds();
     return failures == 0 ? 0 : 1;
