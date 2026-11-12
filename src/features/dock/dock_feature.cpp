@@ -24,7 +24,6 @@ struct reach_dock_slot
     uint32_t key;
 };
 
-static const double REACH_DOCK_SLOT_ANIMATION_SECONDS = 0.25;
 static const float REACH_DOCK_SLOT_REVEAL_THRESHOLD = 0.7f;
 static const float REACH_DOCK_OUTER_PADDING_SCALE = 1.15f;
 
@@ -1387,6 +1386,25 @@ static size_t reach_dock_slot_track(size_t pool_index)
     return REACH_DOCK_ANIM_SLOT_BASE + pool_index;
 }
 
+static reach_motion_spec reach_dock_motion_preset(const reach_dock *dock,
+                                                  reach_motion_preset preset)
+{
+    return reach_theme_motion_preset(
+        dock->pointer_theme != nullptr ? dock->pointer_theme : reach_theme_default(), preset);
+}
+
+static void reach_dock_slot_animate(reach_dock *dock, size_t pool, float target)
+{
+    reach_motion_spec spec = reach_dock_motion_preset(dock, REACH_MOTION_PRESET_SMOOTH);
+    double now = reach_motion_now_seconds();
+    if (spec.easing == REACH_EASING_SPRING)
+        reach_animation_manager_spring_to_at(&dock->manager, reach_dock_slot_track(pool), target,
+                                             spec.response_seconds, spec.damping, now);
+    else
+        reach_animation_manager_animate_to_at(&dock->manager, reach_dock_slot_track(pool), target,
+                                              spec.duration_seconds, spec.easing, now);
+}
+
 static float reach_dock_slot_reveal(const reach_dock *dock, size_t pool_index)
 {
     float reveal = reach_animation_manager_value(&dock->manager, reach_dock_slot_track(pool_index));
@@ -1551,9 +1569,7 @@ static void reach_dock_sync_slots(reach_dock *dock)
         if (!found)
         {
             slot->lifecycle = REACH_DOCK_SLOT_DYING;
-            reach_animation_manager_animate_to(&dock->manager, reach_dock_slot_track(pool), 0.0f,
-                                               REACH_DOCK_SLOT_ANIMATION_SECONDS,
-                                               REACH_EASING_EASE_IN_OUT);
+            reach_dock_slot_animate(dock, pool, 0.0f);
         }
     }
 
@@ -1592,9 +1608,7 @@ static void reach_dock_sync_slots(reach_dock *dock)
                 if (reach_animation_manager_target(&dock->manager, reach_dock_slot_track(pool)) !=
                     1.0f)
                 {
-                    reach_animation_manager_animate_to(&dock->manager, reach_dock_slot_track(pool),
-                                                       1.0f, REACH_DOCK_SLOT_ANIMATION_SECONDS,
-                                                       REACH_EASING_EASE_IN_OUT);
+                    reach_dock_slot_animate(dock, pool, 1.0f);
                 }
             }
         }
@@ -1607,9 +1621,8 @@ static void reach_dock_sync_slots(reach_dock *dock)
             }
             dock->slots[pool].lifecycle = REACH_DOCK_SLOT_APPEARING;
             dock->slots[pool].key = item_key;
-            reach_animation_manager_start(&dock->manager, reach_dock_slot_track(pool), 0.0f, 1.0f,
-                                          REACH_DOCK_SLOT_ANIMATION_SECONDS,
-                                          REACH_EASING_EASE_IN_OUT);
+            reach_animation_manager_set(&dock->manager, reach_dock_slot_track(pool), 0.0f);
+            reach_dock_slot_animate(dock, pool, 1.0f);
         }
         new_order[new_count++] = (uint16_t)pool;
         for (size_t dying = 0; dying < REACH_DOCK_SLOT_CAPACITY; ++dying)
@@ -1928,7 +1941,9 @@ static void reach_dock_start_item_x_animation(reach_dock *dock, size_t index, fl
         dock->state.item_x_valid[index] = 1;
         return;
     }
-    reach_motion_start(&dock->state.item_x[index], offset, 0.0f, 0.15, REACH_EASING_EASE_IN_OUT);
+    reach_motion_start_spec_at(&dock->state.item_x[index], offset, 0.0f, 0.0f,
+                               reach_dock_motion_preset(dock, REACH_MOTION_PRESET_SMOOTH),
+                               reach_motion_now_seconds());
     dock->state.item_x_valid[index] = 1;
 }
 
