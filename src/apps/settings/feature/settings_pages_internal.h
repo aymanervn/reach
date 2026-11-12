@@ -3,6 +3,35 @@
 
 #include "reach/apps/settings/settings.h"
 
+#include "reach/core/theme.h"
+#include "reach/support/animation.h"
+#include "reach/support/motion.h"
+
+static inline reach_motion_spec reach_settings_motion_preset(reach_motion_preset preset)
+{
+    return reach_theme_motion_preset(reach_theme_default(), preset);
+}
+
+static inline void reach_settings_animate(reach_motion *motion, float target,
+                                          reach_motion_preset preset)
+{
+    reach_motion_animate_spec_to_at(motion, target, reach_settings_motion_preset(preset),
+                                    reach_motion_now_seconds());
+}
+
+static inline void reach_settings_track_to(reach_animation_manager *manager, size_t track,
+                                           float target, reach_motion_preset preset)
+{
+    reach_motion_spec spec = reach_settings_motion_preset(preset);
+    double now = reach_motion_now_seconds();
+    if (spec.easing == REACH_EASING_SPRING)
+        reach_animation_manager_spring_to_at(manager, track, target, spec.response_seconds,
+                                             spec.damping, now);
+    else
+        reach_animation_manager_animate_to_at(manager, track, target, spec.duration_seconds,
+                                              spec.easing, now);
+}
+
 const uint16_t *reach_settings_wifi_page_title(void);
 const uint16_t *reach_settings_bluetooth_page_title(void);
 const uint16_t *reach_settings_account_page_title(void);

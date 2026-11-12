@@ -1,4 +1,6 @@
 #include "reach/core/render_commands.h"
+
+#include <math.h>
 #include "reach/apps/settings/settings.h"
 #include "reach/features/common/ui_controls.h"
 #include "reach/protocol/version.h"
@@ -6,8 +8,6 @@
 #include <string.h>
 
 #include "settings_pages_internal.h"
-
-static const double reach_settings_nav_selection_duration_seconds = 0.22;
 
 static int32_t reach_settings_nav_index_for_page(reach_settings_page page, float *out_index)
 {
@@ -160,9 +160,10 @@ void reach_settings_model_select_page(reach_settings_model *model, reach_setting
     reach_blink_stop(&model->wifi_caret);
     model->selected_page = page;
     reach_settings_model_update_caret(model, reach_motion_now_seconds());
-    reach_motion_animate_to(&model->nav_selection, target_index,
-                            reach_settings_nav_selection_duration_seconds,
-                            REACH_EASING_EASE_IN_OUT);
+    float nav_distance = fabsf(target_index - model->nav_selection.to);
+    reach_settings_animate(&model->nav_selection, target_index,
+                           nav_distance <= 1.5f ? REACH_MOTION_PRESET_BOUNCY
+                                                : REACH_MOTION_PRESET_SMOOTH);
 }
 
 const reach_motion *reach_settings_model_button_press_motion(const reach_settings_model *model,

@@ -201,7 +201,9 @@ void reach_settings_model_select_power_option(reach_settings_model *model, size_
     {
         model->power_minutes[timer] = reach_settings_power_presets[timer][option];
     }
-    reach_motion_start(&model->power_selection[timer], 0.0f, 1.0f, 0.22, REACH_EASING_EASE_OUT);
+    reach_motion_start_spec_at(&model->power_selection[timer], 0.0f, 1.0f, 0.0f,
+                               reach_settings_motion_preset(REACH_MOTION_PRESET_FADE_IN),
+                               reach_motion_now_seconds());
 }
 
 int32_t reach_settings_model_finish_visual_motion_at(reach_settings_model *model,
@@ -292,7 +294,9 @@ static void reach_settings_power_apply_edit_minutes(reach_settings_model *model)
     {
         model->power_previous[timer] = model->power_selected[timer];
         model->power_selected[timer] = REACH_SETTINGS_POWER_CUSTOM_OPTION;
-        reach_motion_start(&model->power_selection[timer], 0.0f, 1.0f, 0.22, REACH_EASING_EASE_OUT);
+        reach_motion_start_spec_at(&model->power_selection[timer], 0.0f, 1.0f, 0.0f,
+                                   reach_settings_motion_preset(REACH_MOTION_PRESET_FADE_IN),
+                                   reach_motion_now_seconds());
     }
 }
 
@@ -365,9 +369,8 @@ int32_t reach_settings_model_toggle_power_wait_apps(reach_settings_model *model,
         return 0;
     }
     model->power_wait_apps[timer] = model->power_wait_apps[timer] ? 0 : 1;
-    reach_motion_animate_to(&model->power_wait_toggles[timer],
-                            model->power_wait_apps[timer] ? 1.0f : 0.0f, 0.18,
-                            REACH_EASING_EASE_OUT);
+    reach_settings_animate(&model->power_wait_toggles[timer],
+                           model->power_wait_apps[timer] ? 1.0f : 0.0f, REACH_MOTION_PRESET_BOUNCY);
     return 1;
 }
 

@@ -45,9 +45,9 @@ int32_t reach_settings_model_toggle_high_refresh_rate(reach_settings_model *mode
         return 0;
     }
     model->display_high_refresh_rate = model->display_high_refresh_rate ? 0 : 1;
-    reach_motion_animate_to(&model->display_fps_toggle,
-                            model->display_high_refresh_rate ? 1.0f : 0.0f, 0.18,
-                            REACH_EASING_EASE_OUT);
+    reach_settings_animate(&model->display_fps_toggle,
+                           model->display_high_refresh_rate ? 1.0f : 0.0f,
+                           REACH_MOTION_PRESET_BOUNCY);
     return 1;
 }
 
@@ -73,8 +73,8 @@ int32_t reach_settings_model_toggle_bundled_font(reach_settings_model *model)
         return 0;
     }
     model->display_bundled_font = model->display_bundled_font ? 0 : 1;
-    reach_motion_animate_to(&model->display_font_toggle, model->display_bundled_font ? 1.0f : 0.0f,
-                            0.18, REACH_EASING_EASE_OUT);
+    reach_settings_animate(&model->display_font_toggle, model->display_bundled_font ? 1.0f : 0.0f,
+                           REACH_MOTION_PRESET_BOUNCY);
     return 1;
 }
 
@@ -101,8 +101,8 @@ int32_t reach_settings_model_select_light_theme(reach_settings_model *model, int
         return 0;
     }
     model->display_light_theme = light_theme;
-    reach_motion_animate_to(&model->display_theme_selection, light_theme ? 1.0f : 0.0f, 0.18,
-                            REACH_EASING_EASE_OUT);
+    reach_settings_animate(&model->display_theme_selection, light_theme ? 1.0f : 0.0f,
+                           REACH_MOTION_PRESET_FADE_IN);
     return 1;
 }
 
