@@ -76,6 +76,14 @@ extern "C"
         float row_pitch;
         reach_rect_motion selection;
         int32_t has_selection;
+        const reach_motion *row_selected;
+        reach_motion press_feedback;
+        size_t press_index;
+        int32_t has_press;
+        reach_motion hover_opacity;
+        size_t hover_index;
+        int32_t has_hover;
+        reach_motion search_icon_opacity;
         float dpi_scale;
         int32_t text_alignment_leading;
 

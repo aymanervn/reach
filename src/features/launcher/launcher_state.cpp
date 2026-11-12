@@ -24,6 +24,12 @@ struct reach_launcher
     reach_launcher_result row_results[REACH_LAUNCHER_ROW_CAPACITY];
     reach_selection_pill selection;
     int32_t selection_valid;
+    reach_motion row_selected[REACH_LAUNCHER_ROW_CAPACITY];
+    reach_motion press_feedback;
+    reach_motion hover_opacity;
+    size_t hover_index;
+    int32_t hover_valid;
+    reach_motion search_icon_opacity;
     uint32_t results_revision;
     uint32_t synced_revision;
     size_t synced_scroll;
@@ -69,6 +75,47 @@ static int32_t reach_launcher_results_animated(const reach_launcher *launcher)
 {
     return launcher->state.model.open && launcher->pointer_layout_valid &&
            reach_feature_transition_visible(&launcher->surface_transition);
+}
+
+reach_pressable_feedback_style reach_launcher_pressable_feedback(reach_launcher *launcher)
+{
+    reach_pressable_feedback_style feedback = {};
+    feedback.motion = launcher != nullptr ? &launcher->press_feedback : nullptr;
+    feedback.pressed_value = 1.0f;
+    return feedback;
+}
+
+static int32_t reach_launcher_fade_to(reach_launcher *launcher, reach_motion *motion,
+                                      int32_t visible)
+{
+    float target = visible ? 1.0f : 0.0f;
+    if (motion->generation != 0 && motion->to == target)
+        return 0;
+    if (!reach_launcher_results_animated(launcher))
+        reach_motion_set(motion, target);
+    else
+        reach_motion_animate_spec_to_at(motion, target,
+                                        visible ? launcher->fade_in_spec : launcher->fade_out_spec,
+                                        reach_motion_now_seconds());
+    return 1;
+}
+
+static void reach_launcher_sync_search_icon(reach_launcher *launcher)
+{
+    (void)reach_launcher_fade_to(launcher, &launcher->search_icon_opacity,
+                                 launcher->state.model.query[0] == 0);
+}
+
+static int32_t reach_launcher_set_hover(reach_launcher *launcher, size_t index, int32_t hovered)
+{
+    int32_t changed = 0;
+    if (hovered && (!launcher->hover_valid || launcher->hover_index != index))
+    {
+        launcher->hover_index = index;
+        launcher->hover_valid = 1;
+        changed = 1;
+    }
+    return reach_launcher_fade_to(launcher, &launcher->hover_opacity, hovered) || changed;
 }
 
 static void reach_launcher_refresh_results_deadline(reach_launcher *launcher)
@@ -201,6 +248,16 @@ static void reach_launcher_sync_rows(reach_launcher *launcher)
     }
     else if (!reach_launcher_rows_held(launcher))
         launcher->selection_valid = 0;
+    for (size_t slot = 0; slot < REACH_LAUNCHER_ROW_CAPACITY; ++slot)
+    {
+        const reach_keyed_row &row = launcher->rows[slot];
+        int32_t selected = row.lifecycle == REACH_KEYED_ROW_LIVE &&
+                           start + row.index == model.selected_result_index;
+        if (row.lifecycle == REACH_KEYED_ROW_EMPTY || !animated)
+            reach_motion_set(&launcher->row_selected[slot], selected ? 1.0f : 0.0f);
+        else
+            (void)reach_launcher_fade_to(launcher, &launcher->row_selected[slot], selected);
+    }
     launcher->synced_revision = launcher->results_revision;
     launcher->synced_pitch = launcher->row_pitch;
     launcher->synced_scroll = start;
@@ -219,6 +276,16 @@ void reach_launcher_fill_row_render_input(const reach_launcher *launcher,
     input->row_pitch = launcher->row_pitch;
     input->selection = launcher->selection.rect;
     input->has_selection = launcher->selection_valid;
+    input->row_selected = launcher->row_selected;
+    input->press_feedback = launcher->press_feedback;
+    input->press_index = reach_pressable_feedback_index(&launcher->state.pressable);
+    input->has_press = input->press_index < launcher->state.model.result_count &&
+                       launcher->press_feedback.generation != 0;
+    input->hover_opacity = launcher->hover_opacity;
+    input->hover_index = launcher->hover_index;
+    input->has_hover =
+        launcher->hover_valid && launcher->hover_index < launcher->state.model.result_count;
+    input->search_icon_opacity = launcher->search_icon_opacity;
 }
 
 static void reach_launcher_sync_results_opacity(reach_launcher *launcher, int32_t was_attached)
@@ -319,6 +386,7 @@ int32_t reach_launcher_arrange(reach_launcher *launcher, const reach_launcher_ar
     launcher->row_pitch = 56.0f * scale;
     reach_launcher_sync_body_height(launcher, layout.bounds.height, animate);
     reach_launcher_sync_rows(launcher);
+    reach_launcher_sync_search_icon(launcher);
     return changed;
 }
 
@@ -807,6 +875,9 @@ void reach_launcher_surface_hidden(reach_launcher *launcher)
     for (reach_keyed_row &row : launcher->rows)
         row = {};
     launcher->selection_valid = 0;
+    launcher->hover_valid = 0;
+    reach_motion_set(&launcher->hover_opacity, 0);
+    reach_motion_set(&launcher->search_icon_opacity, 1);
     launcher->synced_pitch = 0.0f;
     launcher->results_deadline = 0;
 }
@@ -1083,7 +1154,8 @@ static void reach_launcher_capsule_reset(void *capsule)
     reach_launcher_reset_scrollbar_drag(launcher);
     if (launcher != nullptr)
     {
-        reach_pressable_reset(&launcher->state.pressable, nullptr);
+        reach_pressable_feedback_style feedback = reach_launcher_pressable_feedback(launcher);
+        reach_pressable_reset(&launcher->state.pressable, &feedback);
         launcher->pointer_layout_valid = 0;
         reach_motion_set(&launcher->results_opacity,
                          reach_launcher_results_attached(&launcher->state) ? 1.0f : 0.0f);
@@ -1170,7 +1242,8 @@ static int32_t reach_launcher_capsule_wants_pointer_move(const void *capsule)
     }
     const reach_launcher_state *state =
         reach_launcher_state_ptr(const_cast<reach_launcher *>(launcher));
-    return state->launcher_scrollbar_drag.active || reach_pressable_tracking(&state->pressable);
+    return state->model.open || state->launcher_scrollbar_drag.active ||
+           reach_pressable_tracking(&state->pressable);
 }
 
 static int32_t reach_launcher_capsule_pointer_sequence_active(const void *capsule)
@@ -1430,6 +1503,19 @@ static void reach_launcher_capsule_handle_pointer(void *capsule, const reach_poi
     }
     if (launcher->synced_revision == launcher->results_revision)
         reach_launcher_sync_rows(launcher);
+    int32_t hover_changed = 0;
+    if (mapped.kind == REACH_POINTER_EVENT_LEAVE || mapped.kind == REACH_POINTER_EVENT_CANCEL)
+        hover_changed = reach_launcher_set_hover(launcher, 0, 0);
+    else if (mapped.kind != REACH_POINTER_EVENT_WHEEL)
+    {
+        reach_launcher_hit_result hover =
+            reach_launcher_hit_test(&launcher->state.model, &layout, mapped.x, mapped.y);
+        hover_changed =
+            reach_launcher_set_hover(launcher, hover.index,
+                                     hover.type == REACH_LAUNCHER_HIT_SEARCH_RESULT &&
+                                         hover.index < launcher->state.model.result_count);
+    }
+    event_result.redraw = event_result.redraw || hover_changed;
     reach_launcher_capsule_apply_event_result(launcher, &event_result, out);
 }
 
