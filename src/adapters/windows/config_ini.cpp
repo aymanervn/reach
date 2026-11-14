@@ -190,6 +190,13 @@ static reach_result reach_config_store_load(reach_config_store *store,
                                          top_bar_mode <= REACH_CONFIG_TOP_BAR_MODE_STATIC
                                      ? (reach_config_top_bar_mode)top_bar_mode
                                      : REACH_CONFIG_TOP_BAR_MODE_DYNAMIC;
+    int32_t top_bar_opacity = (int32_t)GetPrivateProfileIntW(
+        L"top_bar", L"opacity", REACH_CONFIG_TOP_BAR_OPACITY_MAX, path);
+    out_snapshot->top_bar_opacity =
+        top_bar_opacity < 0
+            ? 0
+            : (top_bar_opacity > REACH_CONFIG_TOP_BAR_OPACITY_MAX ? REACH_CONFIG_TOP_BAR_OPACITY_MAX
+                                                                  : top_bar_opacity);
     out_snapshot->power_screen_off_minutes =
         (int32_t)GetPrivateProfileIntW(L"power", L"screen_off_minutes", 10, path);
     out_snapshot->power_sleep_minutes =
@@ -338,6 +345,8 @@ static reach_result reach_config_store_save(reach_config_store *store,
     text.append(std::to_wstring((int32_t)snapshot->top_bar_style));
     text.append(L"\r\nmode=");
     text.append(std::to_wstring((int32_t)snapshot->top_bar_mode));
+    text.append(L"\r\nopacity=");
+    text.append(std::to_wstring(snapshot->top_bar_opacity));
     text.append(L"\r\n\r\n[power]\r\nscreen_off_minutes=");
     text.append(std::to_wstring(snapshot->power_screen_off_minutes));
     text.append(L"\r\nsleep_minutes=");

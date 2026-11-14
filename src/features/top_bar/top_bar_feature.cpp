@@ -48,6 +48,17 @@ int32_t reach_top_bar_apply_config(reach_top_bar *top_bar, reach_config_top_bar_
     return changed;
 }
 
+int32_t reach_top_bar_apply_opacity(reach_top_bar *top_bar, int32_t opacity)
+{
+    if (top_bar == nullptr || opacity < 0 || opacity > REACH_CONFIG_TOP_BAR_OPACITY_MAX ||
+        top_bar->state.opacity == opacity)
+    {
+        return 0;
+    }
+    top_bar->state.opacity = opacity;
+    return 1;
+}
+
 static void reach_top_bar_load_motion_specs(reach_top_bar *top_bar, const reach_theme *theme)
 {
     top_bar->snappy_spec = reach_theme_motion_preset(theme, REACH_MOTION_PRESET_SNAPPY);
@@ -83,6 +94,7 @@ reach_result reach_top_bar_create(reach_top_bar **out_top_bar)
 
     for (reach_motion &motion : top_bar->motions)
         reach_motion_set(&motion, 0.0f);
+    top_bar->state.opacity = REACH_CONFIG_TOP_BAR_OPACITY_MAX;
     reach_pressable_init(&top_bar->state.pressable);
     reach_motion_set(&top_bar->press_feedback, 0.0f);
     reach_motion_set(&top_bar->power_hover, 0.0f);

@@ -658,6 +658,7 @@ static void reach_settings_load_top_bar_config(reach_settings_app *app)
     }
     reach_settings_model_set_top_bar_style(&app->model, snapshot->top_bar_style);
     reach_settings_model_set_top_bar_mode(&app->model, snapshot->top_bar_mode);
+    (void)reach_settings_model_set_top_bar_opacity(&app->model, snapshot->top_bar_opacity);
 }
 
 static void reach_settings_save_top_bar_config(reach_settings_app *app)
@@ -669,6 +670,7 @@ static void reach_settings_save_top_bar_config(reach_settings_app *app)
     reach_config_top_bar_settings settings = {};
     settings.style = reach_settings_model_top_bar_style(&app->model);
     settings.mode = reach_settings_model_top_bar_mode(&app->model);
+    settings.opacity = reach_settings_model_top_bar_opacity(&app->model);
     (void)reach_config_service_set_top_bar(app->config_service, &settings);
 }
 
@@ -1894,6 +1896,7 @@ static uint64_t reach_settings_pressable_target(reach_settings_hit_result hit)
     case REACH_SETTINGS_HIT_WIFI_SCROLLBAR_THUMB:
     case REACH_SETTINGS_HIT_BLUETOOTH_SCROLLBAR_TRACK:
     case REACH_SETTINGS_HIT_BLUETOOTH_SCROLLBAR_THUMB:
+    case REACH_SETTINGS_HIT_TOP_BAR_OPACITY:
         return REACH_PRESSABLE_TARGET_NONE;
     default:
         break;
@@ -2108,8 +2111,32 @@ static void reach_settings_handle_bluetooth_action(reach_settings_app *app,
     app->dirty = 1;
 }
 
+static void reach_settings_drag_top_bar_opacity(reach_settings_app *app, float x)
+{
+    if (reach_settings_model_set_top_bar_opacity(
+            &app->model, reach_settings_top_bar_opacity_at(&app->layout, x)))
+    {
+        reach_settings_save_top_bar_config(app);
+        app->dirty = 1;
+    }
+}
+
+static void reach_settings_end_top_bar_opacity_drag(reach_settings_app *app)
+{
+    app->model.top_bar_opacity_dragging = 0;
+    if (app->window.ops.set_pointer_capture != nullptr)
+    {
+        (void)app->window.ops.set_pointer_capture(app->window.window, 0);
+    }
+}
+
 static void reach_settings_handle_pointer_up(reach_settings_app *app, const reach_ui_event *event)
 {
+    if (app->model.top_bar_opacity_dragging)
+    {
+        reach_settings_end_top_bar_opacity_drag(app);
+        return;
+    }
     reach_scroll_view *dragging = reach_settings_model_dragging_scroll(&app->model);
     if (dragging != nullptr)
     {
@@ -2471,6 +2498,19 @@ static void reach_settings_handle_pointer_down(reach_settings_app *app, const re
     float x = (float)event->x - app->bounds.x;
     float y = (float)event->y - app->bounds.y;
     reach_settings_hit_result hit = reach_settings_hit_test(&app->layout, x, y);
+    if (hit.type == REACH_SETTINGS_HIT_TOP_BAR_OPACITY)
+    {
+        if (reach_settings_model_top_bar_opacity_enabled(&app->model))
+        {
+            app->model.top_bar_opacity_dragging = 1;
+            if (app->window.ops.set_pointer_capture != nullptr)
+            {
+                (void)app->window.ops.set_pointer_capture(app->window.window, 1);
+            }
+            reach_settings_drag_top_bar_opacity(app, x);
+        }
+        return;
+    }
     uint64_t target = reach_settings_pressable_target(hit);
     if (target != REACH_PRESSABLE_TARGET_NONE)
     {
@@ -2502,6 +2542,11 @@ static void reach_settings_handle_pointer_move(reach_settings_app *app, const re
     }
     reach_settings_refresh_bounds(app);
     reach_settings_refresh_layout(app);
+    if (app->model.top_bar_opacity_dragging)
+    {
+        reach_settings_drag_top_bar_opacity(app, (float)event->x - app->bounds.x);
+        return;
+    }
 
     reach_settings_hit_result hover = reach_settings_hit_test(
         &app->layout, (float)event->x - app->bounds.x, (float)event->y - app->bounds.y);
@@ -2610,6 +2655,7 @@ static void reach_settings_handle_event(void *user, const reach_ui_event *event)
         reach_scroll_view *dragging = reach_settings_model_dragging_scroll(&app->model);
         if (dragging != nullptr)
             (void)reach_scroll_view_pointer_up(dragging);
+        app->model.top_bar_opacity_dragging = 0;
         if (reach_settings_model_set_hovered_button(&app->model, REACH_SETTINGS_HIT_NONE))
         {
             app->dirty = 1;

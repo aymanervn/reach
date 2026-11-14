@@ -12,6 +12,7 @@ extern "C"
 #endif
 
 #define REACH_MAX_WALLPAPER_MONITORS 8
+#define REACH_CONFIG_TOP_BAR_OPACITY_MAX 100
 
     typedef enum reach_config_theme_preference
     {
@@ -43,6 +44,7 @@ extern "C"
         float dock_height;
         reach_config_top_bar_style top_bar_style;
         reach_config_top_bar_mode top_bar_mode;
+        int32_t top_bar_opacity;
         int32_t power_screen_off_minutes;
         int32_t power_sleep_minutes;
         int32_t power_lock_minutes;

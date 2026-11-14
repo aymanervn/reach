@@ -492,6 +492,57 @@ static void render_display_selector_card(
                                              reach_settings_control_group_id(hit, 0), selection);
 }
 
+static void render_top_bar_opacity_card(const reach_settings_render_input *input,
+                                        reach_render_command_buffer *commands, reach_color accent)
+{
+    const reach_settings_model *model = input->model;
+    const reach_settings_layout *layout = input->layout;
+    const reach_theme *theme = input->theme;
+    float radius = reach_settings_scale(input, theme->radius_small);
+    reach_settings_push_rect(commands, layout->top_bar_opacity_card, radius,
+                             theme->settings_card_background);
+    reach_settings_push_text(
+        commands, layout->top_bar_opacity_title, (const uint16_t *)u"Top bar opacity",
+        reach_settings_scale(input, REACH_TEXT_SIZE_MEDIUM), REACH_TEXT_WEIGHT_SEMIBOLD,
+        input->text_alignment_leading, theme->settings_text, 1);
+    reach_settings_push_text(commands, layout->top_bar_opacity_subtitle,
+                             (const uint16_t *)u"Change the opacity of the simple top bar",
+                             reach_settings_scale(input, REACH_TEXT_SIZE_XSMALL),
+                             REACH_TEXT_WEIGHT_NORMAL, input->text_alignment_leading,
+                             theme->settings_secondary_text, 1);
+
+    int32_t enabled = reach_settings_model_top_bar_opacity_enabled(model);
+    int32_t opacity = reach_settings_model_top_bar_opacity(model);
+    float ratio = (float)opacity / (float)REACH_CONFIG_TOP_BAR_OPACITY_MAX;
+    reach_color level = enabled
+                            ? reach_settings_color_with_alpha(accent, 0.85f)
+                            : reach_settings_color_with_alpha(theme->settings_secondary_text, 0.5f);
+    reach_rect_f32 slider = layout->top_bar_opacity_track;
+    float track_height = reach_settings_scale(input, 4.0f);
+    float thumb_size = reach_settings_scale(input, REACH_SETTINGS_SLIDER_THUMB_SIZE);
+    reach_rect_f32 track = {slider.x, slider.y + (slider.height - track_height) * 0.5f,
+                            slider.width, track_height};
+    reach_settings_push_rect(commands, track, track_height * 0.5f,
+                             theme->settings_segmented_control_background);
+    reach_rect_f32 fill = track;
+    fill.width = track.width * ratio;
+    if (fill.width > 0.0f)
+    {
+        reach_settings_push_rect(commands, fill, track_height * 0.5f, level);
+    }
+    reach_rect_f32 thumb = {track.x + track.width * ratio - thumb_size * 0.5f,
+                            slider.y + (slider.height - thumb_size) * 0.5f, thumb_size, thumb_size};
+    reach_settings_push_rect(commands, thumb, thumb_size * 0.5f, level);
+
+    uint16_t value[8] = {};
+    append_number(value, 8, (size_t)opacity);
+    append_text(value, 8, (const uint16_t *)u"%");
+    reach_settings_push_text(commands, layout->top_bar_opacity_value, value,
+                             reach_settings_scale(input, REACH_TEXT_SIZE_SMALL),
+                             REACH_TEXT_WEIGHT_SEMIBOLD, REACH_TEXT_ALIGNMENT_TRAILING,
+                             enabled ? theme->settings_text : theme->settings_secondary_text, 1);
+}
+
 static void render_display_page(const reach_settings_render_input *input,
                                 reach_render_command_buffer *commands)
 {
@@ -566,6 +617,7 @@ static void render_display_page(const reach_settings_render_input *input,
         (const uint16_t *)u"Choose how top bar items are grouped and framed", top_bar_style_labels,
         REACH_SETTINGS_SELECTOR_ITEM_COUNT, &model->top_bar_style_selection,
         REACH_SETTINGS_HIT_TOP_BAR_STYLE, accent);
+    render_top_bar_opacity_card(input, commands, accent);
     display_toggle_card auto_hide = {layout->top_bar_auto_hide_card,
                                      {},
                                      layout->top_bar_auto_hide_title,

@@ -76,6 +76,7 @@ void reach_settings_model_init(reach_settings_model *model)
     reach_motion_set(&model->display_theme_selection, 0);
     reach_motion_set(&model->top_bar_style_selection, 0);
     reach_motion_set(&model->top_bar_mode_toggle, 1.0f);
+    model->top_bar_opacity = REACH_CONFIG_TOP_BAR_OPACITY_MAX;
     reach_motion_set(&model->button_press_feedback, 0.0f);
     reach_pressable_init(&model->button_pressable);
     for (size_t field = 0; field < REACH_SETTINGS_ACCOUNT_FIELD_COUNT; ++field)
@@ -774,11 +775,34 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
             &layout.top_bar_style_card, &layout.top_bar_style_title, &layout.top_bar_style_subtitle,
             &layout.top_bar_style_selector, nullptr, area_x, desktop_y, area_width,
             appearance_card_height, REACH_SETTINGS_SELECTOR_WIDTH, scale);
+        float opacity_y = desktop_y + appearance_card_height + card_spacing;
+        float value_width_dp = 40.0f;
+        float value_gap_dp = 12.0f;
+        float slider_width_dp =
+            (REACH_SETTINGS_SELECTOR_WIDTH - value_width_dp - value_gap_dp) * 0.5f;
+        reach_rect_f32 opacity_control = {};
+        reach_settings_layout_selector_card(
+            &layout.top_bar_opacity_card, &layout.top_bar_opacity_title,
+            &layout.top_bar_opacity_subtitle, &opacity_control, nullptr, area_x, opacity_y,
+            area_width, appearance_card_height, slider_width_dp + value_gap_dp + value_width_dp,
+            scale);
+        float value_width = value_width_dp * scale;
+        float thumb_radius = REACH_SETTINGS_SLIDER_THUMB_SIZE * 0.5f * scale;
+        layout.top_bar_opacity_value =
+            reach_settings_rect(opacity_control.x + opacity_control.width - value_width,
+                                opacity_control.y, value_width, opacity_control.height);
+        layout.top_bar_opacity_slider = reach_settings_rect(
+            opacity_control.x, opacity_control.y,
+            opacity_control.width - value_width - value_gap_dp * scale, opacity_control.height);
+        layout.top_bar_opacity_track = reach_settings_rect(
+            layout.top_bar_opacity_slider.x + thumb_radius, layout.top_bar_opacity_slider.y,
+            layout.top_bar_opacity_slider.width - 2.0f * thumb_radius,
+            layout.top_bar_opacity_slider.height);
         reach_settings_toggle_card_rects auto_hide = {
             &layout.top_bar_auto_hide_card, nullptr, &layout.top_bar_auto_hide_title,
             &layout.top_bar_auto_hide_subtitle, &layout.top_bar_auto_hide_toggle};
         reach_settings_layout_toggle_card(&auto_hide, area_x,
-                                          desktop_y + appearance_card_height + card_spacing,
+                                          opacity_y + appearance_card_height + card_spacing,
                                           area_width, card_height, scale);
         layout.display_content_height =
             layout.top_bar_auto_hide_card.y + layout.top_bar_auto_hide_card.height +
@@ -1105,6 +1129,12 @@ reach_settings_hit_result reach_settings_hit_test(const reach_settings_layout *l
          reach_settings_rect_contains(layout->top_bar_auto_hide_card, x, y)))
     {
         result.type = REACH_SETTINGS_HIT_TOP_BAR_AUTO_HIDE_TOGGLE;
+        return result;
+    }
+
+    if (display_pointer && reach_settings_rect_contains(layout->top_bar_opacity_slider, x, y))
+    {
+        result.type = REACH_SETTINGS_HIT_TOP_BAR_OPACITY;
         return result;
     }
 
