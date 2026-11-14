@@ -3,7 +3,6 @@
 #include "launcher_common.h"
 
 #include "reach/core/typography.h"
-#include "reach/features/common/scrollbar_render.h"
 #include "reach/features/common/ui_controls.h"
 
 #include <math.h>
@@ -165,34 +164,15 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
         results_clip.y = layout->search_results.y - layout->bounds.y;
         results_clip.width = layout->bounds.width;
         results_clip.height = fmaxf(1, envelope_height - results_clip.y);
-        reach_render_group viewport = {};
+        reach_scroll_view_group viewport = {};
         viewport.id = UINT64_C(0x2900000000040010);
         viewport.parent_id = interior.id;
         viewport.bounds = results_clip;
-        viewport.clip = results_clip;
-        viewport.has_clip = 1;
-        result = reach_render_command_buffer_begin_group(out_commands, &viewport);
-        reach_render_command_buffer_end_group(out_commands);
+        result = reach_scroll_view_push_viewport(input->scroll, &viewport, out_commands);
         if (result != REACH_OK)
             return result;
-        reach_render_group content = {};
-        content.id = viewport.id + 1;
-        content.parent_id = viewport.id;
-        content.bounds = viewport.bounds;
-        content.bounds.x = floorf(content.bounds.x);
-        content.bounds.y = floorf(content.bounds.y);
-        content.bounds.width = ceilf(viewport.bounds.x + viewport.bounds.width) - content.bounds.x;
-        content.bounds.height =
-            ceilf(viewport.bounds.y + viewport.bounds.height) - content.bounds.y;
+        uint64_t content_id = viewport.id + 1;
         reach_motion opacity = input->results_opacity;
-        if (input->content_offset.generation != 0)
-            content.y = input->content_offset;
-        else
-            reach_motion_set(&content.y, 0.0f);
-        result = reach_render_command_buffer_begin_group(out_commands, &content);
-        reach_render_command_buffer_end_group(out_commands);
-        if (result != REACH_OK)
-            return result;
         reach_motion stationary = {};
         auto retain = [&](size_t first, uint64_t id)
         {
@@ -201,28 +181,16 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
         };
         float row_height = input->row_pitch;
 
-        if (layout->search_result_scrollbar_track.height > 0.0f)
-        {
-            size_t first = out_commands->count;
-            reach_scrollbar_build_render_commands(layout->search_result_scrollbar_track,
-                                                  layout->search_result_scrollbar_thumb,
-                                                  layout->bounds, theme->launcher_scrollbar_track,
-                                                  theme->launcher_scrollbar_thumb, out_commands);
-            reach_render_command thumb = out_commands->commands[out_commands->count - 1];
-            out_commands->count -= 1;
-            result = retain(first, UINT64_C(0x2900000000060000));
-            if (result != REACH_OK)
-                return result;
-            first = out_commands->count;
-            reach_render_command_buffer_push(out_commands, &thumb);
-            reach_motion thumb_offset = input->scrollbar_thumb_offset;
-            if (thumb_offset.generation == 0)
-                reach_motion_set(&thumb_offset, 0.0f);
-            result = reach_render_retain_commands(out_commands, first, UINT64_C(0x2900000000060001),
-                                                  viewport.id, &opacity, &thumb_offset);
-            if (result != REACH_OK)
-                return result;
-        }
+        reach_scroll_view_group scrollbar = {};
+        scrollbar.id = UINT64_C(0x2900000000060000);
+        scrollbar.parent_id = viewport.id;
+        scrollbar.opacity = &opacity;
+        result = reach_scroll_view_push_scrollbar(
+            input->scroll, layout->bounds,
+            {theme->launcher_scrollbar_track, theme->launcher_scrollbar_thumb}, &scrollbar,
+            reach_motion_now_seconds(), out_commands);
+        if (result != REACH_OK)
+            return result;
 
         if (input->has_selection)
         {
@@ -232,7 +200,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
                 return REACH_INVALID_ARGUMENT;
             reach_render_group pill = {};
             pill.id = UINT64_C(0x2900000000060020);
-            pill.parent_id = content.id;
+            pill.parent_id = content_id;
             pill.bounds = {0, 0, fmaxf(1, ceilf(width)), fmaxf(1, ceilf(height))};
             pill.opacity = opacity;
             result = reach_render_push_rect_motion(out_commands, &pill, &input->selection,
@@ -256,7 +224,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
                                     highlight_width, highlight_height};
             reach_render_group placement = {};
             placement.bounds = hover;
-            placement.parent_id = content.id;
+            placement.parent_id = content_id;
             result = reach_ui_feedback_render(
                 out_commands, UINT64_C(0x2900000000060030), hover, row_selected_radius,
                 reach_theme_color_alpha(theme->launcher_row_selected_background,
@@ -341,7 +309,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
             {
                 reach_render_group title = {};
                 title.id = row_id + 6;
-                title.parent_id = content.id;
+                title.parent_id = content_id;
                 if (!reach_render_retained_command_bounds(&command, &title.bounds))
                     return REACH_INVALID_ARGUMENT;
                 title.opacity = row.opacity;
@@ -350,7 +318,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
                                               theme->launcher_row_title_selected,
                                               &input->row_selected[slot]);
                 command.color = {1.0f, 1.0f, 1.0f, 1.0f};
-                result = reach_render_retain_commands(out_commands, first, row_id + 1, content.id,
+                result = reach_render_retain_commands(out_commands, first, row_id + 1, content_id,
                                                       &row.opacity, &offset);
                 if (result == REACH_OK)
                     result = reach_render_command_buffer_begin_group(out_commands, &title);
@@ -376,7 +344,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
             command.text_ellipsis = 1;
             reach_copy_utf16(command.text, 260, row_result.subtitle);
             reach_render_command_buffer_push(out_commands, &command);
-            result = reach_render_retain_commands(out_commands, first, row_id + 7, content.id,
+            result = reach_render_retain_commands(out_commands, first, row_id + 7, content_id,
                                                   &row.opacity, &offset);
             if (result != REACH_OK)
                 return result;
@@ -389,7 +357,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
                                     highlight_width, highlight_height};
             reach_render_group placement = {};
             placement.bounds = press;
-            placement.parent_id = content.id;
+            placement.parent_id = content_id;
             reach_color overlay = {0.0f, 0.0f, 0.0f, 0.12f};
             result = reach_ui_feedback_render(out_commands, UINT64_C(0x2900000000060031), press,
                                               row_selected_radius, overlay, &input->press_feedback,
@@ -455,9 +423,9 @@ reach_result reach_launcher_append_render_commands(reach_launcher *launcher,
     reach_launcher_state *state = reach_launcher_state_mut(launcher);
 
     const size_t icon_overscan_rows = 4;
-    size_t icon_start = reach_launcher_model_result_scroll_offset(&state->model);
+    size_t icon_start = reach_launcher_result_scroll_offset_state(state);
     icon_start = icon_start > icon_overscan_rows ? icon_start - icon_overscan_rows : 0;
-    size_t icon_end = reach_launcher_model_result_scroll_offset(&state->model) +
+    size_t icon_end = reach_launcher_result_scroll_offset_state(state) +
                       REACH_SEARCH_VISIBLE_RESULTS + icon_overscan_rows;
 
     for (size_t index = icon_start;

@@ -6,7 +6,6 @@
 
 #include "reach/core/geometry.h"
 #include "reach/core/pinned_app.h"
-#include "reach/core/scrollbar.h"
 #include "reach/support/search_types.h"
 #include "reach/support/util.h"
 
@@ -57,7 +56,6 @@ extern "C"
         size_t selected_result_index;
         size_t visible_result_capacity;
         int32_t search_error;
-        reach_scrollbar_model result_scrollbar;
     } reach_launcher_model;
 
     void reach_dock_model_defaults(reach_dock_model *dock);

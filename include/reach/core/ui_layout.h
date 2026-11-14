@@ -40,7 +40,6 @@ extern "C"
         reach_rect_f32 search_results;
         reach_rect_f32 search_result_items;
         reach_rect_f32 search_result_scrollbar_track;
-        reach_rect_f32 search_result_scrollbar_thumb;
     } reach_launcher_layout;
 
     typedef struct reach_ui_layout

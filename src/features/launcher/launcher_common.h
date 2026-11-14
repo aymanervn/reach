@@ -55,8 +55,7 @@ typedef enum reach_launcher_hit_type
 {
     REACH_LAUNCHER_HIT_NONE = 0,
     REACH_LAUNCHER_HIT_SEARCH_RESULT = 2,
-    REACH_LAUNCHER_HIT_SCROLLBAR_TRACK = 3,
-    REACH_LAUNCHER_HIT_SCROLLBAR_THUMB = 4
+    REACH_LAUNCHER_HIT_SCROLLBAR = 3
 } reach_launcher_hit_type;
 
 typedef struct reach_launcher_hit_result
@@ -93,7 +92,7 @@ typedef struct reach_launcher_event_result
     reach_launcher_action action;
 } reach_launcher_event_result;
 
-reach_launcher_hit_result reach_launcher_hit_test(const reach_launcher_model *model,
+reach_launcher_hit_result reach_launcher_hit_test(const reach_launcher_state *state,
                                                   const reach_launcher_layout *layout, int32_t x,
                                                   int32_t y);
 reach_launcher_action reach_launcher_action_for_hit(const reach_launcher_model *model,
@@ -127,9 +126,6 @@ reach_result reach_launcher_set_terminal_command_result_state(reach_launcher_sta
 reach_result reach_launcher_set_selected_result_state(reach_launcher_state *state, size_t index);
 reach_result reach_launcher_select_next_result_state(reach_launcher_state *state);
 reach_result reach_launcher_select_previous_result_state(reach_launcher_state *state);
-reach_result reach_launcher_scroll_results_state(reach_launcher_state *state, int32_t delta);
-reach_result reach_launcher_set_result_scroll_offset_state(reach_launcher_state *state,
-                                                           size_t offset);
 size_t reach_launcher_result_scroll_offset_state(const reach_launcher_state *state);
 reach_result reach_launcher_clear_results_state(reach_launcher_state *state);
 
