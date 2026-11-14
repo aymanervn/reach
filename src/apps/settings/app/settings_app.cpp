@@ -608,7 +608,7 @@ static void reach_settings_apply_theme(reach_settings_app *app)
     app->dirty = 1;
 }
 
-static void reach_settings_load_display_config(reach_settings_app *app)
+static void reach_settings_load_theme_config(reach_settings_app *app)
 {
     if (app == nullptr || app->config_service == nullptr)
     {
@@ -629,7 +629,7 @@ static void reach_settings_load_display_config(reach_settings_app *app)
     reach_settings_apply_theme(app);
 }
 
-static void reach_settings_save_display_config(reach_settings_app *app)
+static void reach_settings_save_theme_config(reach_settings_app *app)
 {
     if (app == nullptr || app->config_service == nullptr)
     {
@@ -1864,12 +1864,12 @@ static uint64_t reach_settings_pressable_target(reach_settings_hit_result hit)
     case REACH_SETTINGS_HIT_APPLICATION_UNINSTALL:
         detail = (uint32_t)hit.installed_app_index;
         break;
-    case REACH_SETTINGS_HIT_DISPLAY_WINDOWS_SYSTEM_THEME:
-    case REACH_SETTINGS_HIT_DISPLAY_WINDOWS_APP_THEME:
-        detail = (uint32_t)hit.display_theme_preference;
+    case REACH_SETTINGS_HIT_THEME_WINDOWS_SYSTEM_THEME:
+    case REACH_SETTINGS_HIT_THEME_WINDOWS_APP_THEME:
+        detail = (uint32_t)hit.theme_preference;
         break;
-    case REACH_SETTINGS_HIT_DISPLAY_THEME:
-        detail = (uint32_t)hit.display_light_theme;
+    case REACH_SETTINGS_HIT_THEME_REACH:
+        detail = (uint32_t)hit.theme_light;
         break;
     case REACH_SETTINGS_HIT_TOP_BAR_STYLE:
         detail = (uint32_t)hit.top_bar_style;
@@ -1884,8 +1884,8 @@ static uint64_t reach_settings_pressable_target(reach_settings_hit_result hit)
         detail = (uint32_t)hit.bluetooth_index;
         break;
     case REACH_SETTINGS_HIT_NONE:
-    case REACH_SETTINGS_HIT_DISPLAY_SCROLLBAR_TRACK:
-    case REACH_SETTINGS_HIT_DISPLAY_SCROLLBAR_THUMB:
+    case REACH_SETTINGS_HIT_THEME_SCROLLBAR_TRACK:
+    case REACH_SETTINGS_HIT_THEME_SCROLLBAR_THUMB:
     case REACH_SETTINGS_HIT_UPDATE_SCROLLBAR_TRACK:
     case REACH_SETTINGS_HIT_UPDATE_SCROLLBAR_THUMB:
     case REACH_SETTINGS_HIT_STARTUP_SCROLLBAR_TRACK:
@@ -2323,7 +2323,7 @@ static void reach_settings_handle_pointer_up(reach_settings_app *app, const reac
             reach_settings_schedule_startup_toggle(app, hit.startup_index);
         }
     }
-    else if (app->model.selected_page == REACH_SETTINGS_PAGE_DISPLAY)
+    else if (app->model.selected_page == REACH_SETTINGS_PAGE_THEME)
     {
         if (hit.type == REACH_SETTINGS_HIT_TOP_BAR_STYLE)
         {
@@ -2339,41 +2339,39 @@ static void reach_settings_handle_pointer_up(reach_settings_app *app, const reac
             reach_settings_save_top_bar_config(app);
             app->dirty = 1;
         }
-        else if (hit.type == REACH_SETTINGS_HIT_DISPLAY_FPS_TOGGLE)
+        else if (hit.type == REACH_SETTINGS_HIT_THEME_FPS_TOGGLE)
         {
             (void)reach_settings_model_toggle_high_refresh_rate(&app->model);
-            reach_settings_save_display_config(app);
+            reach_settings_save_theme_config(app);
             app->dirty = 1;
         }
-        else if (hit.type == REACH_SETTINGS_HIT_DISPLAY_FONT_TOGGLE)
+        else if (hit.type == REACH_SETTINGS_HIT_THEME_FONT_TOGGLE)
         {
             (void)reach_settings_model_toggle_bundled_font(&app->model);
-            reach_settings_save_display_config(app);
+            reach_settings_save_theme_config(app);
             reach_settings_apply_ui_font(app);
         }
-        else if (hit.type == REACH_SETTINGS_HIT_DISPLAY_THEME)
+        else if (hit.type == REACH_SETTINGS_HIT_THEME_REACH)
         {
-            if (reach_settings_model_select_light_theme(&app->model, hit.display_light_theme))
+            if (reach_settings_model_select_light_theme(&app->model, hit.theme_light))
             {
-                reach_settings_save_display_config(app);
+                reach_settings_save_theme_config(app);
                 reach_settings_apply_theme(app);
             }
         }
-        else if (hit.type == REACH_SETTINGS_HIT_DISPLAY_WINDOWS_SYSTEM_THEME)
+        else if (hit.type == REACH_SETTINGS_HIT_THEME_WINDOWS_SYSTEM_THEME)
         {
-            if (reach_settings_model_select_windows_system_theme(&app->model,
-                                                                 hit.display_theme_preference))
+            if (reach_settings_model_select_windows_system_theme(&app->model, hit.theme_preference))
             {
-                reach_settings_save_display_config(app);
+                reach_settings_save_theme_config(app);
                 app->dirty = 1;
             }
         }
-        else if (hit.type == REACH_SETTINGS_HIT_DISPLAY_WINDOWS_APP_THEME)
+        else if (hit.type == REACH_SETTINGS_HIT_THEME_WINDOWS_APP_THEME)
         {
-            if (reach_settings_model_select_windows_app_theme(&app->model,
-                                                              hit.display_theme_preference))
+            if (reach_settings_model_select_windows_app_theme(&app->model, hit.theme_preference))
             {
-                reach_settings_save_display_config(app);
+                reach_settings_save_theme_config(app);
                 app->dirty = 1;
             }
         }
@@ -2712,11 +2710,11 @@ static void reach_settings_handle_event(void *user, const reach_ui_event *event)
         app->dirty = 1;
     }
     else if (event->type == REACH_UI_EVENT_POINTER_WHEEL &&
-             app->model.selected_page == REACH_SETTINGS_PAGE_DISPLAY && event->wheel_delta != 0)
+             app->model.selected_page == REACH_SETTINGS_PAGE_THEME && event->wheel_delta != 0)
     {
-        reach_settings_model_scroll_display(
-            &app->model, event->wheel_delta > 0 ? -86.0f * reach_settings_app_scale(app)
-                                                : 86.0f * reach_settings_app_scale(app));
+        reach_settings_model_scroll_theme(&app->model, event->wheel_delta > 0
+                                                           ? -86.0f * reach_settings_app_scale(app)
+                                                           : 86.0f * reach_settings_app_scale(app));
         app->dirty = 1;
     }
     else if (event->type == REACH_UI_EVENT_POINTER_WHEEL &&
@@ -2895,7 +2893,7 @@ reach_result reach_settings_app_create(reach_settings_app **out_app,
                                     &app->config_service) == REACH_OK)
     {
         reach_settings_load_power_config(app);
-        reach_settings_load_display_config(app);
+        reach_settings_load_theme_config(app);
         reach_settings_load_top_bar_config(app);
     }
 

@@ -26,7 +26,7 @@ extern "C"
 {
 #endif
 
-#define REACH_SETTINGS_NAV_ITEM_COUNT 8
+#define REACH_SETTINGS_NAV_ITEM_COUNT 9
 #define REACH_SETTINGS_POWER_TIMER_COUNT 5
 #define REACH_SETTINGS_POWER_OPTION_COUNT 6
 #define REACH_SETTINGS_POWER_PRESET_COUNT (REACH_SETTINGS_POWER_OPTION_COUNT - 1)
@@ -59,9 +59,10 @@ extern "C"
         REACH_SETTINGS_PAGE_ACCOUNT = 2,
         REACH_SETTINGS_PAGE_STARTUP_APPS = 3,
         REACH_SETTINGS_PAGE_POWER_SLEEP = 4,
-        REACH_SETTINGS_PAGE_DISPLAY = 5,
+        REACH_SETTINGS_PAGE_THEME = 5,
         REACH_SETTINGS_PAGE_UPDATE = 6,
-        REACH_SETTINGS_PAGE_APPLICATIONS = 7
+        REACH_SETTINGS_PAGE_APPLICATIONS = 7,
+        REACH_SETTINGS_PAGE_DISPLAY = 8
     } reach_settings_page;
 
     typedef enum reach_settings_hit_type
@@ -80,13 +81,13 @@ extern "C"
         REACH_SETTINGS_HIT_POWER_OPTION,
         REACH_SETTINGS_HIT_POWER_APPLY,
         REACH_SETTINGS_HIT_POWER_WAIT_TOGGLE,
-        REACH_SETTINGS_HIT_DISPLAY_FPS_TOGGLE,
-        REACH_SETTINGS_HIT_DISPLAY_FONT_TOGGLE,
-        REACH_SETTINGS_HIT_DISPLAY_THEME,
-        REACH_SETTINGS_HIT_DISPLAY_WINDOWS_SYSTEM_THEME,
-        REACH_SETTINGS_HIT_DISPLAY_WINDOWS_APP_THEME,
-        REACH_SETTINGS_HIT_DISPLAY_SCROLLBAR_TRACK,
-        REACH_SETTINGS_HIT_DISPLAY_SCROLLBAR_THUMB,
+        REACH_SETTINGS_HIT_THEME_FPS_TOGGLE,
+        REACH_SETTINGS_HIT_THEME_FONT_TOGGLE,
+        REACH_SETTINGS_HIT_THEME_REACH,
+        REACH_SETTINGS_HIT_THEME_WINDOWS_SYSTEM_THEME,
+        REACH_SETTINGS_HIT_THEME_WINDOWS_APP_THEME,
+        REACH_SETTINGS_HIT_THEME_SCROLLBAR_TRACK,
+        REACH_SETTINGS_HIT_THEME_SCROLLBAR_THUMB,
         REACH_SETTINGS_HIT_TOP_BAR_STYLE,
         REACH_SETTINGS_HIT_TOP_BAR_AUTO_HIDE_TOGGLE,
         REACH_SETTINGS_HIT_TOP_BAR_OPACITY,
@@ -270,15 +271,15 @@ extern "C"
         int32_t installed_apps_loaded;
         int32_t installed_apps_busy;
         int32_t installed_apps_status;
-        int32_t display_high_refresh_rate;
-        reach_scroll_view display_scroll;
-        reach_motion display_fps_toggle;
-        int32_t display_bundled_font;
-        reach_motion display_font_toggle;
-        int32_t display_light_theme;
-        reach_motion display_theme_selection;
-        reach_config_theme_preference display_windows_system_theme;
-        reach_config_theme_preference display_windows_app_theme;
+        int32_t theme_high_refresh_rate;
+        reach_scroll_view theme_scroll;
+        reach_motion theme_fps_toggle;
+        int32_t theme_bundled_font;
+        reach_motion theme_font_toggle;
+        int32_t theme_light;
+        reach_motion theme_reach_selection;
+        reach_config_theme_preference theme_windows_system_theme;
+        reach_config_theme_preference theme_windows_app_theme;
         reach_config_top_bar_style top_bar_style;
         reach_motion top_bar_style_selection;
         reach_config_top_bar_mode top_bar_mode;
@@ -397,35 +398,35 @@ extern "C"
         reach_rect_f32 installed_app_uninstall_buttons[REACH_INSTALLED_APP_MAX_ENTRIES];
         size_t installed_app_row_count;
         float installed_apps_content_height;
-        reach_rect_f32 display_viewport;
-        reach_rect_f32 display_scrollbar_track;
-        reach_rect_f32 display_scrollbar_thumb;
-        float display_content_height;
-        reach_rect_f32 display_fps_card;
-        reach_rect_f32 display_fps_icon;
-        reach_rect_f32 display_fps_title;
-        reach_rect_f32 display_fps_subtitle;
-        reach_rect_f32 display_fps_toggle;
-        reach_rect_f32 display_font_card;
-        reach_rect_f32 display_font_icon;
-        reach_rect_f32 display_font_title;
-        reach_rect_f32 display_font_subtitle;
-        reach_rect_f32 display_font_toggle;
-        reach_rect_f32 display_theme_card;
-        reach_rect_f32 display_theme_icon;
-        reach_rect_f32 display_theme_title;
-        reach_rect_f32 display_theme_subtitle;
-        reach_rect_f32 display_theme_selector;
-        reach_rect_f32 display_windows_section_title;
-        reach_rect_f32 display_windows_system_card;
-        reach_rect_f32 display_windows_system_title;
-        reach_rect_f32 display_windows_system_subtitle;
-        reach_rect_f32 display_windows_system_selector;
-        reach_rect_f32 display_windows_app_card;
-        reach_rect_f32 display_windows_app_title;
-        reach_rect_f32 display_windows_app_subtitle;
-        reach_rect_f32 display_windows_app_selector;
-        reach_rect_f32 display_desktop_section_title;
+        reach_rect_f32 theme_viewport;
+        reach_rect_f32 theme_scrollbar_track;
+        reach_rect_f32 theme_scrollbar_thumb;
+        float theme_content_height;
+        reach_rect_f32 theme_fps_card;
+        reach_rect_f32 theme_fps_icon;
+        reach_rect_f32 theme_fps_title;
+        reach_rect_f32 theme_fps_subtitle;
+        reach_rect_f32 theme_fps_toggle;
+        reach_rect_f32 theme_font_card;
+        reach_rect_f32 theme_font_icon;
+        reach_rect_f32 theme_font_title;
+        reach_rect_f32 theme_font_subtitle;
+        reach_rect_f32 theme_font_toggle;
+        reach_rect_f32 theme_reach_card;
+        reach_rect_f32 theme_reach_icon;
+        reach_rect_f32 theme_reach_title;
+        reach_rect_f32 theme_reach_subtitle;
+        reach_rect_f32 theme_reach_selector;
+        reach_rect_f32 theme_windows_section_title;
+        reach_rect_f32 theme_windows_system_card;
+        reach_rect_f32 theme_windows_system_title;
+        reach_rect_f32 theme_windows_system_subtitle;
+        reach_rect_f32 theme_windows_system_selector;
+        reach_rect_f32 theme_windows_app_card;
+        reach_rect_f32 theme_windows_app_title;
+        reach_rect_f32 theme_windows_app_subtitle;
+        reach_rect_f32 theme_windows_app_selector;
+        reach_rect_f32 theme_desktop_section_title;
         reach_rect_f32 top_bar_style_card;
         reach_rect_f32 top_bar_style_title;
         reach_rect_f32 top_bar_style_subtitle;
@@ -519,8 +520,8 @@ extern "C"
         size_t account_field;
         size_t startup_index;
         size_t installed_app_index;
-        int32_t display_light_theme;
-        reach_config_theme_preference display_theme_preference;
+        int32_t theme_light;
+        reach_config_theme_preference theme_preference;
         reach_config_top_bar_style top_bar_style;
         size_t wifi_index;
         size_t wifi_security_option;
@@ -640,7 +641,7 @@ extern "C"
     reach_settings_model_windows_app_theme(const reach_settings_model *model);
     int32_t reach_settings_model_select_windows_app_theme(reach_settings_model *model,
                                                           reach_config_theme_preference preference);
-    void reach_settings_model_scroll_display(reach_settings_model *model, float delta);
+    void reach_settings_model_scroll_theme(reach_settings_model *model, float delta);
     void reach_settings_model_set_top_bar_style(reach_settings_model *model,
                                                 reach_config_top_bar_style style);
     reach_config_top_bar_style
