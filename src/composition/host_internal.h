@@ -32,7 +32,7 @@
 #include "reach/services/system_status.h"
 #include "reach/services/window_tracking.h"
 #include "reach/services/wallpaper.h"
-#include "reach/support/animation.h"
+#include "reach/support/motion.h"
 
 #include <atomic>
 #include <condition_variable>

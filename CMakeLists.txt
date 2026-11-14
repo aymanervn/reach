@@ -61,7 +61,6 @@ add_library(reach_support STATIC
     src/support/crash_dump_prune.cpp
     src/support/render_device_loss.cpp
     src/support/render_recovery.cpp
-    src/support/animation.cpp
     src/support/motion.cpp
     src/support/motion_clock.cpp
     src/support/workload.cpp

@@ -412,14 +412,14 @@ composition draws the title as static clipped text. Hidden groups are detached a
 Transport controls retain their dedicated actions, and a pressable release on the remaining card
 opens the snapshot's source application through the shared `OPEN_TARGET` action.
 
-Finite scalar animation tracks also own canonical `reach_motion` descriptors. The manager samples
-an explicit monotonic event time with `reach_animation_manager_sample_at`; it no longer accumulates
-frame deltas or implements a separate interpolation curve. Retargeting samples the previous curve
-at the event, advances generation and preserves continuity between application frames. Cached value
-and activity are CPU presentation state: pending activity survives until a sample delivers the final
-endpoint, then stops. `reach_animation_manager_motion` exposes the same intent for retained rendering
-without GPU readback. Settings samples all finite scalar families at one update timestamp. Loader,
-scroll and native choreography timing remain separate migration responsibilities.
+CPU-sampled scalars are plain `reach_motion` fields owned by their feature; there is no separate
+animation manager. A feature records one sample time per tick and reads `reach_motion_value_at` and
+`reach_motion_active_at` at that time, so values and edge decisions stay consistent within a tick.
+Retargeting samples the previous curve at the event, advances generation and preserves continuity
+between application frames. `reach_motion_pending` reports a motion that has not settled and
+`reach_motion_advance_at` settles it exactly on its endpoint, so a surface that redraws on the CPU
+keeps demanding frames until its final value is drawn. Loader and native choreography timing remain
+separate responsibilities.
 Switcher fitting uses canonical retained motion directly with the `smooth` spring; one endpoint
 deadline retires its width descriptor without periodic capsule redraw or scalar-manager sampling.
 One selection pill, parented to a body-center anchor that follows the width and clips to the
@@ -841,7 +841,7 @@ time at which the damped oscillator's decay envelope bounds displacement below 5
 amplitude `|from - to| + |velocity| / omega`. Every spring with the same parameters therefore shares
 one duration regardless of span or velocity, so same-epoch derivations compare durations exactly;
 the deadline snaps exactly to `to`, so completion and `wait_ms` are unchanged.
-`reach_motion_spring_to_at` and `reach_animation_manager_spring_to_at` retarget from any finite,
+`reach_motion_spring_to_at` retargets from any finite,
 repeating, mapped or clamped curve, preserving value and `reach_motion_velocity_at` at the event
 time. `reach_motion_spec` names either a spring or a legacy curve. Range, crossing, mapping,
 lookup, combination and clamp helpers treat the spring's raw domain as including its analytic extrema and split time at
@@ -859,15 +859,15 @@ that scale from the persisted Stage duration relative to `stage_motion_reference
 
 Every feature transition reads a preset; no feature owns a literal duration or easing for a
 transition, and the clock-reading fixed-curve entry points (`reach_motion_start`,
-`reach_motion_animate_to`, `reach_animation_manager_animate_to`) are removed. The preset per event:
+`reach_motion_animate_to`) and the animation manager are removed. The preset per event:
 popup and panel geometry, list survivors, resizes, bar reveal, Dock slots and Stage tiles use
 `smooth`; compact bar widths, tray reorder and drag snaps use `snappy`; one-step selection pills,
 toggle knobs and the adjacent Settings sidebar step use `bouncy`; hover, tint and content opacity use
 `fade_in`/`fade_out`; presses use `press`/`release`. Bounce never appears on popups, panels, Stage,
-the Top Bar or opacity. Stage open and close scale `smooth` so it settles in exactly the persisted
-Stage duration; `reach_theme_stage_motion_scale` is not used by Stage yet. Scalar tracks sampled on
-the CPU (`reach_animation_manager`: Stage, Dock slots, bar reveal, Top Bar widths, Clipboard height,
-Settings rows) carry the same presets through `reach_animation_manager_spring_to_at`. Drag gestures
+the Top Bar or opacity. Stage open and close scale `smooth` by `reach_theme_stage_motion_scale`
+(configured duration over the theme reference), so the default follows the natural `smooth` settle.
+Scalars sampled on the CPU (Stage, Dock slots, bar reveal, Top Bar widths, Clipboard height, Settings
+rows) carry the same presets through `reach_motion_animate_spec_to_at`. Drag gestures
 feed `reach_drag_velocity` (`features/common/draggable`) with the value they display and hand its
 release velocity to the snap spring. Documented exceptions, which are periodic effects or holds
 rather than transitions: caret blink, the shared loader cycle, the now-playing marquee and the HUD
