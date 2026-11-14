@@ -867,7 +867,7 @@ popup and panel geometry, list survivors, resizes, bar reveal, Dock slots and St
 `smooth`; compact bar widths, tray reorder and drag snaps use `snappy`; one-step selection pills,
 toggle knobs and the adjacent Settings sidebar step use `bouncy`; hover, tint and content opacity use
 `fade_in`/`fade_out`; cards appear with `card_fade_in` (0.05 s) and leave with `card_fade_out`
-(0.7 s, matched to macOS); presses use `press`/`release`. Bounce never appears on popups, panels, Stage,
+(0.35 s); presses use `press`/`release`. Bounce never appears on popups, panels, Stage,
 the Top Bar or opacity. Stage open and close scale `smooth` by `reach_theme_stage_motion_scale`
 (configured duration over the theme reference), so the default follows the natural `smooth` settle.
 Scalars sampled on the CPU (Stage, Dock slots, bar reveal, Top Bar widths, Clipboard height, Settings
