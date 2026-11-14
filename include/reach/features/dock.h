@@ -18,7 +18,7 @@
 #include "reach/features/feature_capsule.h"
 #include "reach/services/icon_service.h"
 #include "reach/services/window_tracking.h"
-#include "reach/support/animation.h"
+#include "reach/support/motion.h"
 #include "reach/support/util.h"
 
 #ifdef __cplusplus
@@ -146,13 +146,6 @@ extern "C"
 
 #define REACH_DOCK_SLOT_CAPACITY (REACH_MAX_DOCK_ITEMS + 1)
 
-    enum reach_dock_animation_id
-    {
-        REACH_DOCK_ANIM_Y = 0,
-        REACH_DOCK_ANIM_SLOT_BASE,
-        REACH_DOCK_ANIM_COUNT = REACH_DOCK_ANIM_SLOT_BASE + REACH_DOCK_SLOT_CAPACITY
-    };
-
     typedef struct reach_dock reach_dock;
 
     reach_result reach_dock_create(reach_dock **out_animations);
@@ -162,8 +155,6 @@ extern "C"
                                     reach_window_tracking *windows);
 
     void reach_dock_set_routes(reach_dock *dock, const reach_dock_routes *routes);
-
-    reach_animation_manager *reach_dock_manager(reach_dock *animations);
 
     const reach_feature_capsule_ops *reach_dock_capsule_ops(void);
 

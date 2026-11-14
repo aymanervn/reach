@@ -5,7 +5,7 @@
 #include <stdint.h>
 
 #include "reach/core/geometry.h"
-#include "reach/support/animation.h"
+#include "reach/support/motion.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -87,8 +87,8 @@ extern "C"
                                             reach_rect_f32 monitor_bounds, float shadow_clearance);
 
     reach_bar_visibility_result
-    reach_bar_update_visibility(reach_bar_visibility_state *state, reach_animation_manager *manager,
-                                size_t y_track, const reach_bar_visibility_request *request);
+    reach_bar_update_visibility(reach_bar_visibility_state *state, reach_motion *y,
+                                const reach_bar_visibility_request *request);
 
 #ifdef __cplusplus
 }
