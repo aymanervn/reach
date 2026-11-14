@@ -24,7 +24,7 @@
 #include "reach/services/system_status.h"
 #include "reach/services/tray.h"
 #include "reach/services/window_tracking.h"
-#include "reach/support/animation.h"
+#include "reach/support/motion.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -85,16 +85,6 @@ extern "C"
         reach_rect_f32 stats_download;
         reach_rect_f32 stats_upload;
     } reach_top_bar_layout;
-
-    enum reach_top_bar_animation_id
-    {
-        REACH_TOP_BAR_ANIM_Y = 0,
-        REACH_TOP_BAR_ANIM_NOW_PLAYING_WIDTH,
-        REACH_TOP_BAR_ANIM_CURRENT_APP_WIDTH,
-        REACH_TOP_BAR_ANIM_TRAY_WIDTH,
-        REACH_TOP_BAR_ANIM_QUICK_SETTINGS_WIDTH,
-        REACH_TOP_BAR_ANIM_COUNT
-    };
 
     enum reach_top_bar_feedback_slot
     {
@@ -214,7 +204,6 @@ extern "C"
 
     const reach_feature_capsule_ops *reach_top_bar_capsule_ops(void);
     const reach_top_bar_state *reach_top_bar_state_ptr(const reach_top_bar *top_bar);
-    reach_animation_manager *reach_top_bar_manager(reach_top_bar *top_bar);
 
     typedef struct reach_top_bar_build_context
     {

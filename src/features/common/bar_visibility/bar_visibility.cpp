@@ -138,22 +138,22 @@ void reach_bar_begin_reveal_session(reach_bar_visibility_state *state)
 }
 
 reach_bar_visibility_result reach_bar_update_visibility(reach_bar_visibility_state *state,
-                                                        reach_animation_manager *manager,
-                                                        size_t y_track,
+                                                        reach_motion *y,
                                                         const reach_bar_visibility_request *request)
 {
     reach_bar_visibility_result result = {};
-    if (state == nullptr || manager == nullptr || request == nullptr)
+    if (state == nullptr || y == nullptr || request == nullptr)
     {
         return result;
     }
+    double now = reach_motion_now_seconds();
 
     float hidden_y = reach_bar_hidden_position(request->edge, request->shown_bounds,
                                                request->monitor_bounds, request->shadow_clearance);
     reach_rect_f32 current_bounds = request->shown_bounds;
     if (state->animation_initialized)
     {
-        current_bounds.y = reach_animation_manager_value(manager, y_track);
+        current_bounds.y = reach_motion_value_at(y, now);
     }
     reach_rect_f32 bridge_bounds = reach_bar_reveal_edge_bounds(
         request->edge, REACH_BAR_REVEAL_EDGE_BRIDGE, request->reveal_span_inset,
@@ -214,31 +214,23 @@ reach_bar_visibility_result reach_bar_update_visibility(reach_bar_visibility_sta
     {
         state->animation_initialized = 1;
         state->target_hidden = target_hidden;
-        reach_animation_manager_set(manager, y_track, target_y);
+        reach_motion_set(y, target_y);
     }
 
     if (state->target_hidden != target_hidden)
     {
         state->target_hidden = target_hidden;
-        double now = reach_motion_now_seconds();
-        if (request->reveal.easing == REACH_EASING_SPRING)
-            reach_animation_manager_spring_to_at(manager, y_track, target_y,
-                                                 request->reveal.response_seconds,
-                                                 request->reveal.damping, now);
-        else
-            reach_animation_manager_animate_to_at(manager, y_track, target_y,
-                                                  request->reveal.duration_seconds,
-                                                  request->reveal.easing, now);
+        reach_motion_animate_spec_to_at(y, target_y, request->reveal, now);
     }
-    else if (fabsf(reach_animation_manager_target(manager, y_track) - target_y) >= 0.01f)
+    else if (fabsf(y->to - target_y) >= 0.01f)
     {
-        reach_animation_manager_set(manager, y_track, target_y);
+        reach_motion_set(y, target_y);
     }
 
-    result.reveal_transition_active = reach_animation_manager_active(manager, y_track);
+    result.reveal_transition_active = reach_motion_active_at(y, now);
 
     reach_rect_f32 animated = request->shown_bounds;
-    animated.y = reach_animation_manager_value(manager, y_track);
+    animated.y = reach_motion_value_at(y, now);
     result.animated_bounds = animated;
     result.reveal_progress =
         reach_bar_reveal_progress(animated.y, request->shown_bounds.y, hidden_y);

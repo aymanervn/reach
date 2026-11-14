@@ -20,10 +20,20 @@ typedef struct reach_top_bar_tray_drag_state
 
 #define REACH_TOP_BAR_STATS_SLOT_COUNT 4
 
+enum reach_top_bar_animation_id
+{
+    REACH_TOP_BAR_ANIM_Y = 0,
+    REACH_TOP_BAR_ANIM_NOW_PLAYING_WIDTH,
+    REACH_TOP_BAR_ANIM_CURRENT_APP_WIDTH,
+    REACH_TOP_BAR_ANIM_TRAY_WIDTH,
+    REACH_TOP_BAR_ANIM_QUICK_SETTINGS_WIDTH,
+    REACH_TOP_BAR_ANIM_COUNT
+};
+
 struct reach_top_bar
 {
-    reach_animation_manager manager;
-    reach_animation_track tracks[REACH_TOP_BAR_ANIM_COUNT];
+    reach_motion motions[REACH_TOP_BAR_ANIM_COUNT];
+    double sampled_seconds;
     reach_top_bar_state state;
     reach_motion press_feedback;
     reach_motion power_hover;
