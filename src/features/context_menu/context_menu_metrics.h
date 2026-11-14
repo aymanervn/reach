@@ -20,7 +20,7 @@ struct reach_context_menu_metrics
     float icon_text_inset;
 };
 
-static constexpr float reach_context_menu_hover_text_size = REACH_TEXT_SIZE_MEDIUM;
+static constexpr float reach_context_menu_hover_text_size = REACH_TEXT_SIZE_SMALL;
 static constexpr float reach_context_menu_popup_scale = 0.9285714f;
 
 static constexpr reach_context_menu_metrics reach_context_menu_make_large_metrics()
