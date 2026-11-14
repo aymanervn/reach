@@ -2,7 +2,6 @@
 #include "reach/core/typography.h"
 #include "reach/apps/settings/settings.h"
 #include "reach/features/common/loader_render.h"
-#include "reach/features/common/scrollbar_render.h"
 #include "reach/features/common/ui_controls.h"
 
 #include "settings_pages_internal.h"
@@ -582,10 +581,10 @@ static void render_display_page(const reach_settings_render_input *input,
     reach_render_command_buffer_clear_scissor(commands);
     if (layout->display_scrollbar_thumb.height > 0.0f)
     {
-        reach_scrollbar_build_render_commands(
-            layout->display_scrollbar_track, layout->display_scrollbar_thumb,
-            {0.0f, 0.0f, 0.0f, 0.0f}, input->theme->settings_scrollbar_track,
-            input->theme->settings_scrollbar_thumb, commands);
+        (void)reach_scroll_view_push_scrollbar(
+            &input->model->display_scroll, {0.0f, 0.0f, 0.0f, 0.0f},
+            {input->theme->settings_scrollbar_track, input->theme->settings_scrollbar_thumb},
+            nullptr, layout->scroll_time, commands);
     }
 }
 
@@ -724,10 +723,10 @@ static void render_startup_apps_page(const reach_settings_render_input *input,
     if (layout->startup_scrollbar_thumb.height > 0.0f)
     {
         reach_rect_f32 origin = {0.0f, 0.0f, 0.0f, 0.0f};
-        reach_scrollbar_build_render_commands(layout->startup_scrollbar_track,
-                                              layout->startup_scrollbar_thumb, origin,
-                                              input->theme->settings_scrollbar_track,
-                                              input->theme->settings_scrollbar_thumb, commands);
+        (void)reach_scroll_view_push_scrollbar(
+            &input->model->startup_scroll, origin,
+            {input->theme->settings_scrollbar_track, input->theme->settings_scrollbar_thumb},
+            nullptr, layout->scroll_time, commands);
     }
 }
 
@@ -856,10 +855,10 @@ static void render_installed_apps_page(const reach_settings_render_input *input,
 
     if (layout->installed_apps_scrollbar_thumb.height > 0.0f)
     {
-        reach_scrollbar_build_render_commands(
-            layout->installed_apps_scrollbar_track, layout->installed_apps_scrollbar_thumb,
-            {0.0f, 0.0f, 0.0f, 0.0f}, input->theme->settings_scrollbar_track,
-            input->theme->settings_scrollbar_thumb, commands);
+        (void)reach_scroll_view_push_scrollbar(
+            &input->model->installed_apps_scroll, {0.0f, 0.0f, 0.0f, 0.0f},
+            {input->theme->settings_scrollbar_track, input->theme->settings_scrollbar_thumb},
+            nullptr, layout->scroll_time, commands);
     }
 }
 
@@ -1172,10 +1171,10 @@ static void render_update_page(const reach_settings_render_input *input,
     if (layout->update_scrollbar_thumb.height > 0.0f)
     {
         reach_rect_f32 origin = {0.0f, 0.0f, 0.0f, 0.0f};
-        reach_scrollbar_build_render_commands(layout->update_scrollbar_track,
-                                              layout->update_scrollbar_thumb, origin,
-                                              input->theme->settings_scrollbar_track,
-                                              input->theme->settings_scrollbar_thumb, commands);
+        (void)reach_scroll_view_push_scrollbar(
+            &input->model->update_scroll, origin,
+            {input->theme->settings_scrollbar_track, input->theme->settings_scrollbar_thumb},
+            nullptr, layout->scroll_time, commands);
     }
 }
 

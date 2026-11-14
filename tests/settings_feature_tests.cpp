@@ -170,11 +170,13 @@ static void test_scroll_and_operation_states(void)
         new reach_windows_update_operation_result());
     reach_settings_model_init(model.get());
     model->update_list = sample_updates(12);
-    reach_scrollbar_set_extents(&model->update_scrollbar, 600.0f, 100.0f);
+    reach_scroll_view_set_extents(&model->update_scroll, 600.0f, 100.0f);
     reach_settings_model_scroll_updates(model.get(), 120.0f);
-    expect_true(model->update_scrollbar.target == 120.0f, "update list scrolls down");
+    expect_true(reach_scroll_view_position(&model->update_scroll) == 120.0f,
+                "update list scrolls down");
     reach_settings_model_scroll_updates(model.get(), -40.0f);
-    expect_true(model->update_scrollbar.target == 80.0f, "update list scrolls up");
+    expect_true(reach_scroll_view_position(&model->update_scroll) == 80.0f,
+                "update list scrolls up");
 
     result->overall_reboot_required = 1;
     result->per_update_result_count = 1;
@@ -662,14 +664,13 @@ static void test_display_scrollbar_hit_testing(void)
     expect_true(hit.type == REACH_SETTINGS_HIT_DISPLAY_SCROLLBAR_TRACK,
                 "display scrollbar track is hit-testable");
 
-    reach_scrollbar_layout scrollbar = {layout.display_scrollbar_track,
-                                        layout.display_scrollbar_thumb};
-    reach_scrollbar_drag drag = {};
-    reach_scrollbar_begin_drag(&model->display_scrollbar, &drag, &scrollbar,
-                               layout.display_scrollbar_thumb.y + 1.0f, 1);
-    reach_scrollbar_update_drag(&model->display_scrollbar, &drag, &scrollbar,
-                                layout.display_scrollbar_thumb.y + 21.0f);
-    expect_true(model->display_scrollbar.target > 0.0f, "dragging the display thumb scrolls");
+    (void)reach_scroll_view_pointer_down(&model->display_scroll,
+                                         layout.display_scrollbar_thumb.x + 1.0f,
+                                         layout.display_scrollbar_thumb.y + 1.0f, 0.0);
+    (void)reach_scroll_view_pointer_move(&model->display_scroll,
+                                         layout.display_scrollbar_thumb.y + 21.0f, 0.0);
+    expect_true(reach_scroll_view_position(&model->display_scroll) > 0.0f,
+                "dragging the display thumb scrolls");
 }
 
 static void test_bluetooth_radio_stops_scan(void)

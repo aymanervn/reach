@@ -7,6 +7,33 @@
 #include "reach/support/animation.h"
 #include "reach/support/motion.h"
 
+static inline void reach_settings_scroll_init(reach_scroll_view *view)
+{
+    reach_scroll_view_config config = {};
+    config.unit = 1.0f;
+    reach_scroll_view_init(view, &config);
+}
+
+static inline void reach_settings_scroll_to_top(reach_scroll_view *view)
+{
+    (void)reach_scroll_view_set_position(view, 0.0f);
+    (void)reach_scroll_view_sync(view, nullptr, REACH_SCROLL_VIEW_SET, reach_motion_now_seconds());
+}
+
+static inline void reach_settings_layout_scroll(reach_scroll_view *view, reach_rect_f32 viewport,
+                                                reach_rect_f32 track, float content_height,
+                                                float minimum_thumb, double now_seconds,
+                                                reach_rect_f32 *out_thumb)
+{
+    reach_scroll_view_config config = view->config;
+    config.minimum_thumb = minimum_thumb;
+    reach_scroll_view_configure(view, &config);
+    reach_scroll_view_set_extents(view, content_height, viewport.height);
+    reach_scroll_view_set_frame(view, viewport, track);
+    (void)reach_scroll_view_sync(view, nullptr, REACH_SCROLL_VIEW_WHEEL, now_seconds);
+    *out_thumb = reach_scroll_view_thumb_at(view, now_seconds);
+}
+
 static inline reach_motion_spec reach_settings_motion_preset(reach_motion_preset preset)
 {
     return reach_theme_motion_preset(reach_theme_default(), preset);

@@ -1219,7 +1219,6 @@ int32_t reach_clipboard_tick_scroll(reach_clipboard_feature *clipboard, double n
     {
         return 0;
     }
-    const reach_clipboard_state *state = &clipboard->state;
-    return reach_scroll_view_value_at(&state->model.scroll, now_seconds) !=
-           reach_scroll_view_value_at(&state->model.scroll, state->layout.scroll_time);
+    return reach_scroll_view_advance(&reach_clipboard_feature_state_mut(clipboard)->model.scroll,
+                                     now_seconds);
 }

@@ -143,7 +143,7 @@ void reach_settings_model_set_wifi_view(reach_settings_model *model, reach_setti
     }
     model->wifi_view = view;
     reach_settings_model_wifi_expand_row(model, REACH_SETTINGS_WIFI_ROW_NONE);
-    reach_scrollbar_model_init(&model->wifi_scrollbar, REACH_SCROLLBAR_DRAG_FREE, 0.0f);
+    reach_settings_scroll_init(&model->wifi_scroll);
 }
 
 void reach_settings_model_set_wifi_status(reach_settings_model *model, int32_t status,
@@ -419,13 +419,8 @@ void reach_settings_model_scroll_wifi(reach_settings_model *model, float delta)
 {
     if (model != nullptr)
     {
-        reach_scrollbar_scroll(&model->wifi_scrollbar, delta);
+        (void)reach_scroll_view_scroll_by(&model->wifi_scroll, delta, reach_motion_now_seconds());
     }
-}
-
-int32_t reach_settings_model_wifi_scroll(reach_settings_model *model, double delta_seconds)
-{
-    return model != nullptr ? reach_scrollbar_update(&model->wifi_scrollbar, delta_seconds) : 0;
 }
 
 int32_t reach_settings_model_sample_wifi_animations_at(reach_settings_model *model,

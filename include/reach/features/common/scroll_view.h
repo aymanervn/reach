@@ -83,6 +83,7 @@ extern "C"
     int32_t reach_scroll_view_sync(reach_scroll_view *view, const reach_theme *theme,
                                    reach_scroll_view_mode mode, double now_seconds);
 
+    int32_t reach_scroll_view_scroll_by(reach_scroll_view *view, float delta, double now_seconds);
     uint32_t reach_scroll_view_wheel(reach_scroll_view *view, float x, float y, int32_t wheel_delta,
                                      double now_seconds);
     int32_t reach_scroll_view_hit(const reach_scroll_view *view, float x, float y);
@@ -96,6 +97,8 @@ extern "C"
     reach_motion reach_scroll_view_content_offset(const reach_scroll_view *view);
     int32_t reach_scroll_view_active(const reach_scroll_view *view);
     int32_t reach_scroll_view_active_at(const reach_scroll_view *view, double now_seconds);
+    int32_t reach_scroll_view_pending(const reach_scroll_view *view);
+    int32_t reach_scroll_view_advance(reach_scroll_view *view, double now_seconds);
     double reach_scroll_view_deadline(const reach_scroll_view *view);
     void reach_scroll_view_settle(reach_scroll_view *view);
     reach_scroll_view_window reach_scroll_view_item_window(const reach_scroll_view *view,

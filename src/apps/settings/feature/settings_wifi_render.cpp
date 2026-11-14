@@ -2,7 +2,6 @@
 #include "reach/core/typography.h"
 #include "reach/features/common/level_presentation.h"
 #include "reach/features/common/loader_render.h"
-#include "reach/features/common/scrollbar_render.h"
 #include "reach/features/common/section_reveal.h"
 #include "reach/features/common/ui_controls.h"
 
@@ -465,9 +464,9 @@ void reach_settings_render_wifi_page(const reach_settings_render_input *input,
     if (layout->wifi_scrollbar_thumb.height > 0.0f)
     {
         reach_rect_f32 origin = {0.0f, 0.0f, 0.0f, 0.0f};
-        reach_scrollbar_build_render_commands(layout->wifi_scrollbar_track,
-                                              layout->wifi_scrollbar_thumb, origin,
-                                              input->theme->settings_scrollbar_track,
-                                              input->theme->settings_scrollbar_thumb, commands);
+        (void)reach_scroll_view_push_scrollbar(
+            &input->model->wifi_scroll, origin,
+            {input->theme->settings_scrollbar_track, input->theme->settings_scrollbar_thumb},
+            nullptr, layout->scroll_time, commands);
     }
 }

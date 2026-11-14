@@ -217,14 +217,9 @@ void reach_settings_model_scroll_bluetooth(reach_settings_model *model, float de
 {
     if (model != nullptr)
     {
-        reach_scrollbar_scroll(&model->bluetooth_scrollbar, delta);
+        (void)reach_scroll_view_scroll_by(&model->bluetooth_scroll, delta,
+                                          reach_motion_now_seconds());
     }
-}
-
-int32_t reach_settings_model_bluetooth_scroll(reach_settings_model *model, double delta_seconds)
-{
-    return model != nullptr ? reach_scrollbar_update(&model->bluetooth_scrollbar, delta_seconds)
-                            : 0;
 }
 
 int32_t reach_settings_model_sample_bluetooth_animations_at(reach_settings_model *model,

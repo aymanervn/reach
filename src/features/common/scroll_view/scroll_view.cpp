@@ -137,6 +137,15 @@ int32_t reach_scroll_view_sync(reach_scroll_view *view, const reach_theme *theme
     return 1;
 }
 
+int32_t reach_scroll_view_scroll_by(reach_scroll_view *view, float delta, double now_seconds)
+{
+    if (view == nullptr || !isfinite(delta))
+        return 0;
+    int32_t changed = reach_scroll_view_set_position(view, view->model.target + delta);
+    (void)reach_scroll_view_sync(view, nullptr, REACH_SCROLL_VIEW_WHEEL, now_seconds);
+    return changed;
+}
+
 uint32_t reach_scroll_view_wheel(reach_scroll_view *view, float x, float y, int32_t wheel_delta,
                                  double now_seconds)
 {
@@ -144,9 +153,8 @@ uint32_t reach_scroll_view_wheel(reach_scroll_view *view, float x, float y, int3
         return 0;
     float delta = wheel_delta > 0 ? -view->config.wheel_delta : view->config.wheel_delta;
     uint32_t flags = REACH_SCROLL_VIEW_HANDLED;
-    if (reach_scroll_view_set_position(view, view->model.target + delta))
+    if (reach_scroll_view_scroll_by(view, delta, now_seconds))
         flags |= REACH_SCROLL_VIEW_CHANGED;
-    (void)reach_scroll_view_sync(view, nullptr, REACH_SCROLL_VIEW_WHEEL, now_seconds);
     return flags;
 }
 
@@ -229,6 +237,20 @@ int32_t reach_scroll_view_active(const reach_scroll_view *view)
 int32_t reach_scroll_view_active_at(const reach_scroll_view *view, double now_seconds)
 {
     return view != nullptr && reach_motion_active_at(&view->offset, now_seconds);
+}
+
+int32_t reach_scroll_view_pending(const reach_scroll_view *view)
+{
+    return view != nullptr && view->offset.duration_seconds > 0.0;
+}
+
+int32_t reach_scroll_view_advance(reach_scroll_view *view, double now_seconds)
+{
+    if (!reach_scroll_view_pending(view))
+        return 0;
+    if (!reach_motion_active_at(&view->offset, now_seconds))
+        reach_scroll_view_settle(view);
+    return 1;
 }
 
 double reach_scroll_view_deadline(const reach_scroll_view *view)

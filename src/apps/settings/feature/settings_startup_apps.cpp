@@ -39,8 +39,7 @@ void reach_settings_model_apply_startup_apps(reach_settings_model *model,
         reach_motion_set(&model->startup_toggles[index], value);
     }
 
-    reach_scrollbar_set_target(&model->startup_scrollbar, 0.0f);
-    model->startup_scrollbar.offset = 0.0f;
+    reach_settings_scroll_to_top(&model->startup_scroll);
     model->startup_loaded = 1;
     model->startup_status = REACH_SETTINGS_STARTUP_STATUS_NONE;
 }
@@ -110,14 +109,5 @@ void reach_settings_model_scroll_startup(reach_settings_model *model, float delt
     {
         return;
     }
-    reach_scrollbar_scroll(&model->startup_scrollbar, delta);
-}
-
-int32_t reach_settings_model_startup_scroll(reach_settings_model *model, double delta_seconds)
-{
-    if (model == nullptr)
-    {
-        return 0;
-    }
-    return reach_scrollbar_update(&model->startup_scrollbar, delta_seconds);
+    (void)reach_scroll_view_scroll_by(&model->startup_scroll, delta, reach_motion_now_seconds());
 }
