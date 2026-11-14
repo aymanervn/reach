@@ -1,6 +1,6 @@
 #include "reach/features/clipboard.h"
 #include "reach/features/common/presentation.h"
-#include "reach/support/animation.h"
+#include "reach/support/motion.h"
 
 #include "clipboard_common.h"
 #include "clipboard_metrics.h"
@@ -253,16 +253,9 @@ reach_clipboard_hit_result reach_clipboard_hit_test(const reach_clipboard_model 
     return result;
 }
 
-enum
-{
-    REACH_CLIPBOARD_ANIMATION_HEIGHT = 0,
-    REACH_CLIPBOARD_ANIMATION_COUNT
-};
-
 struct reach_clipboard_feature
 {
-    reach_animation_manager animations;
-    reach_animation_track animation_tracks[REACH_CLIPBOARD_ANIMATION_COUNT];
+    reach_motion height;
     reach_motion item_width;
     double item_width_deadline;
     reach_motion_spec smooth_spec;
@@ -835,8 +828,7 @@ reach_result reach_clipboard_feature_create(reach_clipboard_feature **out_clipbo
     {
         return REACH_ERROR;
     }
-    reach_animation_manager_init(&clipboard->animations, clipboard->animation_tracks,
-                                 REACH_CLIPBOARD_ANIMATION_COUNT);
+    reach_motion_set(&clipboard->height, 0.0f);
     reach_clipboard_feature_load_motion_specs(clipboard, reach_theme_default());
     reach_feature_transition_init(&clipboard->surface_transition, REACH_FEATURE_PRESENTATION_POPUP,
                                   REACH_FEATURE_TRANSITION_FROM_BELOW);
@@ -953,7 +945,7 @@ void reach_clipboard_feature_sample_at(reach_clipboard_feature *clipboard, doubl
     {
         return;
     }
-    reach_animation_manager_sample_at(&clipboard->animations, now_seconds);
+    (void)reach_motion_advance_at(&clipboard->height, now_seconds);
 }
 
 static void reach_clipboard_feature_sync_hover(reach_clipboard_feature *clipboard)
@@ -1046,7 +1038,7 @@ int32_t reach_clipboard_feature_any_animation_active(const reach_clipboard_featu
         if (reach_motion_active(&offset))
             return 1;
     }
-    return reach_animation_manager_any_active(&clipboard->animations);
+    return reach_motion_pending(&clipboard->height);
 }
 
 const reach_motion *reach_clipboard_feature_hover_motions(reach_clipboard_feature *clipboard)
@@ -1073,33 +1065,24 @@ static float reach_clipboard_feature_animate_height(reach_clipboard_feature *cli
         return target;
     }
 
-    size_t track_id = REACH_CLIPBOARD_ANIMATION_HEIGHT;
-    float value = reach_animation_manager_value(&clipboard->animations, track_id);
-    if (value <= 0.0f)
+    reach_motion *height = &clipboard->height;
+    double now = reach_motion_now_seconds();
+    if (reach_motion_value_at(height, now) <= 0.0f)
     {
-        reach_animation_manager_set(&clipboard->animations, track_id, target);
+        reach_motion_set(height, target);
         return target;
     }
 
-    if (fabsf(reach_animation_manager_target(&clipboard->animations, track_id) - target) >= 0.5f)
-    {
-        const reach_motion_spec &spec = clipboard->smooth_spec;
-        double now = reach_motion_now_seconds();
-        if (spec.easing == REACH_EASING_SPRING)
-            reach_animation_manager_spring_to_at(&clipboard->animations, track_id, target,
-                                                 spec.response_seconds, spec.damping, now);
-        else
-            reach_animation_manager_animate_to_at(&clipboard->animations, track_id, target,
-                                                  spec.duration_seconds, spec.easing, now);
-    }
+    if (fabsf(height->to - target) >= 0.5f)
+        reach_motion_animate_spec_to_at(height, target, clipboard->smooth_spec, now);
 
-    if (reach_animation_manager_active(&clipboard->animations, track_id))
+    if (reach_motion_active_at(height, now))
     {
         if (out_active != nullptr)
         {
             *out_active = 1;
         }
-        return reach_animation_manager_value(&clipboard->animations, track_id);
+        return reach_motion_value_at(height, now);
     }
 
     return target;
