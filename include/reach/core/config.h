@@ -13,6 +13,8 @@ extern "C"
 
 #define REACH_MAX_WALLPAPER_MONITORS 8
 #define REACH_CONFIG_TOP_BAR_OPACITY_MAX 100
+#define REACH_CONFIG_DOCK_SIZE_MIN 50
+#define REACH_CONFIG_DOCK_SIZE_MAX 100
 
     typedef enum reach_config_theme_preference
     {
@@ -42,6 +44,7 @@ extern "C"
         uint16_t wallpaper_path[260];
         uint16_t monitor_wallpaper_paths[REACH_MAX_WALLPAPER_MONITORS][260];
         float dock_height;
+        int32_t dock_size;
         reach_config_top_bar_style top_bar_style;
         reach_config_top_bar_mode top_bar_mode;
         int32_t top_bar_opacity;

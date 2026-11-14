@@ -269,7 +269,8 @@ static void reach_feature_notify_dock(void *capsule, const reach_feature_notific
     else if (notification->kind == REACH_FEATURE_NOTIFICATION_CONFIG_CHANGED &&
              notification->config != nullptr)
     {
-        reach_dock_apply_config(dock, notification->config->dock_height);
+        reach_dock_apply_config(dock, notification->config->dock_height,
+                                notification->config->dock_size);
         out->relayout = 1;
         out->redraw = 1;
     }

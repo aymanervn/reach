@@ -28,6 +28,7 @@ enum reach_config_operation_type
     REACH_CONFIG_OPERATION_SET_POWER,
     REACH_CONFIG_OPERATION_SET_DISPLAY,
     REACH_CONFIG_OPERATION_SET_TOP_BAR,
+    REACH_CONFIG_OPERATION_SET_DOCK_SIZE,
     REACH_CONFIG_OPERATION_SET_WALLPAPERS,
     REACH_CONFIG_OPERATION_SET_MONITOR_WALLPAPER
 };
@@ -41,6 +42,7 @@ struct reach_config_operation
     reach_config_power_settings power;
     reach_config_display_settings display;
     reach_config_top_bar_settings top_bar;
+    int32_t dock_size;
     uint32_t pin_id;
     size_t target_index;
     size_t monitor_count;
@@ -129,6 +131,10 @@ static reach_result reach_config_apply_operation(reach_config_snapshot *snapshot
         snapshot->top_bar_style = operation->top_bar.style;
         snapshot->top_bar_mode = operation->top_bar.mode;
         snapshot->top_bar_opacity = operation->top_bar.opacity;
+        return REACH_OK;
+    case REACH_CONFIG_OPERATION_SET_DOCK_SIZE:
+        *out_changed = snapshot->dock_size != operation->dock_size;
+        snapshot->dock_size = operation->dock_size;
         return REACH_OK;
     case REACH_CONFIG_OPERATION_SET_WALLPAPERS:
         *out_changed = !reach_path_equals(snapshot->wallpaper_path, operation->path);
@@ -655,6 +661,18 @@ reach_result reach_config_service_set_top_bar(reach_config_service *service,
     reach_config_operation operation = {};
     operation.type = REACH_CONFIG_OPERATION_SET_TOP_BAR;
     operation.top_bar = *settings;
+    return reach_config_service_commit(service, &operation);
+}
+
+reach_result reach_config_service_set_dock_size(reach_config_service *service, int32_t size)
+{
+    if (size < REACH_CONFIG_DOCK_SIZE_MIN || size > REACH_CONFIG_DOCK_SIZE_MAX)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    reach_config_operation operation = {};
+    operation.type = REACH_CONFIG_OPERATION_SET_DOCK_SIZE;
+    operation.dock_size = size;
     return reach_config_service_commit(service, &operation);
 }
 

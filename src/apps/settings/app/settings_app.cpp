@@ -22,6 +22,7 @@
 
 #include <atomic>
 #include <condition_variable>
+#include <math.h>
 #include <memory>
 #include <mutex>
 #include <new>
@@ -659,6 +660,7 @@ static void reach_settings_load_top_bar_config(reach_settings_app *app)
     reach_settings_model_set_top_bar_style(&app->model, snapshot->top_bar_style);
     reach_settings_model_set_top_bar_mode(&app->model, snapshot->top_bar_mode);
     (void)reach_settings_model_set_top_bar_opacity(&app->model, snapshot->top_bar_opacity);
+    (void)reach_settings_model_set_dock_size(&app->model, snapshot->dock_size);
 }
 
 static void reach_settings_save_top_bar_config(reach_settings_app *app)
@@ -1897,6 +1899,7 @@ static uint64_t reach_settings_pressable_target(reach_settings_hit_result hit)
     case REACH_SETTINGS_HIT_BLUETOOTH_SCROLLBAR_TRACK:
     case REACH_SETTINGS_HIT_BLUETOOTH_SCROLLBAR_THUMB:
     case REACH_SETTINGS_HIT_TOP_BAR_OPACITY:
+    case REACH_SETTINGS_HIT_DOCK_SIZE:
         return REACH_PRESSABLE_TARGET_NONE;
     default:
         break;
@@ -2111,19 +2114,35 @@ static void reach_settings_handle_bluetooth_action(reach_settings_app *app,
     app->dirty = 1;
 }
 
-static void reach_settings_drag_top_bar_opacity(reach_settings_app *app, float x)
+static void reach_settings_drag_slider(reach_settings_app *app, float x)
 {
-    if (reach_settings_model_set_top_bar_opacity(
-            &app->model, reach_settings_top_bar_opacity_at(&app->layout, x)))
+    if (app->model.dragging_slider == REACH_SETTINGS_HIT_TOP_BAR_OPACITY)
     {
-        reach_settings_save_top_bar_config(app);
-        app->dirty = 1;
+        float ratio = reach_settings_slider_ratio_at(&app->layout.top_bar_opacity, x);
+        if (reach_settings_model_set_top_bar_opacity(
+                &app->model, (int32_t)lroundf(ratio * (float)REACH_CONFIG_TOP_BAR_OPACITY_MAX)))
+        {
+            reach_settings_save_top_bar_config(app);
+            app->dirty = 1;
+        }
+    }
+    else if (app->model.dragging_slider == REACH_SETTINGS_HIT_DOCK_SIZE)
+    {
+        float ratio = reach_settings_slider_ratio_at(&app->layout.dock_size, x);
+        int32_t size = REACH_CONFIG_DOCK_SIZE_MIN +
+                       (int32_t)lroundf(ratio * (float)(REACH_CONFIG_DOCK_SIZE_MAX -
+                                                        REACH_CONFIG_DOCK_SIZE_MIN));
+        if (reach_settings_model_set_dock_size(&app->model, size) && app->config_service != nullptr)
+        {
+            (void)reach_config_service_set_dock_size(app->config_service, size);
+            app->dirty = 1;
+        }
     }
 }
 
-static void reach_settings_end_top_bar_opacity_drag(reach_settings_app *app)
+static void reach_settings_end_slider_drag(reach_settings_app *app)
 {
-    app->model.top_bar_opacity_dragging = 0;
+    app->model.dragging_slider = REACH_SETTINGS_HIT_NONE;
     if (app->window.ops.set_pointer_capture != nullptr)
     {
         (void)app->window.ops.set_pointer_capture(app->window.window, 0);
@@ -2132,9 +2151,9 @@ static void reach_settings_end_top_bar_opacity_drag(reach_settings_app *app)
 
 static void reach_settings_handle_pointer_up(reach_settings_app *app, const reach_ui_event *event)
 {
-    if (app->model.top_bar_opacity_dragging)
+    if (app->model.dragging_slider != REACH_SETTINGS_HIT_NONE)
     {
-        reach_settings_end_top_bar_opacity_drag(app);
+        reach_settings_end_slider_drag(app);
         return;
     }
     reach_scroll_view *dragging = reach_settings_model_dragging_scroll(&app->model);
@@ -2496,16 +2515,17 @@ static void reach_settings_handle_pointer_down(reach_settings_app *app, const re
     float x = (float)event->x - app->bounds.x;
     float y = (float)event->y - app->bounds.y;
     reach_settings_hit_result hit = reach_settings_hit_test(&app->layout, x, y);
-    if (hit.type == REACH_SETTINGS_HIT_TOP_BAR_OPACITY)
+    if (hit.type == REACH_SETTINGS_HIT_TOP_BAR_OPACITY || hit.type == REACH_SETTINGS_HIT_DOCK_SIZE)
     {
-        if (reach_settings_model_top_bar_opacity_enabled(&app->model))
+        if (hit.type == REACH_SETTINGS_HIT_DOCK_SIZE ||
+            reach_settings_model_top_bar_opacity_enabled(&app->model))
         {
-            app->model.top_bar_opacity_dragging = 1;
+            app->model.dragging_slider = hit.type;
             if (app->window.ops.set_pointer_capture != nullptr)
             {
                 (void)app->window.ops.set_pointer_capture(app->window.window, 1);
             }
-            reach_settings_drag_top_bar_opacity(app, x);
+            reach_settings_drag_slider(app, x);
         }
         return;
     }
@@ -2540,9 +2560,9 @@ static void reach_settings_handle_pointer_move(reach_settings_app *app, const re
     }
     reach_settings_refresh_bounds(app);
     reach_settings_refresh_layout(app);
-    if (app->model.top_bar_opacity_dragging)
+    if (app->model.dragging_slider != REACH_SETTINGS_HIT_NONE)
     {
-        reach_settings_drag_top_bar_opacity(app, (float)event->x - app->bounds.x);
+        reach_settings_drag_slider(app, (float)event->x - app->bounds.x);
         return;
     }
 
@@ -2653,7 +2673,7 @@ static void reach_settings_handle_event(void *user, const reach_ui_event *event)
         reach_scroll_view *dragging = reach_settings_model_dragging_scroll(&app->model);
         if (dragging != nullptr)
             (void)reach_scroll_view_pointer_up(dragging);
-        app->model.top_bar_opacity_dragging = 0;
+        app->model.dragging_slider = REACH_SETTINGS_HIT_NONE;
         if (reach_settings_model_set_hovered_button(&app->model, REACH_SETTINGS_HIT_NONE))
         {
             app->dirty = 1;

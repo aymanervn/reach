@@ -178,6 +178,12 @@ static reach_result reach_config_store_load(reach_config_store *store,
     GetPrivateProfileStringW(L"reach", L"version", L"",
                              reinterpret_cast<wchar_t *>(out_snapshot->version), 32, path);
     out_snapshot->dock_height = (float)GetPrivateProfileIntW(L"dock", L"height", 64, path);
+    int32_t dock_size =
+        (int32_t)GetPrivateProfileIntW(L"dock", L"size", REACH_CONFIG_DOCK_SIZE_MAX, path);
+    out_snapshot->dock_size =
+        dock_size < REACH_CONFIG_DOCK_SIZE_MIN
+            ? REACH_CONFIG_DOCK_SIZE_MIN
+            : (dock_size > REACH_CONFIG_DOCK_SIZE_MAX ? REACH_CONFIG_DOCK_SIZE_MAX : dock_size);
     int32_t top_bar_style = (int32_t)GetPrivateProfileIntW(L"top_bar", L"style",
                                                            REACH_CONFIG_TOP_BAR_STYLE_SPLIT, path);
     out_snapshot->top_bar_style = top_bar_style >= REACH_CONFIG_TOP_BAR_STYLE_SPLIT &&
@@ -341,6 +347,8 @@ static reach_result reach_config_store_save(reach_config_store *store,
     text.append(REACH_CONFIG_VERSION_WIDE(REACH_VERSION_STRING));
     text.append(L"\r\n\r\n[dock]\r\nheight=");
     text.append(std::to_wstring((int32_t)snapshot->dock_height));
+    text.append(L"\r\nsize=");
+    text.append(std::to_wstring(snapshot->dock_size));
     text.append(L"\r\n\r\n[top_bar]\r\nstyle=");
     text.append(std::to_wstring((int32_t)snapshot->top_bar_style));
     text.append(L"\r\nmode=");

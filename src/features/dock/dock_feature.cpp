@@ -1,5 +1,7 @@
 #include "reach/features/dock.h"
 
+#include "reach/core/config.h"
+
 #include "dock_common_state.h"
 #include "dock_interaction.h"
 
@@ -54,6 +56,7 @@ struct reach_dock
     reach_menu_request hover_request;
     uint32_t hover_owner_key;
     reach_dock_model metrics;
+    float size_scale;
     uint32_t next_app_key;
     reach_dock_routes routes;
     const reach_theme *pointer_theme;
@@ -155,6 +158,7 @@ reach_result reach_dock_create(reach_dock **out_animations)
         return REACH_ERROR;
     }
     reach_dock_model_defaults(&animations->metrics);
+    animations->size_scale = 1.0f;
     reach_motion_set(&animations->y_motion, 0.0f);
     for (reach_motion &motion : animations->slot_motions)
         reach_motion_set(&motion, 0.0f);
@@ -778,11 +782,19 @@ static int32_t reach_dock_capsule_control_at_point(const void *capsule, int32_t 
     }
 }
 
-void reach_dock_apply_config(reach_dock *dock, float height)
+void reach_dock_apply_config(reach_dock *dock, float height, int32_t size)
 {
-    if (dock != nullptr && height > 0.0f)
+    if (dock == nullptr)
+    {
+        return;
+    }
+    if (height > 0.0f)
     {
         dock->metrics.height = height;
+    }
+    if (size >= REACH_CONFIG_DOCK_SIZE_MIN && size <= REACH_CONFIG_DOCK_SIZE_MAX)
+    {
+        dock->size_scale = (float)size / (float)REACH_CONFIG_DOCK_SIZE_MAX;
     }
 }
 
@@ -820,6 +832,7 @@ int32_t reach_dock_arrange(reach_dock *dock, const reach_dock_arrange_context *c
     build.dpi_scale = ctx->dpi_scale;
     build.icon_size = dock->metrics.icon_size;
     build.gap = dock->metrics.gap;
+    build.size_scale = dock->size_scale;
     build.pinned_apps = dock->pinned_apps;
     build.pinned_app_count = dock->pinned_app_count;
 
@@ -1700,7 +1713,8 @@ float reach_dock_item_reveal(reach_dock *dock, size_t item_index)
 
 reach_dock_fit_result reach_dock_fit_metrics(float native_height, float native_icon_size,
                                              float native_gap, float native_border_thickness,
-                                             float available_width, float app_slot_units)
+                                             float available_width, float app_slot_units,
+                                             float size_scale)
 {
     reach_dock_fit_result result = {};
     if (native_height < 0.0f)
@@ -1736,8 +1750,8 @@ reach_dock_fit_result reach_dock_fit_metrics(float native_height, float native_i
     const float native_outer_padding = native_gap * REACH_DOCK_OUTER_PADDING_SCALE;
     const float native_width = native_border_thickness * 2.0f + native_outer_padding * 2.0f +
                                native_icon_size + app_slot_units * (native_icon_size + native_gap);
-    result.scale = 1.0f;
-    if (available_width > 0.0f && native_width > available_width)
+    result.scale = size_scale > 0.0f && size_scale < 1.0f ? size_scale : 1.0f;
+    if (available_width > 0.0f && native_width * result.scale > available_width)
     {
         result.scale = available_width / native_width;
     }
@@ -1776,9 +1790,9 @@ void reach_dock_build_layout(reach_dock *dock, const reach_dock_build_context *c
     const float native_height =
         layout->native_height > 0.0f ? layout->native_height : layout->bounds.height;
     const float native_border_thickness = reach_theme_border_thickness(ctx->theme, dpi_scale);
-    const reach_dock_fit_result fit =
-        reach_dock_fit_metrics(native_height, ctx->icon_size * dpi_scale, ctx->gap * dpi_scale,
-                               native_border_thickness, layout->available_width, app_slot_units);
+    const reach_dock_fit_result fit = reach_dock_fit_metrics(
+        native_height, ctx->icon_size * dpi_scale, ctx->gap * dpi_scale, native_border_thickness,
+        layout->available_width, app_slot_units, ctx->size_scale);
     const float center_x = layout->bounds.x + layout->bounds.width * 0.5f;
     const float bottom = layout->bounds.y + layout->bounds.height;
     layout->bounds.x = center_x - fit.width * 0.5f;
