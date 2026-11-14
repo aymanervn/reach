@@ -1,5 +1,4 @@
 #include "reach/core/scrollbar.h"
-#include "reach/support/workload.h"
 
 #include <math.h>
 
@@ -14,22 +13,20 @@ static float reach_scrollbar_clamp(float value, float minimum, float maximum)
 
 static float reach_scrollbar_quantize(const reach_scrollbar_model *model, float value)
 {
-    if (model == nullptr || model->drag_mode != REACH_SCROLLBAR_DRAG_STEPPED || model->step <= 0.0f)
+    if (model == nullptr || model->step <= 0.0f)
     {
         return value;
     }
     return floorf(value / model->step + 0.5f) * model->step;
 }
 
-void reach_scrollbar_model_init(reach_scrollbar_model *model, reach_scrollbar_drag_mode drag_mode,
-                                float step)
+void reach_scrollbar_model_init(reach_scrollbar_model *model, float step)
 {
     if (model == nullptr)
     {
         return;
     }
     *model = {};
-    model->drag_mode = drag_mode;
     model->step = step;
 }
 
@@ -41,72 +38,22 @@ void reach_scrollbar_set_extents(reach_scrollbar_model *model, float content_ext
         return;
     }
     model->maximum = content_extent > viewport_extent ? content_extent - viewport_extent : 0.0f;
-    model->target = reach_scrollbar_clamp(model->target, 0.0f, model->maximum);
-    model->offset = reach_scrollbar_clamp(model->offset, 0.0f, model->maximum);
+    model->position = reach_scrollbar_clamp(model->position, 0.0f, model->maximum);
 }
 
-void reach_scrollbar_set_target(reach_scrollbar_model *model, float target)
+void reach_scrollbar_set_position(reach_scrollbar_model *model, float position)
 {
     if (model == nullptr)
     {
         return;
     }
-    target = reach_scrollbar_quantize(model, target);
-    model->target = reach_scrollbar_clamp(target, 0.0f, model->maximum);
-}
-
-void reach_scrollbar_scroll(reach_scrollbar_model *model, float delta)
-{
-    if (model != nullptr && delta != 0.0f)
-    {
-        reach_scrollbar_set_target(model, model->target + delta);
-    }
-}
-
-int32_t reach_scrollbar_update(reach_scrollbar_model *model, double delta_seconds)
-{
-    if (model == nullptr)
-    {
-        return 0;
-    }
-    float difference = model->target - model->offset;
-    if (fabsf(difference) < 0.1f)
-    {
-        model->offset = model->target;
-        return 0;
-    }
-    float blend = (float)(delta_seconds * 18.0);
-    reach_workload_add(REACH_WORKLOAD_SCROLL_ADVANCES, 1);
-    if (blend > 1.0f)
-    {
-        blend = 1.0f;
-    }
-    model->offset += difference * blend;
-    return 1;
-}
-
-reach_result reach_scrollbar_motion_retarget(reach_motion *motion, float target, double now_seconds)
-{
-    if (motion == nullptr || !isfinite(target) || !isfinite(now_seconds))
-        return REACH_INVALID_ARGUMENT;
-    float current = reach_motion_value_at(motion, now_seconds);
-    if (!isfinite(current))
-        return REACH_INVALID_ARGUMENT;
-    if (fabsf(target - current) <= .1f)
-    {
-        reach_motion_set(motion, target);
-        return REACH_OK;
-    }
-    reach_motion_start_at(motion, current, target, 12 / (-60 * log(.7)),
-                          REACH_EASING_EXPONENTIAL_OUT, now_seconds);
-    reach_motion_segment segments[REACH_MOTION_MAX_SEGMENTS] = {};
-    return reach_motion_compile_at(motion, now_seconds, segments) > 0 ? REACH_OK
-                                                                      : REACH_NOT_IMPLEMENTED;
+    position = reach_scrollbar_quantize(model, position);
+    model->position = reach_scrollbar_clamp(position, 0.0f, model->maximum);
 }
 
 reach_scrollbar_layout reach_scrollbar_compute_layout(const reach_scrollbar_model *model,
-                                                      reach_rect_f32 track, float viewport_extent,
-                                                      float content_extent,
+                                                      reach_rect_f32 track, float position,
+                                                      float viewport_extent, float content_extent,
                                                       float minimum_thumb_extent)
 {
     reach_scrollbar_layout layout = {};
@@ -127,7 +74,7 @@ reach_scrollbar_layout reach_scrollbar_compute_layout(const reach_scrollbar_mode
         thumb_extent = track.height;
     }
     float travel = track.height - thumb_extent;
-    float progress = model->maximum > 0.0f ? model->offset / model->maximum : 0.0f;
+    float progress = model->maximum > 0.0f ? position / model->maximum : 0.0f;
     layout.thumb = {track.x, track.y + travel * reach_scrollbar_clamp(progress, 0.0f, 1.0f),
                     track.width, thumb_extent};
     return layout;
@@ -156,13 +103,12 @@ void reach_scrollbar_update_drag(reach_scrollbar_model *model, const reach_scrol
     float travel = layout->track.height - layout->thumb.height;
     if (travel <= 0.0f)
     {
-        reach_scrollbar_set_target(model, 0.0f);
-        model->offset = model->target;
+        reach_scrollbar_set_position(model, 0.0f);
         return;
     }
     float progress = (pointer_position - drag->grab_offset - layout->track.y) / travel;
-    reach_scrollbar_set_target(model, reach_scrollbar_clamp(progress, 0.0f, 1.0f) * model->maximum);
-    model->offset = model->target;
+    reach_scrollbar_set_position(model,
+                                 reach_scrollbar_clamp(progress, 0.0f, 1.0f) * model->maximum);
 }
 
 void reach_scrollbar_end_drag(reach_scrollbar_drag *drag)
