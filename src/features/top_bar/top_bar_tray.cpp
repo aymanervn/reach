@@ -698,8 +698,9 @@ reach_result reach_top_bar_append_tray_render_commands(reach_top_bar *top_bar,
     popup.notch_center_x = popup_state->placement.notch_anchor_x - ctx->bounds.x;
     popup.notch_side = popup_state->placement.notch_side;
     popup.dpi_scale = ctx->dpi_scale;
-    popup.background_color_override = ctx->theme->bar_tray_background;
+    popup.background_color_override = ctx->theme->top_bar_dropdown_background;
     popup.has_background_color_override = 1;
+    popup.hide_notch = 1;
     reach_result result = reach_popup_push_background(&popup, out_commands);
     if (result != REACH_OK)
     {

@@ -776,6 +776,9 @@ reach_quick_settings_build_render_commands(const reach_quick_settings_render_inp
         background.notch_center_x = input->notch_center_x;
         background.notch_side = input->notch_side;
         background.dpi_scale = input->dpi_scale;
+        background.background_color_override = input->theme.top_bar_dropdown_background;
+        background.has_background_color_override = 1;
+        background.hide_notch = 1;
         reach_result result = reach_popup_push_height_background(
             &background, &input->surface_motion.height, 7, 1700, commands);
         if (result != REACH_OK)
