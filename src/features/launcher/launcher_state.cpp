@@ -746,7 +746,7 @@ reach_result reach_launcher_create(reach_launcher **out_launcher)
     {
         return REACH_ERROR;
     }
-    reach_feature_transition_init(&launcher->surface_transition, REACH_FEATURE_PRESENTATION_POPUP,
+    reach_feature_transition_init(&launcher->surface_transition,
                                   REACH_FEATURE_TRANSITION_FROM_ABOVE);
     reach_launcher_load_motion_specs(launcher, reach_theme_default());
     reach_motion_set(&launcher->body_height, 0);

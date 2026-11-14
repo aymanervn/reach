@@ -251,8 +251,7 @@ reach_result reach_system_hud_create(reach_system_hud **out_hud)
     {
         return REACH_ERROR;
     }
-    reach_feature_transition_init(&hud->transition, REACH_FEATURE_PRESENTATION_POPUP,
-                                  REACH_FEATURE_TRANSITION_FROM_BELOW);
+    reach_feature_transition_init(&hud->transition, REACH_FEATURE_TRANSITION_FROM_BELOW);
     reach_system_hud_reset(hud);
     *out_hud = hud;
     return REACH_OK;

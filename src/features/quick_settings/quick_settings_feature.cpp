@@ -1745,7 +1745,6 @@ reach_result reach_quick_settings_create(reach_quick_settings **out_quick_settin
         return REACH_ERROR;
     }
     reach_feature_transition_init(&quick_settings->popup_transition,
-                                  REACH_FEATURE_PRESENTATION_POPUP,
                                   REACH_FEATURE_TRANSITION_FROM_ABOVE);
     reach_pressable_init(&quick_settings->pressable);
     reach_quick_settings_model_init(&quick_settings->state.model);

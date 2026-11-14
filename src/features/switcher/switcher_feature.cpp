@@ -203,11 +203,13 @@ static void reach_switcher_apply_action(reach_switcher *switcher, reach_switcher
     if (switcher != nullptr && action.type == REACH_SWITCHER_ACTION_OPENED)
     {
         (void)reach_feature_transition_set_open(&switcher->surface_transition, 1);
+        ++switcher->preview_generation;
     }
     else if (switcher != nullptr && (action.type == REACH_SWITCHER_ACTION_CLOSED ||
                                      action.type == REACH_SWITCHER_ACTION_COMMITTED))
     {
         (void)reach_feature_transition_set_open(&switcher->surface_transition, 0);
+        ++switcher->preview_generation;
     }
     switch (action.type)
     {
@@ -252,6 +254,7 @@ int32_t reach_switcher_set_open(reach_switcher *switcher, int32_t open)
     }
     switcher->state.open = 0;
     (void)reach_feature_transition_set_open(&switcher->surface_transition, 0);
+    ++switcher->preview_generation;
     return 1;
 }
 
@@ -301,7 +304,7 @@ reach_result reach_switcher_create(reach_switcher **out_switcher)
     {
         return REACH_ERROR;
     }
-    reach_feature_transition_init(&switcher->surface_transition, REACH_FEATURE_PRESENTATION_MENU,
+    reach_feature_transition_init(&switcher->surface_transition,
                                   REACH_FEATURE_TRANSITION_FROM_BELOW);
     *out_switcher = switcher;
     return REACH_OK;
@@ -556,7 +559,7 @@ size_t reach_switcher_preview_generation(const reach_switcher *switcher)
 
 size_t reach_switcher_thumbnail_count(const reach_switcher *switcher)
 {
-    return switcher != nullptr ? switcher->layout.count : 0;
+    return switcher != nullptr && switcher->state.open ? switcher->layout.count : 0;
 }
 
 reach_result reach_switcher_thumbnail_motion_at(const reach_switcher *switcher, size_t index,

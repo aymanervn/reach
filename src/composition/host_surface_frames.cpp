@@ -843,6 +843,11 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
         bounds = reach_host_reconcile_bar_visibility(
             host, desc->definition->id, geometry.visible_bounds, ctx->monitor_bounds, &geometry);
     }
+    if (desc->surface->window.ops.set_input_passthrough != nullptr)
+        (void)desc->surface->window.ops.set_input_passthrough(
+            desc->surface->window.window, (desc->definition->surface.behavior_flags &
+                                           REACH_SURFACE_BEHAVIOR_INPUT_PASSTHROUGH) != 0 ||
+                                              geometry.wait_for_presentation);
     reach_shadow_pad shadow_pad = reach_host_surface_shadow_pad(host, desc->definition->id);
     if (geometry.presentation.retained)
     {

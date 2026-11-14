@@ -830,7 +830,7 @@ reach_result reach_clipboard_feature_create(reach_clipboard_feature **out_clipbo
     }
     reach_motion_set(&clipboard->height, 0.0f);
     reach_clipboard_feature_load_motion_specs(clipboard, reach_theme_default());
-    reach_feature_transition_init(&clipboard->surface_transition, REACH_FEATURE_PRESENTATION_POPUP,
+    reach_feature_transition_init(&clipboard->surface_transition,
                                   REACH_FEATURE_TRANSITION_FROM_BELOW);
     reach_pressable_init(&clipboard->state.pressable);
     clipboard->refresh_requested.store(0);

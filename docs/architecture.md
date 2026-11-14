@@ -856,7 +856,7 @@ springs and normalized products of zero-span springs are rejected without output
 Reach has one motion vocabulary: `reach_theme.motion_presets`, indexed by `reach_motion_preset`
 and read through `reach_theme_motion_preset`. Springs `snappy`, `smooth`, `bouncy`, `press` and
 `release` store only response and damping, so their settle time stays derived by the engine; the
-`fade_in`, `fade_out` and `menu_fade` ease-out curves store a duration. `reach_motion_spec_scaled`
+`fade_in`, `fade_out`, `card_fade_in` and `card_fade_out` ease-out curves store a duration. `reach_motion_spec_scaled`
 multiplies response and duration by one time scale, and `reach_theme_stage_motion_scale` derives
 that scale from the persisted Stage duration relative to `stage_motion_reference_seconds`.
 
@@ -866,7 +866,8 @@ transition, and the clock-reading fixed-curve entry points (`reach_motion_start`
 popup and panel geometry, list survivors, resizes, bar reveal, Dock slots and Stage tiles use
 `smooth`; compact bar widths, tray reorder and drag snaps use `snappy`; one-step selection pills,
 toggle knobs and the adjacent Settings sidebar step use `bouncy`; hover, tint and content opacity use
-`fade_in`/`fade_out`; presses use `press`/`release`. Bounce never appears on popups, panels, Stage,
+`fade_in`/`fade_out`; cards appear with `card_fade_in` (0.05 s) and leave with `card_fade_out`
+(0.7 s, matched to macOS); presses use `press`/`release`. Bounce never appears on popups, panels, Stage,
 the Top Bar or opacity. Stage open and close scale `smooth` by `reach_theme_stage_motion_scale`
 (configured duration over the theme reference), so the default follows the natural `smooth` settle.
 Scalars sampled on the CPU (Stage, Dock slots, bar reveal, Top Bar widths, Clipboard height, Settings
@@ -1329,12 +1330,14 @@ notification, while the HUD keeps its copied display text for the rest of its in
 Per-frame layout resolves in dependency order in `reach_host_update`, and every capsule owns its
 own geometry: the Dock and the Launcher each compute their layout inside `arrange` during the frame
 pass. Popup capsules, Launcher,
-Clipboard, Switcher and System HUD embed the shared `features/common/presentation` transition and
-choose only a style: popup scales 0.94 to 1 with a 6dp offset toward its anchor, and menu (Context
-Menu and Switcher, anchored at the Switcher's center) scales 0.98 to 1 without offset. Scale and offset use the `snappy` spring and opacity the
-style's fade; close retargets to a smaller rest (0.97 and 4dp for popups) with an ease-out fade.
-Open and close retarget every channel from its current value and velocity, and completion and
-visibility end at the opacity deadline rather than the spring tail. A capsule supplies its anchor
+Clipboard, Switcher and System HUD embed the shared `features/common/presentation` transition, the one
+card animation: every card opens at full size in place with `card_fade_in` and closes with
+`card_fade_out`; there is no scale, travel or per-card style. Open and close retarget opacity from its
+current value, and completion and visibility end at the opacity deadline. While a card is closing its
+geometry reports `wait_for_presentation`, and composition makes its window pass input through so the
+fading card never blocks the window beneath. Cards that host live DWM thumbnails (the Dock window list
+and the Switcher) stop publishing them the moment they close, because native thumbnails cannot follow
+the managed fade. A capsule supplies its anchor
 in surface coordinates with `reach_feature_transition_set_anchor`, or its trigger x through
 `reach_feature_transition_set_trigger`; otherwise the anchor is the center of the edge facing its
 direction. The anchor is published as the canonical root scale center. System HUD keeps its own

@@ -555,8 +555,7 @@ reach_result reach_battery_create(reach_battery **out_battery)
     {
         return REACH_ERROR;
     }
-    reach_feature_transition_init(&battery->popup_transition, REACH_FEATURE_PRESENTATION_POPUP,
-                                  REACH_FEATURE_TRANSITION_FROM_ABOVE);
+    reach_feature_transition_init(&battery->popup_transition, REACH_FEATURE_TRANSITION_FROM_ABOVE);
     reach_pressable_init(&battery->pressable);
     reach_battery_reset(battery);
     *out_battery = battery;
