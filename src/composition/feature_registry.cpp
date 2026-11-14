@@ -316,6 +316,12 @@ static void reach_feature_notify_top_bar(void *capsule,
         out->relayout = 1;
         out->request_update = 1;
     }
+    if (reach_top_bar_apply_opacity(static_cast<reach_top_bar *>(capsule),
+                                    notification->config->top_bar_opacity))
+    {
+        out->redraw = 1;
+        out->request_update = 1;
+    }
 }
 
 static int32_t reach_feature_control_launcher_open(void *capsule, int32_t open,

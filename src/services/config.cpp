@@ -124,9 +124,11 @@ static reach_result reach_config_apply_operation(reach_config_snapshot *snapshot
         return REACH_OK;
     case REACH_CONFIG_OPERATION_SET_TOP_BAR:
         *out_changed = snapshot->top_bar_style != operation->top_bar.style ||
-                       snapshot->top_bar_mode != operation->top_bar.mode;
+                       snapshot->top_bar_mode != operation->top_bar.mode ||
+                       snapshot->top_bar_opacity != operation->top_bar.opacity;
         snapshot->top_bar_style = operation->top_bar.style;
         snapshot->top_bar_mode = operation->top_bar.mode;
+        snapshot->top_bar_opacity = operation->top_bar.opacity;
         return REACH_OK;
     case REACH_CONFIG_OPERATION_SET_WALLPAPERS:
         *out_changed = !reach_path_equals(snapshot->wallpaper_path, operation->path);
@@ -645,7 +647,8 @@ reach_result reach_config_service_set_top_bar(reach_config_service *service,
     if (settings == nullptr || settings->style < REACH_CONFIG_TOP_BAR_STYLE_SPLIT ||
         settings->style > REACH_CONFIG_TOP_BAR_STYLE_SIMPLE ||
         settings->mode < REACH_CONFIG_TOP_BAR_MODE_DYNAMIC ||
-        settings->mode > REACH_CONFIG_TOP_BAR_MODE_STATIC)
+        settings->mode > REACH_CONFIG_TOP_BAR_MODE_STATIC || settings->opacity < 0 ||
+        settings->opacity > REACH_CONFIG_TOP_BAR_OPACITY_MAX)
     {
         return REACH_INVALID_ARGUMENT;
     }

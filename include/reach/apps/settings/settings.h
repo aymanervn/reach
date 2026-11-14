@@ -35,6 +35,7 @@ extern "C"
 #define REACH_SETTINGS_POWER_FIELD_HOURS 0
 #define REACH_SETTINGS_POWER_FIELD_MINUTES 1
 #define REACH_SETTINGS_POWER_FIELD_COUNT 2
+#define REACH_SETTINGS_SLIDER_THUMB_SIZE 14.0f
 #define REACH_SETTINGS_ACCOUNT_NAME_CAPACITY 128
 #define REACH_SETTINGS_ACCOUNT_PASSWORD_CAPACITY 64
 #define REACH_SETTINGS_ACCOUNT_FIELD_CURRENT 0
@@ -88,6 +89,7 @@ extern "C"
         REACH_SETTINGS_HIT_DISPLAY_SCROLLBAR_THUMB,
         REACH_SETTINGS_HIT_TOP_BAR_STYLE,
         REACH_SETTINGS_HIT_TOP_BAR_AUTO_HIDE_TOGGLE,
+        REACH_SETTINGS_HIT_TOP_BAR_OPACITY,
         REACH_SETTINGS_HIT_ACCOUNT_PASSWORD,
         REACH_SETTINGS_HIT_ACCOUNT_PASSWORD_FIELD,
         REACH_SETTINGS_HIT_STARTUP_TOGGLE,
@@ -281,6 +283,8 @@ extern "C"
         reach_motion top_bar_style_selection;
         reach_config_top_bar_mode top_bar_mode;
         reach_motion top_bar_mode_toggle;
+        int32_t top_bar_opacity;
+        int32_t top_bar_opacity_dragging;
         int32_t hovered_button;
         reach_motion button_press_feedback;
         reach_pressable button_pressable;
@@ -426,6 +430,12 @@ extern "C"
         reach_rect_f32 top_bar_style_title;
         reach_rect_f32 top_bar_style_subtitle;
         reach_rect_f32 top_bar_style_selector;
+        reach_rect_f32 top_bar_opacity_card;
+        reach_rect_f32 top_bar_opacity_title;
+        reach_rect_f32 top_bar_opacity_subtitle;
+        reach_rect_f32 top_bar_opacity_slider;
+        reach_rect_f32 top_bar_opacity_track;
+        reach_rect_f32 top_bar_opacity_value;
         reach_rect_f32 top_bar_auto_hide_card;
         reach_rect_f32 top_bar_auto_hide_title;
         reach_rect_f32 top_bar_auto_hide_subtitle;
@@ -641,6 +651,10 @@ extern "C"
                                                reach_config_top_bar_mode mode);
     reach_config_top_bar_mode reach_settings_model_top_bar_mode(const reach_settings_model *model);
     int32_t reach_settings_model_toggle_top_bar_mode(reach_settings_model *model);
+    int32_t reach_settings_model_set_top_bar_opacity(reach_settings_model *model, int32_t opacity);
+    int32_t reach_settings_model_top_bar_opacity(const reach_settings_model *model);
+    int32_t reach_settings_model_top_bar_opacity_enabled(const reach_settings_model *model);
+    int32_t reach_settings_top_bar_opacity_at(const reach_settings_layout *layout, float x);
     int32_t reach_settings_model_power_dirty(const reach_settings_model *model);
     void reach_settings_model_power_mark_applied(reach_settings_model *model);
 
