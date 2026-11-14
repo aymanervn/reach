@@ -494,36 +494,30 @@ static void render_theme_selector_card(const reach_settings_render_input *input,
                                              reach_settings_control_group_id(hit, 0), selection);
 }
 
-static void render_top_bar_opacity_card(const reach_settings_render_input *input,
-                                        reach_render_command_buffer *commands, reach_color accent)
+static void render_slider_card(const reach_settings_render_input *input,
+                               reach_render_command_buffer *commands,
+                               const reach_settings_slider_card_layout *slider,
+                               const uint16_t *title, const uint16_t *subtitle, float ratio,
+                               int32_t percent, int32_t enabled, reach_color accent)
 {
-    const reach_settings_model *model = input->model;
-    const reach_settings_layout *layout = input->layout;
     const reach_theme *theme = input->theme;
     float radius = reach_settings_scale(input, theme->radius_small);
-    reach_settings_push_rect(commands, layout->top_bar_opacity_card, radius,
-                             theme->settings_card_background);
+    reach_settings_push_rect(commands, slider->card, radius, theme->settings_card_background);
     reach_settings_push_text(
-        commands, layout->top_bar_opacity_title, (const uint16_t *)u"Top bar opacity",
-        reach_settings_scale(input, REACH_TEXT_SIZE_MEDIUM), REACH_TEXT_WEIGHT_SEMIBOLD,
-        input->text_alignment_leading, theme->settings_text, 1);
-    reach_settings_push_text(commands, layout->top_bar_opacity_subtitle,
-                             (const uint16_t *)u"Change the opacity of the simple top bar",
-                             reach_settings_scale(input, REACH_TEXT_SIZE_XSMALL),
-                             REACH_TEXT_WEIGHT_NORMAL, input->text_alignment_leading,
-                             theme->settings_secondary_text, 1);
+        commands, slider->title, title, reach_settings_scale(input, REACH_TEXT_SIZE_MEDIUM),
+        REACH_TEXT_WEIGHT_SEMIBOLD, input->text_alignment_leading, theme->settings_text, 1);
+    reach_settings_push_text(
+        commands, slider->subtitle, subtitle, reach_settings_scale(input, REACH_TEXT_SIZE_XSMALL),
+        REACH_TEXT_WEIGHT_NORMAL, input->text_alignment_leading, theme->settings_secondary_text, 1);
 
-    int32_t enabled = reach_settings_model_top_bar_opacity_enabled(model);
-    int32_t opacity = reach_settings_model_top_bar_opacity(model);
-    float ratio = (float)opacity / (float)REACH_CONFIG_TOP_BAR_OPACITY_MAX;
     reach_color level = enabled
                             ? reach_settings_color_with_alpha(accent, 0.85f)
                             : reach_settings_color_with_alpha(theme->settings_secondary_text, 0.5f);
-    reach_rect_f32 slider = layout->top_bar_opacity_track;
+    reach_rect_f32 area = slider->track;
     float track_height = reach_settings_scale(input, 4.0f);
     float thumb_size = reach_settings_scale(input, REACH_SETTINGS_SLIDER_THUMB_SIZE);
-    reach_rect_f32 track = {slider.x, slider.y + (slider.height - track_height) * 0.5f,
-                            slider.width, track_height};
+    reach_rect_f32 track = {area.x, area.y + (area.height - track_height) * 0.5f, area.width,
+                            track_height};
     reach_settings_push_rect(commands, track, track_height * 0.5f,
                              theme->settings_segmented_control_background);
     reach_rect_f32 fill = track;
@@ -533,13 +527,13 @@ static void render_top_bar_opacity_card(const reach_settings_render_input *input
         reach_settings_push_rect(commands, fill, track_height * 0.5f, level);
     }
     reach_rect_f32 thumb = {track.x + track.width * ratio - thumb_size * 0.5f,
-                            slider.y + (slider.height - thumb_size) * 0.5f, thumb_size, thumb_size};
+                            area.y + (area.height - thumb_size) * 0.5f, thumb_size, thumb_size};
     reach_settings_push_rect(commands, thumb, thumb_size * 0.5f, level);
 
     uint16_t value[8] = {};
-    append_number(value, 8, (size_t)opacity);
+    append_number(value, 8, (size_t)percent);
     append_text(value, 8, (const uint16_t *)u"%");
-    reach_settings_push_text(commands, layout->top_bar_opacity_value, value,
+    reach_settings_push_text(commands, slider->value, value,
                              reach_settings_scale(input, REACH_TEXT_SIZE_SMALL),
                              REACH_TEXT_WEIGHT_SEMIBOLD, REACH_TEXT_ALIGNMENT_TRAILING,
                              enabled ? theme->settings_text : theme->settings_secondary_text, 1);
@@ -619,7 +613,12 @@ static void render_theme_page(const reach_settings_render_input *input,
         (const uint16_t *)u"Choose how top bar items are grouped and framed", top_bar_style_labels,
         REACH_SETTINGS_SELECTOR_ITEM_COUNT, &model->top_bar_style_selection,
         REACH_SETTINGS_HIT_TOP_BAR_STYLE, accent);
-    render_top_bar_opacity_card(input, commands, accent);
+    int32_t opacity = reach_settings_model_top_bar_opacity(model);
+    render_slider_card(input, commands, &layout->top_bar_opacity,
+                       (const uint16_t *)u"Top bar opacity",
+                       (const uint16_t *)u"Change the opacity of the simple top bar",
+                       (float)opacity / (float)REACH_CONFIG_TOP_BAR_OPACITY_MAX, opacity,
+                       reach_settings_model_top_bar_opacity_enabled(model), accent);
     theme_toggle_card auto_hide = {layout->top_bar_auto_hide_card,
                                    {},
                                    layout->top_bar_auto_hide_title,
@@ -632,6 +631,12 @@ static void render_theme_page(const reach_settings_render_input *input,
                                    &model->top_bar_mode_toggle,
                                    REACH_SETTINGS_HIT_TOP_BAR_AUTO_HIDE_TOGGLE};
     render_theme_toggle_card(input, commands, &toggle_style, &auto_hide);
+    int32_t dock_size = reach_settings_model_dock_size(model);
+    render_slider_card(input, commands, &layout->dock_size, (const uint16_t *)u"Dock size",
+                       (const uint16_t *)u"Change the size of the dock",
+                       (float)(dock_size - REACH_CONFIG_DOCK_SIZE_MIN) /
+                           (float)(REACH_CONFIG_DOCK_SIZE_MAX - REACH_CONFIG_DOCK_SIZE_MIN),
+                       dock_size, 1, accent);
     reach_render_command_buffer_clear_scissor(commands);
     if (layout->theme_scrollbar_thumb.height > 0.0f)
     {

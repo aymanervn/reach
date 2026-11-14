@@ -1,7 +1,5 @@
 #include "settings_pages_internal.h"
 
-#include <math.h>
-
 void reach_settings_model_set_top_bar_style(reach_settings_model *model,
                                             reach_config_top_bar_style style)
 {
@@ -87,13 +85,28 @@ int32_t reach_settings_model_top_bar_opacity_enabled(const reach_settings_model 
     return model != nullptr && model->top_bar_style == REACH_CONFIG_TOP_BAR_STYLE_SIMPLE;
 }
 
-int32_t reach_settings_top_bar_opacity_at(const reach_settings_layout *layout, float x)
+int32_t reach_settings_model_set_dock_size(reach_settings_model *model, int32_t size)
 {
-    if (layout == nullptr || layout->top_bar_opacity_track.width <= 0.0f)
+    if (model == nullptr || size < REACH_CONFIG_DOCK_SIZE_MIN ||
+        size > REACH_CONFIG_DOCK_SIZE_MAX || model->dock_size == size)
     {
-        return REACH_CONFIG_TOP_BAR_OPACITY_MAX;
+        return 0;
     }
-    float ratio = (x - layout->top_bar_opacity_track.x) / layout->top_bar_opacity_track.width;
-    ratio = ratio < 0.0f ? 0.0f : (ratio > 1.0f ? 1.0f : ratio);
-    return (int32_t)lroundf(ratio * (float)REACH_CONFIG_TOP_BAR_OPACITY_MAX);
+    model->dock_size = size;
+    return 1;
+}
+
+int32_t reach_settings_model_dock_size(const reach_settings_model *model)
+{
+    return model != nullptr ? model->dock_size : REACH_CONFIG_DOCK_SIZE_MAX;
+}
+
+float reach_settings_slider_ratio_at(const reach_settings_slider_card_layout *slider, float x)
+{
+    if (slider == nullptr || slider->track.width <= 0.0f)
+    {
+        return 1.0f;
+    }
+    float ratio = (x - slider->track.x) / slider->track.width;
+    return ratio < 0.0f ? 0.0f : (ratio > 1.0f ? 1.0f : ratio);
 }

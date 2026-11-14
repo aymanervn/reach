@@ -174,6 +174,7 @@ extern "C"
         float dpi_scale;
         float icon_size;
         float gap;
+        float size_scale;
         const reach_pinned_app_model *pinned_apps;
         size_t pinned_app_count;
     } reach_dock_build_context;
@@ -190,7 +191,8 @@ extern "C"
 
     reach_dock_fit_result reach_dock_fit_metrics(float native_height, float native_icon_size,
                                                  float native_gap, float native_border_thickness,
-                                                 float available_width, float app_slot_units);
+                                                 float available_width, float app_slot_units,
+                                                 float size_scale);
 
     typedef struct reach_dock_arrange_context
     {
@@ -207,7 +209,7 @@ extern "C"
     int32_t reach_dock_take_items_changed(reach_dock *dock);
     int32_t reach_dock_slots_animating(const reach_dock *dock);
 
-    void reach_dock_apply_config(reach_dock *dock, float height);
+    void reach_dock_apply_config(reach_dock *dock, float height, int32_t size);
     int32_t reach_dock_arrange(reach_dock *dock, const reach_dock_arrange_context *ctx);
     const reach_dock_layout *reach_dock_arranged_layout(const reach_dock *dock);
 
