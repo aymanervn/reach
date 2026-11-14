@@ -126,7 +126,7 @@ static int32_t reach_context_menu_arrange_previews_as(reach_context_menu *menu,
         aspects[index] = reach_window_preview_aspect(frame);
         const reach_window_snapshot *window =
             reach_window_tracking_window_by_id(menu->windows, state->item_windows[index]);
-        live[index] = valid && window != nullptr && !window->minimized;
+        live[index] = valid && window != nullptr;
         if (window != nullptr)
         {
             if (window->title[0] != 0)

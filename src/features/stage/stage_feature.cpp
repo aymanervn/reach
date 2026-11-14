@@ -654,8 +654,7 @@ reach_result reach_stage_thumbnail_at(const reach_stage *stage, size_t index,
     out_placement->source_screen = tile->source_rect;
     out_placement->opacity = tile->presence;
     out_placement->backdrop_opacity = state->backdrop_opacity;
-    out_placement->visible =
-        state->open && !state->close_failed && !tile->minimized && tile->presence > 0.0f ? 1 : 0;
+    out_placement->visible = state->open && !state->close_failed && tile->presence > 0.0f ? 1 : 0;
     out_placement->source_screen_valid = tile->desktop;
     out_placement->minimized = tile->minimized;
     out_placement->desktop = tile->desktop;

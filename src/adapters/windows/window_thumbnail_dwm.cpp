@@ -377,7 +377,8 @@ reach_window_thumbnail_set_placement(reach_window_thumbnails *thumbnails,
     }
 
     RECT window_rect = {};
-    if (placement->source_screen_valid)
+    int32_t source_minimized = entry->source != nullptr && IsIconic(entry->source);
+    if (!source_minimized && placement->source_screen_valid)
     {
         if (entry->source == nullptr || !GetWindowRect(entry->source, &window_rect) ||
             placement->source_screen.width <= 0.0f || placement->source_screen.height <= 0.0f)
@@ -403,7 +404,7 @@ reach_window_thumbnail_set_placement(reach_window_thumbnails *thumbnails,
         props.dwFlags |= DWM_TNP_RECTSOURCE;
         props.rcSource = crop;
     }
-    else
+    else if (!source_minimized)
     {
         RECT visible_rect = {};
         if (entry->source != nullptr && GetWindowRect(entry->source, &window_rect) &&

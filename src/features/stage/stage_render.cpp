@@ -339,7 +339,7 @@ reach_result reach_stage_append_render_commands(reach_stage *stage,
                 return result;
             }
 
-            if ((tile->minimized || tile->departing) && !tile->desktop)
+            if (tile->departing && !tile->desktop)
             {
                 result = reach_stage_push_tile_placeholder(ctx, tile, rect, alpha, out_commands);
                 if (result != REACH_OK)

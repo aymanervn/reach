@@ -604,8 +604,7 @@ static void test_preview_membership_refresh_and_reanchor(void)
     reach_window_id window = 0;
     reach_rect_f32 rect = {};
     reach_context_menu_thumbnail_at(menu, 1, &window, &rect);
-    expect_true(window == 0 && reach_context_menu_preview_generation(menu) != generation,
-                "minimization retires the native source");
+    expect_true(window != 0, "a minimized window keeps its live preview");
     preview_windows[1].minimized = 0;
     preview_frames[1] = {0, 0, 1200, 600};
     reach_window_tracking_refresh(windows, nullptr);
