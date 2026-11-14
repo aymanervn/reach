@@ -100,11 +100,6 @@ float reach_scroll_view_position(const reach_scroll_view *view)
     return view != nullptr ? view->model.position : 0.0f;
 }
 
-float reach_scroll_view_maximum(const reach_scroll_view *view)
-{
-    return view != nullptr ? view->model.maximum : 0.0f;
-}
-
 int32_t reach_scroll_view_sync(reach_scroll_view *view, const reach_theme *theme,
                                reach_scroll_view_mode mode, double now_seconds)
 {
@@ -233,11 +228,6 @@ reach_motion reach_scroll_view_content_offset(const reach_scroll_view *view)
 int32_t reach_scroll_view_active(const reach_scroll_view *view)
 {
     return view != nullptr && reach_motion_active(&view->offset);
-}
-
-int32_t reach_scroll_view_active_at(const reach_scroll_view *view, double now_seconds)
-{
-    return view != nullptr && reach_motion_active_at(&view->offset, now_seconds);
 }
 
 int32_t reach_scroll_view_pending(const reach_scroll_view *view)
