@@ -158,7 +158,6 @@ reach_result reach_launcher_layout_compute(const reach_launcher_model *launcher,
     out_layout->search_result_items.y += search_results_top_padding;
     out_layout->search_result_items.height = search_results_items_height;
     out_layout->search_result_scrollbar_track = (reach_rect_f32){0};
-    out_layout->search_result_scrollbar_thumb = (reach_rect_f32){0};
 
     if (launcher->result_count > visible_capacity && visible_result_count > 0)
     {
@@ -178,13 +177,6 @@ reach_result reach_launcher_layout_compute(const reach_launcher_model *launcher,
         out_layout->search_result_scrollbar_track.width = track_width;
         out_layout->search_result_scrollbar_track.height =
             out_layout->search_result_items.height - track_padding_y * 2.0f;
-
-        float min_thumb_height = reach_scale(22.0f, scale);
-        reach_scrollbar_layout scrollbar = reach_scrollbar_compute_layout(
-            &launcher->result_scrollbar, out_layout->search_result_scrollbar_track,
-            (float)visible_result_count, (float)launcher->result_count, min_thumb_height);
-        out_layout->search_result_scrollbar_track = scrollbar.track;
-        out_layout->search_result_scrollbar_thumb = scrollbar.thumb;
     }
     out_layout->bounds = out_layout->search_box;
 

@@ -34,7 +34,6 @@ struct reach_launcher
     uint32_t synced_revision;
     size_t synced_scroll;
     size_t synced_first;
-    reach_scroll_view scroll;
     size_t synced_selected;
     float synced_pitch;
     reach_feature_transition surface_transition;
@@ -128,9 +127,9 @@ static void reach_launcher_refresh_results_deadline(reach_launcher *launcher)
     if (reach_motion_active(&launcher->results_opacity))
         launcher->results_deadline =
             fmax(launcher->results_deadline, reach_motion_deadline(&launcher->results_opacity));
-    if (reach_scroll_view_active(&launcher->scroll))
+    if (reach_scroll_view_active(&launcher->state.scroll))
         launcher->results_deadline =
-            fmax(launcher->results_deadline, reach_scroll_view_deadline(&launcher->scroll));
+            fmax(launcher->results_deadline, reach_scroll_view_deadline(&launcher->state.scroll));
     if (reach_keyed_rows_active(launcher->rows, REACH_LAUNCHER_ROW_CAPACITY))
         launcher->results_deadline =
             fmax(launcher->results_deadline,
@@ -197,7 +196,7 @@ static void reach_launcher_sync_rows(reach_launcher *launcher)
     if (launcher == nullptr || !launcher->pointer_layout_valid || launcher->row_pitch <= 0.0f)
         return;
     const reach_launcher_model &model = launcher->state.model;
-    size_t start = reach_launcher_model_result_scroll_offset(&model);
+    size_t start = reach_launcher_result_scroll_offset_state(&launcher->state);
     if (start > model.result_count)
         start = model.result_count;
     size_t count = reach_launcher_visible_result_count(&model);
@@ -219,13 +218,12 @@ static void reach_launcher_sync_rows(reach_launcher *launcher)
     reach_scroll_view_mode scroll_mode = REACH_SCROLL_VIEW_SET;
     if (animated && (results_changed || selected_changed))
         scroll_mode = REACH_SCROLL_VIEW_GLIDE;
-    else if (animated && !launcher->state.launcher_scrollbar_drag.active)
+    else if (animated && !reach_scroll_view_dragging(&launcher->state.scroll))
         scroll_mode = REACH_SCROLL_VIEW_WHEEL;
-    (void)reach_scroll_view_retarget(&launcher->scroll, &launcher->theme,
-                                     (float)start * launcher->row_pitch, scroll_mode, now);
-    reach_scroll_view_window window =
-        reach_scroll_view_item_window(&launcher->scroll, launcher->row_pitch, model.result_count,
-                                      count, 1, REACH_LAUNCHER_ROW_CAPACITY - 4);
+    (void)reach_scroll_view_sync(&launcher->state.scroll, &launcher->theme, scroll_mode, now);
+    reach_scroll_view_window window = reach_scroll_view_item_window(
+        &launcher->state.scroll, launcher->row_pitch, model.result_count, count, 1,
+        REACH_LAUNCHER_ROW_CAPACITY - 4);
     size_t first = window.first;
     if (results_changed || pitch_changed || scroll_changed || first != launcher->synced_first)
     {
@@ -293,18 +291,7 @@ void reach_launcher_fill_row_render_input(const reach_launcher *launcher,
     input->row_results = launcher->row_results;
     input->row_start = launcher->synced_first;
     input->row_pitch = launcher->row_pitch;
-    input->content_offset = reach_scroll_view_content_offset(&launcher->scroll);
-    reach_motion_set(&input->scrollbar_thumb_offset, 0.0f);
-    const reach_launcher_layout &layout = launcher->pointer_layout;
-    float travel =
-        layout.search_result_scrollbar_track.height - layout.search_result_scrollbar_thumb.height;
-    float maximum = launcher->state.model.result_scrollbar.maximum * launcher->row_pitch;
-    if (launcher->pointer_layout_valid && travel > 0.0f && maximum > 0.0f)
-    {
-        float ratio = travel / maximum;
-        input->scrollbar_thumb_offset = reach_motion_affine(
-            &launcher->scroll.offset, ratio, -ratio * reach_scroll_view_target(&launcher->scroll));
-    }
+    input->scroll = &launcher->state.scroll;
     input->selection = launcher->selection.rect;
     input->has_selection = launcher->selection_valid;
     input->row_selected = launcher->row_selected;
@@ -415,6 +402,15 @@ int32_t reach_launcher_arrange(reach_launcher *launcher, const reach_launcher_ar
     reach_launcher_set_pointer_context(launcher, &layout);
     launcher->dpi_scale = scale;
     launcher->row_pitch = 56.0f * scale;
+    reach_scroll_view_config scroll = launcher->state.scroll.config;
+    scroll.unit = launcher->row_pitch;
+    scroll.minimum_thumb = 22.0f * scale;
+    reach_scroll_view_configure(&launcher->state.scroll, &scroll);
+    reach_scroll_view_set_extents(
+        &launcher->state.scroll, (float)launcher->state.model.result_count,
+        (float)reach_launcher_visible_result_count(&launcher->state.model));
+    reach_scroll_view_set_frame(&launcher->state.scroll, layout.search_results,
+                                layout.search_result_scrollbar_track);
     reach_launcher_sync_body_height(launcher, layout.bounds.height, animate);
     reach_launcher_sync_rows(launcher);
     reach_launcher_sync_search_icon(launcher);
@@ -484,16 +480,10 @@ static size_t reach_launcher_max_scroll_offset(const reach_launcher_state *state
     return state->model.result_count - capacity;
 }
 
-size_t reach_launcher_model_result_scroll_offset(const reach_launcher_model *launcher)
-{
-    return launcher != 0 && launcher->result_scrollbar.offset > 0.0f
-               ? (size_t)(launcher->result_scrollbar.offset + 0.5f)
-               : 0;
-}
-
 size_t reach_launcher_result_scroll_offset_state(const reach_launcher_state *state)
 {
-    return state != 0 ? reach_launcher_model_result_scroll_offset(&state->model) : 0;
+    float position = state != 0 ? reach_scroll_view_position(&state->scroll) : 0.0f;
+    return position > 0.0f ? (size_t)(position + 0.5f) : 0;
 }
 
 static void reach_launcher_set_scroll_immediate(reach_launcher_state *state, size_t offset)
@@ -502,8 +492,7 @@ static void reach_launcher_set_scroll_immediate(reach_launcher_state *state, siz
     {
         return;
     }
-    reach_scrollbar_set_target(&state->model.result_scrollbar, (float)offset);
-    state->model.result_scrollbar.offset = state->model.result_scrollbar.target;
+    (void)reach_scroll_view_set_position(&state->scroll, (float)offset);
 }
 
 static void reach_launcher_clamp_result_scroll(reach_launcher_state *state)
@@ -562,9 +551,11 @@ void reach_launcher_state_init(reach_launcher_state *state)
     state->model.result_count = 0;
     state->model.selected_result_index = 0;
     state->model.search_error = 0;
-    reach_scrollbar_model_init(&state->model.result_scrollbar, REACH_SCROLLBAR_DRAG_STEPPED, 1.0f);
+    reach_scroll_view_config scroll = {};
+    scroll.step = 1.0f;
+    scroll.wheel_delta = (float)REACH_SEARCH_SCROLL_STEP;
+    reach_scroll_view_init(&state->scroll, &scroll);
     reach_pressable_init(&state->pressable);
-    state->launcher_scrollbar_drag = reach_scrollbar_drag{};
     reach_text_edit_init(&state->launcher_text_edit, REACH_MAX_SEARCH_CHARS);
     state->launcher_caret_visible = 1;
 }
@@ -625,7 +616,7 @@ reach_result reach_launcher_clear_results_state(reach_launcher_state *state)
     state->model.result_count = 0;
     state->model.selected_result_index = 0;
     state->model.search_error = 0;
-    reach_scrollbar_set_extents(&state->model.result_scrollbar, 0.0f, 0.0f);
+    reach_scroll_view_set_extents(&state->scroll, 0.0f, 0.0f);
     reach_launcher_set_scroll_immediate(state, 0);
     return REACH_OK;
 }
@@ -655,8 +646,8 @@ reach_result reach_launcher_set_results_state(reach_launcher_state *state,
         result->payload.search = results[index];
     }
     state->model.result_count = count;
-    reach_scrollbar_set_extents(&state->model.result_scrollbar, (float)count,
-                                (float)reach_launcher_visible_count(state));
+    reach_scroll_view_set_extents(&state->scroll, (float)count,
+                                  (float)reach_launcher_visible_count(state));
     state->model.selected_result_index = 0;
     reach_launcher_set_scroll_immediate(state, 0);
     return REACH_OK;
@@ -683,7 +674,7 @@ reach_result reach_launcher_set_terminal_command_result_state(reach_launcher_sta
     reach_copy_utf16(result->payload.terminal_command, REACH_MAX_SEARCH_CHARS + 1, command);
     state->model.result_count = 1;
     state->model.selected_result_index = 0;
-    reach_scrollbar_set_extents(&state->model.result_scrollbar, 1.0f, 1.0f);
+    reach_scroll_view_set_extents(&state->scroll, 1.0f, 1.0f);
     reach_launcher_set_scroll_immediate(state, 0);
     return REACH_OK;
 }
@@ -721,41 +712,6 @@ reach_result reach_launcher_select_previous_result_state(reach_launcher_state *s
     state->model.selected_result_index -= 1;
     reach_launcher_keep_selected_visible(state);
     return REACH_OK;
-}
-
-reach_result reach_launcher_set_result_scroll_offset_state(reach_launcher_state *state,
-                                                           size_t offset)
-{
-    if (state == 0)
-    {
-        return REACH_INVALID_ARGUMENT;
-    }
-
-    reach_scrollbar_set_target(&state->model.result_scrollbar, (float)offset);
-    state->model.result_scrollbar.offset = state->model.result_scrollbar.target;
-    reach_launcher_clamp_result_scroll(state);
-    return REACH_OK;
-}
-
-reach_result reach_launcher_scroll_results_state(reach_launcher_state *state, int32_t delta)
-{
-    if (state == 0)
-    {
-        return REACH_INVALID_ARGUMENT;
-    }
-
-    size_t offset = reach_launcher_result_scroll_offset_state(state);
-    if (delta < 0)
-    {
-        size_t amount = (size_t)(-delta);
-        offset = amount > offset ? 0 : offset - amount;
-    }
-    else
-    {
-        offset += (size_t)delta;
-    }
-
-    return reach_launcher_set_result_scroll_offset_state(state, offset);
 }
 
 reach_result reach_launcher_set_selected_result_state(reach_launcher_state *state, size_t index)
@@ -905,7 +861,8 @@ void reach_launcher_surface_hidden(reach_launcher *launcher)
         reach_motion_set(&launcher->body_height, launcher->pointer_layout.search_box.height);
     for (reach_keyed_row &row : launcher->rows)
         row = {};
-    reach_scroll_view_init(&launcher->scroll);
+    (void)reach_scroll_view_sync(&launcher->state.scroll, nullptr, REACH_SCROLL_VIEW_SET,
+                                 reach_motion_now_seconds());
     launcher->synced_first = 0;
     launcher->selection_valid = 0;
     launcher->hover_valid = 0;
@@ -1072,16 +1029,6 @@ static int32_t reach_launcher_update_caret(reach_launcher *launcher)
     return changed;
 }
 
-static void reach_launcher_reset_scrollbar_drag(reach_launcher *launcher)
-{
-    if (launcher == nullptr)
-    {
-        return;
-    }
-    launcher->state.launcher_scrollbar_drag.active = 0;
-    launcher->state.launcher_scrollbar_drag.grab_offset = 0.0f;
-}
-
 void reach_launcher_reset_text_edit(reach_launcher *launcher)
 {
     if (launcher == nullptr)
@@ -1184,9 +1131,9 @@ void reach_launcher_handle_text_event(reach_launcher *launcher, const reach_ui_e
 static void reach_launcher_capsule_reset(void *capsule)
 {
     reach_launcher *launcher = static_cast<reach_launcher *>(capsule);
-    reach_launcher_reset_scrollbar_drag(launcher);
     if (launcher != nullptr)
     {
+        (void)reach_scroll_view_pointer_up(&launcher->state.scroll);
         reach_pressable_feedback_style feedback = reach_launcher_pressable_feedback(launcher);
         reach_pressable_reset(&launcher->state.pressable, &feedback);
         launcher->pointer_layout_valid = 0;
@@ -1230,7 +1177,7 @@ static void reach_launcher_capsule_tick(void *capsule, double, reach_feature_tic
         {
             reach_motion_set(&launcher->body_height, launcher->body_height.to);
             reach_motion_set(&launcher->results_opacity, launcher->results_opacity.to);
-            reach_scroll_view_settle(&launcher->scroll);
+            reach_scroll_view_settle(&launcher->state.scroll);
             reach_keyed_row_change released[REACH_LAUNCHER_ROW_CAPACITY];
             (void)reach_keyed_rows_release_settled(launcher->rows, REACH_LAUNCHER_ROW_CAPACITY,
                                                    released, REACH_LAUNCHER_ROW_CAPACITY);
@@ -1276,7 +1223,7 @@ static int32_t reach_launcher_capsule_wants_pointer_move(const void *capsule)
     }
     const reach_launcher_state *state =
         reach_launcher_state_ptr(const_cast<reach_launcher *>(launcher));
-    return state->model.open || state->launcher_scrollbar_drag.active ||
+    return state->model.open || reach_scroll_view_dragging(&state->scroll) ||
            reach_pressable_tracking(&state->pressable);
 }
 
@@ -1498,6 +1445,8 @@ static void reach_launcher_capsule_handle_pointer(void *capsule, const reach_poi
     layout.bounds.height = height;
     layout.search_results.height =
         revealed > 0 ? fmaxf(0, height - (layout.search_results.y - layout.bounds.y)) : 0;
+    reach_scroll_view_set_frame(&launcher->state.scroll, layout.search_results,
+                                layout.search_result_scrollbar_track);
     reach_launcher_event_context ctx = {};
     ctx.layout = &layout;
     reach_launcher_event_result event_result = {};
@@ -1510,7 +1459,7 @@ static void reach_launcher_capsule_handle_pointer(void *capsule, const reach_poi
         break;
     case REACH_POINTER_EVENT_UP:
         if (mapped.button == REACH_POINTER_BUTTON_PRIMARY &&
-            launcher->state.launcher_scrollbar_drag.active)
+            reach_scroll_view_dragging(&launcher->state.scroll))
         {
             reach_launcher_scrollbar_release(launcher, &event_result);
         }
@@ -1543,7 +1492,7 @@ static void reach_launcher_capsule_handle_pointer(void *capsule, const reach_poi
     else if (mapped.kind != REACH_POINTER_EVENT_WHEEL)
     {
         reach_launcher_hit_result hover =
-            reach_launcher_hit_test(&launcher->state.model, &layout, mapped.x, mapped.y);
+            reach_launcher_hit_test(&launcher->state, &layout, mapped.x, mapped.y);
         hover_changed =
             reach_launcher_set_hover(launcher, hover.index,
                                      hover.type == REACH_LAUNCHER_HIT_SEARCH_RESULT &&

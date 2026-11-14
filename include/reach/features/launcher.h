@@ -51,7 +51,6 @@ extern "C"
     reach_result reach_launcher_set_results(reach_launcher *launcher,
                                             const reach_search_candidate *results, size_t count);
     reach_result reach_launcher_clear_results(reach_launcher *launcher);
-    size_t reach_launcher_model_result_scroll_offset(const reach_launcher_model *launcher);
 
     void reach_launcher_attach_search(reach_launcher *launcher, reach_search_service *search);
 
@@ -75,8 +74,7 @@ extern "C"
         const uint64_t *row_icon_ids;
         size_t row_start;
         float row_pitch;
-        reach_motion content_offset;
-        reach_motion scrollbar_thumb_offset;
+        const reach_scroll_view *scroll;
         reach_rect_motion selection;
         int32_t has_selection;
         const reach_motion *row_selected;
@@ -104,7 +102,7 @@ extern "C"
     {
         reach_launcher_model model;
         reach_pressable pressable;
-        reach_scrollbar_drag launcher_scrollbar_drag;
+        reach_scroll_view scroll;
 
         reach_text_edit launcher_text_edit;
         int32_t launcher_caret_visible;
