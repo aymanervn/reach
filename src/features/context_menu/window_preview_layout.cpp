@@ -1,4 +1,5 @@
 #include "context_menu_common.h"
+#include "reach/core/typography.h"
 #include "reach/features/common/window_preview_layout.h"
 
 #include <math.h>
@@ -8,6 +9,8 @@ static constexpr float reach_preview_padding_dp = 12.0f;
 static constexpr float reach_preview_gap_dp = 12.0f;
 static constexpr float reach_preview_header_dp = 18.0f;
 static constexpr float reach_preview_header_gap_dp = 4.0f;
+static constexpr float reach_preview_label_padding_x_dp = 12.0f;
+static constexpr float reach_preview_label_padding_y_dp = 6.0f;
 
 void reach_context_menu_attach_services(reach_context_menu *menu, reach_window_tracking *windows,
                                         reach_icon_service *icons)
@@ -148,6 +151,15 @@ static int32_t reach_context_menu_arrange_previews_as(reach_context_menu *menu,
     float tallest_popup =
         (border + padding) * 2 + notch + header + header_gap +
         fminf(reach_preview_height_dp * scale, fmaxf(0.0f, available_height - chrome));
+    int32_t label_mode = state->item_count == 0;
+    float label_padding_x = reach_preview_label_padding_x_dp * scale;
+    float label_padding_y = reach_preview_label_padding_y_dp * scale;
+    float label_width =
+        label_mode
+            ? fminf(room, ceilf(reach_text_width_or_estimate(
+                              &ctx->text_measure, menu->request.label,
+                              REACH_TEXT_SIZE_SMALL * scale, REACH_TEXT_WEIGHT_NORMAL, .55f)))
+            : 0.0f;
     height *= fit_scale;
     gap *= fit_scale;
     header *= fit_scale;
@@ -160,10 +172,15 @@ static int32_t reach_context_menu_arrange_previews_as(reach_context_menu *menu,
         content_width += (index > 0 ? gap : 0.0f) + widths[index];
     }
     reach_context_menu_preview_layout layout = {};
-    layout.card_scale = scale * fit_scale;
+    layout.card_scale = label_mode ? scale : scale * fit_scale;
+    layout.label_mode = label_mode;
+    layout.label_width = label_width;
+    layout.label_height = header;
     float row_width = fminf(room, fmaxf(content_width, header));
-    float target_width = row_width + (padding + border) * 2;
-    float content = header + header_gap + height;
+    float target_width = label_mode ? label_width + (label_padding_x + border) * 2
+                                    : row_width + (padding + border) * 2;
+    float content =
+        label_mode ? header + (label_padding_y - padding) * 2 : header + header_gap + height;
     double now = reach_motion_now_seconds();
     int32_t cut = force_cut || !menu->layout_initialized ||
                   !reach_feature_transition_visible(&menu->popup_transition) || monitor_changed ||
@@ -173,8 +190,10 @@ static int32_t reach_context_menu_arrange_previews_as(reach_context_menu *menu,
                   previous_context.bar_edge_y != ctx->bar_edge_y;
     layout.count = state->item_count;
     layout.border = border;
-    layout.header_y = border + padding + (ctx->drop_direction == REACH_POPUP_DROP_DOWN ? notch : 0);
-    int32_t sources_changed = layout.count != menu->previews.count;
+    layout.header_y = border + (label_mode ? label_padding_y : padding) +
+                      (ctx->drop_direction == REACH_POPUP_DROP_DOWN ? notch : 0);
+    int32_t sources_changed =
+        layout.count != menu->previews.count || label_mode != menu->previews.label_mode;
     int32_t membership_changed = sources_changed;
     int32_t source_geometry_changed = 0;
     size_t survivors = 0;
@@ -228,10 +247,21 @@ static int32_t reach_context_menu_arrange_previews_as(reach_context_menu *menu,
     reach_motion_set(&layout.card_size, 1);
     if (!cut && state->open && restart)
     {
-        float previous = menu->previews.card_size.generation
-                             ? reach_motion_value_at(&menu->previews.card_size, now)
-                             : 1.0f;
-        float from = previous * menu->previews.card_scale / layout.card_scale;
+        float from = 0.0f;
+        if (label_mode != menu->previews.label_mode)
+        {
+            float previous_height = menu->previews.body.height.generation
+                                        ? reach_motion_value_at(&menu->previews.body.height, now)
+                                        : 0.0f;
+            from = (previous_height - (border + padding) * 2 - notch) / content;
+        }
+        else
+        {
+            float previous = menu->previews.card_size.generation
+                                 ? reach_motion_value_at(&menu->previews.card_size, now)
+                                 : 1.0f;
+            from = previous * menu->previews.card_scale / layout.card_scale;
+        }
         if (isfinite(from) && from > 0.0f)
             layout.card_size = reach_motion_affine(&menu->reflow, 1.0f - from, from);
     }
@@ -245,6 +275,8 @@ static int32_t reach_context_menu_arrange_previews_as(reach_context_menu *menu,
     anchor.monitor = ctx->monitor;
     anchor.bar_edge_y = ctx->bar_edge_y;
     anchor.direction = ctx->drop_direction;
+    anchor.bar_offset = reach_popup_hidden_notch_bar_offset_scaled(scale);
+    anchor.has_bar_offset = 1;
     if (reach_popup_width_motion(&anchor, &menu->width, &popup_height, margin, scale, &layout.body,
                                  &layout.notch) != REACH_OK)
         return 0;
@@ -318,7 +350,9 @@ static int32_t reach_context_menu_arrange_previews_as(reach_context_menu *menu,
                       !reach_motion_equal(&layout.body.y, &menu->previews.body.y) ||
                       !reach_motion_equal(&layout.body.height, &menu->previews.body.height) ||
                       !reach_motion_equal(&layout.notch, &menu->previews.notch) ||
-                      layout.card_scale != menu->previews.card_scale;
+                      layout.card_scale != menu->previews.card_scale ||
+                      layout.label_mode != menu->previews.label_mode ||
+                      layout.label_width != menu->previews.label_width;
     for (size_t index = 0; index < layout.count; ++index)
     {
         const auto &card = layout.cards[index];
@@ -371,7 +405,7 @@ void reach_context_menu_open_window_list(reach_context_menu *menu, size_t target
                                          const reach_context_menu_open_context *ctx)
 {
     if (menu == nullptr || ctx == nullptr || ctx->request == nullptr ||
-        ctx->request->window_count == 0)
+        (ctx->request->window_count == 0 && ctx->request->label[0] == 0))
     {
         return;
     }
@@ -379,7 +413,7 @@ void reach_context_menu_open_window_list(reach_context_menu *menu, size_t target
         reach_context_menu_reset_preview_layout(menu);
     menu->state.item_count = 0;
     reach_context_menu_load_windows(menu, ctx->request);
-    if (menu->state.item_count == 0)
+    if (menu->state.item_count == 0 && menu->request.label[0] == 0)
     {
         return;
     }
@@ -405,7 +439,7 @@ void reach_context_menu_refresh_window_list(reach_context_menu *menu,
     }
     reach_context_menu_load_windows(menu, request);
     menu->state.target_index = request->target_index;
-    if (menu->state.item_count == 0)
+    if (menu->state.item_count == 0 && menu->request.label[0] == 0)
     {
         reach_context_menu_set_open(menu, 0);
     }
@@ -464,7 +498,7 @@ void reach_context_menu_notify_windows_changed(reach_context_menu *menu,
             reach_context_menu_window_list_remove(menu, menu->state.item_windows[index - 1]);
         }
     }
-    if (menu->state.item_count == 0)
+    if (menu->state.item_count == 0 && menu->request.label[0] == 0)
     {
         reach_context_menu_set_open(menu, 0);
     }

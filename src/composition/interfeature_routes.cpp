@@ -27,6 +27,9 @@ reach_host_menu_open_context(reach_host *host, const reach_menu_request *request
     ctx.item_commands = request->commands;
     ctx.item_count = request->command_count;
     ctx.request = request;
+    ctx.text_measure.context = host->surfaces[REACH_SURFACE_ID_CONTEXT_MENU].renderer.backend;
+    ctx.text_measure.measure =
+        host->surfaces[REACH_SURFACE_ID_CONTEXT_MENU].renderer.ops.measure_text;
     return ctx;
 }
 
@@ -170,7 +173,7 @@ static void reach_host_route_dock_windows_changed(void *user, const reach_menu_r
     {
         return;
     }
-    if (request == nullptr || request->window_count == 0)
+    if (request == nullptr || (request->window_count == 0 && request->label[0] == 0))
     {
         reach_host_close_registered_surface(host, REACH_SURFACE_ID_CONTEXT_MENU,
                                             REACH_SURFACE_CLOSE_SUPERSEDED);

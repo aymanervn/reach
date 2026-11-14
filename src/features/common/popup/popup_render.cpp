@@ -505,6 +505,7 @@ reach_result reach_popup_push_width_background(const reach_popup_background_inpu
     float notch_height = reach_popup_notch_height_scaled(input->dpi_scale);
     if (input->bounds.height <= notch_height)
         return REACH_INVALID_ARGUMENT;
+    float shape_notch_width = input->hide_notch ? 0.0f : notch_width;
     float clearance =
         reach_popup_radius_scaled(reach_theme_default(), input->dpi_scale) + notch_width;
     auto near_limit = reach_motion_affine(width, .5f, 0);
@@ -591,7 +592,7 @@ reach_result reach_popup_push_width_background(const reach_popup_background_inpu
                 if (result == REACH_OK)
                     result = reach_popup_motion_shape(
                         batch.get(), source.id, first_group_id + 1, *width, center,
-                        input->bounds.height, 0, radius, notch_width, notch_height,
+                        input->bounds.height, 0, radius, shape_notch_width, notch_height,
                         input->notch_side, {1, 1, 1, 1}, input->bounds.width);
             }
             else
@@ -608,13 +609,13 @@ reach_result reach_popup_push_width_background(const reach_popup_background_inpu
             if (result == REACH_OK)
                 result = reach_popup_motion_shape(batch.get(), 0, first_group_id + 4, *width,
                                                   center, input->bounds.height, 0, radius,
-                                                  notch_width, notch_height, input->notch_side,
-                                                  outer, input->bounds.width);
+                                                  shape_notch_width, notch_height,
+                                                  input->notch_side, outer, input->bounds.width);
             if (result == REACH_OK && border > 0 && input->theme->popup_border.a > 0)
-                result = reach_popup_motion_shape(batch.get(), 0, first_group_id + 7, *width,
-                                                  center, input->bounds.height, border, radius,
-                                                  notch_width, notch_height, input->notch_side,
-                                                  background, input->bounds.width);
+                result = reach_popup_motion_shape(
+                    batch.get(), 0, first_group_id + 7, *width, center, input->bounds.height,
+                    border, radius, shape_notch_width, notch_height, input->notch_side, background,
+                    input->bounds.width);
         }
     }
     if (result != REACH_OK)
