@@ -1393,7 +1393,9 @@ window identity. Retained parents move the independent sources; thumbnails prese
 equal heights, while title widths, close widths and proportional glyph/icon sizes follow fitting.
 Native rectangles and event-time item/close hit tests sample the same geometry. The fixed-geometry
 preview-border path reuses the existing pixel-aligned bordered-shape recipe; active geometry uses
-the published clips. Complete-card paging and source-loss handling retain the native overlay seam.
+the published clips. Every window shows in one row fitted to the screen by
+`reach_window_preview_row_fit`, the same helper the Switcher uses; source-loss handling retains the
+native overlay seam.
 
 Retained render groups also publish four animated clip insets. Both Windows backends retain their
 clip objects and submit changed edges without regenerating unchanged content; unsupported targets
