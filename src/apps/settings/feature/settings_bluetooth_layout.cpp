@@ -143,7 +143,8 @@ void reach_settings_layout_bluetooth(reach_settings_layout *layout, reach_settin
                 continue;
             }
 
-            float progress = reach_animation_manager_value(&model->bluetooth_row_animations, index);
+            float progress =
+                reach_motion_value_at(&model->bluetooth_row_motions[index], layout->scroll_time);
             float extra = reach_settings_bluetooth_row_is_pairing(model, index)
                               ? REACH_SETTINGS_BLUETOOTH_PIN_STRIP * scale
                               : REACH_SETTINGS_BLUETOOTH_ACTION_STRIP * scale;

@@ -4,7 +4,6 @@
 #include "reach/apps/settings/settings.h"
 
 #include "reach/core/theme.h"
-#include "reach/support/animation.h"
 #include "reach/support/motion.h"
 
 static inline void reach_settings_scroll_init(reach_scroll_view *view)
@@ -46,17 +45,21 @@ static inline void reach_settings_animate(reach_motion *motion, float target,
                                     reach_motion_now_seconds());
 }
 
-static inline void reach_settings_track_to(reach_animation_manager *manager, size_t track,
-                                           float target, reach_motion_preset preset)
+static inline int32_t reach_settings_advance_motions(reach_motion *motions, size_t count,
+                                                     double now_seconds)
 {
-    reach_motion_spec spec = reach_settings_motion_preset(preset);
-    double now = reach_motion_now_seconds();
-    if (spec.easing == REACH_EASING_SPRING)
-        reach_animation_manager_spring_to_at(manager, track, target, spec.response_seconds,
-                                             spec.damping, now);
-    else
-        reach_animation_manager_animate_to_at(manager, track, target, spec.duration_seconds,
-                                              spec.easing, now);
+    int32_t pending = 0;
+    for (size_t index = 0; index < count; ++index)
+        pending |= reach_motion_advance_at(&motions[index], now_seconds);
+    return pending;
+}
+
+static inline int32_t reach_settings_motions_pending(const reach_motion *motions, size_t count)
+{
+    for (size_t index = 0; index < count; ++index)
+        if (reach_motion_pending(&motions[index]))
+            return 1;
+    return 0;
 }
 
 const uint16_t *reach_settings_wifi_page_title(void);

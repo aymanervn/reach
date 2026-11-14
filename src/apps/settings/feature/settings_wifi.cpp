@@ -127,11 +127,9 @@ void reach_settings_model_apply_wifi(reach_settings_model *model, reach_wifi_rad
     for (size_t index = 0; index <= REACH_WIFI_MAX_NETWORKS; ++index)
     {
         float target = reach_settings_wifi_track_target(model->wifi_expanded_row, index);
-        if (reach_animation_manager_target(&model->wifi_row_animations, index) != target)
-        {
-            reach_settings_track_to(&model->wifi_row_animations, index, target,
-                                    REACH_MOTION_PRESET_SMOOTH);
-        }
+        if (model->wifi_row_motions[index].to != target)
+            reach_settings_animate(&model->wifi_row_motions[index], target,
+                                   REACH_MOTION_PRESET_SMOOTH);
     }
 }
 
@@ -219,11 +217,9 @@ void reach_settings_model_wifi_expand_row(reach_settings_model *model, int32_t r
     for (size_t index = 0; index <= REACH_WIFI_MAX_NETWORKS; ++index)
     {
         float target = reach_settings_wifi_track_target(row, index);
-        if (reach_animation_manager_target(&model->wifi_row_animations, index) != target)
-        {
-            reach_settings_track_to(&model->wifi_row_animations, index, target,
-                                    REACH_MOTION_PRESET_SMOOTH);
-        }
+        if (model->wifi_row_motions[index].to != target)
+            reach_settings_animate(&model->wifi_row_motions[index], target,
+                                   REACH_MOTION_PRESET_SMOOTH);
     }
 }
 
@@ -430,16 +426,12 @@ int32_t reach_settings_model_sample_wifi_animations_at(reach_settings_model *mod
     {
         return 0;
     }
-    int32_t changed = 0;
-    if (reach_animation_manager_any_active(&model->wifi_row_animations))
-    {
-        reach_animation_manager_sample_at(&model->wifi_row_animations, now_seconds);
-        changed = 1;
-    }
-    return changed;
+    return reach_settings_advance_motions(model->wifi_row_motions, REACH_WIFI_MAX_NETWORKS + 1,
+                                          now_seconds);
 }
 
 int32_t reach_settings_model_wifi_animations_active(const reach_settings_model *model)
 {
-    return model != nullptr && reach_animation_manager_any_active(&model->wifi_row_animations);
+    return model != nullptr &&
+           reach_settings_motions_pending(model->wifi_row_motions, REACH_WIFI_MAX_NETWORKS + 1);
 }
