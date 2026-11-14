@@ -24,6 +24,8 @@ extern "C"
         float bar_edge_y;
         float bar_height;
         int32_t direction;
+        float bar_offset;
+        int32_t has_bar_offset;
     } reach_popup_anchor;
 
     typedef struct reach_popup_placement
@@ -66,6 +68,7 @@ extern "C"
     float reach_popup_notch_width_scaled(float dpi_scale);
     float reach_popup_notch_height(void);
     float reach_popup_notch_height_scaled(float dpi_scale);
+    float reach_popup_hidden_notch_bar_offset_scaled(float dpi_scale);
     float reach_popup_clamp_notch_center_scaled(float notch_center_x, float width, float dpi_scale);
     reach_result reach_popup_push_height_background(const reach_popup_background_input *input,
                                                     const reach_motion *height, uint64_t parent_id,

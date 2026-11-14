@@ -1111,8 +1111,9 @@ its own bounds or re-derives its notch at render time has reintroduced the bug
 this helper exists to prevent.
 Top Bar dropdowns (Quick Settings, the tray dropdown and the power menu) keep that placement but
 draw `reach_popup_background_input.hide_notch`: a plain rounded card in the body below the notch
-strip, filled with the `top_bar_dropdown_background` token (the Top Bar colour in dark mode). The
-Dock's menus keep their notch.
+strip, filled with the `top_bar_dropdown_background` token (the Top Bar colour in dark mode). They
+set `reach_popup_anchor.bar_offset` from `reach_popup_hidden_notch_bar_offset_scaled`, so the visible
+card starts 2 dp below the bar edge. The Dock's menus keep their notch and margin.
 
 `features/common/layout` is the other shared state machine: a pure registry of
 participants, layers, conditions and visibility intent with a `resolve` that has no

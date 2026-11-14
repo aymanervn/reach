@@ -84,9 +84,10 @@ reach_popup_placement reach_popup_place(const reach_popup_anchor *anchor, float 
     placement.bounds.width = width;
     placement.bounds.height = height;
     placement.bounds.x = anchor->button.x + anchor->button.width * 0.5f - width * 0.5f;
+    float offset = anchor->has_bar_offset ? anchor->bar_offset : margin;
     placement.bounds.y = anchor->direction == REACH_POPUP_DROP_DOWN
-                             ? anchor->bar_edge_y + margin
-                             : anchor->bar_edge_y - height - margin;
+                             ? anchor->bar_edge_y + offset
+                             : anchor->bar_edge_y - height - offset;
     placement.bounds = reach_popup_constrain_bounds(placement.bounds, anchor->monitor, margin);
     placement.notch_anchor_x = anchor->button.x + anchor->button.width * 0.5f;
     placement.notch_side = reach_popup_notch_side(anchor->direction);
@@ -130,7 +131,8 @@ reach_result reach_popup_height_motion(const reach_popup_anchor *anchor, float w
     reach_motion_set(&result.width, placement.bounds.width);
     if (anchor->direction == REACH_POPUP_DROP_DOWN)
     {
-        float anchor_y = anchor->bar_edge_y + margin;
+        float anchor_y =
+            anchor->bar_edge_y + (anchor->has_bar_offset ? anchor->bar_offset : margin);
         if (constrained)
         {
             result.y = reach_motion_affine(&result.height, -1, bottom);
@@ -141,7 +143,8 @@ reach_result reach_popup_height_motion(const reach_popup_anchor *anchor, float w
     }
     else
     {
-        float anchor_y = anchor->bar_edge_y - margin;
+        float anchor_y =
+            anchor->bar_edge_y - (anchor->has_bar_offset ? anchor->bar_offset : margin);
         result.y = reach_motion_affine(&result.height, -1,
                                        constrained ? fminf(anchor_y, bottom) : anchor_y);
         if (constrained)
@@ -240,6 +243,11 @@ float reach_popup_notch_height(void)
 float reach_popup_notch_height_scaled(float dpi_scale)
 {
     return reach_popup_scale(reach_popup_notch_height(), dpi_scale);
+}
+
+float reach_popup_hidden_notch_bar_offset_scaled(float dpi_scale)
+{
+    return reach_popup_scale(2.0f, dpi_scale) - reach_popup_notch_height_scaled(dpi_scale);
 }
 
 float reach_popup_clamp_notch_center_scaled(float notch_center_x, float width, float dpi_scale)
