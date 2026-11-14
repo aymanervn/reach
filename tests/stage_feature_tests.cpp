@@ -28,6 +28,19 @@ static void expect_near(float actual, float expected, const char *message)
     }
 }
 
+static double stage_seconds(float configured_seconds)
+{
+    reach_motion natural = {};
+    reach_motion_start_spec_at(&natural, 0.0f, 1.0f, 0.0f,
+                               reach_theme_motion_preset(nullptr, REACH_MOTION_PRESET_SMOOTH), 0.0);
+    return natural.duration_seconds * reach_theme_stage_motion_scale(nullptr, configured_seconds);
+}
+
+static int stage_steps(void)
+{
+    return (int)ceil(stage_seconds(reach_theme_default()->stage_animation_seconds) / 0.016) + 2;
+}
+
 static reach_rect_f32 make_rect(float x, float y, float width, float height)
 {
     reach_rect_f32 rect = {x, y, width, height};
@@ -127,7 +140,7 @@ static void test_open_and_close_state_machine(void)
 
     const reach_feature_capsule_ops *ops = reach_stage_capsule_ops();
     reach_feature_tick_result tick = {};
-    for (int step = 0; step < 40; ++step)
+    for (int step = 0; step < stage_steps(); ++step)
     {
         tick_stage(stage, 0.016, &tick);
     }
@@ -141,7 +154,7 @@ static void test_open_and_close_state_machine(void)
     expect_true(reach_stage_is_open(stage), "stage stays open while closing animates");
     expect_true(reach_stage_animation_active(stage), "closing animation is active");
 
-    for (int step = 0; step < 40; ++step)
+    for (int step = 0; step < stage_steps() * 2; ++step)
     {
         tick_stage(stage, 0.016, &tick);
     }
@@ -577,8 +590,9 @@ static void test_desktop_uses_a_shorter_relative_animation(void)
     reach_stage_open(stage, make_rect(0, 0, 1920, 1080), 1, windows, 2);
 
     reach_feature_tick_result tick = {};
-    reach_test_motion_clock_advance(0.35);
-    reach_stage_capsule_ops()->tick(stage, 0.35, &tick);
+    double desktop = stage_seconds(0.35f) + 0.001;
+    reach_test_motion_clock_advance(desktop);
+    reach_stage_capsule_ops()->tick(stage, desktop, &tick);
     const reach_stage_state *state = reach_stage_state_ptr(stage);
     expect_near(state->desktop_progress, 1.0f,
                 "Desktop settles after its relative animation segment");
@@ -594,12 +608,13 @@ static void test_desktop_only_close_has_no_hidden_app_wait(void)
     reach_stage_set_animation_seconds(stage, 1.0f);
     reach_stage_open_window desktop = make_desktop(100, make_rect(0, 0, 1920, 1080));
     reach_stage_open(stage, make_rect(0, 0, 1920, 1080), 1, &desktop, 1);
-    advance_stage(stage, 1, 0.35);
+    double seconds = stage_seconds(0.35f) + 0.001;
+    advance_stage(stage, 1, seconds);
 
     reach_stage_begin_close(stage);
     reach_feature_tick_result tick = {};
-    reach_test_motion_clock_advance(0.35);
-    reach_stage_capsule_ops()->tick(stage, 0.35, &tick);
+    reach_test_motion_clock_advance(seconds);
+    reach_stage_capsule_ops()->tick(stage, seconds, &tick);
     expect_true(reach_stage_state_ptr(stage)->close_phase == REACH_STAGE_CLOSE_ALIGNED,
                 "Desktop-only close does not wait for an invisible app track");
     reach_stage_destroy(stage);

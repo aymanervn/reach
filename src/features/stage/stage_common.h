@@ -24,12 +24,8 @@ static inline reach_motion_spec reach_stage_presentation_spec(float animation_se
     reach_motion_spec spec = reach_stage_motion_preset(REACH_MOTION_PRESET_SMOOTH);
     float seconds =
         animation_seconds > 0.0f ? animation_seconds : reach_stage_animation_seconds_default();
-    reach_motion natural = {};
-    reach_motion_start_spec_at(&natural, 0.0f, 1.0f, 0.0f, spec, 0.0);
-    if (!(natural.duration_seconds > 0.0) || !(seconds * factor > 0.0f))
-        return spec;
-    return reach_motion_spec_scaled(spec,
-                                    (float)((double)(seconds * factor) / natural.duration_seconds));
+    return reach_motion_spec_scaled(
+        spec, reach_theme_stage_motion_scale(reach_theme_default(), seconds * factor));
 }
 
 enum
