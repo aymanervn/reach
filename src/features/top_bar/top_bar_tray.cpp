@@ -241,7 +241,7 @@ reach_result reach_top_bar_tray_popup_create(reach_top_bar_tray_popup **out_popu
     {
         return REACH_ERROR;
     }
-    reach_feature_transition_init(&(*out_popup)->popup_transition, REACH_FEATURE_PRESENTATION_POPUP,
+    reach_feature_transition_init(&(*out_popup)->popup_transition,
                                   REACH_FEATURE_TRANSITION_FROM_ABOVE);
     reach_pressable_init(&(*out_popup)->pressable);
     return REACH_OK;

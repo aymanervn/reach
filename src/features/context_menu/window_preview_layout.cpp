@@ -484,7 +484,9 @@ size_t reach_context_menu_preview_generation(const reach_context_menu *menu)
 
 size_t reach_context_menu_thumbnail_count(const reach_context_menu *menu)
 {
-    return menu != nullptr && menu->state.window_list_open ? menu->previews.count : 0;
+    return menu != nullptr && menu->state.open && menu->state.window_list_open
+               ? menu->previews.count
+               : 0;
 }
 
 reach_result reach_context_menu_thumbnail_motion_at(const reach_context_menu *menu, size_t index,

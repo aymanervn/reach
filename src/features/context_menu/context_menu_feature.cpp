@@ -175,6 +175,7 @@ int32_t reach_context_menu_set_open(reach_context_menu *menu, int32_t open)
     {
         (void)reach_context_menu_state_ptr(menu);
         reach_context_menu_stop_preview_reflow(menu);
+        ++menu->preview_generation;
     }
     reach_pressable_reset(&menu->pressable, nullptr);
     menu->pressable_identity = 0;
@@ -1000,8 +1001,7 @@ reach_result reach_context_menu_create(reach_context_menu **out_menu)
     {
         return REACH_ERROR;
     }
-    reach_feature_transition_init(&menu->popup_transition, REACH_FEATURE_PRESENTATION_MENU,
-                                  REACH_FEATURE_TRANSITION_FROM_BELOW);
+    reach_feature_transition_init(&menu->popup_transition, REACH_FEATURE_TRANSITION_FROM_BELOW);
     reach_pressable_init(&menu->pressable);
     reach_context_menu_reset(menu);
     *out_menu = menu;

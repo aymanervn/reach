@@ -84,7 +84,8 @@
             [REACH_MOTION_PRESET_RELEASE] = REACH_THEME_SPRING(0.30f, 0.72f),                      \
             [REACH_MOTION_PRESET_FADE_IN] = REACH_THEME_FADE(0.14),                                \
             [REACH_MOTION_PRESET_FADE_OUT] = REACH_THEME_FADE(0.11),                               \
-            [REACH_MOTION_PRESET_MENU_FADE] = REACH_THEME_FADE(0.09),                              \
+            [REACH_MOTION_PRESET_CARD_FADE_IN] = REACH_THEME_FADE(0.05),                           \
+            [REACH_MOTION_PRESET_CARD_FADE_OUT] = REACH_THEME_FADE(0.70),                          \
         },                                                                                         \
     .stage_motion_reference_seconds = 0.28f
 
