@@ -4,6 +4,35 @@
 #include <math.h>
 #include <initializer_list>
 
+static float reach_easing_clamp01(float value)
+{
+    if (value < 0.0f)
+        return 0.0f;
+    return value > 1.0f ? 1.0f : value;
+}
+
+float reach_easing_apply(float value, reach_easing easing)
+{
+    float t = reach_easing_clamp01(value);
+    switch (easing)
+    {
+    case REACH_EASING_EASE_IN:
+        return t * t * t;
+    case REACH_EASING_EASE_OUT:
+    {
+        float inverse = 1.0f - t;
+        return 1.0f - inverse * inverse * inverse;
+    }
+    case REACH_EASING_EXPONENTIAL_OUT:
+        return (float)(-expm1(-12.0 * t) / -expm1(-12.0));
+    case REACH_EASING_EASE_IN_OUT:
+    default:
+        return t < 0.5f
+                   ? 4.0f * t * t * t
+                   : 1.0f - ((-2.0f * t + 2.0f) * (-2.0f * t + 2.0f) * (-2.0f * t + 2.0f)) / 2.0f;
+    }
+}
+
 static constexpr double reach_motion_pi = 3.14159265358979323846;
 static constexpr double reach_spring_settle_ratio = 5e-6;
 

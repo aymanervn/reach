@@ -1,7 +1,6 @@
 #include "reach/core/theme.h"
 #include "reach/support/util.h"
 #include "reach/support/motion.h"
-#include "reach/support/animation.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -1141,22 +1140,6 @@ static void test_spring_retarget_preserves_velocity(void)
                        "retargeted motion leaves with the interrupted velocity");
             }
     }
-    reach_animation_track tracks[1] = {};
-    reach_animation_manager manager = {};
-    reach_animation_manager_init(&manager, tracks, 1);
-    reach_animation_manager_start_at(&manager, 0, 0, 100, .5, REACH_EASING_EASE_IN_OUT, 1);
-    float velocity = reach_motion_velocity_at(reach_animation_manager_motion(&manager, 0), 1.2);
-    reach_animation_manager_spring_to_at(&manager, 0, 10, .3f, 1, 1.2);
-    const reach_motion *track = reach_animation_manager_motion(&manager, 0);
-    expect(track->easing == REACH_EASING_SPRING && track->spring_velocity == velocity &&
-               reach_animation_manager_active(&manager, 0) &&
-               reach_animation_manager_value(&manager, 0) == track->from &&
-               reach_animation_manager_target(&manager, 0) == 10,
-           "animation manager retargets tracks with springs");
-    reach_animation_manager_sample_at(&manager, reach_motion_deadline(track));
-    expect(!reach_animation_manager_active(&manager, 0) &&
-               reach_animation_manager_value(&manager, 0) == 10,
-           "spring tracks finish on the exact endpoint");
     reach_motion spec_motion = {};
     reach_motion_start_spec_at(&spec_motion, 0, 10, 40, reach_motion_spec_spring(.3f, .8f), 2);
     reach_motion direct = {};

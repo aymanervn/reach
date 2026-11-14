@@ -1,6 +1,5 @@
 #include "reach/core/frame_clock.h"
 #include "reach/core/blink.h"
-#include "reach/support/animation.h"
 
 #include <cmath>
 #include <initializer_list>
@@ -129,77 +128,6 @@ static void test_blink_invalid_or_unrepresentable_deadlines(void)
     reach_blink_reset_at(&blink, 1e-30, 1e-30, 100.0);
     expect_true(blink.deadline_seconds == 0,
                 "unrepresentable boundaries cannot create a busy deadline loop");
-}
-
-static void test_animation_absolute_sampling_and_final_update(void)
-{
-    reach_animation_track tracks[2] = {};
-    reach_animation_manager manager = {};
-    reach_animation_manager_init(&manager, tracks, 2);
-    reach_animation_manager_start_at(&manager, 0, 0, 100, 2, REACH_EASING_EASE_OUT, 10);
-    reach_animation_manager_start_at(&manager, 1, 0, 1, 4, REACH_EASING_EASE_IN_OUT, 10);
-    reach_animation_manager_sample_at(&manager, 11);
-    expect_true(std::fabs(reach_animation_manager_value(&manager, 0) - 87.5f) < 0.0001f,
-                "scalar tracks sample elapsed absolute time with canonical easing");
-    expect_true(std::fabs(reach_animation_manager_value(&manager, 1) - 0.0625f) < 0.0001f,
-                "one event time samples all tracks independently of frame deltas");
-    uint64_t generation = tracks[0].motion.generation;
-    reach_animation_manager_sample_at(&manager, 11);
-    expect_true(tracks[0].motion.generation == generation && tracks[0].value == 87.5f,
-                "sampling does not restart the physical timeline");
-    expect_true(reach_animation_manager_any_active(&manager),
-                "cached activity retains the required final update after a delayed wake");
-    reach_animation_manager_sample_at(&manager, 20);
-    expect_true(tracks[0].value == 100 && tracks[1].value == 1 &&
-                    !reach_animation_manager_any_active(&manager),
-                "a late wake lands at both endpoints and retires frame demand");
-}
-
-static void test_animation_event_time_retarget_and_descriptor(void)
-{
-    reach_animation_track track = {};
-    reach_animation_manager manager = {};
-    reach_animation_manager_init(&manager, &track, 1);
-    expect_true(track.motion.generation != 0 && reach_motion_value(&track.motion) == 0,
-                "initialized zero is explicit compositor intent rather than an absent property");
-    reach_animation_manager_start_at(&manager, 0, 0, 1, 1, REACH_EASING_EASE_OUT, 1000);
-    reach_animation_manager_sample_at(&manager, 1000.1);
-    const reach_motion previous = *reach_animation_manager_motion(&manager, 0);
-    float at_event = reach_motion_value_at(&previous, 1000.5);
-    reach_animation_manager_animate_to_at(&manager, 0, 0, 0.5, REACH_EASING_EASE_IN, 1000.5);
-    const reach_motion *motion = reach_animation_manager_motion(&manager, 0);
-    expect_true(motion->from == at_event && track.value == at_event &&
-                    motion->started_seconds == 1000.5 && motion->generation != previous.generation,
-                "retarget samples the event instead of the last rendered frame");
-    reach_animation_manager_sample_at(&manager, 1000.75);
-    expect_true(track.value == reach_motion_value_at(motion, 1000.75),
-                "published compositor intent and CPU sampling share one curve");
-    reach_animation_manager_sample_at(&manager, 1001);
-    expect_true(track.value == 0 && !track.active,
-                "reversal reaches its exact endpoint without accumulated deltas");
-}
-
-static void test_animation_immediate_reset_and_invalid_sample(void)
-{
-    reach_animation_track track = {};
-    reach_animation_manager manager = {};
-    reach_animation_manager_init(&manager, &track, 1);
-    reach_animation_manager_start_at(&manager, 0, 3, 3, 1, REACH_EASING_EASE_OUT, 10);
-    expect_true(track.value == 3 && !track.active, "equal targets do not request animation frames");
-    reach_animation_manager_start_at(&manager, 0, 3, 9, 0, REACH_EASING_EASE_OUT, 10);
-    expect_true(track.value == 9 && !track.active, "zero duration sets the endpoint immediately");
-    reach_animation_manager_start_at(&manager, 0, 0, 1, 1, REACH_EASING_EASE_OUT, 10);
-    reach_animation_manager_sample_at(&manager, NAN);
-    expect_true(track.value == 0 && track.active, "invalid sampling cannot poison cached geometry");
-    uint64_t generation = track.motion.generation;
-    reach_animation_manager_set(&manager, 0, 4);
-    expect_true(track.value == 4 && !track.active && track.motion.generation != generation,
-                "setting a value cancels old intent with a new generation");
-    generation = track.motion.generation;
-    reach_animation_manager_reset(&manager, 0);
-    expect_true(track.value == 0 && !track.active && track.motion.generation != 0 &&
-                    track.motion.generation != generation,
-                "reset retires old ownership and publishes an explicit zero endpoint");
 }
 
 static void test_repeating_motion_compilation_and_limits(void)
@@ -397,9 +325,6 @@ int main(void)
     test_blink_deadlines_and_duty_cycle();
     test_blink_delayed_wake_reset_and_stop();
     test_blink_invalid_or_unrepresentable_deadlines();
-    test_animation_absolute_sampling_and_final_update();
-    test_animation_event_time_retarget_and_descriptor();
-    test_animation_immediate_reset_and_invalid_sample();
     test_repeating_motion_compilation_and_limits();
     test_repeating_motion_affine_crossing_and_retirement();
     test_discrete_repetition_sampling_compilation_and_crossing();
