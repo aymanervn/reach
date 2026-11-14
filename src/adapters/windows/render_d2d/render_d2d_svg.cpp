@@ -90,6 +90,8 @@ static int reach_d2d_vector_icon_resource(uint64_t icon_id)
         return 240;
     case REACH_VECTOR_ICON_MUSIC_NOTE:
         return 241;
+    case REACH_VECTOR_ICON_QUESTION:
+        return 242;
     default:
         return 0;
     }

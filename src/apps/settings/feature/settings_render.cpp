@@ -978,7 +978,7 @@ static void render_diagnostics_row(const reach_settings_render_input *input,
                              reach_settings_scale(input, input->theme->radius_small),
                              input->theme->settings_icon_box_background);
     reach_settings_push_icon(commands, icon_box, input->theme->settings_secondary_text,
-                             REACH_VECTOR_ICON_DOCUMENT, 0.22f);
+                             REACH_VECTOR_ICON_QUESTION, 0.22f);
 
     float left = icon_box.x + icon_box.width + reach_settings_scale(input, 12.0f);
     float width = layout->diagnostics_button.x - left - reach_settings_scale(input, 12.0f);
