@@ -267,7 +267,8 @@ Switcher retains 125dp. Both consume the shared pure aspect, common-height fitti
 packing helpers in `reach/features/common/window_preview_layout.h`. Context Menu keeps its own
 anchoring and complete-card page navigation, exposing every instance in the 16-window semantic
 payload independently of the eight-command menu capacity. Headers and close controls stay above
-native previews; minimized or unavailable sources use retained icon placeholders.
+native previews; unavailable sources use retained icon placeholders. Minimized windows keep their
+live preview, because DWM retains a minimized window's last frame.
 Window-change notifications refresh titles, geometry and eligibility, prune departed sources,
 and close an empty popup. Dock republishes the hovered owner's payload after model changes through
 its public route callback, preserving the popup transition for the same owner. Current layout
@@ -306,15 +307,17 @@ DirectComposition surface stays transparent except for app plates, headers, titl
 close buttons, and the Desktop's transparent-center outline made from ordinary fills, so no
 moving cutout or split backdrop is required. Because each app DWM
 thumbnail still composites on top of its own destination surface, app chrome stays
-outside the app thumbnail rect. Minimized windows have no DWM content and fall back
-to an icon tile. The Desktop source is the Reach-owned top-level Progman
+outside the app thumbnail rect. Minimized windows keep a live DWM thumbnail: DWM retains their
+last frame, and the thumbnail adapter skips its on-screen source crop for an iconic source because
+its window rectangle is the minimized caption. Stage, the Dock window list and the Switcher all
+show it. The Desktop source is the Reach-owned top-level Progman
 compatibility host, cropped from the virtual-screen thumbnail to the primary
 monitor.
 Every Stage dismissal uses one close choreography. An app tile publishes ordinary activation
 without close-first ordering, so the app-control worker queues the selected window before generic
 feature-action handling requests the same Stage close used by the Dock trigger. Stage stores no
-closing selection: every live app thumbnail returns to its source frame, while a minimized icon
-placeholder keeps its Stage size and exits fully beyond the surface's top-left instead of expanding
+closing selection: every live app thumbnail returns to its source frame, while a minimized
+window's thumbnail keeps its Stage size and exits fully beyond the surface's top-left instead of expanding
 toward its restore bounds. Desktop follows its shorter track, and event-driven window-state changes
 update that same running close rather than selecting a different choreography. For an app handoff,
 composition marks the activated source as the

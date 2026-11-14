@@ -658,7 +658,7 @@ int32_t reach_switcher_arrange(reach_switcher *switcher, const reach_switcher_ar
         aspects[index] = reach_window_preview_aspect(frame);
         const reach_window_snapshot *window =
             reach_window_tracking_window_by_id(switcher->windows, state->windows[index]);
-        preview_visible[index] = valid && window != nullptr && !window->minimized;
+        preview_visible[index] = valid && window != nullptr;
     }
     float height = reach_window_preview_height(aspects, state->window_count,
                                                REACH_SWITCHER_PREVIEW_HEIGHT * scale,

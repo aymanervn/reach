@@ -214,9 +214,8 @@ static void test_switcher_fits_variable_width_previews_and_keeps_selection_visib
     reach_switcher_notify_windows_changed(switcher, &tick);
     (void)reach_switcher_arrange(switcher, &arrange);
     (void)reach_switcher_thumbnail_at(switcher, 1, &portrait);
-    expect_true(!portrait.visible && portrait.window == 0 &&
-                    reach_switcher_preview_generation(switcher) != generation,
-                "minimized placeholders retire their native relationship");
+    expect_true(portrait.visible && portrait.window != 0,
+                "a minimized window keeps its live preview");
     fake_windows[1].minimized = 0;
     fake_frames[1] = {0.0f, 0.0f, 1200.0f, 600.0f};
     (void)reach_window_tracking_refresh(windows, nullptr);
