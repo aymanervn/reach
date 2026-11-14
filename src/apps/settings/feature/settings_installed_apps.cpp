@@ -1,4 +1,4 @@
-#include "reach/apps/settings/settings.h"
+#include "settings_pages_internal.h"
 
 #include <string.h>
 
@@ -29,8 +29,7 @@ void reach_settings_model_apply_installed_apps(reach_settings_model *model,
             model->installed_apps.count = REACH_INSTALLED_APP_MAX_ENTRIES;
         }
     }
-    reach_scrollbar_set_target(&model->installed_apps_scrollbar, 0.0f);
-    model->installed_apps_scrollbar.offset = 0.0f;
+    reach_settings_scroll_to_top(&model->installed_apps_scroll);
     model->installed_apps_loaded = 1;
     model->installed_apps_busy = 0;
     model->installed_apps_status = REACH_SETTINGS_APPLICATIONS_STATUS_NONE;
@@ -75,14 +74,7 @@ void reach_settings_model_scroll_installed_apps(reach_settings_model *model, flo
 {
     if (model != nullptr)
     {
-        reach_scrollbar_scroll(&model->installed_apps_scrollbar, delta);
+        (void)reach_scroll_view_scroll_by(&model->installed_apps_scroll, delta,
+                                          reach_motion_now_seconds());
     }
-}
-
-int32_t reach_settings_model_installed_apps_scroll(reach_settings_model *model,
-                                                   double delta_seconds)
-{
-    return model != nullptr
-               ? reach_scrollbar_update(&model->installed_apps_scrollbar, delta_seconds)
-               : 0;
 }

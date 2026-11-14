@@ -129,7 +129,8 @@ void reach_settings_layout_bluetooth(reach_settings_layout *layout, reach_settin
         layout->bluetooth_section_ids[section_index] = section;
         layout->bluetooth_section_titles[section_index] = reach_settings_bluetooth_rect(
             layout->bluetooth_viewport.x,
-            layout->bluetooth_viewport.y + content_y - model->bluetooth_scrollbar.offset,
+            layout->bluetooth_viewport.y + content_y -
+                reach_scroll_view_value_at(&model->bluetooth_scroll, layout->scroll_time),
             layout->bluetooth_viewport.width, section_title_height);
         content_y += section_title_height + 5.0f * scale;
 
@@ -152,7 +153,8 @@ void reach_settings_layout_bluetooth(reach_settings_layout *layout, reach_settin
             layout->bluetooth_row_indices[row_index] = index;
             layout->bluetooth_rows[row_index] = reach_settings_bluetooth_rect(
                 layout->bluetooth_viewport.x,
-                layout->bluetooth_viewport.y + content_y - model->bluetooth_scrollbar.offset,
+                layout->bluetooth_viewport.y + content_y -
+                    reach_scroll_view_value_at(&model->bluetooth_scroll, layout->scroll_time),
                 layout->bluetooth_viewport.width, height);
 
             if (model->bluetooth_expanded_row >= 0 &&
@@ -169,14 +171,8 @@ void reach_settings_layout_bluetooth(reach_settings_layout *layout, reach_settin
     layout->bluetooth_content_height = base_content_height > layout->bluetooth_viewport.height
                                            ? base_content_height + 20.0f * scale
                                            : base_content_height;
-    reach_scrollbar_set_extents(&model->bluetooth_scrollbar, layout->bluetooth_content_height,
-                                layout->bluetooth_viewport.height);
-    if (layout->bluetooth_content_height > layout->bluetooth_viewport.height)
-    {
-        reach_scrollbar_layout scrollbar = reach_scrollbar_compute_layout(
-            &model->bluetooth_scrollbar, layout->bluetooth_scrollbar_track,
-            layout->bluetooth_viewport.height, layout->bluetooth_content_height, 34.0f * scale);
-        layout->bluetooth_scrollbar_track = scrollbar.track;
-        layout->bluetooth_scrollbar_thumb = scrollbar.thumb;
-    }
+    reach_settings_layout_scroll(&model->bluetooth_scroll, layout->bluetooth_viewport,
+                                 layout->bluetooth_scrollbar_track,
+                                 layout->bluetooth_content_height, 34.0f * scale,
+                                 layout->scroll_time, &layout->bluetooth_scrollbar_thumb);
 }

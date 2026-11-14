@@ -148,12 +148,6 @@ struct reach_settings_app
     reach_settings_reach_worker reach_worker;
     reach_settings_startup_worker startup_worker;
     uint16_t app_update_zip[260];
-    reach_scrollbar_drag update_scrollbar_drag;
-    reach_scrollbar_drag display_scrollbar_drag;
-    reach_scrollbar_drag startup_scrollbar_drag;
-    reach_scrollbar_drag installed_apps_scrollbar_drag;
-    reach_scrollbar_drag wifi_scrollbar_drag;
-    reach_scrollbar_drag bluetooth_scrollbar_drag;
     int32_t running;
     int32_t dirty;
     reach_monitor_refresh_retry monitor_refresh_retry;
@@ -2116,16 +2110,10 @@ static void reach_settings_handle_bluetooth_action(reach_settings_app *app,
 
 static void reach_settings_handle_pointer_up(reach_settings_app *app, const reach_ui_event *event)
 {
-    if (app->update_scrollbar_drag.active || app->display_scrollbar_drag.active ||
-        app->startup_scrollbar_drag.active || app->installed_apps_scrollbar_drag.active ||
-        app->wifi_scrollbar_drag.active || app->bluetooth_scrollbar_drag.active)
+    reach_scroll_view *dragging = reach_settings_model_dragging_scroll(&app->model);
+    if (dragging != nullptr)
     {
-        reach_scrollbar_end_drag(&app->update_scrollbar_drag);
-        reach_scrollbar_end_drag(&app->display_scrollbar_drag);
-        reach_scrollbar_end_drag(&app->startup_scrollbar_drag);
-        reach_scrollbar_end_drag(&app->installed_apps_scrollbar_drag);
-        reach_scrollbar_end_drag(&app->wifi_scrollbar_drag);
-        reach_scrollbar_end_drag(&app->bluetooth_scrollbar_drag);
+        (void)reach_scroll_view_pointer_up(dragging);
         if (app->window.ops.set_pointer_capture != nullptr)
         {
             (void)app->window.ops.set_pointer_capture(app->window.window, 0);
@@ -2493,60 +2481,9 @@ static void reach_settings_handle_pointer_down(reach_settings_app *app, const re
                               feedback_index, &feedback, &result);
         reach_settings_apply_pressable_result(app, &result);
     }
-    if (hit.type == REACH_SETTINGS_HIT_UPDATE_SCROLLBAR_TRACK ||
-        hit.type == REACH_SETTINGS_HIT_UPDATE_SCROLLBAR_THUMB)
-    {
-        reach_scrollbar_layout layout = {app->layout.update_scrollbar_track,
-                                         app->layout.update_scrollbar_thumb};
-        reach_scrollbar_begin_drag(&app->model.update_scrollbar, &app->update_scrollbar_drag,
-                                   &layout, y,
-                                   hit.type == REACH_SETTINGS_HIT_UPDATE_SCROLLBAR_THUMB);
-    }
-    else if (hit.type == REACH_SETTINGS_HIT_DISPLAY_SCROLLBAR_TRACK ||
-             hit.type == REACH_SETTINGS_HIT_DISPLAY_SCROLLBAR_THUMB)
-    {
-        reach_scrollbar_layout layout = {app->layout.display_scrollbar_track,
-                                         app->layout.display_scrollbar_thumb};
-        reach_scrollbar_begin_drag(&app->model.display_scrollbar, &app->display_scrollbar_drag,
-                                   &layout, y,
-                                   hit.type == REACH_SETTINGS_HIT_DISPLAY_SCROLLBAR_THUMB);
-    }
-    else if (hit.type == REACH_SETTINGS_HIT_STARTUP_SCROLLBAR_TRACK ||
-             hit.type == REACH_SETTINGS_HIT_STARTUP_SCROLLBAR_THUMB)
-    {
-        reach_scrollbar_layout layout = {app->layout.startup_scrollbar_track,
-                                         app->layout.startup_scrollbar_thumb};
-        reach_scrollbar_begin_drag(&app->model.startup_scrollbar, &app->startup_scrollbar_drag,
-                                   &layout, y,
-                                   hit.type == REACH_SETTINGS_HIT_STARTUP_SCROLLBAR_THUMB);
-    }
-    else if (hit.type == REACH_SETTINGS_HIT_APPLICATION_SCROLLBAR_TRACK ||
-             hit.type == REACH_SETTINGS_HIT_APPLICATION_SCROLLBAR_THUMB)
-    {
-        reach_scrollbar_layout layout = {app->layout.installed_apps_scrollbar_track,
-                                         app->layout.installed_apps_scrollbar_thumb};
-        reach_scrollbar_begin_drag(&app->model.installed_apps_scrollbar,
-                                   &app->installed_apps_scrollbar_drag, &layout, y,
-                                   hit.type == REACH_SETTINGS_HIT_APPLICATION_SCROLLBAR_THUMB);
-    }
-    else if (hit.type == REACH_SETTINGS_HIT_WIFI_SCROLLBAR_TRACK ||
-             hit.type == REACH_SETTINGS_HIT_WIFI_SCROLLBAR_THUMB)
-    {
-        reach_scrollbar_layout layout = {app->layout.wifi_scrollbar_track,
-                                         app->layout.wifi_scrollbar_thumb};
-        reach_scrollbar_begin_drag(&app->model.wifi_scrollbar, &app->wifi_scrollbar_drag, &layout,
-                                   y, hit.type == REACH_SETTINGS_HIT_WIFI_SCROLLBAR_THUMB);
-    }
-    else if (hit.type == REACH_SETTINGS_HIT_BLUETOOTH_SCROLLBAR_TRACK ||
-             hit.type == REACH_SETTINGS_HIT_BLUETOOTH_SCROLLBAR_THUMB)
-    {
-        reach_scrollbar_layout layout = {app->layout.bluetooth_scrollbar_track,
-                                         app->layout.bluetooth_scrollbar_thumb};
-        reach_scrollbar_begin_drag(&app->model.bluetooth_scrollbar, &app->bluetooth_scrollbar_drag,
-                                   &layout, y,
-                                   hit.type == REACH_SETTINGS_HIT_BLUETOOTH_SCROLLBAR_THUMB);
-    }
-    else
+    reach_scroll_view *scroll = reach_settings_model_scroll_for_hit(&app->model, hit.type);
+    if (scroll == nullptr ||
+        reach_scroll_view_pointer_down(scroll, x, y, reach_motion_now_seconds()) == 0)
     {
         return;
     }
@@ -2579,56 +2516,14 @@ static void reach_settings_handle_pointer_move(reach_settings_app *app, const re
         app->dirty = 1;
     }
 
-    if (!app->update_scrollbar_drag.active && !app->display_scrollbar_drag.active &&
-        !app->startup_scrollbar_drag.active && !app->installed_apps_scrollbar_drag.active &&
-        !app->wifi_scrollbar_drag.active && !app->bluetooth_scrollbar_drag.active)
+    reach_scroll_view *dragging = reach_settings_model_dragging_scroll(&app->model);
+    if (dragging == nullptr)
     {
         return;
     }
     reach_settings_refresh_layout(app);
     float y = (float)event->y - app->bounds.y;
-    if (app->update_scrollbar_drag.active)
-    {
-        reach_scrollbar_layout layout = {app->layout.update_scrollbar_track,
-                                         app->layout.update_scrollbar_thumb};
-        reach_scrollbar_update_drag(&app->model.update_scrollbar, &app->update_scrollbar_drag,
-                                    &layout, y);
-    }
-    else if (app->display_scrollbar_drag.active)
-    {
-        reach_scrollbar_layout layout = {app->layout.display_scrollbar_track,
-                                         app->layout.display_scrollbar_thumb};
-        reach_scrollbar_update_drag(&app->model.display_scrollbar, &app->display_scrollbar_drag,
-                                    &layout, y);
-    }
-    else if (app->installed_apps_scrollbar_drag.active)
-    {
-        reach_scrollbar_layout layout = {app->layout.installed_apps_scrollbar_track,
-                                         app->layout.installed_apps_scrollbar_thumb};
-        reach_scrollbar_update_drag(&app->model.installed_apps_scrollbar,
-                                    &app->installed_apps_scrollbar_drag, &layout, y);
-    }
-    else if (app->wifi_scrollbar_drag.active)
-    {
-        reach_scrollbar_layout layout = {app->layout.wifi_scrollbar_track,
-                                         app->layout.wifi_scrollbar_thumb};
-        reach_scrollbar_update_drag(&app->model.wifi_scrollbar, &app->wifi_scrollbar_drag, &layout,
-                                    y);
-    }
-    else if (app->bluetooth_scrollbar_drag.active)
-    {
-        reach_scrollbar_layout layout = {app->layout.bluetooth_scrollbar_track,
-                                         app->layout.bluetooth_scrollbar_thumb};
-        reach_scrollbar_update_drag(&app->model.bluetooth_scrollbar, &app->bluetooth_scrollbar_drag,
-                                    &layout, y);
-    }
-    else
-    {
-        reach_scrollbar_layout layout = {app->layout.startup_scrollbar_track,
-                                         app->layout.startup_scrollbar_thumb};
-        reach_scrollbar_update_drag(&app->model.startup_scrollbar, &app->startup_scrollbar_drag,
-                                    &layout, y);
-    }
+    (void)reach_scroll_view_pointer_move(dragging, y, reach_motion_now_seconds());
     app->dirty = 1;
 }
 
@@ -2712,12 +2607,9 @@ static void reach_settings_handle_event(void *user, const reach_ui_event *event)
         reach_pressable_result result = {};
         reach_pressable_cancel(&app->model.button_pressable, &feedback, &result);
         reach_settings_apply_pressable_result(app, &result);
-        reach_scrollbar_end_drag(&app->update_scrollbar_drag);
-        reach_scrollbar_end_drag(&app->display_scrollbar_drag);
-        reach_scrollbar_end_drag(&app->startup_scrollbar_drag);
-        reach_scrollbar_end_drag(&app->installed_apps_scrollbar_drag);
-        reach_scrollbar_end_drag(&app->wifi_scrollbar_drag);
-        reach_scrollbar_end_drag(&app->bluetooth_scrollbar_drag);
+        reach_scroll_view *dragging = reach_settings_model_dragging_scroll(&app->model);
+        if (dragging != nullptr)
+            (void)reach_scroll_view_pointer_up(dragging);
         if (reach_settings_model_set_hovered_button(&app->model, REACH_SETTINGS_HIT_NONE))
         {
             app->dirty = 1;
@@ -3114,19 +3006,7 @@ reach_result reach_settings_app_update(reach_settings_app *app, double delta_sec
     }
     reach_settings_apply_wifi_snapshot(app);
     reach_settings_apply_bluetooth_snapshot(app);
-    if (reach_settings_model_wifi_scroll(&app->model, delta_seconds))
-    {
-        app->dirty = 1;
-    }
-    if (reach_settings_model_bluetooth_scroll(&app->model, delta_seconds))
-    {
-        app->dirty = 1;
-    }
-    if (reach_settings_model_installed_apps_scroll(&app->model, delta_seconds))
-    {
-        app->dirty = 1;
-    }
-    if (reach_settings_model_display_scroll(&app->model, delta_seconds))
+    if (reach_settings_model_advance_scroll(&app->model, reach_motion_now_seconds()))
     {
         app->dirty = 1;
     }
@@ -3136,14 +3016,6 @@ reach_result reach_settings_app_update(reach_settings_app *app, double delta_sec
         app->dirty = 1;
     }
     if (reach_settings_model_sample_bluetooth_animations_at(&app->model, animation_now))
-    {
-        app->dirty = 1;
-    }
-    if (reach_settings_model_update_scroll(&app->model, delta_seconds))
-    {
-        app->dirty = 1;
-    }
-    if (reach_settings_model_startup_scroll(&app->model, delta_seconds))
     {
         app->dirty = 1;
     }
@@ -3264,14 +3136,8 @@ int32_t reach_settings_app_needs_frame(const reach_settings_app *app)
            (caret_deadline > 0.0 && reach_motion_wait_ms(caret_deadline) == 0) || sampled_visual ||
            app->dirty || reach_busy || startup_busy || worker->completed ||
            app->update_worker.progress_state.load() != 0 ||
-           app->model.update_scrollbar.offset != app->model.update_scrollbar.target ||
-           app->model.startup_scrollbar.offset != app->model.startup_scrollbar.target ||
-           app->model.installed_apps_scrollbar.offset !=
-               app->model.installed_apps_scrollbar.target ||
-           app->model.display_scrollbar.offset != app->model.display_scrollbar.target ||
-           app->async_notify.load() != 0 || app->system_controls_change_flags.load() != 0 ||
-           app->model.wifi_scrollbar.offset != app->model.wifi_scrollbar.target ||
-           app->model.bluetooth_scrollbar.offset != app->model.bluetooth_scrollbar.target ||
+           reach_settings_model_scroll_pending(&app->model) || app->async_notify.load() != 0 ||
+           app->system_controls_change_flags.load() != 0 ||
            reach_settings_model_wifi_animations_active(&app->model) ||
            reach_settings_model_bluetooth_animations_active(&app->model);
 }

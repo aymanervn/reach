@@ -218,7 +218,8 @@ void reach_settings_layout_wifi(reach_settings_layout *layout, reach_settings_mo
             float visible_height = full_height * progress;
             layout->wifi_add_row = reach_settings_wifi_rect(
                 layout->wifi_viewport.x,
-                layout->wifi_viewport.y + content_y - model->wifi_scrollbar.offset,
+                layout->wifi_viewport.y + content_y -
+                    reach_scroll_view_value_at(&model->wifi_scroll, layout->scroll_time),
                 layout->wifi_viewport.width, full_height);
             float clip_top = layout->wifi_add_row.y > layout->wifi_viewport.y
                                  ? layout->wifi_add_row.y
@@ -256,7 +257,8 @@ void reach_settings_layout_wifi(reach_settings_layout *layout, reach_settings_mo
         layout->wifi_row_indices[row_index] = index;
         layout->wifi_rows[row_index] = reach_settings_wifi_rect(
             layout->wifi_viewport.x,
-            layout->wifi_viewport.y + content_y - model->wifi_scrollbar.offset,
+            layout->wifi_viewport.y + content_y -
+                reach_scroll_view_value_at(&model->wifi_scroll, layout->scroll_time),
             layout->wifi_viewport.width, height);
 
         if (model->wifi_expanded_row >= 0 && (size_t)model->wifi_expanded_row == index &&
@@ -272,14 +274,7 @@ void reach_settings_layout_wifi(reach_settings_layout *layout, reach_settings_mo
     layout->wifi_content_height = base_content_height > layout->wifi_viewport.height
                                       ? base_content_height + 20.0f * scale
                                       : base_content_height;
-    reach_scrollbar_set_extents(&model->wifi_scrollbar, layout->wifi_content_height,
-                                layout->wifi_viewport.height);
-    if (layout->wifi_content_height > layout->wifi_viewport.height)
-    {
-        reach_scrollbar_layout scrollbar = reach_scrollbar_compute_layout(
-            &model->wifi_scrollbar, layout->wifi_scrollbar_track, layout->wifi_viewport.height,
-            layout->wifi_content_height, 34.0f * scale);
-        layout->wifi_scrollbar_track = scrollbar.track;
-        layout->wifi_scrollbar_thumb = scrollbar.thumb;
-    }
+    reach_settings_layout_scroll(&model->wifi_scroll, layout->wifi_viewport,
+                                 layout->wifi_scrollbar_track, layout->wifi_content_height,
+                                 34.0f * scale, layout->scroll_time, &layout->wifi_scrollbar_thumb);
 }

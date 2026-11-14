@@ -46,13 +46,13 @@ void reach_settings_model_init(reach_settings_model *model)
             version_wide[index] = (uint16_t)version_text[index];
         reach_settings_model_set_current_version(model, version_wide);
     }
-    reach_scrollbar_model_init(&model->update_scrollbar, REACH_SCROLLBAR_DRAG_FREE, 0.0f);
-    reach_scrollbar_model_init(&model->startup_scrollbar, REACH_SCROLLBAR_DRAG_FREE, 0.0f);
-    reach_scrollbar_model_init(&model->installed_apps_scrollbar, REACH_SCROLLBAR_DRAG_FREE, 0.0f);
+    reach_settings_scroll_init(&model->update_scroll);
+    reach_settings_scroll_init(&model->startup_scroll);
+    reach_settings_scroll_init(&model->installed_apps_scroll);
     reach_loader_model_init(&model->installed_apps_loader, 0.7f);
-    reach_scrollbar_model_init(&model->display_scrollbar, REACH_SCROLLBAR_DRAG_FREE, 0.0f);
-    reach_scrollbar_model_init(&model->wifi_scrollbar, REACH_SCROLLBAR_DRAG_FREE, 0.0f);
-    reach_scrollbar_model_init(&model->bluetooth_scrollbar, REACH_SCROLLBAR_DRAG_FREE, 0.0f);
+    reach_settings_scroll_init(&model->display_scroll);
+    reach_settings_scroll_init(&model->wifi_scroll);
+    reach_settings_scroll_init(&model->bluetooth_scroll);
     reach_loader_model_init(&model->update_loader, 0.7f);
     reach_loader_model_init(&model->wifi_loader, 0.7f);
     reach_loader_model_init(&model->bluetooth_loader, 0.7f);
@@ -389,6 +389,7 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
     float scale = dpi_scale > 0.0f ? dpi_scale : 1.0f;
     reach_settings_layout layout = {};
     layout.bounds = bounds;
+    layout.scroll_time = reach_motion_now_seconds();
 
     float nav_width = bounds.width * 0.25f;
     if (nav_width < 176.0f * scale)
@@ -627,7 +628,8 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
         {
             layout.startup_rows[index] = reach_settings_rect(
                 layout.startup_viewport.x,
-                layout.startup_viewport.y + content_y - model->startup_scrollbar.offset,
+                layout.startup_viewport.y + content_y -
+                    reach_scroll_view_value_at(&model->startup_scroll, layout.scroll_time),
                 layout.startup_viewport.width, row_height);
             layout.startup_toggles[index] = reach_settings_rect(
                 layout.startup_rows[index].x + layout.startup_rows[index].width - 18.0f * scale -
@@ -641,16 +643,10 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
         layout.startup_content_height = base_content_height > layout.startup_viewport.height
                                             ? base_content_height + 20.0f * scale
                                             : base_content_height;
-        reach_scrollbar_set_extents(&model->startup_scrollbar, layout.startup_content_height,
-                                    layout.startup_viewport.height);
-        if (layout.startup_content_height > layout.startup_viewport.height)
-        {
-            reach_scrollbar_layout scrollbar = reach_scrollbar_compute_layout(
-                &model->startup_scrollbar, layout.startup_scrollbar_track,
-                layout.startup_viewport.height, layout.startup_content_height, 34.0f * scale);
-            layout.startup_scrollbar_track = scrollbar.track;
-            layout.startup_scrollbar_thumb = scrollbar.thumb;
-        }
+        reach_settings_layout_scroll(&model->startup_scroll, layout.startup_viewport,
+                                     layout.startup_scrollbar_track, layout.startup_content_height,
+                                     34.0f * scale, layout.scroll_time,
+                                     &layout.startup_scrollbar_thumb);
     }
 
     if (model != nullptr && model->selected_page == REACH_SETTINGS_PAGE_APPLICATIONS)
@@ -687,11 +683,11 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
                 : REACH_INSTALLED_APP_MAX_ENTRIES;
         for (size_t index = 0; index < layout.installed_app_row_count; ++index)
         {
-            layout.installed_app_rows[index] =
-                reach_settings_rect(layout.installed_apps_viewport.x,
-                                    layout.installed_apps_viewport.y + content_y -
-                                        model->installed_apps_scrollbar.offset,
-                                    layout.installed_apps_viewport.width, row_height);
+            layout.installed_app_rows[index] = reach_settings_rect(
+                layout.installed_apps_viewport.x,
+                layout.installed_apps_viewport.y + content_y -
+                    reach_scroll_view_value_at(&model->installed_apps_scroll, layout.scroll_time),
+                layout.installed_apps_viewport.width, row_height);
             float right = layout.installed_app_rows[index].x +
                           layout.installed_app_rows[index].width - 14.0f * scale;
             layout.installed_app_uninstall_buttons[index] = reach_settings_rect(
@@ -702,18 +698,10 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
         }
         float base_height = content_y > 0.0f ? content_y - row_gap : 0.0f;
         layout.installed_apps_content_height = base_height;
-        reach_scrollbar_set_extents(&model->installed_apps_scrollbar,
-                                    layout.installed_apps_content_height,
-                                    layout.installed_apps_viewport.height);
-        if (layout.installed_apps_content_height > layout.installed_apps_viewport.height)
-        {
-            reach_scrollbar_layout scrollbar = reach_scrollbar_compute_layout(
-                &model->installed_apps_scrollbar, layout.installed_apps_scrollbar_track,
-                layout.installed_apps_viewport.height, layout.installed_apps_content_height,
-                34.0f * scale);
-            layout.installed_apps_scrollbar_track = scrollbar.track;
-            layout.installed_apps_scrollbar_thumb = scrollbar.thumb;
-        }
+        reach_settings_layout_scroll(&model->installed_apps_scroll, layout.installed_apps_viewport,
+                                     layout.installed_apps_scrollbar_track,
+                                     layout.installed_apps_content_height, 34.0f * scale,
+                                     layout.scroll_time, &layout.installed_apps_scrollbar_thumb);
     }
 
     if (model != nullptr && model->selected_page == REACH_SETTINGS_PAGE_DISPLAY)
@@ -730,7 +718,8 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
         layout.display_scrollbar_track = reach_settings_rect(
             layout.display_viewport.x + layout.display_viewport.width + 8.0f * scale, viewport_y,
             scrollbar_width, layout.display_viewport.height);
-        float area_y = viewport_y - model->display_scrollbar.offset;
+        float area_y =
+            viewport_y - reach_scroll_view_value_at(&model->display_scroll, layout.scroll_time);
 
         float card_height = 72.0f * scale;
         float card_spacing = 12.0f * scale;
@@ -791,19 +780,13 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
         reach_settings_layout_toggle_card(&auto_hide, area_x,
                                           desktop_y + appearance_card_height + card_spacing,
                                           area_width, card_height, scale);
-        layout.display_content_height = layout.top_bar_auto_hide_card.y +
-                                        layout.top_bar_auto_hide_card.height +
-                                        model->display_scrollbar.offset - viewport_y;
-        reach_scrollbar_set_extents(&model->display_scrollbar, layout.display_content_height,
-                                    layout.display_viewport.height);
-        if (layout.display_content_height > layout.display_viewport.height)
-        {
-            reach_scrollbar_layout scrollbar = reach_scrollbar_compute_layout(
-                &model->display_scrollbar, layout.display_scrollbar_track,
-                layout.display_viewport.height, layout.display_content_height, 34.0f * scale);
-            layout.display_scrollbar_track = scrollbar.track;
-            layout.display_scrollbar_thumb = scrollbar.thumb;
-        }
+        layout.display_content_height =
+            layout.top_bar_auto_hide_card.y + layout.top_bar_auto_hide_card.height +
+            reach_scroll_view_value_at(&model->display_scroll, layout.scroll_time) - viewport_y;
+        reach_settings_layout_scroll(&model->display_scroll, layout.display_viewport,
+                                     layout.display_scrollbar_track, layout.display_content_height,
+                                     34.0f * scale, layout.scroll_time,
+                                     &layout.display_scrollbar_thumb);
     }
 
     if (model != nullptr && model->selected_page == REACH_SETTINGS_PAGE_WIFI)
@@ -913,11 +896,13 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
         {
             size_t section_index = layout.update_section_count++;
             layout.update_section_ids[section_index] = section;
-            layout.update_section_titles[section_index] =
-                reach_settings_rect(layout.update_viewport.x,
-                                    layout.update_viewport.y + content_y -
-                                        (model != nullptr ? model->update_scrollbar.offset : 0.0f),
-                                    layout.update_viewport.width, section_title_height);
+            layout.update_section_titles[section_index] = reach_settings_rect(
+                layout.update_viewport.x,
+                layout.update_viewport.y + content_y -
+                    (model != nullptr
+                         ? reach_scroll_view_value_at(&model->update_scroll, layout.scroll_time)
+                         : 0.0f),
+                layout.update_viewport.width, section_title_height);
             content_y += section_title_height + 5.0f * scale;
         }
 
@@ -930,7 +915,8 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
             layout.update_indices[row_index] = update_index;
             layout.update_rows[row_index] = reach_settings_rect(
                 layout.update_viewport.x,
-                layout.update_viewport.y + content_y - model->update_scrollbar.offset,
+                layout.update_viewport.y + content_y -
+                    reach_scroll_view_value_at(&model->update_scroll, layout.scroll_time),
                 layout.update_viewport.width, row_height);
             float checkbox_size = 18.0f * scale;
             layout.update_checkboxes[row_index] = reach_settings_rect(
@@ -945,22 +931,11 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
     layout.update_content_height = base_content_height > layout.update_viewport.height
                                        ? base_content_height + bottom_pad
                                        : base_content_height;
-    float scroll_max = layout.update_content_height > layout.update_viewport.height
-                           ? layout.update_content_height - layout.update_viewport.height
-                           : 0.0f;
     if (model != nullptr)
-    {
-        reach_scrollbar_set_extents(&model->update_scrollbar, layout.update_content_height,
-                                    layout.update_viewport.height);
-    }
-    if (scroll_max > 0.0f && model != nullptr)
-    {
-        reach_scrollbar_layout scrollbar = reach_scrollbar_compute_layout(
-            &model->update_scrollbar, layout.update_scrollbar_track, layout.update_viewport.height,
-            layout.update_content_height, 34.0f * scale);
-        layout.update_scrollbar_track = scrollbar.track;
-        layout.update_scrollbar_thumb = scrollbar.thumb;
-    }
+        reach_settings_layout_scroll(&model->update_scroll, layout.update_viewport,
+                                     layout.update_scrollbar_track, layout.update_content_height,
+                                     34.0f * scale, layout.scroll_time,
+                                     &layout.update_scrollbar_thumb);
     return layout;
 }
 
@@ -1386,4 +1361,69 @@ reach_settings_hit_result reach_settings_hit_test(const reach_settings_layout *l
         }
     }
     return result;
+}
+
+static reach_scroll_view *reach_settings_model_scrolls(reach_settings_model *model, size_t index)
+{
+    reach_scroll_view *scrolls[] = {&model->update_scroll,         &model->startup_scroll,
+                                    &model->installed_apps_scroll, &model->display_scroll,
+                                    &model->wifi_scroll,           &model->bluetooth_scroll};
+    return index < sizeof(scrolls) / sizeof(scrolls[0]) ? scrolls[index] : nullptr;
+}
+
+int32_t reach_settings_model_advance_scroll(reach_settings_model *model, double now_seconds)
+{
+    int32_t changed = 0;
+    for (size_t index = 0; model != nullptr && reach_settings_model_scrolls(model, index); ++index)
+        changed |=
+            reach_scroll_view_advance(reach_settings_model_scrolls(model, index), now_seconds);
+    return changed;
+}
+
+int32_t reach_settings_model_scroll_pending(const reach_settings_model *model)
+{
+    reach_settings_model *scrolls = const_cast<reach_settings_model *>(model);
+    for (size_t index = 0; model != nullptr && reach_settings_model_scrolls(scrolls, index);
+         ++index)
+        if (reach_scroll_view_pending(reach_settings_model_scrolls(scrolls, index)))
+            return 1;
+    return 0;
+}
+
+reach_scroll_view *reach_settings_model_scroll_for_hit(reach_settings_model *model,
+                                                       int32_t hit_type)
+{
+    if (model == nullptr)
+        return nullptr;
+    switch (hit_type)
+    {
+    case REACH_SETTINGS_HIT_UPDATE_SCROLLBAR_TRACK:
+    case REACH_SETTINGS_HIT_UPDATE_SCROLLBAR_THUMB:
+        return &model->update_scroll;
+    case REACH_SETTINGS_HIT_STARTUP_SCROLLBAR_TRACK:
+    case REACH_SETTINGS_HIT_STARTUP_SCROLLBAR_THUMB:
+        return &model->startup_scroll;
+    case REACH_SETTINGS_HIT_APPLICATION_SCROLLBAR_TRACK:
+    case REACH_SETTINGS_HIT_APPLICATION_SCROLLBAR_THUMB:
+        return &model->installed_apps_scroll;
+    case REACH_SETTINGS_HIT_DISPLAY_SCROLLBAR_TRACK:
+    case REACH_SETTINGS_HIT_DISPLAY_SCROLLBAR_THUMB:
+        return &model->display_scroll;
+    case REACH_SETTINGS_HIT_WIFI_SCROLLBAR_TRACK:
+    case REACH_SETTINGS_HIT_WIFI_SCROLLBAR_THUMB:
+        return &model->wifi_scroll;
+    case REACH_SETTINGS_HIT_BLUETOOTH_SCROLLBAR_TRACK:
+    case REACH_SETTINGS_HIT_BLUETOOTH_SCROLLBAR_THUMB:
+        return &model->bluetooth_scroll;
+    default:
+        return nullptr;
+    }
+}
+
+reach_scroll_view *reach_settings_model_dragging_scroll(reach_settings_model *model)
+{
+    for (size_t index = 0; model != nullptr && reach_settings_model_scrolls(model, index); ++index)
+        if (reach_scroll_view_dragging(reach_settings_model_scrolls(model, index)))
+            return reach_settings_model_scrolls(model, index);
+    return nullptr;
 }

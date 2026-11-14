@@ -1,7 +1,6 @@
 #include "reach/core/render_commands.h"
 #include "reach/core/typography.h"
 #include "reach/features/common/loader_render.h"
-#include "reach/features/common/scrollbar_render.h"
 #include "reach/features/common/ui_controls.h"
 
 #include "settings_pages_internal.h"
@@ -249,9 +248,9 @@ void reach_settings_render_bluetooth_page(const reach_settings_render_input *inp
     if (layout->bluetooth_scrollbar_thumb.height > 0.0f)
     {
         reach_rect_f32 origin = {0.0f, 0.0f, 0.0f, 0.0f};
-        reach_scrollbar_build_render_commands(layout->bluetooth_scrollbar_track,
-                                              layout->bluetooth_scrollbar_thumb, origin,
-                                              input->theme->settings_scrollbar_track,
-                                              input->theme->settings_scrollbar_thumb, commands);
+        (void)reach_scroll_view_push_scrollbar(
+            &input->model->bluetooth_scroll, origin,
+            {input->theme->settings_scrollbar_track, input->theme->settings_scrollbar_thumb},
+            nullptr, layout->scroll_time, commands);
     }
 }

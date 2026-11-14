@@ -152,7 +152,7 @@ void reach_settings_model_begin_update_scan(reach_settings_model *model)
     if (model == nullptr || reach_settings_model_update_busy(model))
         return;
     model->update_page_state = REACH_SETTINGS_UPDATE_SCANNING;
-    reach_scrollbar_model_init(&model->update_scrollbar, REACH_SCROLLBAR_DRAG_FREE, 0.0f);
+    reach_settings_scroll_init(&model->update_scroll);
     reach_loader_model_reset(&model->update_loader);
 }
 
@@ -249,7 +249,7 @@ void reach_settings_model_begin_update_resume(reach_settings_model *model,
 
     model->update_page_state = journal->helper_running ? REACH_SETTINGS_UPDATE_INSTALLING
                                                        : REACH_SETTINGS_UPDATE_VERIFYING;
-    reach_scrollbar_model_init(&model->update_scrollbar, REACH_SCROLLBAR_DRAG_FREE, 0.0f);
+    reach_settings_scroll_init(&model->update_scroll);
 }
 
 static int identity_equal(const reach_windows_update_identity *left,
@@ -360,10 +360,5 @@ int32_t reach_settings_model_update_busy(const reach_settings_model *model)
 void reach_settings_model_scroll_updates(reach_settings_model *model, float delta)
 {
     if (model != nullptr)
-        reach_scrollbar_scroll(&model->update_scrollbar, delta);
-}
-
-int32_t reach_settings_model_update_scroll(reach_settings_model *model, double delta_seconds)
-{
-    return model != nullptr ? reach_scrollbar_update(&model->update_scrollbar, delta_seconds) : 0;
+        (void)reach_scroll_view_scroll_by(&model->update_scroll, delta, reach_motion_now_seconds());
 }
