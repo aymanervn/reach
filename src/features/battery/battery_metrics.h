@@ -13,7 +13,6 @@ struct reach_battery_metrics
     float row_gap;
     float row_inset;
 
-    float separator_height;
     float separator_inset;
 
     float label_text_size;
@@ -35,7 +34,6 @@ static constexpr reach_battery_metrics reach_battery_make_metrics()
     metrics.row_gap = 2.0f;
     metrics.row_inset = 12.0f;
 
-    metrics.separator_height = 1.0f;
     metrics.separator_inset = 12.0f;
 
     metrics.label_text_size = REACH_TEXT_SIZE_MEDIUM;

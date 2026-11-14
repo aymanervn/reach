@@ -1,5 +1,7 @@
 #include "battery_common.h"
 
+#include "reach/features/common/ui_controls.h"
+
 #include <new>
 
 static const double REACH_BATTERY_SAVER_PENDING_TIMEOUT_SECONDS = 2.0;
@@ -234,7 +236,7 @@ static void reach_battery_place(reach_battery_state *state, const reach_battery_
     float row_height = metrics.row_height * scale;
     float row_gap = metrics.row_gap * scale;
     float row_inset = metrics.row_inset * scale;
-    float separator_height = metrics.separator_height * scale;
+    float separator_height = reach_ui_horizontal_separator_bounds(0, 0, 0, scale).height;
     float separator_inset = metrics.separator_inset * scale;
     float body_width = metrics.popup_width * scale;
     float popup_width = body_width + border_thickness * 2.0f;
@@ -267,8 +269,8 @@ static void reach_battery_place(reach_battery_state *state, const reach_battery_
     state->percent_label = {content_x, content_y, content_width, row_height};
     content_y += row_height + row_gap;
 
-    state->separator = {border_thickness + separator_inset, content_y,
-                        body_width - separator_inset * 2.0f, separator_height};
+    state->separator = reach_ui_horizontal_separator_bounds(
+        border_thickness + separator_inset, content_y, body_width - separator_inset * 2.0f, scale);
     content_y += separator_height + row_gap;
 
     state->saver_row = {border_thickness + padding, content_y, body_width - padding * 2.0f,

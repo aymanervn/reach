@@ -53,12 +53,8 @@ reach_result reach_battery_append_render_commands(const reach_battery *battery,
                             metrics.value_text_size * scale, REACH_TEXT_WEIGHT_DEMIBOLD,
                             REACH_TEXT_ALIGNMENT_TRAILING, theme->primary_text);
 
-    reach_render_command separator = {};
-    separator.type = REACH_RENDER_COMMAND_RECT;
-    separator.rect = state->separator;
-    separator.radius = state->separator.height * 0.5f;
-    separator.color = theme->popup_separator;
-    (void)reach_render_command_buffer_push(out_commands, &separator);
+    (void)reach_ui_horizontal_separator_render(out_commands, state->separator,
+                                               theme->popup_separator);
 
     reach_battery_push_text(out_commands, state->saver_label, saver_label,
                             metrics.label_text_size * scale, REACH_TEXT_WEIGHT_NORMAL,

@@ -102,6 +102,26 @@ static reach_render_group reach_ui_color_group(uint64_t id, reach_rect_f32 bound
     return group;
 }
 
+reach_rect_f32 reach_ui_horizontal_separator_bounds(float x, float y, float width, float dpi_scale)
+{
+    float thickness = fmaxf(1.0f, floorf((dpi_scale > 0.0f ? dpi_scale : 1.0f) + 0.5f));
+    return {x, y, fmaxf(0.0f, width), thickness};
+}
+
+reach_result reach_ui_horizontal_separator_render(reach_render_command_buffer *commands,
+                                                  reach_rect_f32 bounds, reach_color color)
+{
+    if (commands == nullptr)
+        return REACH_INVALID_ARGUMENT;
+    if (bounds.width <= 0.0f || bounds.height <= 0.0f)
+        return REACH_OK;
+    reach_render_command line = {};
+    line.type = REACH_RENDER_COMMAND_RECT;
+    line.rect = bounds;
+    line.color = color;
+    return reach_render_command_buffer_push(commands, &line);
+}
+
 reach_result reach_ui_motion_background_render(reach_render_command_buffer *commands,
                                                const reach_rect_motion *bounds, float radius,
                                                float border, reach_color background,

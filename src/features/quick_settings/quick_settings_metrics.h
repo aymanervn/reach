@@ -46,7 +46,6 @@ struct reach_quick_settings_metrics
     float app_row_percent_gap;
 
     float separator_inset;
-    float separator_thickness;
     float expand_button_gap;
     float expand_button_height;
     float chevron_icon_size;
@@ -119,7 +118,6 @@ static constexpr reach_quick_settings_metrics reach_quick_settings_make_metrics(
     metrics.app_row_percent_gap = 10.0f;
 
     metrics.separator_inset = 12.0f;
-    metrics.separator_thickness = 1.0f;
     metrics.expand_button_gap = 10.0f;
     metrics.expand_button_height = 34.0f;
     metrics.chevron_icon_size = 14.0f;
@@ -230,8 +228,6 @@ static inline reach_quick_settings_metrics reach_quick_settings_metrics_for_scal
         reach_quick_settings_metric_scale_value(metrics.app_row_percent_gap, dpi_scale);
     metrics.separator_inset =
         reach_quick_settings_metric_scale_value(metrics.separator_inset, dpi_scale);
-    metrics.separator_thickness =
-        reach_quick_settings_metric_scale_value(metrics.separator_thickness, dpi_scale);
     metrics.expand_button_gap =
         reach_quick_settings_metric_scale_value(metrics.expand_button_gap, dpi_scale);
     metrics.expand_button_height =

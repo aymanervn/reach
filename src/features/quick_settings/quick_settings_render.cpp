@@ -608,8 +608,8 @@ static reach_result reach_quick_settings_push_output_device_row_commands(
 
     if (separator)
     {
-        reach_quick_settings_push_rounded_rect(commands, layout->separator, 0.0f,
-                                               theme->quick_settings_separator);
+        reach_ui_horizontal_separator_render(commands, layout->separator,
+                                             theme->quick_settings_separator);
     }
 
     return REACH_OK;
@@ -684,8 +684,8 @@ static reach_result reach_quick_settings_push_app_volume_row_commands(
 
     if (separator)
     {
-        reach_quick_settings_push_rounded_rect(commands, layout->separator, 0.0f,
-                                               theme->quick_settings_separator);
+        reach_ui_horizontal_separator_render(commands, layout->separator,
+                                             theme->quick_settings_separator);
     }
 
     return REACH_OK;
