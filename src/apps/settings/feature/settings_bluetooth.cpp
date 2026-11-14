@@ -78,11 +78,9 @@ void reach_settings_model_apply_bluetooth(reach_settings_model *model,
             model->bluetooth_expanded_row >= 0 && (size_t)model->bluetooth_expanded_row == index
                 ? 1.0f
                 : 0.0f;
-        if (reach_animation_manager_target(&model->bluetooth_row_animations, index) != target)
-        {
-            reach_settings_track_to(&model->bluetooth_row_animations, index, target,
-                                    REACH_MOTION_PRESET_SMOOTH);
-        }
+        if (model->bluetooth_row_motions[index].to != target)
+            reach_settings_animate(&model->bluetooth_row_motions[index], target,
+                                   REACH_MOTION_PRESET_SMOOTH);
     }
 }
 
@@ -205,11 +203,9 @@ void reach_settings_model_bluetooth_expand_row(reach_settings_model *model, int3
     for (size_t index = 0; index < REACH_BLUETOOTH_MAX_DEVICES; ++index)
     {
         float target = row >= 0 && (size_t)row == index ? 1.0f : 0.0f;
-        if (reach_animation_manager_target(&model->bluetooth_row_animations, index) != target)
-        {
-            reach_settings_track_to(&model->bluetooth_row_animations, index, target,
-                                    REACH_MOTION_PRESET_SMOOTH);
-        }
+        if (model->bluetooth_row_motions[index].to != target)
+            reach_settings_animate(&model->bluetooth_row_motions[index], target,
+                                   REACH_MOTION_PRESET_SMOOTH);
     }
 }
 
@@ -225,15 +221,13 @@ void reach_settings_model_scroll_bluetooth(reach_settings_model *model, float de
 int32_t reach_settings_model_sample_bluetooth_animations_at(reach_settings_model *model,
                                                             double now_seconds)
 {
-    if (model == nullptr || !reach_animation_manager_any_active(&model->bluetooth_row_animations))
-    {
-        return 0;
-    }
-    reach_animation_manager_sample_at(&model->bluetooth_row_animations, now_seconds);
-    return 1;
+    return model != nullptr &&
+           reach_settings_advance_motions(model->bluetooth_row_motions, REACH_BLUETOOTH_MAX_DEVICES,
+                                          now_seconds);
 }
 
 int32_t reach_settings_model_bluetooth_animations_active(const reach_settings_model *model)
 {
-    return model != nullptr && reach_animation_manager_any_active(&model->bluetooth_row_animations);
+    return model != nullptr && reach_settings_motions_pending(model->bluetooth_row_motions,
+                                                              REACH_BLUETOOTH_MAX_DEVICES);
 }

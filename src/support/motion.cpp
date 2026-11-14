@@ -2269,6 +2269,20 @@ int32_t reach_motion_active_at(const reach_motion *motion, double now_seconds)
            now_seconds < reach_motion_deadline(motion);
 }
 
+int32_t reach_motion_pending(const reach_motion *motion)
+{
+    return motion != nullptr && !motion->repeating && motion->duration_seconds > 0.0;
+}
+
+int32_t reach_motion_advance_at(reach_motion *motion, double now_seconds)
+{
+    if (!reach_motion_pending(motion))
+        return 0;
+    if (!reach_motion_active_at(motion, now_seconds))
+        reach_motion_set(motion, motion->to);
+    return 1;
+}
+
 double reach_motion_time_to_value_at(const reach_motion *motion, float target_value,
                                      double now_seconds)
 {

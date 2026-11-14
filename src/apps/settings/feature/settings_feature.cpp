@@ -56,10 +56,10 @@ void reach_settings_model_init(reach_settings_model *model)
     reach_loader_model_init(&model->update_loader, 0.7f);
     reach_loader_model_init(&model->wifi_loader, 0.7f);
     reach_loader_model_init(&model->bluetooth_loader, 0.7f);
-    reach_animation_manager_init(&model->wifi_row_animations, model->wifi_row_tracks,
-                                 REACH_WIFI_MAX_NETWORKS + 1);
-    reach_animation_manager_init(&model->bluetooth_row_animations, model->bluetooth_row_tracks,
-                                 REACH_BLUETOOTH_MAX_DEVICES);
+    for (reach_motion &motion : model->wifi_row_motions)
+        reach_motion_set(&motion, 0.0f);
+    for (reach_motion &motion : model->bluetooth_row_motions)
+        reach_motion_set(&motion, 0.0f);
     model->wifi_expanded_row = REACH_SETTINGS_WIFI_ROW_NONE;
     model->wifi_focused_field = REACH_SETTINGS_WIFI_FIELD_NONE;
     model->wifi_add_security = REACH_WIFI_SECURITY_WPA2_PERSONAL;

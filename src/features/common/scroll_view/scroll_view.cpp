@@ -232,16 +232,12 @@ int32_t reach_scroll_view_active(const reach_scroll_view *view)
 
 int32_t reach_scroll_view_pending(const reach_scroll_view *view)
 {
-    return view != nullptr && view->offset.duration_seconds > 0.0;
+    return view != nullptr && reach_motion_pending(&view->offset);
 }
 
 int32_t reach_scroll_view_advance(reach_scroll_view *view, double now_seconds)
 {
-    if (!reach_scroll_view_pending(view))
-        return 0;
-    if (!reach_motion_active_at(&view->offset, now_seconds))
-        reach_scroll_view_settle(view);
-    return 1;
+    return view != nullptr && reach_motion_advance_at(&view->offset, now_seconds);
 }
 
 double reach_scroll_view_deadline(const reach_scroll_view *view)

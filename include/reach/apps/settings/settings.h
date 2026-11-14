@@ -19,7 +19,7 @@
 #include "reach/core/wifi.h"
 #include "reach/core/windows_update.h"
 #include "reach/features/common/text_edit.h"
-#include "reach/support/animation.h"
+#include "reach/support/motion.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -301,8 +301,7 @@ extern "C"
         int32_t wifi_loaded;
         reach_scroll_view wifi_scroll;
         reach_loader_model wifi_loader;
-        reach_animation_track wifi_row_tracks[REACH_WIFI_MAX_NETWORKS + 1];
-        reach_animation_manager wifi_row_animations;
+        reach_motion wifi_row_motions[REACH_WIFI_MAX_NETWORKS + 1];
         reach_motion wifi_radio_toggle;
         reach_bluetooth_device_list bluetooth_devices;
         uint64_t bluetooth_icons[REACH_BLUETOOTH_MAX_DEVICES];
@@ -315,8 +314,7 @@ extern "C"
         int32_t bluetooth_loaded;
         reach_scroll_view bluetooth_scroll;
         reach_loader_model bluetooth_loader;
-        reach_animation_track bluetooth_row_tracks[REACH_BLUETOOTH_MAX_DEVICES];
-        reach_animation_manager bluetooth_row_animations;
+        reach_motion bluetooth_row_motions[REACH_BLUETOOTH_MAX_DEVICES];
         reach_motion bluetooth_radio_toggle;
     } reach_settings_model;
 

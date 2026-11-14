@@ -209,8 +209,8 @@ void reach_settings_layout_wifi(reach_settings_layout *layout, reach_settings_mo
 
     if (model->wifi_view == REACH_SETTINGS_WIFI_VIEW_AVAILABLE)
     {
-        float progress =
-            reach_animation_manager_value(&model->wifi_row_animations, REACH_WIFI_MAX_NETWORKS);
+        float progress = reach_motion_value_at(&model->wifi_row_motions[REACH_WIFI_MAX_NETWORKS],
+                                               layout->scroll_time);
         if (progress > 0.0f)
         {
             float full_height =
@@ -247,7 +247,8 @@ void reach_settings_layout_wifi(reach_settings_layout *layout, reach_settings_mo
             continue;
         }
 
-        float progress = reach_animation_manager_value(&model->wifi_row_animations, index);
+        float progress =
+            reach_motion_value_at(&model->wifi_row_motions[index], layout->scroll_time);
         float extra = reach_settings_wifi_row_needs_key_form(model, index)
                           ? REACH_SETTINGS_WIFI_KEY_FORM * scale
                           : REACH_SETTINGS_WIFI_ACTION_STRIP * scale;

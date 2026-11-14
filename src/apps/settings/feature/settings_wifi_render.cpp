@@ -449,8 +449,8 @@ void reach_settings_render_wifi_page(const reach_settings_render_input *input,
         reach_render_command_buffer_set_scissor(commands, layout->wifi_add_clip);
         size_t first_command = commands->count;
         reach_settings_wifi_render_add_row(input, commands, accent);
-        float progress =
-            reach_animation_manager_value(&model->wifi_row_animations, REACH_WIFI_MAX_NETWORKS);
+        float progress = reach_motion_value_at(&model->wifi_row_motions[REACH_WIFI_MAX_NETWORKS],
+                                               layout->scroll_time);
         reach_section_reveal_apply(commands, first_command, progress,
                                    reach_settings_scale(input, 4.0f));
         reach_render_command_buffer_set_scissor(commands, layout->wifi_viewport);
