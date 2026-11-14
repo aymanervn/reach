@@ -76,6 +76,7 @@ extern "C"
         reach_color bar_border;
         reach_shadow bar_shadow;
         reach_color popup_background;
+        reach_color top_bar_dropdown_background;
         reach_color popup_border;
         reach_color popup_separator;
         reach_color system_hud_background;

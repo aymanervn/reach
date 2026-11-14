@@ -75,6 +75,12 @@ reach_result reach_context_menu_build_render_commands(const reach_context_menu_r
     popup.notch_center_x = input->notch_center_x;
     popup.notch_side = input->notch_side;
     popup.dpi_scale = input->dpi_scale;
+    if (input->top_bar_dropdown)
+    {
+        popup.background_color_override = input->theme->top_bar_dropdown_background;
+        popup.has_background_color_override = 1;
+        popup.hide_notch = 1;
+    }
     reach_result popup_result = reach_popup_push_background(&popup, out_commands);
     if (popup_result != REACH_OK)
     {
@@ -169,6 +175,7 @@ reach_result reach_context_menu_append_render_commands(reach_context_menu *menu,
     input.hovered_index = state->hovered_index;
     input.notch_center_x = state->notch_anchor_x - state->bounds.x;
     input.notch_side = reach_popup_notch_side(state->drop_direction);
+    input.top_bar_dropdown = state->power_open;
     input.dpi_scale = ctx->dpi_scale;
     input.text_alignment_leading = REACH_TEXT_ALIGNMENT_LEADING;
 

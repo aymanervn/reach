@@ -276,6 +276,15 @@ static reach_render_command reach_popup_shape(const reach_popup_background_input
     shape.notch_width = reach_popup_notch_width_scaled(input->dpi_scale);
     shape.notch_height = reach_popup_notch_height_scaled(input->dpi_scale);
     shape.notch_side = input->notch_side;
+    if (input->hide_notch)
+    {
+        shape.type = REACH_RENDER_COMMAND_RECT;
+        if (input->notch_side == REACH_NOTCH_SIDE_TOP)
+            shape.rect.y = shape.notch_height;
+        shape.rect.height = fmaxf(1.0f, shape.rect.height - shape.notch_height);
+        shape.notch_width = 0;
+        shape.notch_height = 0;
+    }
     return shape;
 }
 

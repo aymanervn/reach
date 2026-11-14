@@ -17,6 +17,7 @@ typedef struct reach_context_menu_render_input
     size_t hovered_index;
     float notch_center_x;
     int32_t notch_side;
+    int32_t top_bar_dropdown;
     float dpi_scale;
     int32_t text_alignment_leading;
 } reach_context_menu_render_input;
