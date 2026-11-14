@@ -125,7 +125,7 @@ reach_result reach_host_apply_feature_action(reach_host *host, reach_feature_run
         return reach_host_launch_settings_app(host);
 
     case REACH_FEATURE_ACTION_EXECUTE_MENU_COMMAND:
-        return reach_host_execute_power_command(host, (uint32_t)action->id);
+        return reach_host_execute_menu_command(host, (uint32_t)action->id);
 
     case REACH_FEATURE_ACTION_OPEN_TARGET:
     {

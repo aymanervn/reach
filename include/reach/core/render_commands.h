@@ -147,7 +147,13 @@ extern "C"
         REACH_VECTOR_ICON_EXECUTABLE = 39,
         REACH_VECTOR_ICON_MENU = 40,
         REACH_VECTOR_ICON_MUSIC_NOTE = 41,
-        REACH_VECTOR_ICON_QUESTION = 42
+        REACH_VECTOR_ICON_QUESTION = 42,
+        REACH_VECTOR_ICON_INFO = 43,
+        REACH_VECTOR_ICON_ACTIVITY = 44,
+        REACH_VECTOR_ICON_CHIP = 45,
+        REACH_VECTOR_ICON_SLIDERS = 46,
+        REACH_VECTOR_ICON_BRACES = 47,
+        REACH_VECTOR_ICON_LAYERS = 48
     } reach_vector_icon_id;
 
     typedef enum reach_text_weight

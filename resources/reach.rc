@@ -44,6 +44,12 @@ IDI_ICON1 ICON DISCARDABLE "favicon.ico"
 240 RCDATA "dock/menu.svg"
 241 RCDATA "music_player/music.svg"
 242 RCDATA "extra/question.svg"
+243 RCDATA "system/info.svg"
+244 RCDATA "system/activity.svg"
+245 RCDATA "system/chip.svg"
+246 RCDATA "system/sliders.svg"
+247 RCDATA "system/braces.svg"
+248 RCDATA "system/layers.svg"
 
 #include "fonts.rc"
 

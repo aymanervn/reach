@@ -60,7 +60,8 @@ static constexpr reach_context_menu_metrics reach_context_menu_popup_metrics =
     reach_context_menu_make_popup_metrics();
 
 static constexpr float reach_context_menu_power_popup_width =
-    176.0f * reach_context_menu_popup_scale;
+    224.0f * reach_context_menu_popup_scale;
+static constexpr float reach_context_menu_separator_gap = 9.0f * reach_context_menu_popup_scale;
 static constexpr float reach_context_menu_power_anchor_ratio = 0.72f;
 static constexpr float reach_context_menu_item_popup_width =
     224.0f * reach_context_menu_popup_scale;

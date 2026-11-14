@@ -173,7 +173,17 @@ reach_result reach_host_cycle_input_language(reach_host *host)
                                                    reach_host_foreground_window(host));
 }
 
-reach_result reach_host_execute_power_command(reach_host *host, uint32_t command)
+static reach_result reach_host_launch_system_tool(reach_host *host, reach_system_tool tool)
+{
+    if (host->app_launcher.ops.resolve_system_tool == nullptr)
+        return REACH_ERROR;
+    reach_app_launch_request request = {};
+    reach_result resolved =
+        host->app_launcher.ops.resolve_system_tool(host->app_launcher.launcher, tool, &request);
+    return resolved == REACH_OK ? reach_host_schedule_app_launch(host, &request) : resolved;
+}
+
+reach_result reach_host_execute_menu_command(reach_host *host, uint32_t command)
 {
     if (host == nullptr)
     {
@@ -182,6 +192,20 @@ reach_result reach_host_execute_power_command(reach_host *host, uint32_t command
 
     switch (command)
     {
+    case REACH_CONTEXT_MENU_COMMAND_SYSTEM_INFORMATION:
+        return reach_host_launch_system_tool(host, REACH_SYSTEM_TOOL_SYSTEM_INFORMATION);
+    case REACH_CONTEXT_MENU_COMMAND_TASK_MANAGER:
+        return reach_host_launch_system_tool(host, REACH_SYSTEM_TOOL_TASK_MANAGER);
+    case REACH_CONTEXT_MENU_COMMAND_DEVICE_MANAGER:
+        return reach_host_launch_system_tool(host, REACH_SYSTEM_TOOL_DEVICE_MANAGER);
+    case REACH_CONTEXT_MENU_COMMAND_REACH_SETTINGS:
+        return reach_host_launch_settings_app(host);
+    case REACH_CONTEXT_MENU_COMMAND_CONTROL_PANEL:
+        return reach_host_launch_system_tool(host, REACH_SYSTEM_TOOL_CONTROL_PANEL);
+    case REACH_CONTEXT_MENU_COMMAND_ENVIRONMENT_VARIABLES:
+        return reach_host_launch_system_tool(host, REACH_SYSTEM_TOOL_ENVIRONMENT_VARIABLES);
+    case REACH_CONTEXT_MENU_COMMAND_SERVICES:
+        return reach_host_launch_system_tool(host, REACH_SYSTEM_TOOL_SERVICES);
     case REACH_CONTEXT_MENU_COMMAND_POWER_LOCK:
         return host->power_session.ops.lock != nullptr
                    ? host->power_session.ops.lock(host->power_session.session)

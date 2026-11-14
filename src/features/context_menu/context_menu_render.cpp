@@ -1,58 +1,11 @@
 #include "context_menu_common.h"
 
+#include "reach/features/common/ui_controls.h"
+
 static float reach_context_menu_scale(const reach_context_menu_render_input *input, float value)
 {
     float scale = input != nullptr && input->dpi_scale > 0.0f ? input->dpi_scale : 1.0f;
     return value * scale;
-}
-
-typedef struct reach_context_menu_item_style
-{
-    reach_color foreground;
-    reach_color hover_background;
-    reach_color hover_foreground;
-    int32_t use_hover_foreground;
-} reach_context_menu_item_style;
-
-static reach_context_menu_item_style reach_context_menu_style_for_command(const reach_theme *theme,
-                                                                          uint32_t command)
-{
-    reach_context_menu_item_style style = {};
-    style.foreground = theme->context_menu_text;
-    style.hover_background = theme->context_menu_hover_background;
-    style.hover_foreground = style.foreground;
-    style.use_hover_foreground = 0;
-
-    reach_color accent = {};
-    int32_t power_color = 1;
-    switch (command)
-    {
-    case REACH_CONTEXT_MENU_COMMAND_POWER_SHUTDOWN:
-        accent = theme->menu_accent_shutdown;
-        break;
-    case REACH_CONTEXT_MENU_COMMAND_POWER_SLEEP:
-        accent = theme->menu_accent_sleep;
-        break;
-    case REACH_CONTEXT_MENU_COMMAND_POWER_RESTART:
-        accent = theme->menu_accent_restart;
-        break;
-    case REACH_CONTEXT_MENU_COMMAND_POWER_LOCK:
-    case REACH_CONTEXT_MENU_COMMAND_POWER_SIGN_OUT:
-        accent = theme->menu_accent_lock;
-        break;
-    default:
-        power_color = 0;
-        break;
-    }
-
-    if (power_color)
-    {
-        style.hover_background = reach_theme_color_alpha(accent, 0.12f);
-        style.hover_foreground = accent;
-        style.use_hover_foreground = 1;
-    }
-
-    return style;
 }
 
 reach_result reach_context_menu_build_render_commands(const reach_context_menu_render_input *input,
@@ -92,22 +45,25 @@ reach_result reach_context_menu_build_render_commands(const reach_context_menu_r
     for (size_t index = 0; index < input->item_count; ++index)
     {
         reach_rect_f32 item = input->item_slots[index];
-        reach_context_menu_item_style style =
-            reach_context_menu_style_for_command(input->theme, input->item_commands[index]);
-        reach_color foreground = style.foreground;
+        if (reach_context_menu_separator_before(input->item_commands, index))
+        {
+            float gap = reach_context_menu_scale(input, reach_context_menu_separator_gap);
+            reach_rect_f32 line =
+                reach_ui_horizontal_separator_bounds(item.x, item.y, item.width, input->dpi_scale);
+            line.y = item.y - (gap + line.height) * 0.5f;
+            (void)reach_ui_horizontal_separator_render(out_commands, line,
+                                                       input->theme->popup_separator);
+        }
+        reach_color foreground = input->theme->context_menu_text;
 
         if (input->hovered_index == index)
         {
             command = {};
             command.type = REACH_RENDER_COMMAND_RECT;
             command.rect = item;
-            command.color = style.hover_background;
+            command.color = input->theme->context_menu_hover_background;
             command.radius = reach_context_menu_scale(input, input->theme->radius_small);
             reach_render_command_buffer_push(out_commands, &command);
-            if (style.use_hover_foreground)
-            {
-                foreground = style.hover_foreground;
-            }
         }
 
         int32_t has_icon = input->item_icon_ids != nullptr && input->item_icon_ids[index] != 0;

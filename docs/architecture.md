@@ -275,6 +275,11 @@ its public route callback, preserving the popup transition for the same owner. C
 resolves card placements, hit regions, anchor, DPI and pointer corridor together. An optional
 surface-ops pointer-observation hook lets the generic frame path update the event-driven watch
 after arrangement. Ordinary command and power menus keep their existing row presentation.
+The power menu lists, in groups separated by the shared `reach_ui_horizontal_separator`: System
+Information, Task Manager, Device Manager; Reach Settings, Control Panel, Environment Variables,
+Services; Sleep, Restart, Shut down; Lock, Sign out. Groups come from the command
+(`reach_context_menu_command_group`), so a separator needs no extra state. Windows tools launch
+through `reach_app_launcher_ops.resolve_system_tool`, which keeps their executables in the adapter.
 Dock preview width and membership reflow share one capsule-owned canonical layout epoch driven by
 the theme `smooth` spring.
 Target packing remains CPU policy; body/notch placement, proportional equal-height cards and gaps,

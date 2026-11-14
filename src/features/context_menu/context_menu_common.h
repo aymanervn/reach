@@ -130,6 +130,40 @@ void reach_context_menu_stop_preview_reflow(reach_context_menu *menu);
 void reach_context_menu_reset_preview_layout(reach_context_menu *menu);
 void reach_context_menu_anchor_presentation(reach_context_menu *menu);
 
+static inline int32_t reach_context_menu_command_group(uint32_t command)
+{
+    switch (command)
+    {
+    case REACH_CONTEXT_MENU_COMMAND_SYSTEM_INFORMATION:
+    case REACH_CONTEXT_MENU_COMMAND_TASK_MANAGER:
+    case REACH_CONTEXT_MENU_COMMAND_DEVICE_MANAGER:
+        return 1;
+    case REACH_CONTEXT_MENU_COMMAND_REACH_SETTINGS:
+    case REACH_CONTEXT_MENU_COMMAND_CONTROL_PANEL:
+    case REACH_CONTEXT_MENU_COMMAND_ENVIRONMENT_VARIABLES:
+    case REACH_CONTEXT_MENU_COMMAND_SERVICES:
+        return 2;
+    case REACH_CONTEXT_MENU_COMMAND_POWER_SLEEP:
+    case REACH_CONTEXT_MENU_COMMAND_POWER_RESTART:
+    case REACH_CONTEXT_MENU_COMMAND_POWER_SHUTDOWN:
+        return 3;
+    case REACH_CONTEXT_MENU_COMMAND_POWER_LOCK:
+    case REACH_CONTEXT_MENU_COMMAND_POWER_SIGN_OUT:
+        return 4;
+    default:
+        return 0;
+    }
+}
+
+static inline int32_t reach_context_menu_separator_before(const uint32_t *commands, size_t index)
+{
+    if (commands == nullptr || index == 0)
+        return 0;
+    int32_t group = reach_context_menu_command_group(commands[index]);
+    int32_t previous = reach_context_menu_command_group(commands[index - 1]);
+    return group != 0 && previous != 0 && group != previous;
+}
+
 static inline void reach_context_menu_load_motion_specs(reach_context_menu *menu,
                                                         const reach_theme *theme)
 {

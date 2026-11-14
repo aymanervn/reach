@@ -11,20 +11,36 @@ void reach_context_menu_build_power_commands(uint32_t *out_commands, uint32_t *o
         return;
     }
 
-    out_commands[0] = REACH_CONTEXT_MENU_COMMAND_POWER_LOCK;
-    out_commands[1] = REACH_CONTEXT_MENU_COMMAND_POWER_SLEEP;
-    out_commands[2] = REACH_CONTEXT_MENU_COMMAND_POWER_RESTART;
-    out_commands[3] = REACH_CONTEXT_MENU_COMMAND_POWER_SHUTDOWN;
-    out_commands[4] = REACH_CONTEXT_MENU_COMMAND_POWER_SIGN_OUT;
-    if (out_icon_ids != nullptr)
+    static const uint32_t commands[] = {
+        REACH_CONTEXT_MENU_COMMAND_SYSTEM_INFORMATION,
+        REACH_CONTEXT_MENU_COMMAND_TASK_MANAGER,
+        REACH_CONTEXT_MENU_COMMAND_DEVICE_MANAGER,
+        REACH_CONTEXT_MENU_COMMAND_REACH_SETTINGS,
+        REACH_CONTEXT_MENU_COMMAND_CONTROL_PANEL,
+        REACH_CONTEXT_MENU_COMMAND_ENVIRONMENT_VARIABLES,
+        REACH_CONTEXT_MENU_COMMAND_SERVICES,
+        REACH_CONTEXT_MENU_COMMAND_POWER_SLEEP,
+        REACH_CONTEXT_MENU_COMMAND_POWER_RESTART,
+        REACH_CONTEXT_MENU_COMMAND_POWER_SHUTDOWN,
+        REACH_CONTEXT_MENU_COMMAND_POWER_LOCK,
+        REACH_CONTEXT_MENU_COMMAND_POWER_SIGN_OUT,
+    };
+    static const uint32_t icons[] = {
+        REACH_VECTOR_ICON_INFO,     REACH_VECTOR_ICON_ACTIVITY, REACH_VECTOR_ICON_CHIP,
+        REACH_VECTOR_ICON_SETTINGS, REACH_VECTOR_ICON_SLIDERS,  REACH_VECTOR_ICON_BRACES,
+        REACH_VECTOR_ICON_LAYERS,   REACH_VECTOR_ICON_SLEEP,    REACH_VECTOR_ICON_RESTART,
+        REACH_VECTOR_ICON_SHUTDOWN, REACH_VECTOR_ICON_LOCK,     REACH_VECTOR_ICON_SIGN_OUT,
+    };
+    size_t count = sizeof(commands) / sizeof(commands[0]);
+    for (size_t index = 0; index < count; ++index)
     {
-        out_icon_ids[0] = REACH_VECTOR_ICON_LOCK;
-        out_icon_ids[1] = REACH_VECTOR_ICON_SLEEP;
-        out_icon_ids[2] = REACH_VECTOR_ICON_RESTART;
-        out_icon_ids[3] = REACH_VECTOR_ICON_SHUTDOWN;
-        out_icon_ids[4] = REACH_VECTOR_ICON_SIGN_OUT;
+        out_commands[index] = commands[index];
+        if (out_icon_ids != nullptr)
+        {
+            out_icon_ids[index] = icons[index];
+        }
     }
-    *out_count = 5;
+    *out_count = count;
 }
 
 const uint16_t *reach_context_menu_command_text(uint32_t command)
@@ -72,6 +88,34 @@ const uint16_t *reach_context_menu_command_text(uint32_t command)
     if (command == REACH_CONTEXT_MENU_COMMAND_POWER_SIGN_OUT)
     {
         return (const uint16_t *)L"Sign out";
+    }
+    if (command == REACH_CONTEXT_MENU_COMMAND_SYSTEM_INFORMATION)
+    {
+        return (const uint16_t *)L"System Information";
+    }
+    if (command == REACH_CONTEXT_MENU_COMMAND_TASK_MANAGER)
+    {
+        return (const uint16_t *)L"Task Manager";
+    }
+    if (command == REACH_CONTEXT_MENU_COMMAND_DEVICE_MANAGER)
+    {
+        return (const uint16_t *)L"Device Manager";
+    }
+    if (command == REACH_CONTEXT_MENU_COMMAND_REACH_SETTINGS)
+    {
+        return (const uint16_t *)L"Reach Settings";
+    }
+    if (command == REACH_CONTEXT_MENU_COMMAND_CONTROL_PANEL)
+    {
+        return (const uint16_t *)L"Control Panel";
+    }
+    if (command == REACH_CONTEXT_MENU_COMMAND_ENVIRONMENT_VARIABLES)
+    {
+        return (const uint16_t *)L"Environment Variables";
+    }
+    if (command == REACH_CONTEXT_MENU_COMMAND_SERVICES)
+    {
+        return (const uint16_t *)L"Services";
     }
     return (const uint16_t *)L"";
 }
@@ -288,7 +332,16 @@ static void reach_context_menu_place(reach_context_menu_state *state,
     float padding = metrics->padding * scale;
     float margin = metrics->screen_margin * scale;
     float notch_height = reach_popup_notch_height_scaled(scale);
-    float popup_body_height = padding * 2.0f + item_height * (float)state->item_count;
+    float separator_gap = reach_context_menu_separator_gap * scale;
+    float content_height = item_height * (float)state->item_count;
+    for (size_t index = 1; index < state->item_count; ++index)
+    {
+        if (reach_context_menu_separator_before(state->item_commands, index))
+        {
+            content_height += separator_gap;
+        }
+    }
+    float popup_body_height = padding * 2.0f + content_height;
     float popup_height = popup_body_height + notch_height + border_thickness * 2.0f;
 
     reach_rect_f32 placed = {};
@@ -332,7 +385,7 @@ static void reach_context_menu_place(reach_context_menu_state *state,
         state->item_viewport.height = 0.0f;
     }
     state->item_height = item_height;
-    state->scroll_max = item_height * (float)state->item_count - state->item_viewport.height;
+    state->scroll_max = content_height - state->item_viewport.height;
     if (state->scroll_max < 0.0f)
     {
         state->scroll_max = 0.0f;
@@ -341,11 +394,16 @@ static void reach_context_menu_place(reach_context_menu_state *state,
     {
         state->scroll_offset = state->scroll_max;
     }
+    float item_y = items_y - state->scroll_offset;
     for (size_t index = 0; index < state->item_count; ++index)
     {
-        state->item_slots[index] = {border_thickness + padding,
-                                    items_y + item_height * (float)index - state->scroll_offset,
-                                    state->item_viewport.width, item_height};
+        if (reach_context_menu_separator_before(state->item_commands, index))
+        {
+            item_y += separator_gap;
+        }
+        state->item_slots[index] = {border_thickness + padding, item_y, state->item_viewport.width,
+                                    item_height};
+        item_y += item_height;
     }
 }
 

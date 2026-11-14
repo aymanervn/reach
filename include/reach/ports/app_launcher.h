@@ -32,12 +32,24 @@ extern "C"
         REACH_APP_LAUNCH_FAILURE_UNKNOWN = 4
     } reach_app_launch_failure;
 
+    typedef enum reach_system_tool
+    {
+        REACH_SYSTEM_TOOL_SYSTEM_INFORMATION = 1,
+        REACH_SYSTEM_TOOL_TASK_MANAGER = 2,
+        REACH_SYSTEM_TOOL_DEVICE_MANAGER = 3,
+        REACH_SYSTEM_TOOL_CONTROL_PANEL = 4,
+        REACH_SYSTEM_TOOL_ENVIRONMENT_VARIABLES = 5,
+        REACH_SYSTEM_TOOL_SERVICES = 6
+    } reach_system_tool;
+
     typedef struct reach_app_launcher_ops
     {
 
         reach_result (*launch)(reach_app_launcher *launcher,
                                const reach_app_launch_request *request,
                                reach_app_launch_failure *out_failure);
+        reach_result (*resolve_system_tool)(reach_app_launcher *launcher, reach_system_tool tool,
+                                            reach_app_launch_request *out_request);
         void (*destroy)(reach_app_launcher *launcher);
     } reach_app_launcher_ops;
 

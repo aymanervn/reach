@@ -155,10 +155,6 @@ extern "C"
         reach_color context_menu_hover_background;
         reach_color context_menu_close_background;
         reach_color context_menu_close_glyph;
-        reach_color menu_accent_shutdown;
-        reach_color menu_accent_sleep;
-        reach_color menu_accent_restart;
-        reach_color menu_accent_lock;
 
         reach_color stage_backdrop;
         reach_color stage_tile_placeholder;
