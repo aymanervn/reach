@@ -1,3 +1,4 @@
+#include "reach/features/common/ui_controls.h"
 #include "reach/features/quick_settings.h"
 #include "reach/features/common/popup.h"
 
@@ -410,10 +411,11 @@ reach_quick_settings_output_device_row_layout_at(reach_rect_f32 panel, float top
         row.label.width = 0.0f;
     }
 
-    row.separator.x = row.bounds.x + metrics.separator_inset;
-    row.separator.y = row.bounds.y + row.bounds.height - metrics.separator_thickness;
-    row.separator.width = row.bounds.width - metrics.separator_inset * 2.0f;
-    row.separator.height = metrics.separator_thickness;
+    float separator_thickness = reach_ui_horizontal_separator_bounds(0, 0, 0, dpi_scale).height;
+    row.separator = reach_ui_horizontal_separator_bounds(
+        row.bounds.x + metrics.separator_inset,
+        row.bounds.y + row.bounds.height - separator_thickness,
+        row.bounds.width - metrics.separator_inset * 2.0f, dpi_scale);
     if (row.separator.width < 0.0f)
     {
         row.separator.width = 0.0f;
@@ -483,10 +485,11 @@ reach_quick_settings_app_volume_row_layout_at(reach_rect_f32 panel, float top, f
                          metrics.app_row_thumb_size * 0.5f;
     row.slider_thumb.y = row.bounds.y + (row.bounds.height - metrics.app_row_thumb_size) * 0.5f;
 
-    row.separator.x = row.bounds.x + metrics.separator_inset;
-    row.separator.y = row.bounds.y + row.bounds.height - metrics.separator_thickness;
-    row.separator.width = row.bounds.width - metrics.separator_inset * 2.0f;
-    row.separator.height = metrics.separator_thickness;
+    float separator_thickness = reach_ui_horizontal_separator_bounds(0, 0, 0, dpi_scale).height;
+    row.separator = reach_ui_horizontal_separator_bounds(
+        row.bounds.x + metrics.separator_inset,
+        row.bounds.y + row.bounds.height - separator_thickness,
+        row.bounds.width - metrics.separator_inset * 2.0f, dpi_scale);
     if (row.separator.width < 0.0f)
     {
         row.separator.width = 0.0f;

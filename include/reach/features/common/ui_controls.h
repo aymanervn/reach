@@ -128,6 +128,10 @@ extern "C"
                                           const reach_motion *progress);
     void reach_ui_color_feedback_apply(reach_render_group *group, reach_color from, reach_color to,
                                        const reach_motion *progress);
+    reach_rect_f32 reach_ui_horizontal_separator_bounds(float x, float y, float width,
+                                                        float dpi_scale);
+    reach_result reach_ui_horizontal_separator_render(reach_render_command_buffer *commands,
+                                                      reach_rect_f32 bounds, reach_color color);
     reach_result reach_ui_motion_background_render(reach_render_command_buffer *commands,
                                                    const reach_rect_motion *bounds, float radius,
                                                    float border, reach_color background,
