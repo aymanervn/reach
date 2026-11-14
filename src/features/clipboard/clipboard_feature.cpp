@@ -605,7 +605,8 @@ static int32_t reach_clipboard_capsule_needs_frame(const void *capsule)
         return 0;
     }
     return reach_feature_transition_needs_update(&clipboard->surface_transition) ||
-           reach_clipboard_feature_any_animation_active(clipboard);
+           reach_clipboard_feature_any_animation_active(clipboard) ||
+           reach_scroll_view_pending(&clipboard->state.model.scroll);
 }
 
 static int32_t reach_clipboard_capsule_presentation_visible(const void *capsule)
