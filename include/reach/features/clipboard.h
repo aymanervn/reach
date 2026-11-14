@@ -6,8 +6,8 @@
 #include "reach/features/feature_capsule.h"
 #include "reach/core/theme.h"
 #include "reach/core/clipboard.h"
-#include "reach/core/scrollbar.h"
 #include "reach/features/common/pressable.h"
+#include "reach/features/common/scroll_view.h"
 #include "reach/ports/clipboard.h"
 #include "reach/support/util.h"
 
@@ -23,7 +23,7 @@ extern "C"
         reach_clipboard_item items[REACH_CLIPBOARD_MAX_ITEMS];
         size_t count;
         size_t hovered_index;
-        reach_scrollbar_model scrollbar;
+        reach_scroll_view scroll;
     } reach_clipboard_model;
 
     typedef struct reach_clipboard_insert_result
@@ -42,7 +42,8 @@ extern "C"
         reach_rect_f32 viewport;
         reach_rect_f32 items[REACH_CLIPBOARD_MAX_ITEMS];
         reach_rect_f32 close_buttons[REACH_CLIPBOARD_MAX_ITEMS];
-        reach_scrollbar_layout scrollbar;
+        reach_rect_f32 scrollbar_track;
+        double scroll_time;
         float content_height;
         float item_large_size;
         float item_width;
@@ -82,7 +83,6 @@ extern "C"
     {
         reach_clipboard_model model;
         reach_clipboard_layout layout;
-        reach_scrollbar_drag scrollbar_drag;
         reach_pressable pressable;
         uint64_t press_identity;
     } reach_clipboard_state;
@@ -123,7 +123,7 @@ extern "C"
                                          reach_clipboard_item item,
                                          reach_clipboard_insert_outcome *out);
 
-    int32_t reach_clipboard_tick_scroll(reach_clipboard_feature *clipboard, double delta_seconds);
+    int32_t reach_clipboard_tick_scroll(reach_clipboard_feature *clipboard, double now_seconds);
 
     void reach_clipboard_confirm_restore(reach_clipboard_feature *clipboard, size_t index);
 

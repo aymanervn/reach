@@ -1,7 +1,6 @@
 #include "reach/features/clipboard.h"
 
 #include "clipboard_common.h"
-#include "reach/features/common/scrollbar_render.h"
 #include "clipboard_metrics.h"
 #include "reach/features/common/ui_controls.h"
 
@@ -98,8 +97,7 @@ static size_t reach_clipboard_first_visible_item(const reach_clipboard_layout *l
 
 static int32_t reach_clipboard_layout_has_scrollbar(const reach_clipboard_layout *layout)
 {
-    return layout != nullptr && layout->scrollbar.track.height > 0.0f &&
-           layout->scrollbar.thumb.height > 0.0f &&
+    return layout != nullptr && layout->scrollbar_track.height > 0.0f &&
            layout->content_height > layout->viewport.height;
 }
 
@@ -899,15 +897,20 @@ reach_result reach_clipboard_build_render_commands(const reach_clipboard_render_
         {
             reach_render_group position = {};
             position.id = UINT64_C(0x7100000000000000);
-            position.bounds = reach_clipboard_local(layout->scrollbar.track, layout->bounds);
+            position.bounds = reach_clipboard_local(layout->scrollbar_track, layout->bounds);
             position.x = reach_motion_affine(&item_width, 1, -layout->item_width);
             result = reach_render_command_buffer_begin_group(commands, &position);
             if (result != REACH_OK)
                 return result;
         }
-        reach_scrollbar_build_render_commands(layout->scrollbar.track, layout->scrollbar.thumb,
-                                              layout->bounds, theme->clipboard_scrollbar_track,
-                                              theme->clipboard_scrollbar_thumb, commands);
+        reach_rect_f32 track_origin = layout->bounds;
+        track_origin.x -= layout->scrollbar_track.x - model->scroll.track.x;
+        result = reach_scroll_view_push_scrollbar(
+            &model->scroll, track_origin,
+            {theme->clipboard_scrollbar_track, theme->clipboard_scrollbar_thumb}, nullptr,
+            layout->scroll_time, commands);
+        if (result != REACH_OK)
+            return result;
         if (retained_width)
             reach_render_command_buffer_end_group(commands);
     }
