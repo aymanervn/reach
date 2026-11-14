@@ -1,11 +1,10 @@
 #include "settings_pages_internal.h"
 
-void reach_settings_model_scroll_display(reach_settings_model *model, float delta)
+void reach_settings_model_scroll_theme(reach_settings_model *model, float delta)
 {
     if (model != nullptr)
     {
-        (void)reach_scroll_view_scroll_by(&model->display_scroll, delta,
-                                          reach_motion_now_seconds());
+        (void)reach_scroll_view_scroll_by(&model->theme_scroll, delta, reach_motion_now_seconds());
     }
 }
 
@@ -14,9 +13,9 @@ const uint16_t *reach_settings_display_page_title(void)
     return (const uint16_t *)L"Display";
 }
 
-const uint16_t *reach_settings_display_page_placeholder(void)
+const uint16_t *reach_settings_theme_page_title(void)
 {
-    return (const uint16_t *)L"Display settings page";
+    return (const uint16_t *)L"Theme";
 }
 
 void reach_settings_model_set_high_refresh_rate(reach_settings_model *model, int32_t enabled)
@@ -25,13 +24,13 @@ void reach_settings_model_set_high_refresh_rate(reach_settings_model *model, int
     {
         return;
     }
-    model->display_high_refresh_rate = enabled ? 1 : 0;
-    reach_motion_set(&model->display_fps_toggle, enabled ? 1.0f : 0.0f);
+    model->theme_high_refresh_rate = enabled ? 1 : 0;
+    reach_motion_set(&model->theme_fps_toggle, enabled ? 1.0f : 0.0f);
 }
 
 int32_t reach_settings_model_high_refresh_rate(const reach_settings_model *model)
 {
-    return model != nullptr && model->display_high_refresh_rate;
+    return model != nullptr && model->theme_high_refresh_rate;
 }
 
 int32_t reach_settings_model_toggle_high_refresh_rate(reach_settings_model *model)
@@ -40,9 +39,8 @@ int32_t reach_settings_model_toggle_high_refresh_rate(reach_settings_model *mode
     {
         return 0;
     }
-    model->display_high_refresh_rate = model->display_high_refresh_rate ? 0 : 1;
-    reach_settings_animate(&model->display_fps_toggle,
-                           model->display_high_refresh_rate ? 1.0f : 0.0f,
+    model->theme_high_refresh_rate = model->theme_high_refresh_rate ? 0 : 1;
+    reach_settings_animate(&model->theme_fps_toggle, model->theme_high_refresh_rate ? 1.0f : 0.0f,
                            REACH_MOTION_PRESET_BOUNCY);
     return 1;
 }
@@ -53,13 +51,13 @@ void reach_settings_model_set_bundled_font(reach_settings_model *model, int32_t 
     {
         return;
     }
-    model->display_bundled_font = enabled ? 1 : 0;
-    reach_motion_set(&model->display_font_toggle, enabled ? 1.0f : 0.0f);
+    model->theme_bundled_font = enabled ? 1 : 0;
+    reach_motion_set(&model->theme_font_toggle, enabled ? 1.0f : 0.0f);
 }
 
 int32_t reach_settings_model_bundled_font(const reach_settings_model *model)
 {
-    return model != nullptr && model->display_bundled_font;
+    return model != nullptr && model->theme_bundled_font;
 }
 
 int32_t reach_settings_model_toggle_bundled_font(reach_settings_model *model)
@@ -68,8 +66,8 @@ int32_t reach_settings_model_toggle_bundled_font(reach_settings_model *model)
     {
         return 0;
     }
-    model->display_bundled_font = model->display_bundled_font ? 0 : 1;
-    reach_settings_animate(&model->display_font_toggle, model->display_bundled_font ? 1.0f : 0.0f,
+    model->theme_bundled_font = model->theme_bundled_font ? 0 : 1;
+    reach_settings_animate(&model->theme_font_toggle, model->theme_bundled_font ? 1.0f : 0.0f,
                            REACH_MOTION_PRESET_BOUNCY);
     return 1;
 }
@@ -80,24 +78,24 @@ void reach_settings_model_set_light_theme(reach_settings_model *model, int32_t e
     {
         return;
     }
-    model->display_light_theme = enabled ? 1 : 0;
-    reach_motion_set(&model->display_theme_selection, enabled ? 1.0f : 0.0f);
+    model->theme_light = enabled ? 1 : 0;
+    reach_motion_set(&model->theme_reach_selection, enabled ? 1.0f : 0.0f);
 }
 
 int32_t reach_settings_model_light_theme(const reach_settings_model *model)
 {
-    return model != nullptr && model->display_light_theme;
+    return model != nullptr && model->theme_light;
 }
 
 int32_t reach_settings_model_select_light_theme(reach_settings_model *model, int32_t enabled)
 {
     int32_t light_theme = enabled ? 1 : 0;
-    if (model == nullptr || model->display_light_theme == light_theme)
+    if (model == nullptr || model->theme_light == light_theme)
     {
         return 0;
     }
-    model->display_light_theme = light_theme;
-    reach_settings_animate(&model->display_theme_selection, light_theme ? 1.0f : 0.0f,
+    model->theme_light = light_theme;
+    reach_settings_animate(&model->theme_reach_selection, light_theme ? 1.0f : 0.0f,
                            REACH_MOTION_PRESET_FADE_IN);
     return 1;
 }
@@ -112,25 +110,25 @@ void reach_settings_model_set_windows_system_theme(reach_settings_model *model,
 {
     if (model != nullptr && reach_settings_theme_preference_valid(preference))
     {
-        model->display_windows_system_theme = preference;
+        model->theme_windows_system_theme = preference;
     }
 }
 
 reach_config_theme_preference
 reach_settings_model_windows_system_theme(const reach_settings_model *model)
 {
-    return model != nullptr ? model->display_windows_system_theme : REACH_CONFIG_THEME_FOLLOW_REACH;
+    return model != nullptr ? model->theme_windows_system_theme : REACH_CONFIG_THEME_FOLLOW_REACH;
 }
 
 int32_t reach_settings_model_select_windows_system_theme(reach_settings_model *model,
                                                          reach_config_theme_preference preference)
 {
     if (model == nullptr || !reach_settings_theme_preference_valid(preference) ||
-        model->display_windows_system_theme == preference)
+        model->theme_windows_system_theme == preference)
     {
         return 0;
     }
-    model->display_windows_system_theme = preference;
+    model->theme_windows_system_theme = preference;
     return 1;
 }
 
@@ -139,24 +137,24 @@ void reach_settings_model_set_windows_app_theme(reach_settings_model *model,
 {
     if (model != nullptr && reach_settings_theme_preference_valid(preference))
     {
-        model->display_windows_app_theme = preference;
+        model->theme_windows_app_theme = preference;
     }
 }
 
 reach_config_theme_preference
 reach_settings_model_windows_app_theme(const reach_settings_model *model)
 {
-    return model != nullptr ? model->display_windows_app_theme : REACH_CONFIG_THEME_FOLLOW_REACH;
+    return model != nullptr ? model->theme_windows_app_theme : REACH_CONFIG_THEME_FOLLOW_REACH;
 }
 
 int32_t reach_settings_model_select_windows_app_theme(reach_settings_model *model,
                                                       reach_config_theme_preference preference)
 {
     if (model == nullptr || !reach_settings_theme_preference_valid(preference) ||
-        model->display_windows_app_theme == preference)
+        model->theme_windows_app_theme == preference)
     {
         return 0;
     }
-    model->display_windows_app_theme = preference;
+    model->theme_windows_app_theme = preference;
     return 1;
 }

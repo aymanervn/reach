@@ -405,7 +405,7 @@ static void render_power_page(const reach_settings_render_input *input,
         reach_settings_model_button_press_motion(model, REACH_SETTINGS_HIT_POWER_APPLY));
 }
 
-typedef struct display_toggle_card
+typedef struct theme_toggle_card
 {
     reach_rect_f32 card;
     reach_rect_f32 icon;
@@ -418,12 +418,12 @@ typedef struct display_toggle_card
     const wchar_t *subtitle_text;
     const reach_motion *position;
     int32_t hit;
-} display_toggle_card;
+} theme_toggle_card;
 
-static void render_display_toggle_card(const reach_settings_render_input *input,
-                                       reach_render_command_buffer *commands,
-                                       const reach_ui_toggle_style *toggle_style,
-                                       const display_toggle_card *card)
+static void render_theme_toggle_card(const reach_settings_render_input *input,
+                                     reach_render_command_buffer *commands,
+                                     const reach_ui_toggle_style *toggle_style,
+                                     const theme_toggle_card *card)
 {
     float radius = reach_settings_scale(input, input->theme->radius_small);
     reach_settings_push_rect(commands, card->card, radius, input->theme->settings_card_background);
@@ -456,12 +456,14 @@ static void render_display_toggle_card(const reach_settings_render_input *input,
                                   reach_settings_control_group_id(card->hit, 0), card->position);
 }
 
-static void render_display_selector_card(
-    const reach_settings_render_input *input, reach_render_command_buffer *commands,
-    reach_rect_f32 card, reach_rect_f32 icon, reach_vector_icon_id icon_id, reach_rect_f32 title,
-    reach_rect_f32 subtitle, reach_rect_f32 selector, const uint16_t *title_text,
-    const uint16_t *subtitle_text, const uint16_t *const *labels, size_t label_count,
-    const reach_motion *selection, int32_t hit, reach_color accent)
+static void render_theme_selector_card(const reach_settings_render_input *input,
+                                       reach_render_command_buffer *commands, reach_rect_f32 card,
+                                       reach_rect_f32 icon, reach_vector_icon_id icon_id,
+                                       reach_rect_f32 title, reach_rect_f32 subtitle,
+                                       reach_rect_f32 selector, const uint16_t *title_text,
+                                       const uint16_t *subtitle_text, const uint16_t *const *labels,
+                                       size_t label_count, const reach_motion *selection,
+                                       int32_t hit, reach_color accent)
 {
     float radius = reach_settings_scale(input, input->theme->radius_small);
     reach_settings_push_rect(commands, card, radius, input->theme->settings_card_background);
@@ -543,45 +545,45 @@ static void render_top_bar_opacity_card(const reach_settings_render_input *input
                              enabled ? theme->settings_text : theme->settings_secondary_text, 1);
 }
 
-static void render_display_page(const reach_settings_render_input *input,
-                                reach_render_command_buffer *commands)
+static void render_theme_page(const reach_settings_render_input *input,
+                              reach_render_command_buffer *commands)
 {
     const reach_settings_model *model = input->model;
     const reach_settings_layout *layout = input->layout;
     reach_color accent = reach_theme_accent_color(input->theme, REACH_THEME_ACCENT_CYAN);
-    reach_render_command_buffer_set_scissor(commands, layout->display_viewport);
+    reach_render_command_buffer_set_scissor(commands, layout->theme_viewport);
 
     reach_ui_toggle_style toggle_style = {};
     toggle_style.track_off = input->theme->settings_toggle_track_off;
     toggle_style.track_on = reach_settings_color_with_alpha(accent, 0.85f);
     toggle_style.knob = input->theme->settings_toggle_knob;
 
-    const display_toggle_card cards[] = {
-        {layout->display_fps_card, layout->display_fps_icon, layout->display_fps_title,
-         layout->display_fps_subtitle, layout->display_fps_toggle, REACH_VECTOR_ICON_ARROW_UP,
-         nullptr, L"Adaptive animations",
+    const theme_toggle_card cards[] = {
+        {layout->theme_fps_card, layout->theme_fps_icon, layout->theme_fps_title,
+         layout->theme_fps_subtitle, layout->theme_fps_toggle, REACH_VECTOR_ICON_ARROW_UP, nullptr,
+         L"Adaptive animations",
          L"Match your main display's refresh rate\nBattery saver sets animations to 60 Hz",
-         &model->display_fps_toggle, REACH_SETTINGS_HIT_DISPLAY_FPS_TOGGLE},
-        {layout->display_font_card, layout->display_font_icon, layout->display_font_title,
-         layout->display_font_subtitle, layout->display_font_toggle, REACH_VECTOR_ICON_NONE, L"F",
-         L"Use JetBrains Mono", L"Off uses the Windows system font", &model->display_font_toggle,
-         REACH_SETTINGS_HIT_DISPLAY_FONT_TOGGLE},
+         &model->theme_fps_toggle, REACH_SETTINGS_HIT_THEME_FPS_TOGGLE},
+        {layout->theme_font_card, layout->theme_font_icon, layout->theme_font_title,
+         layout->theme_font_subtitle, layout->theme_font_toggle, REACH_VECTOR_ICON_NONE, L"F",
+         L"Use JetBrains Mono", L"Off uses the Windows system font", &model->theme_font_toggle,
+         REACH_SETTINGS_HIT_THEME_FONT_TOGGLE},
     };
     for (size_t index = 0; index < sizeof(cards) / sizeof(cards[0]); ++index)
     {
-        render_display_toggle_card(input, commands, &toggle_style, &cards[index]);
+        render_theme_toggle_card(input, commands, &toggle_style, &cards[index]);
     }
 
     const uint16_t *reach_theme_labels[2] = {(const uint16_t *)u"Dark", (const uint16_t *)u"Light"};
-    render_display_selector_card(
-        input, commands, layout->display_theme_card, layout->display_theme_icon,
-        REACH_VECTOR_ICON_BRIGHTNESS, layout->display_theme_title, layout->display_theme_subtitle,
-        layout->display_theme_selector, (const uint16_t *)u"Reach theme",
+    render_theme_selector_card(
+        input, commands, layout->theme_reach_card, layout->theme_reach_icon,
+        REACH_VECTOR_ICON_BRIGHTNESS, layout->theme_reach_title, layout->theme_reach_subtitle,
+        layout->theme_reach_selector, (const uint16_t *)u"Reach theme",
         (const uint16_t *)u"Choose the Reach interface theme", reach_theme_labels, 2,
-        &model->display_theme_selection, REACH_SETTINGS_HIT_DISPLAY_THEME, accent);
+        &model->theme_reach_selection, REACH_SETTINGS_HIT_THEME_REACH, accent);
 
     reach_settings_push_text(
-        commands, layout->display_windows_section_title, (const uint16_t *)u"System appearance",
+        commands, layout->theme_windows_section_title, (const uint16_t *)u"System appearance",
         reach_settings_scale(input, REACH_TEXT_SIZE_XSMALL), REACH_TEXT_WEIGHT_SEMIBOLD,
         input->text_alignment_leading, input->theme->settings_secondary_text, 1);
     const uint16_t *theme_labels[REACH_SETTINGS_SELECTOR_ITEM_COUNT] = {
@@ -589,28 +591,28 @@ static void render_display_page(const reach_settings_render_input *input,
     reach_motion system_theme = {}, app_theme = {};
     reach_motion_set(&system_theme, (float)reach_settings_model_windows_system_theme(model));
     reach_motion_set(&app_theme, (float)reach_settings_model_windows_app_theme(model));
-    render_display_selector_card(
-        input, commands, layout->display_windows_system_card, {}, REACH_VECTOR_ICON_NONE,
-        layout->display_windows_system_title, layout->display_windows_system_subtitle,
-        layout->display_windows_system_selector, (const uint16_t *)u"System theme",
+    render_theme_selector_card(
+        input, commands, layout->theme_windows_system_card, {}, REACH_VECTOR_ICON_NONE,
+        layout->theme_windows_system_title, layout->theme_windows_system_subtitle,
+        layout->theme_windows_system_selector, (const uint16_t *)u"System theme",
         (const uint16_t *)u"Taskbar, Start, and system surfaces", theme_labels,
         REACH_SETTINGS_SELECTOR_ITEM_COUNT, &system_theme,
-        REACH_SETTINGS_HIT_DISPLAY_WINDOWS_SYSTEM_THEME, accent);
-    render_display_selector_card(
-        input, commands, layout->display_windows_app_card, {}, REACH_VECTOR_ICON_NONE,
-        layout->display_windows_app_title, layout->display_windows_app_subtitle,
-        layout->display_windows_app_selector, (const uint16_t *)u"Application theme",
+        REACH_SETTINGS_HIT_THEME_WINDOWS_SYSTEM_THEME, accent);
+    render_theme_selector_card(
+        input, commands, layout->theme_windows_app_card, {}, REACH_VECTOR_ICON_NONE,
+        layout->theme_windows_app_title, layout->theme_windows_app_subtitle,
+        layout->theme_windows_app_selector, (const uint16_t *)u"Application theme",
         (const uint16_t *)u"Supported apps and Windows dialogs", theme_labels,
-        REACH_SETTINGS_SELECTOR_ITEM_COUNT, &app_theme,
-        REACH_SETTINGS_HIT_DISPLAY_WINDOWS_APP_THEME, accent);
+        REACH_SETTINGS_SELECTOR_ITEM_COUNT, &app_theme, REACH_SETTINGS_HIT_THEME_WINDOWS_APP_THEME,
+        accent);
 
     reach_settings_push_text(
-        commands, layout->display_desktop_section_title, (const uint16_t *)u"Desktop appearance",
+        commands, layout->theme_desktop_section_title, (const uint16_t *)u"Desktop appearance",
         reach_settings_scale(input, REACH_TEXT_SIZE_XSMALL), REACH_TEXT_WEIGHT_SEMIBOLD,
         input->text_alignment_leading, input->theme->settings_secondary_text, 1);
     const uint16_t *top_bar_style_labels[REACH_SETTINGS_SELECTOR_ITEM_COUNT] = {
         (const uint16_t *)u"Split", (const uint16_t *)u"Unified", (const uint16_t *)u"Simple"};
-    render_display_selector_card(
+    render_theme_selector_card(
         input, commands, layout->top_bar_style_card, {}, REACH_VECTOR_ICON_NONE,
         layout->top_bar_style_title, layout->top_bar_style_subtitle, layout->top_bar_style_selector,
         (const uint16_t *)u"Top bar style",
@@ -618,23 +620,23 @@ static void render_display_page(const reach_settings_render_input *input,
         REACH_SETTINGS_SELECTOR_ITEM_COUNT, &model->top_bar_style_selection,
         REACH_SETTINGS_HIT_TOP_BAR_STYLE, accent);
     render_top_bar_opacity_card(input, commands, accent);
-    display_toggle_card auto_hide = {layout->top_bar_auto_hide_card,
-                                     {},
-                                     layout->top_bar_auto_hide_title,
-                                     layout->top_bar_auto_hide_subtitle,
-                                     layout->top_bar_auto_hide_toggle,
-                                     REACH_VECTOR_ICON_NONE,
-                                     nullptr,
-                                     L"Auto hide top bar",
-                                     L"Hide it when a window enters its screen region",
-                                     &model->top_bar_mode_toggle,
-                                     REACH_SETTINGS_HIT_TOP_BAR_AUTO_HIDE_TOGGLE};
-    render_display_toggle_card(input, commands, &toggle_style, &auto_hide);
+    theme_toggle_card auto_hide = {layout->top_bar_auto_hide_card,
+                                   {},
+                                   layout->top_bar_auto_hide_title,
+                                   layout->top_bar_auto_hide_subtitle,
+                                   layout->top_bar_auto_hide_toggle,
+                                   REACH_VECTOR_ICON_NONE,
+                                   nullptr,
+                                   L"Auto hide top bar",
+                                   L"Hide it when a window enters its screen region",
+                                   &model->top_bar_mode_toggle,
+                                   REACH_SETTINGS_HIT_TOP_BAR_AUTO_HIDE_TOGGLE};
+    render_theme_toggle_card(input, commands, &toggle_style, &auto_hide);
     reach_render_command_buffer_clear_scissor(commands);
-    if (layout->display_scrollbar_thumb.height > 0.0f)
+    if (layout->theme_scrollbar_thumb.height > 0.0f)
     {
         (void)reach_scroll_view_push_scrollbar(
-            &input->model->display_scroll, {0.0f, 0.0f, 0.0f, 0.0f},
+            &input->model->theme_scroll, {0.0f, 0.0f, 0.0f, 0.0f},
             {input->theme->settings_scrollbar_track, input->theme->settings_scrollbar_thumb},
             nullptr, layout->scroll_time, commands);
     }
@@ -1324,8 +1326,8 @@ reach_result reach_settings_build_render_commands(const reach_settings_render_in
         render_power_page(input, commands);
     else if (input->model->selected_page == REACH_SETTINGS_PAGE_ACCOUNT)
         render_account_page(input, commands);
-    else if (input->model->selected_page == REACH_SETTINGS_PAGE_DISPLAY)
-        render_display_page(input, commands);
+    else if (input->model->selected_page == REACH_SETTINGS_PAGE_THEME)
+        render_theme_page(input, commands);
     else if (input->model->selected_page == REACH_SETTINGS_PAGE_STARTUP_APPS)
         render_startup_apps_page(input, commands);
     else if (input->model->selected_page == REACH_SETTINGS_PAGE_APPLICATIONS)

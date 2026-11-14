@@ -50,7 +50,7 @@ void reach_settings_model_init(reach_settings_model *model)
     reach_settings_scroll_init(&model->startup_scroll);
     reach_settings_scroll_init(&model->installed_apps_scroll);
     reach_loader_model_init(&model->installed_apps_loader, 0.7f);
-    reach_settings_scroll_init(&model->display_scroll);
+    reach_settings_scroll_init(&model->theme_scroll);
     reach_settings_scroll_init(&model->wifi_scroll);
     reach_settings_scroll_init(&model->bluetooth_scroll);
     reach_loader_model_init(&model->update_loader, 0.7f);
@@ -73,7 +73,7 @@ void reach_settings_model_init(reach_settings_model *model)
     model->power_focused_timer = -1;
     model->account_focused_field = -1;
     model->hovered_button = REACH_SETTINGS_HIT_NONE;
-    reach_motion_set(&model->display_theme_selection, 0);
+    reach_motion_set(&model->theme_reach_selection, 0);
     reach_motion_set(&model->top_bar_style_selection, 0);
     reach_motion_set(&model->top_bar_mode_toggle, 1.0f);
     model->top_bar_opacity = REACH_CONFIG_TOP_BAR_OPACITY_MAX;
@@ -213,8 +213,10 @@ const reach_settings_nav_item *reach_settings_nav_items(size_t *out_count)
          (const uint16_t *)L"Applications", REACH_THEME_ACCENT_BLUE},
         {REACH_SETTINGS_PAGE_POWER_SLEEP, REACH_VECTOR_ICON_SLEEP, (const uint16_t *)L"Energy",
          REACH_THEME_ACCENT_ORANGE},
-        {REACH_SETTINGS_PAGE_DISPLAY, REACH_VECTOR_ICON_RESIZE, (const uint16_t *)L"Display",
+        {REACH_SETTINGS_PAGE_THEME, REACH_VECTOR_ICON_BRIGHTNESS, (const uint16_t *)L"Theme",
          REACH_THEME_ACCENT_YELLOW},
+        {REACH_SETTINGS_PAGE_DISPLAY, REACH_VECTOR_ICON_RESIZE, (const uint16_t *)L"Display",
+         REACH_THEME_ACCENT_TEAL},
         {REACH_SETTINGS_PAGE_UPDATE, REACH_VECTOR_ICON_RESTART, (const uint16_t *)L"Updates",
          REACH_THEME_ACCENT_CYAN},
     };
@@ -242,6 +244,8 @@ const uint16_t *reach_settings_page_title(reach_settings_page page)
         return reach_settings_installed_apps_page_title();
     case REACH_SETTINGS_PAGE_POWER_SLEEP:
         return reach_settings_power_sleep_page_title();
+    case REACH_SETTINGS_PAGE_THEME:
+        return reach_settings_theme_page_title();
     case REACH_SETTINGS_PAGE_DISPLAY:
         return reach_settings_display_page_title();
     case REACH_SETTINGS_PAGE_UPDATE:
@@ -267,8 +271,9 @@ const uint16_t *reach_settings_page_placeholder(reach_settings_page page)
         return reach_settings_installed_apps_page_placeholder();
     case REACH_SETTINGS_PAGE_POWER_SLEEP:
         return reach_settings_power_sleep_page_placeholder();
+    case REACH_SETTINGS_PAGE_THEME:
     case REACH_SETTINGS_PAGE_DISPLAY:
-        return reach_settings_display_page_placeholder();
+        return (const uint16_t *)L"";
     case REACH_SETTINGS_PAGE_UPDATE:
         return (const uint16_t *)L"";
     default:
@@ -705,7 +710,7 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
                                      layout.scroll_time, &layout.installed_apps_scrollbar_thumb);
     }
 
-    if (model != nullptr && model->selected_page == REACH_SETTINGS_PAGE_DISPLAY)
+    if (model != nullptr && model->selected_page == REACH_SETTINGS_PAGE_THEME)
     {
         float area_x = layout.content_title.x;
         float viewport_y = layout.content_title.y + layout.content_title.height + 14.0f * scale;
@@ -713,22 +718,22 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
         float scrollbar_width = 5.0f * scale;
         float area_width =
             layout.content.x + layout.content.width - 28.0f * scale - area_x - scrollbar_width;
-        layout.display_viewport =
+        layout.theme_viewport =
             reach_settings_rect(area_x, viewport_y, area_width,
                                 viewport_bottom > viewport_y ? viewport_bottom - viewport_y : 0.0f);
-        layout.display_scrollbar_track = reach_settings_rect(
-            layout.display_viewport.x + layout.display_viewport.width + 8.0f * scale, viewport_y,
-            scrollbar_width, layout.display_viewport.height);
+        layout.theme_scrollbar_track = reach_settings_rect(
+            layout.theme_viewport.x + layout.theme_viewport.width + 8.0f * scale, viewport_y,
+            scrollbar_width, layout.theme_viewport.height);
         float area_y =
-            viewport_y - reach_scroll_view_value_at(&model->display_scroll, layout.scroll_time);
+            viewport_y - reach_scroll_view_value_at(&model->theme_scroll, layout.scroll_time);
 
         float card_height = 72.0f * scale;
         float card_spacing = 12.0f * scale;
         reach_settings_toggle_card_rects cards[] = {
-            {&layout.display_fps_card, &layout.display_fps_icon, &layout.display_fps_title,
-             &layout.display_fps_subtitle, &layout.display_fps_toggle},
-            {&layout.display_font_card, &layout.display_font_icon, &layout.display_font_title,
-             &layout.display_font_subtitle, &layout.display_font_toggle},
+            {&layout.theme_fps_card, &layout.theme_fps_icon, &layout.theme_fps_title,
+             &layout.theme_fps_subtitle, &layout.theme_fps_toggle},
+            {&layout.theme_font_card, &layout.theme_font_icon, &layout.theme_font_title,
+             &layout.theme_font_subtitle, &layout.theme_font_toggle},
         };
         float toggle_card_y = area_y;
         for (size_t index = 0; index < sizeof(cards) / sizeof(cards[0]); ++index)
@@ -738,37 +743,37 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
                                               toggle_card_height, scale);
             toggle_card_y += toggle_card_height + card_spacing;
         }
-        layout.display_fps_subtitle.height = 32.0f * scale;
+        layout.theme_fps_subtitle.height = 32.0f * scale;
 
         float theme_card_y = toggle_card_y;
         float theme_card_height =
             area_width >= REACH_SETTINGS_SELECTOR_WIDE_WIDTH * scale ? card_height : 104.0f * scale;
         reach_settings_layout_selector_card(
-            &layout.display_theme_card, &layout.display_theme_title, &layout.display_theme_subtitle,
-            &layout.display_theme_selector, &layout.display_theme_icon, area_x, theme_card_y,
+            &layout.theme_reach_card, &layout.theme_reach_title, &layout.theme_reach_subtitle,
+            &layout.theme_reach_selector, &layout.theme_reach_icon, area_x, theme_card_y,
             area_width, theme_card_height, 176.0f, scale);
 
         float section_y = theme_card_y + theme_card_height + 18.0f * scale;
-        layout.display_windows_section_title =
+        layout.theme_windows_section_title =
             reach_settings_rect(area_x, section_y, area_width, 18.0f * scale);
         float appearance_y = section_y + 26.0f * scale;
         float appearance_card_height = area_width >= REACH_SETTINGS_SELECTOR_WIDE_WIDTH * scale
                                            ? 76.0f * scale
                                            : 104.0f * scale;
         reach_settings_layout_selector_card(
-            &layout.display_windows_system_card, &layout.display_windows_system_title,
-            &layout.display_windows_system_subtitle, &layout.display_windows_system_selector,
-            nullptr, area_x, appearance_y, area_width, appearance_card_height,
-            REACH_SETTINGS_SELECTOR_WIDTH, scale);
+            &layout.theme_windows_system_card, &layout.theme_windows_system_title,
+            &layout.theme_windows_system_subtitle, &layout.theme_windows_system_selector, nullptr,
+            area_x, appearance_y, area_width, appearance_card_height, REACH_SETTINGS_SELECTOR_WIDTH,
+            scale);
         reach_settings_layout_selector_card(
-            &layout.display_windows_app_card, &layout.display_windows_app_title,
-            &layout.display_windows_app_subtitle, &layout.display_windows_app_selector, nullptr,
-            area_x, appearance_y + appearance_card_height + card_spacing, area_width,
+            &layout.theme_windows_app_card, &layout.theme_windows_app_title,
+            &layout.theme_windows_app_subtitle, &layout.theme_windows_app_selector, nullptr, area_x,
+            appearance_y + appearance_card_height + card_spacing, area_width,
             appearance_card_height, REACH_SETTINGS_SELECTOR_WIDTH, scale);
 
         float desktop_section_y =
             appearance_y + 2.0f * appearance_card_height + card_spacing + 18.0f * scale;
-        layout.display_desktop_section_title =
+        layout.theme_desktop_section_title =
             reach_settings_rect(area_x, desktop_section_y, area_width, 18.0f * scale);
         float desktop_y = desktop_section_y + 26.0f * scale;
         reach_settings_layout_selector_card(
@@ -804,13 +809,13 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
         reach_settings_layout_toggle_card(&auto_hide, area_x,
                                           opacity_y + appearance_card_height + card_spacing,
                                           area_width, card_height, scale);
-        layout.display_content_height =
+        layout.theme_content_height =
             layout.top_bar_auto_hide_card.y + layout.top_bar_auto_hide_card.height +
-            reach_scroll_view_value_at(&model->display_scroll, layout.scroll_time) - viewport_y;
-        reach_settings_layout_scroll(&model->display_scroll, layout.display_viewport,
-                                     layout.display_scrollbar_track, layout.display_content_height,
+            reach_scroll_view_value_at(&model->theme_scroll, layout.scroll_time) - viewport_y;
+        reach_settings_layout_scroll(&model->theme_scroll, layout.theme_viewport,
+                                     layout.theme_scrollbar_track, layout.theme_content_height,
                                      34.0f * scale, layout.scroll_time,
-                                     &layout.display_scrollbar_thumb);
+                                     &layout.theme_scrollbar_thumb);
     }
 
     if (model != nullptr && model->selected_page == REACH_SETTINGS_PAGE_WIFI)
@@ -1079,52 +1084,49 @@ reach_settings_hit_result reach_settings_hit_test(const reach_settings_layout *l
             }
         }
     }
-    if (layout->display_scrollbar_thumb.height > 0.0f &&
-        reach_settings_rect_contains(layout->display_scrollbar_thumb, x, y))
+    if (layout->theme_scrollbar_thumb.height > 0.0f &&
+        reach_settings_rect_contains(layout->theme_scrollbar_thumb, x, y))
     {
-        result.type = REACH_SETTINGS_HIT_DISPLAY_SCROLLBAR_THUMB;
+        result.type = REACH_SETTINGS_HIT_THEME_SCROLLBAR_THUMB;
         return result;
     }
-    if (layout->display_scrollbar_thumb.height > 0.0f &&
-        reach_settings_rect_contains(layout->display_scrollbar_track, x, y))
+    if (layout->theme_scrollbar_thumb.height > 0.0f &&
+        reach_settings_rect_contains(layout->theme_scrollbar_track, x, y))
     {
-        result.type = REACH_SETTINGS_HIT_DISPLAY_SCROLLBAR_TRACK;
+        result.type = REACH_SETTINGS_HIT_THEME_SCROLLBAR_TRACK;
         return result;
     }
-    int32_t display_pointer = layout->display_viewport.width > 0.0f &&
-                              reach_settings_rect_contains(layout->display_viewport, x, y);
+    int32_t theme_pointer = layout->theme_viewport.width > 0.0f &&
+                            reach_settings_rect_contains(layout->theme_viewport, x, y);
     const struct
     {
         reach_rect_f32 card;
         reach_rect_f32 toggle;
         reach_settings_hit_type type;
-    } display_cards[] = {
-        {layout->display_fps_card, layout->display_fps_toggle,
-         REACH_SETTINGS_HIT_DISPLAY_FPS_TOGGLE},
-        {layout->display_font_card, layout->display_font_toggle,
-         REACH_SETTINGS_HIT_DISPLAY_FONT_TOGGLE},
+    } theme_cards[] = {
+        {layout->theme_fps_card, layout->theme_fps_toggle, REACH_SETTINGS_HIT_THEME_FPS_TOGGLE},
+        {layout->theme_font_card, layout->theme_font_toggle, REACH_SETTINGS_HIT_THEME_FONT_TOGGLE},
     };
-    for (size_t index = 0; index < sizeof(display_cards) / sizeof(display_cards[0]); ++index)
+    for (size_t index = 0; index < sizeof(theme_cards) / sizeof(theme_cards[0]); ++index)
     {
-        if (display_pointer && display_cards[index].toggle.width > 0.0f &&
-            (reach_settings_rect_contains(display_cards[index].toggle, x, y) ||
-             reach_settings_rect_contains(display_cards[index].card, x, y)))
+        if (theme_pointer && theme_cards[index].toggle.width > 0.0f &&
+            (reach_settings_rect_contains(theme_cards[index].toggle, x, y) ||
+             reach_settings_rect_contains(theme_cards[index].card, x, y)))
         {
-            result.type = display_cards[index].type;
+            result.type = theme_cards[index].type;
             return result;
         }
     }
     int32_t option =
-        display_pointer
-            ? reach_ui_segmented_control_index_at(layout->display_theme_selector, 2, x, y)
-            : -1;
+        theme_pointer ? reach_ui_segmented_control_index_at(layout->theme_reach_selector, 2, x, y)
+                      : -1;
     if (option >= 0)
     {
-        result.type = REACH_SETTINGS_HIT_DISPLAY_THEME;
-        result.display_light_theme = option == 1;
+        result.type = REACH_SETTINGS_HIT_THEME_REACH;
+        result.theme_light = option == 1;
         return result;
     }
-    if (display_pointer && layout->top_bar_auto_hide_toggle.width > 0.0f &&
+    if (theme_pointer && layout->top_bar_auto_hide_toggle.width > 0.0f &&
         (reach_settings_rect_contains(layout->top_bar_auto_hide_toggle, x, y) ||
          reach_settings_rect_contains(layout->top_bar_auto_hide_card, x, y)))
     {
@@ -1132,13 +1134,13 @@ reach_settings_hit_result reach_settings_hit_test(const reach_settings_layout *l
         return result;
     }
 
-    if (display_pointer && reach_settings_rect_contains(layout->top_bar_opacity_slider, x, y))
+    if (theme_pointer && reach_settings_rect_contains(layout->top_bar_opacity_slider, x, y))
     {
         result.type = REACH_SETTINGS_HIT_TOP_BAR_OPACITY;
         return result;
     }
 
-    option = display_pointer
+    option = theme_pointer
                  ? reach_ui_segmented_control_index_at(layout->top_bar_style_selector,
                                                        REACH_SETTINGS_SELECTOR_ITEM_COUNT, x, y)
                  : -1;
@@ -1148,24 +1150,24 @@ reach_settings_hit_result reach_settings_hit_test(const reach_settings_layout *l
         result.top_bar_style = (reach_config_top_bar_style)option;
         return result;
     }
-    option = display_pointer
-                 ? reach_ui_segmented_control_index_at(layout->display_windows_system_selector,
+    option = theme_pointer
+                 ? reach_ui_segmented_control_index_at(layout->theme_windows_system_selector,
                                                        REACH_SETTINGS_SELECTOR_ITEM_COUNT, x, y)
                  : -1;
     if (option >= 0)
     {
-        result.type = REACH_SETTINGS_HIT_DISPLAY_WINDOWS_SYSTEM_THEME;
-        result.display_theme_preference = (reach_config_theme_preference)option;
+        result.type = REACH_SETTINGS_HIT_THEME_WINDOWS_SYSTEM_THEME;
+        result.theme_preference = (reach_config_theme_preference)option;
         return result;
     }
-    option = display_pointer
-                 ? reach_ui_segmented_control_index_at(layout->display_windows_app_selector,
+    option = theme_pointer
+                 ? reach_ui_segmented_control_index_at(layout->theme_windows_app_selector,
                                                        REACH_SETTINGS_SELECTOR_ITEM_COUNT, x, y)
                  : -1;
     if (option >= 0)
     {
-        result.type = REACH_SETTINGS_HIT_DISPLAY_WINDOWS_APP_THEME;
-        result.display_theme_preference = (reach_config_theme_preference)option;
+        result.type = REACH_SETTINGS_HIT_THEME_WINDOWS_APP_THEME;
+        result.theme_preference = (reach_config_theme_preference)option;
         return result;
     }
     if (layout->account_password_button.width > 0.0f &&
@@ -1396,7 +1398,7 @@ reach_settings_hit_result reach_settings_hit_test(const reach_settings_layout *l
 static reach_scroll_view *reach_settings_model_scrolls(reach_settings_model *model, size_t index)
 {
     reach_scroll_view *scrolls[] = {&model->update_scroll,         &model->startup_scroll,
-                                    &model->installed_apps_scroll, &model->display_scroll,
+                                    &model->installed_apps_scroll, &model->theme_scroll,
                                     &model->wifi_scroll,           &model->bluetooth_scroll};
     return index < sizeof(scrolls) / sizeof(scrolls[0]) ? scrolls[index] : nullptr;
 }
@@ -1436,9 +1438,9 @@ reach_scroll_view *reach_settings_model_scroll_for_hit(reach_settings_model *mod
     case REACH_SETTINGS_HIT_APPLICATION_SCROLLBAR_TRACK:
     case REACH_SETTINGS_HIT_APPLICATION_SCROLLBAR_THUMB:
         return &model->installed_apps_scroll;
-    case REACH_SETTINGS_HIT_DISPLAY_SCROLLBAR_TRACK:
-    case REACH_SETTINGS_HIT_DISPLAY_SCROLLBAR_THUMB:
-        return &model->display_scroll;
+    case REACH_SETTINGS_HIT_THEME_SCROLLBAR_TRACK:
+    case REACH_SETTINGS_HIT_THEME_SCROLLBAR_THUMB:
+        return &model->theme_scroll;
     case REACH_SETTINGS_HIT_WIFI_SCROLLBAR_TRACK:
     case REACH_SETTINGS_HIT_WIFI_SCROLLBAR_THUMB:
         return &model->wifi_scroll;

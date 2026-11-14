@@ -99,7 +99,7 @@ static void test_navigation_pages(void)
     expect_true(nav_count == REACH_SETTINGS_NAV_ITEM_COUNT, "settings exposes all nav items");
     expect_true(nav[0].page == REACH_SETTINGS_PAGE_WIFI && equals_ascii(nav[0].label, "Wi-Fi"),
                 "first nav item is Wi-Fi");
-    expect_true(nav[7].page == REACH_SETTINGS_PAGE_UPDATE && equals_ascii(nav[7].label, "Updates"),
+    expect_true(nav[8].page == REACH_SETTINGS_PAGE_UPDATE && equals_ascii(nav[8].label, "Updates"),
                 "last nav item is Updates");
     expect_true(reach_motion_value(&model->nav_selection) == 0.0f &&
                     !reach_motion_active(&model->nav_selection),
@@ -108,7 +108,7 @@ static void test_navigation_pages(void)
     reach_settings_model_select_page(model.get(), REACH_SETTINGS_PAGE_UPDATE);
     expect_true(model->selected_page == REACH_SETTINGS_PAGE_UPDATE,
                 "page state updates immediately");
-    expect_true(model->nav_selection.to == 7.0f && reach_motion_active(&model->nav_selection),
+    expect_true(model->nav_selection.to == 8.0f && reach_motion_active(&model->nav_selection),
                 "page selection starts the navigation indicator animation");
     model->nav_selection.started_seconds -= 0.11;
     float interrupted_position = reach_motion_value(&model->nav_selection);
@@ -262,7 +262,7 @@ static void test_power_timers(void)
                     !reach_settings_model_finish_visual_motion_at(model.get(),
                                                                   selection.started_seconds + .1),
                 "in-flight selection publishes one cleanup wake without sampled updates");
-    model->selected_page = REACH_SETTINGS_PAGE_DISPLAY;
+    model->selected_page = REACH_SETTINGS_PAGE_THEME;
     expect_true(reach_settings_model_visual_deadline(model.get()) == 0,
                 "hidden power content publishes no visual cleanup wake");
     model->selected_page = REACH_SETTINGS_PAGE_POWER_SLEEP;
@@ -472,13 +472,13 @@ static void test_display_theme_preferences(void)
                 "Reach theme accepts an explicit light selection");
     expect_true(reach_settings_model_light_theme(model.get()),
                 "Reach theme stores the selected light mode");
-    expect_true(model->display_theme_selection.to == 1.0f,
+    expect_true(model->theme_reach_selection.to == 1.0f,
                 "Reach theme selector animates toward light");
     expect_true(!reach_settings_model_select_light_theme(model.get(), 1),
                 "reselecting the active Reach theme is unchanged");
     expect_true(reach_settings_model_select_light_theme(model.get(), 0),
                 "Reach theme accepts an explicit dark selection");
-    expect_true(model->display_theme_selection.to == 0.0f,
+    expect_true(model->theme_reach_selection.to == 0.0f,
                 "Reach theme selector animates toward dark");
 
     expect_true(reach_settings_model_windows_system_theme(model.get()) ==
@@ -646,30 +646,30 @@ static void test_display_scrollbar_hit_testing(void)
 {
     std::unique_ptr<reach_settings_model> model(new reach_settings_model());
     reach_settings_model_init(model.get());
-    reach_settings_model_select_page(model.get(), REACH_SETTINGS_PAGE_DISPLAY);
+    reach_settings_model_select_page(model.get(), REACH_SETTINGS_PAGE_THEME);
     reach_rect_f32 bounds = {0.0f, 0.0f, 900.0f, 380.0f};
     reach_settings_layout layout =
         reach_settings_layout_for_bounds(bounds, nullptr, 1.0f, model.get());
-    expect_true(layout.display_scrollbar_thumb.height > 0.0f,
+    expect_true(layout.theme_scrollbar_thumb.height > 0.0f,
                 "overflowing display page lays out a scrollbar thumb");
 
     reach_settings_hit_result hit = reach_settings_hit_test(
-        &layout, layout.display_scrollbar_thumb.x + 1.0f, layout.display_scrollbar_thumb.y + 1.0f);
-    expect_true(hit.type == REACH_SETTINGS_HIT_DISPLAY_SCROLLBAR_THUMB,
+        &layout, layout.theme_scrollbar_thumb.x + 1.0f, layout.theme_scrollbar_thumb.y + 1.0f);
+    expect_true(hit.type == REACH_SETTINGS_HIT_THEME_SCROLLBAR_THUMB,
                 "display scrollbar thumb is hit-testable");
 
-    hit = reach_settings_hit_test(&layout, layout.display_scrollbar_track.x + 1.0f,
-                                  layout.display_scrollbar_track.y +
-                                      layout.display_scrollbar_track.height - 1.0f);
-    expect_true(hit.type == REACH_SETTINGS_HIT_DISPLAY_SCROLLBAR_TRACK,
+    hit = reach_settings_hit_test(&layout, layout.theme_scrollbar_track.x + 1.0f,
+                                  layout.theme_scrollbar_track.y +
+                                      layout.theme_scrollbar_track.height - 1.0f);
+    expect_true(hit.type == REACH_SETTINGS_HIT_THEME_SCROLLBAR_TRACK,
                 "display scrollbar track is hit-testable");
 
-    (void)reach_scroll_view_pointer_down(&model->display_scroll,
-                                         layout.display_scrollbar_thumb.x + 1.0f,
-                                         layout.display_scrollbar_thumb.y + 1.0f, 0.0);
-    (void)reach_scroll_view_pointer_move(&model->display_scroll,
-                                         layout.display_scrollbar_thumb.y + 21.0f, 0.0);
-    expect_true(reach_scroll_view_position(&model->display_scroll) > 0.0f,
+    (void)reach_scroll_view_pointer_down(&model->theme_scroll,
+                                         layout.theme_scrollbar_thumb.x + 1.0f,
+                                         layout.theme_scrollbar_thumb.y + 1.0f, 0.0);
+    (void)reach_scroll_view_pointer_move(&model->theme_scroll,
+                                         layout.theme_scrollbar_thumb.y + 21.0f, 0.0);
+    expect_true(reach_scroll_view_position(&model->theme_scroll) > 0.0f,
                 "dragging the display thumb scrolls");
 }
 
@@ -821,7 +821,7 @@ static void test_pressed_buttons_render_worst_case(void)
                 const int timed_hits[] = {
                     REACH_SETTINGS_HIT_WIFI_SCAN,        REACH_SETTINGS_HIT_BLUETOOTH_SCAN,
                     REACH_SETTINGS_HIT_ACCOUNT_PASSWORD, REACH_SETTINGS_HIT_STARTUP_TOGGLE,
-                    REACH_SETTINGS_HIT_POWER_APPLY,      REACH_SETTINGS_HIT_DISPLAY_THEME,
+                    REACH_SETTINGS_HIT_POWER_APPLY,      REACH_SETTINGS_HIT_THEME_REACH,
                     REACH_SETTINGS_HIT_UPDATE_REFRESH,   REACH_SETTINGS_HIT_APPLICATION_UNINSTALL};
                 int timed_hit = timed_hits[page];
                 if (timed_hit != REACH_SETTINGS_HIT_APPLICATION_UNINSTALL)
