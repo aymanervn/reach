@@ -126,11 +126,37 @@ reach_result reach_context_menu_render_previews(reach_context_menu *menu,
                     maximum_height};
     popup.notch_side = reach_popup_notch_side(state.drop_direction);
     popup.dpi_scale = scale;
+    popup.hide_notch = 1;
     if (result == REACH_OK)
         result = reach_popup_push_width_background(&popup, &layout.body.width, &layout.body.height,
                                                    &layout.notch, body.id, 8, out);
     if (result != REACH_OK)
         return result;
+    if (layout.label_mode && menu->request.label[0] != 0)
+    {
+        reach_render_group label = {};
+        label.id = 4;
+        label.parent_id = body.id;
+        label.bounds = {0, 0, ceilf(layout.label_width) + 1, ceilf(layout.label_height)};
+        label.x = reach_motion_affine(&menu->width, .5f, -layout.label_width * .5f);
+        reach_motion_set(&label.y, layout.header_y);
+        label.opacity = menu->reflow;
+        result = reach_render_command_buffer_begin_group(out, &label);
+        reach_render_command text = {};
+        text.type = REACH_RENDER_COMMAND_TEXT;
+        text.rect = {0, 0, ceilf(layout.label_width) + 1, layout.label_height};
+        text.color = theme->context_menu_text;
+        text.text_size = REACH_TEXT_SIZE_SMALL * scale;
+        text.text_weight = REACH_TEXT_WEIGHT_NORMAL;
+        text.text_alignment = REACH_TEXT_ALIGNMENT_CENTER;
+        text.text_ellipsis = 1;
+        reach_copy_utf16(text.text, REACH_MENU_TEXT_CAPACITY, menu->request.label);
+        if (result == REACH_OK)
+            result = reach_render_command_buffer_push(out, &text);
+        reach_render_command_buffer_end_group(out);
+        if (result != REACH_OK)
+            return result;
+    }
     for (size_t visible = 0; visible < layout.count; ++visible)
     {
         const auto &card = layout.cards[visible];

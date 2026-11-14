@@ -446,7 +446,7 @@ static void reach_dock_notify_item_hovered(reach_dock *dock, size_t item_index)
         return;
     }
     if (!reach_dock_build_menu_request(dock, item_index, 0.0f, 0.0f, &dock->hover_request) ||
-        dock->hover_request.window_count == 0)
+        (dock->hover_request.window_count == 0 && dock->hover_request.label[0] == 0))
     {
         dock->routes.item_hovered(dock->routes.user, nullptr);
         return;
@@ -1356,6 +1356,7 @@ int32_t reach_dock_build_menu_request(reach_dock *dock, size_t item_index, float
         reach_copy_utf16(out_request->windows[index].title, REACH_MENU_TEXT_CAPACITY,
                          item_windows[index].title);
     }
+    reach_copy_path_stem_utf16(out_request->label, REACH_MENU_TEXT_CAPACITY, out_request->path);
 
     reach_rect_f32 anchor = {};
     float bar_edge_y = 0.0f;

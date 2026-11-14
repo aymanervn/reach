@@ -84,6 +84,9 @@ typedef struct reach_context_menu_preview_layout
     float border;
     float card_scale;
     reach_motion card_size;
+    int32_t label_mode;
+    float label_width;
+    float label_height;
 } reach_context_menu_preview_layout;
 
 typedef struct reach_context_menu_preview_origin

@@ -64,6 +64,7 @@ extern "C"
 
         reach_menu_window windows[REACH_MENU_MAX_WINDOWS];
         size_t window_count;
+        uint16_t label[REACH_MENU_TEXT_CAPACITY];
 
         reach_rect_f32 anchor_button;
         float bar_edge_y;
