@@ -1988,6 +1988,8 @@ reach_quick_settings_popup_anchor(const reach_quick_settings_layout_context *ctx
     anchor.direction = ctx->drop_direction;
     anchor.bar_offset = reach_popup_hidden_notch_bar_offset_scaled(ctx->dpi_scale);
     anchor.has_bar_offset = 1;
+    anchor.alignment = REACH_POPUP_ALIGN_MONITOR_RIGHT;
+    anchor.edge_gap = reach_popup_bar_gap_scaled(ctx->dpi_scale);
     return anchor;
 }
 

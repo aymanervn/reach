@@ -221,7 +221,7 @@ static void test_expansion_keeps_popup_anchor_position(void)
     reach_quick_settings_layout_context ctx = {};
     ctx.theme = reach_theme_default();
     ctx.dpi_scale = 1.25f;
-    ctx.anchor_button = {120.25f, 8.25f, 32.0f, 24.0f};
+    ctx.anchor_button = {1767.75f, 8.25f, 32.0f, 24.0f};
     ctx.monitor = {0.0f, 0.0f, 1920.0f, 1080.0f};
     ctx.bar_edge_y = 40.25f;
     ctx.drop_direction = REACH_POPUP_DROP_DOWN;

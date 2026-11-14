@@ -89,6 +89,11 @@ reach_popup_placement reach_popup_place(const reach_popup_anchor *anchor, float 
                              ? anchor->bar_edge_y + offset
                              : anchor->bar_edge_y - height - offset;
     placement.bounds = reach_popup_constrain_bounds(placement.bounds, anchor->monitor, margin);
+    if (anchor->alignment == REACH_POPUP_ALIGN_MONITOR_LEFT)
+        placement.bounds.x = anchor->monitor.x + anchor->edge_gap;
+    else if (anchor->alignment == REACH_POPUP_ALIGN_MONITOR_RIGHT)
+        placement.bounds.x =
+            anchor->monitor.x + anchor->monitor.width - placement.bounds.width - anchor->edge_gap;
     placement.notch_anchor_x = anchor->button.x + anchor->button.width * 0.5f;
     placement.notch_side = reach_popup_notch_side(anchor->direction);
     return placement;
@@ -245,9 +250,14 @@ float reach_popup_notch_height_scaled(float dpi_scale)
     return reach_popup_scale(reach_popup_notch_height(), dpi_scale);
 }
 
+float reach_popup_bar_gap_scaled(float dpi_scale)
+{
+    return reach_popup_scale(2.0f, dpi_scale);
+}
+
 float reach_popup_hidden_notch_bar_offset_scaled(float dpi_scale)
 {
-    return reach_popup_scale(2.0f, dpi_scale) - reach_popup_notch_height_scaled(dpi_scale);
+    return reach_popup_bar_gap_scaled(dpi_scale) - reach_popup_notch_height_scaled(dpi_scale);
 }
 
 float reach_popup_clamp_notch_center_scaled(float notch_center_x, float width, float dpi_scale)
