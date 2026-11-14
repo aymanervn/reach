@@ -20,8 +20,8 @@ reach_result reach_stage_create(reach_stage **out_stage)
     }
 
     stage->state.animation_seconds = reach_stage_animation_seconds_default();
-    reach_animation_manager_init(&stage->animations, stage->animation_tracks,
-                                 REACH_STAGE_ANIMATION_COUNT);
+    for (reach_motion &motion : stage->motions)
+        reach_motion_set(&motion, 0.0f);
     reach_pressable_init(&stage->pressable);
     reach_motion_set(&stage->close_hover, 0.0f);
     *out_stage = stage;
@@ -45,10 +45,7 @@ int32_t reach_stage_is_open(const reach_stage *stage)
 
 int32_t reach_stage_animation_active(const reach_stage *stage)
 {
-    return stage != nullptr && stage->state.open &&
-                   reach_animation_manager_any_active(&stage->animations)
-               ? 1
-               : 0;
+    return stage != nullptr && stage->state.open && reach_stage_tracks_active(stage) ? 1 : 0;
 }
 
 void reach_stage_set_animation_seconds(reach_stage *stage, float seconds)
@@ -133,7 +130,7 @@ reach_result reach_stage_open(reach_stage *stage, reach_rect_f32 monitor_bounds,
 
     state->open = 1;
     state->backdrop_opacity = 1.0f;
-    reach_animation_manager_set(&stage->animations, REACH_STAGE_ANIMATION_BACKDROP, 1.0f);
+    reach_motion_set(&stage->motions[REACH_STAGE_ANIMATION_BACKDROP], 1.0f);
     state->closing = 0;
     state->progress = 0.0f;
     state->desktop_progress = 0.0f;
@@ -147,7 +144,7 @@ reach_result reach_stage_open(reach_stage *stage, reach_rect_f32 monitor_bounds,
     }
     else
     {
-        reach_animation_manager_set(&stage->animations, REACH_STAGE_ANIMATION_PROGRESS, 1.0f);
+        reach_motion_set(&stage->motions[REACH_STAGE_ANIMATION_PROGRESS], 1.0f);
         state->progress = 1.0f;
     }
     if (reach_stage_has_desktop(state))
@@ -159,14 +156,13 @@ reach_result reach_stage_open(reach_stage *stage, reach_rect_f32 monitor_bounds,
     }
     else
     {
-        reach_animation_manager_set(&stage->animations, REACH_STAGE_ANIMATION_DESKTOP_PROGRESS,
-                                    1.0f);
+        reach_motion_set(&stage->motions[REACH_STAGE_ANIMATION_DESKTOP_PROGRESS], 1.0f);
         state->desktop_progress = 1.0f;
     }
-    reach_animation_manager_set(&stage->animations, REACH_STAGE_ANIMATION_REFLOW, 1.0f);
-    reach_animation_manager_set(&stage->animations, REACH_STAGE_ANIMATION_DEPARTURE, 1.0f);
+    reach_motion_set(&stage->motions[REACH_STAGE_ANIMATION_REFLOW], 1.0f);
+    reach_motion_set(&stage->motions[REACH_STAGE_ANIMATION_DEPARTURE], 1.0f);
     reach_motion_set(&stage->close_hover, 0.0f);
-    reach_animation_manager_set(&stage->animations, REACH_STAGE_ANIMATION_RETARGET, 0.0f);
+    reach_motion_set(&stage->motions[REACH_STAGE_ANIMATION_RETARGET], 0.0f);
 
     reach_stage_rebuild_layout(stage);
     for (size_t index = 0; index < state->tile_count; ++index)
@@ -243,7 +239,7 @@ void reach_stage_start_reflow(reach_stage *stage)
     }
     else
     {
-        reach_animation_manager_set(&stage->animations, REACH_STAGE_ANIMATION_DEPARTURE, 1.0f);
+        reach_motion_set(&stage->motions[REACH_STAGE_ANIMATION_DEPARTURE], 1.0f);
     }
     reach_stage_apply_progress(stage);
 }
@@ -341,7 +337,7 @@ void reach_stage_begin_close(reach_stage *stage)
     stage->state.close_phase = REACH_STAGE_CLOSE_MOVING;
     stage->state.close_aligned_committed = 0;
     stage->state.retarget_progress = 0.0f;
-    reach_animation_manager_set(&stage->animations, REACH_STAGE_ANIMATION_RETARGET, 0.0f);
+    reach_motion_set(&stage->motions[REACH_STAGE_ANIMATION_RETARGET], 0.0f);
     for (size_t index = 0; index < stage->state.tile_count; ++index)
     {
         reach_stage_tile *tile = &stage->state.tiles[index];
@@ -365,7 +361,7 @@ void reach_stage_begin_close(reach_stage *stage)
     }
     else
     {
-        reach_animation_manager_set(&stage->animations, REACH_STAGE_ANIMATION_PROGRESS, 0.0f);
+        reach_motion_set(&stage->motions[REACH_STAGE_ANIMATION_PROGRESS], 0.0f);
     }
     if (reach_stage_has_desktop(&stage->state))
     {
@@ -376,8 +372,7 @@ void reach_stage_begin_close(reach_stage *stage)
     }
     else
     {
-        reach_animation_manager_set(&stage->animations, REACH_STAGE_ANIMATION_DESKTOP_PROGRESS,
-                                    0.0f);
+        reach_motion_set(&stage->motions[REACH_STAGE_ANIMATION_DESKTOP_PROGRESS], 0.0f);
     }
 }
 
@@ -394,13 +389,13 @@ void reach_stage_force_close(reach_stage *stage)
     reach_pressable_reset(&stage->pressable, nullptr);
     stage->pressable_generation = 0;
     state->animation_seconds = animation_seconds;
-    reach_animation_manager_reset(&stage->animations, REACH_STAGE_ANIMATION_PROGRESS);
-    reach_animation_manager_reset(&stage->animations, REACH_STAGE_ANIMATION_DESKTOP_PROGRESS);
-    reach_animation_manager_reset(&stage->animations, REACH_STAGE_ANIMATION_REFLOW);
-    reach_animation_manager_reset(&stage->animations, REACH_STAGE_ANIMATION_DEPARTURE);
+    reach_motion_set(&stage->motions[REACH_STAGE_ANIMATION_PROGRESS], 0.0f);
+    reach_motion_set(&stage->motions[REACH_STAGE_ANIMATION_DESKTOP_PROGRESS], 0.0f);
+    reach_motion_set(&stage->motions[REACH_STAGE_ANIMATION_REFLOW], 0.0f);
+    reach_motion_set(&stage->motions[REACH_STAGE_ANIMATION_DEPARTURE], 0.0f);
     reach_motion_set(&stage->close_hover, 0.0f);
-    reach_animation_manager_reset(&stage->animations, REACH_STAGE_ANIMATION_BACKDROP);
-    reach_animation_manager_reset(&stage->animations, REACH_STAGE_ANIMATION_RETARGET);
+    reach_motion_set(&stage->motions[REACH_STAGE_ANIMATION_BACKDROP], 0.0f);
+    reach_motion_set(&stage->motions[REACH_STAGE_ANIMATION_RETARGET], 0.0f);
 }
 
 static int32_t reach_stage_holds_window(const reach_stage_state *state, uintptr_t window)
@@ -745,34 +740,27 @@ static void reach_stage_capsule_tick(void *capsule, double delta_seconds,
         out->request_update = 1;
         return;
     }
-    int32_t was_active = reach_animation_manager_any_active(&stage->animations);
+    int32_t was_active = reach_stage_tracks_active(stage);
     if (!was_active && !state->closing)
     {
         return;
     }
 
-    int32_t reflow_was_active =
-        reach_animation_manager_active(&stage->animations, REACH_STAGE_ANIMATION_REFLOW);
-    int32_t retarget_was_active =
-        reach_animation_manager_active(&stage->animations, REACH_STAGE_ANIMATION_RETARGET);
+    int32_t reflow_was_active = reach_stage_track_active(stage, REACH_STAGE_ANIMATION_REFLOW);
+    int32_t retarget_was_active = reach_stage_track_active(stage, REACH_STAGE_ANIMATION_RETARGET);
 
-    reach_animation_manager_sample_at(&stage->animations, reach_motion_now_seconds());
-    state->progress =
-        reach_animation_manager_value(&stage->animations, REACH_STAGE_ANIMATION_PROGRESS);
+    stage->sampled_seconds = reach_motion_now_seconds();
+    state->progress = reach_stage_track_value(stage, REACH_STAGE_ANIMATION_PROGRESS);
     state->desktop_progress =
-        reach_animation_manager_value(&stage->animations, REACH_STAGE_ANIMATION_DESKTOP_PROGRESS);
-    state->backdrop_opacity =
-        reach_animation_manager_value(&stage->animations, REACH_STAGE_ANIMATION_BACKDROP);
-    state->reflow = reach_animation_manager_value(&stage->animations, REACH_STAGE_ANIMATION_REFLOW);
-    state->departure_progress =
-        reach_animation_manager_value(&stage->animations, REACH_STAGE_ANIMATION_DEPARTURE);
-    state->retarget_progress =
-        reach_animation_manager_value(&stage->animations, REACH_STAGE_ANIMATION_RETARGET);
+        reach_stage_track_value(stage, REACH_STAGE_ANIMATION_DESKTOP_PROGRESS);
+    state->backdrop_opacity = reach_stage_track_value(stage, REACH_STAGE_ANIMATION_BACKDROP);
+    state->reflow = reach_stage_track_value(stage, REACH_STAGE_ANIMATION_REFLOW);
+    state->departure_progress = reach_stage_track_value(stage, REACH_STAGE_ANIMATION_DEPARTURE);
+    state->retarget_progress = reach_stage_track_value(stage, REACH_STAGE_ANIMATION_RETARGET);
 
     reach_stage_apply_progress(stage);
 
-    if (retarget_was_active &&
-        !reach_animation_manager_active(&stage->animations, REACH_STAGE_ANIMATION_RETARGET))
+    if (retarget_was_active && !reach_stage_track_active(stage, REACH_STAGE_ANIMATION_RETARGET))
     {
         for (size_t index = 0; index < state->tile_count; ++index)
         {
@@ -780,23 +768,21 @@ static void reach_stage_capsule_tick(void *capsule, double delta_seconds,
         }
     }
 
-    if (reflow_was_active &&
-        !reach_animation_manager_active(&stage->animations, REACH_STAGE_ANIMATION_REFLOW))
+    if (reflow_was_active && !reach_stage_track_active(stage, REACH_STAGE_ANIMATION_REFLOW))
     {
         reach_stage_settle_reflow(stage);
     }
 
     if (state->close_phase == REACH_STAGE_CLOSE_MOVING &&
-        !reach_animation_manager_active(&stage->animations, REACH_STAGE_ANIMATION_PROGRESS) &&
-        !reach_animation_manager_active(&stage->animations,
-                                        REACH_STAGE_ANIMATION_DESKTOP_PROGRESS) &&
-        !reach_animation_manager_active(&stage->animations, REACH_STAGE_ANIMATION_RETARGET))
+        !reach_stage_track_active(stage, REACH_STAGE_ANIMATION_PROGRESS) &&
+        !reach_stage_track_active(stage, REACH_STAGE_ANIMATION_DESKTOP_PROGRESS) &&
+        !reach_stage_track_active(stage, REACH_STAGE_ANIMATION_RETARGET))
     {
         state->close_phase = REACH_STAGE_CLOSE_ALIGNED;
         state->close_aligned_committed = 0;
     }
     if (state->close_phase == REACH_STAGE_CLOSE_REVEALING &&
-        !reach_animation_manager_active(&stage->animations, REACH_STAGE_ANIMATION_BACKDROP))
+        !reach_stage_track_active(stage, REACH_STAGE_ANIMATION_BACKDROP))
     {
         state->close_phase = REACH_STAGE_CLOSE_TRANSPARENT;
     }

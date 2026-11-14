@@ -5,7 +5,7 @@
 
 #include "reach/core/theme.h"
 #include "reach/features/common/pressable.h"
-#include "reach/support/animation.h"
+#include "reach/support/motion.h"
 
 #define REACH_STAGE_DESKTOP_ANIMATION_FACTOR 0.35
 
@@ -41,8 +41,8 @@ enum
 
 struct reach_stage
 {
-    reach_animation_manager animations;
-    reach_animation_track animation_tracks[REACH_STAGE_ANIMATION_COUNT];
+    reach_motion motions[REACH_STAGE_ANIMATION_COUNT];
+    double sampled_seconds;
     reach_stage_state state;
     reach_motion close_hover;
     reach_pressable pressable;
@@ -60,20 +60,33 @@ void reach_stage_rebuild_layout(reach_stage *stage);
 static inline void reach_stage_track_to(reach_stage *stage, size_t track, float target,
                                         reach_motion_spec spec)
 {
-    double now = reach_motion_now_seconds();
-    if (spec.easing == REACH_EASING_SPRING)
-        reach_animation_manager_spring_to_at(&stage->animations, track, target,
-                                             spec.response_seconds, spec.damping, now);
-    else
-        reach_animation_manager_animate_to_at(&stage->animations, track, target,
-                                              spec.duration_seconds, spec.easing, now);
+    reach_motion_animate_spec_to_at(&stage->motions[track], target, spec,
+                                    reach_motion_now_seconds());
 }
 
 static inline void reach_stage_track_start(reach_stage *stage, size_t track, float from, float to,
                                            reach_motion_spec spec)
 {
-    reach_animation_manager_set(&stage->animations, track, from);
+    reach_motion_set(&stage->motions[track], from);
     reach_stage_track_to(stage, track, to, spec);
+}
+
+static inline int32_t reach_stage_track_active(const reach_stage *stage, size_t track)
+{
+    return reach_motion_active_at(&stage->motions[track], stage->sampled_seconds);
+}
+
+static inline float reach_stage_track_value(const reach_stage *stage, size_t track)
+{
+    return reach_motion_value_at(&stage->motions[track], stage->sampled_seconds);
+}
+
+static inline int32_t reach_stage_tracks_active(const reach_stage *stage)
+{
+    for (size_t track = 0; track < REACH_STAGE_ANIMATION_COUNT; ++track)
+        if (reach_stage_track_active(stage, track))
+            return 1;
+    return 0;
 }
 void reach_stage_apply_progress(reach_stage *stage);
 void reach_stage_start_reflow(reach_stage *stage);
