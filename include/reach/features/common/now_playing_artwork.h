@@ -3,6 +3,8 @@
 
 #include "reach/core/render_commands.h"
 
+#define REACH_NOW_PLAYING_ARTWORK_BLUR 0.45f
+
 #ifdef __cplusplus
 extern "C"
 {
@@ -16,6 +18,7 @@ extern "C"
         reach_color base_background;
         reach_color overlay;
         float radius;
+        float blur;
         float cover_radius;
         float cover_fade_start;
         int32_t cover_corner_mask;

@@ -35,9 +35,9 @@ static void test_level_presentation(void)
                 "muted volume uses the muted glyph");
 
     uint16_t text[8] = {};
-    reach_level_format_percent(text, 8, 0.56f);
-    expect_true(reach_test_utf16_equals_ascii(text, "56%"),
-                "level percentages use a concise suffix");
+    reach_level_format_whole_percent(text, 8, 0.56f);
+    expect_true(reach_test_utf16_equals_ascii(text, "56"),
+                "level percentages render as whole numbers");
 }
 
 static void test_payloads_and_repeat_policy(void)

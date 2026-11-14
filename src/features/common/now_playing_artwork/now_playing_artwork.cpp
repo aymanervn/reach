@@ -1,7 +1,6 @@
 #include "reach/features/common/now_playing_artwork.h"
 
 static const float REACH_NOW_PLAYING_ARTWORK_BACKGROUND_SCALE = 1.5f;
-static const float REACH_NOW_PLAYING_ARTWORK_BLUR = 0.45f;
 static const float REACH_NOW_PLAYING_ARTWORK_CONTRAST = 1.20f;
 
 static reach_result reach_now_playing_artwork_push_rect(reach_render_command_buffer *commands,
@@ -43,7 +42,7 @@ reach_now_playing_artwork_build_render_commands(const reach_now_playing_artwork_
     blurred.icon_id = input->cover_image_id;
     blurred.icon_crop_to_fill = 1;
     blurred.radius = input->radius;
-    blurred.blur_radius = input->bounds.height * REACH_NOW_PLAYING_ARTWORK_BLUR;
+    blurred.blur_radius = input->bounds.height * input->blur;
     blurred.image_contrast = REACH_NOW_PLAYING_ARTWORK_CONTRAST;
     blurred.color.a = 1.0f;
     blurred.has_clip_rect = 1;

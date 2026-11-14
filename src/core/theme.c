@@ -108,7 +108,7 @@ static const reach_theme reach_theme_dark = {
     .system_hud_glyph = REACH_DARK_HIGH_CONTRAST_WHITE(1.0f),
     .system_hud_track = REACH_DARK_MIDTONE(1.0f),
     .system_hud_fill = REACH_DARK_HIGH_CONTRAST_WHITE(1.0f),
-    .system_hud_muted_fill = REACH_DARK_HIGH_CONTRAST_WHITE(0.42f),
+    .system_hud_muted_fill = REACH_DARK_HIGH_CONTRAST_WHITE(0.30f),
     .toggle_track_off = REACH_DARK_DEEP(1.0f),
     .toggle_knob = REACH_DARK_HIGH_CONTRAST_WHITE(1.0f),
 
@@ -256,7 +256,7 @@ static const reach_theme reach_theme_light = {
     .system_hud_glyph = REACH_LIGHT_HIGH_CONTRAST_BLACK(1.0f),
     .system_hud_track = REACH_LIGHT_MIDTONE(1.0f),
     .system_hud_fill = REACH_LIGHT_HIGH_CONTRAST_BLACK(1.0f),
-    .system_hud_muted_fill = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.42f),
+    .system_hud_muted_fill = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.30f),
     .toggle_track_off = REACH_LIGHT_MID_CONTRAST_GRAY(0.8f),
     .toggle_knob = REACH_LIGHT_BASE(1.0f),
 

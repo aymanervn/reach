@@ -276,6 +276,7 @@ reach_top_bar_now_playing_build_render_commands(const reach_top_bar_now_playing_
     artwork.base_background = theme->bar_button_background;
     artwork.overlay = theme->now_playing_background;
     artwork.radius = radius;
+    artwork.blur = REACH_NOW_PLAYING_ARTWORK_BLUR;
     artwork.cover_radius = radius;
     artwork.cover_fade_start = REACH_TOP_BAR_NOW_PLAYING_COVER_FADE_START;
     artwork.cover_corner_mask = REACH_RENDER_CORNER_TOP_LEFT | REACH_RENDER_CORNER_BOTTOM_LEFT;
