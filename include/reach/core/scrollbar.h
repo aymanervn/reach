@@ -4,26 +4,17 @@
 #include <stdint.h>
 
 #include "reach/core/geometry.h"
-#include "reach/support/motion.h"
 
 #ifdef __cplusplus
 extern "C"
 {
 #endif
 
-    typedef enum reach_scrollbar_drag_mode
-    {
-        REACH_SCROLLBAR_DRAG_FREE = 0,
-        REACH_SCROLLBAR_DRAG_STEPPED = 1
-    } reach_scrollbar_drag_mode;
-
     typedef struct reach_scrollbar_model
     {
-        float offset;
-        float target;
+        float position;
         float maximum;
         float step;
-        reach_scrollbar_drag_mode drag_mode;
     } reach_scrollbar_model;
 
     typedef struct reach_scrollbar_layout
@@ -38,17 +29,12 @@ extern "C"
         float grab_offset;
     } reach_scrollbar_drag;
 
-    void reach_scrollbar_model_init(reach_scrollbar_model *model,
-                                    reach_scrollbar_drag_mode drag_mode, float step);
+    void reach_scrollbar_model_init(reach_scrollbar_model *model, float step);
     void reach_scrollbar_set_extents(reach_scrollbar_model *model, float content_extent,
                                      float viewport_extent);
-    void reach_scrollbar_set_target(reach_scrollbar_model *model, float target);
-    void reach_scrollbar_scroll(reach_scrollbar_model *model, float delta);
-    int32_t reach_scrollbar_update(reach_scrollbar_model *model, double delta_seconds);
-    reach_result reach_scrollbar_motion_retarget(reach_motion *motion, float target,
-                                                 double now_seconds);
+    void reach_scrollbar_set_position(reach_scrollbar_model *model, float position);
     reach_scrollbar_layout reach_scrollbar_compute_layout(const reach_scrollbar_model *model,
-                                                          reach_rect_f32 track,
+                                                          reach_rect_f32 track, float position,
                                                           float viewport_extent,
                                                           float content_extent,
                                                           float minimum_thumb_extent);

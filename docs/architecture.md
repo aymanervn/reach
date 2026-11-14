@@ -444,6 +444,19 @@ and `_deadline` cover cleanup and presentation deadlines.
 motion for `SET`, retargeting only changed channels from value and velocity, and
 `reach_selection_pill_mode_for_distance` encodes the adjacent-step, otherwise-jump rule.
 
+Every scrollable surface uses one `reach/features/common/scroll_view.h` component. A surface
+configures its unit (pixels per position unit), snap step (`0` scrolls freely), wheel distance and
+minimum thumb, then publishes extents and its viewport/track frame. Wheel, scrollbar press, drag and
+release go through `reach_scroll_view_wheel` and `_pointer_down`/`_move`/`_up`; programmatic moves
+use `_set_position` or `_scroll_by` and `_sync` with `SET`, `GLIDE` (`smooth`) or `WHEEL` (the
+exponential-out wheel curve). The offset is one canonical `reach_motion`: retained surfaces consume
+`_push_viewport` (clipped viewport plus content group riding the offset) and
+`_push_scrollbar` with a group (fixed track, thumb riding an affine of the offset); CPU-drawn
+surfaces sample `_value_at` for content and pass no group so the thumb is drawn at the same sample,
+and drive frames with `_advance`, which settles the motion on its last frame. `core/scrollbar` holds
+only the pure position, clamping, snapping, thumb geometry and drag mapping. The Launcher steps by
+one row (unit = row pitch), Clipboard and Settings scroll by pixels.
+
 Canonical motion supports continuous piecewise affine mappings, preserving epoch, easing and
 generation. `reach_motion_hinge` constructs two slopes meeting at one center; `reach_motion_peak`
 uses that shape to brighten and dim a label. Constructors require ordinary input with compatible
@@ -1015,8 +1028,8 @@ position. Selection is one shared `features/common/selection_pill`: a one-row st
 larger jumps and result-set changes use `smooth`. The selected title crossfades through a retained
 tint, a hover tint and the shared press overlay sit in the same content frame, and the search glyph
 fades with the query. Event-time input samples the same height motion; unrevealed content cannot
-activate. Scroll motion is deliberately absent: scrolling stays stepped until the shared scroll
-component exists. The shared sampled fallback consumes the same command descriptors.
+activate. Scrolling goes through the shared scroll view with a one-row step. The shared sampled
+fallback consumes the same command descriptors.
 
 Text-dependent layout consumes `reach_text_measure_port`. The DirectWrite renderer supplies the
 implementation with the same font family, size, and weight used for drawing; features retain only

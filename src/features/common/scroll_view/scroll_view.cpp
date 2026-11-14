@@ -12,15 +12,14 @@ static int32_t reach_scroll_view_contains(reach_rect_f32 rect, float x, float y)
 
 static reach_scrollbar_layout reach_scroll_view_bar(const reach_scroll_view *view, float position)
 {
-    reach_scrollbar_model model = view->model;
-    model.offset = position;
-    return reach_scrollbar_compute_layout(&model, view->track, view->viewport_extent,
-                                          view->content_extent, view->config.minimum_thumb);
+    return reach_scrollbar_compute_layout(&view->model, view->track, position,
+                                          view->viewport_extent, view->content_extent,
+                                          view->config.minimum_thumb);
 }
 
 static reach_scrollbar_layout reach_scroll_view_resting_bar(const reach_scroll_view *view)
 {
-    return reach_scroll_view_bar(view, view->model.target);
+    return reach_scroll_view_bar(view, view->model.position);
 }
 
 static float reach_scroll_view_pixels(const reach_scroll_view *view, float position)
@@ -28,14 +27,22 @@ static float reach_scroll_view_pixels(const reach_scroll_view *view, float posit
     return view->config.unit > 0.0f ? position * view->config.unit : 0.0f;
 }
 
-static void reach_scroll_view_commit(reach_scroll_view *view)
+static reach_result reach_scroll_view_wheel_retarget(reach_motion *motion, float target,
+                                                     double now_seconds)
 {
-    view->model.offset = view->model.target;
-}
-
-static reach_scrollbar_drag_mode reach_scroll_view_drag_mode(float step)
-{
-    return step > 0.0f ? REACH_SCROLLBAR_DRAG_STEPPED : REACH_SCROLLBAR_DRAG_FREE;
+    float current = reach_motion_value_at(motion, now_seconds);
+    if (!isfinite(current))
+        return REACH_INVALID_ARGUMENT;
+    if (fabsf(target - current) <= .1f)
+    {
+        reach_motion_set(motion, target);
+        return REACH_OK;
+    }
+    reach_motion_start_at(motion, current, target, 12 / (-60 * log(.7)),
+                          REACH_EASING_EXPONENTIAL_OUT, now_seconds);
+    reach_motion_segment segments[REACH_MOTION_MAX_SEGMENTS] = {};
+    return reach_motion_compile_at(motion, now_seconds, segments) > 0 ? REACH_OK
+                                                                      : REACH_NOT_IMPLEMENTED;
 }
 
 void reach_scroll_view_init(reach_scroll_view *view, const reach_scroll_view_config *config)
@@ -45,8 +52,7 @@ void reach_scroll_view_init(reach_scroll_view *view, const reach_scroll_view_con
     reach_scroll_view_config settings = config != nullptr ? *config : reach_scroll_view_config{};
     *view = {};
     view->config = settings;
-    reach_scrollbar_model_init(&view->model, reach_scroll_view_drag_mode(settings.step),
-                               settings.step);
+    reach_scrollbar_model_init(&view->model, settings.step);
     reach_motion_set(&view->offset, 0.0f);
 }
 
@@ -57,9 +63,8 @@ void reach_scroll_view_configure(reach_scroll_view *view, const reach_scroll_vie
     int32_t unit_changed = view->config.unit != config->unit;
     view->config = *config;
     view->model.step = config->step;
-    view->model.drag_mode = reach_scroll_view_drag_mode(config->step);
     if (unit_changed)
-        reach_motion_set(&view->offset, reach_scroll_view_pixels(view, view->model.target));
+        reach_motion_set(&view->offset, reach_scroll_view_pixels(view, view->model.position));
 }
 
 void reach_scroll_view_set_extents(reach_scroll_view *view, float content_extent,
@@ -70,7 +75,6 @@ void reach_scroll_view_set_extents(reach_scroll_view *view, float content_extent
     view->content_extent = content_extent;
     view->viewport_extent = viewport_extent;
     reach_scrollbar_set_extents(&view->model, content_extent, viewport_extent);
-    reach_scroll_view_commit(view);
 }
 
 void reach_scroll_view_set_frame(reach_scroll_view *view, reach_rect_f32 viewport,
@@ -86,15 +90,14 @@ int32_t reach_scroll_view_set_position(reach_scroll_view *view, float position)
 {
     if (view == nullptr || !isfinite(position))
         return 0;
-    float previous = view->model.target;
-    reach_scrollbar_set_target(&view->model, position);
-    reach_scroll_view_commit(view);
-    return view->model.target != previous;
+    float previous = view->model.position;
+    reach_scrollbar_set_position(&view->model, position);
+    return view->model.position != previous;
 }
 
 float reach_scroll_view_position(const reach_scroll_view *view)
 {
-    return view != nullptr ? view->model.target : 0.0f;
+    return view != nullptr ? view->model.position : 0.0f;
 }
 
 float reach_scroll_view_maximum(const reach_scroll_view *view)
@@ -110,7 +113,7 @@ int32_t reach_scroll_view_sync(reach_scroll_view *view, const reach_theme *theme
                  mode == REACH_SCROLL_VIEW_WHEEL);
     if (view == nullptr)
         return 0;
-    float target = reach_scroll_view_pixels(view, view->model.target);
+    float target = reach_scroll_view_pixels(view, view->model.position);
     REACH_ASSERT(isfinite(target) && target >= 0.0f);
     if (!isfinite(target))
         return 0;
@@ -127,7 +130,7 @@ int32_t reach_scroll_view_sync(reach_scroll_view *view, const reach_theme *theme
         return 0;
     if (mode == REACH_SCROLL_VIEW_WHEEL)
     {
-        if (reach_scrollbar_motion_retarget(&view->offset, target, now_seconds) != REACH_OK)
+        if (reach_scroll_view_wheel_retarget(&view->offset, target, now_seconds) != REACH_OK)
             reach_motion_set(&view->offset, target);
         return 1;
     }
@@ -141,7 +144,7 @@ int32_t reach_scroll_view_scroll_by(reach_scroll_view *view, float delta, double
 {
     if (view == nullptr || !isfinite(delta))
         return 0;
-    int32_t changed = reach_scroll_view_set_position(view, view->model.target + delta);
+    int32_t changed = reach_scroll_view_set_position(view, view->model.position + delta);
     (void)reach_scroll_view_sync(view, nullptr, REACH_SCROLL_VIEW_WHEEL, now_seconds);
     return changed;
 }
@@ -174,13 +177,12 @@ uint32_t reach_scroll_view_pointer_down(reach_scroll_view *view, float x, float 
     int32_t hit = reach_scroll_view_hit(view, x, y);
     if (hit == 0)
         return 0;
-    float previous = view->model.target;
+    float previous = view->model.position;
     reach_scrollbar_layout bar = reach_scroll_view_resting_bar(view);
     reach_scrollbar_begin_drag(&view->model, &view->drag, &bar, y, hit == 2);
-    reach_scroll_view_commit(view);
     (void)reach_scroll_view_sync(view, nullptr, REACH_SCROLL_VIEW_SET, now_seconds);
     uint32_t flags = REACH_SCROLL_VIEW_HANDLED | REACH_SCROLL_VIEW_CAPTURE;
-    if (view->model.target != previous)
+    if (view->model.position != previous)
         flags |= REACH_SCROLL_VIEW_CHANGED;
     return flags;
 }
@@ -189,13 +191,12 @@ uint32_t reach_scroll_view_pointer_move(reach_scroll_view *view, float y, double
 {
     if (view == nullptr || !view->drag.active)
         return 0;
-    float previous = view->model.target;
+    float previous = view->model.position;
     reach_scrollbar_layout bar = reach_scroll_view_resting_bar(view);
     reach_scrollbar_update_drag(&view->model, &view->drag, &bar, y);
-    reach_scroll_view_commit(view);
     (void)reach_scroll_view_sync(view, nullptr, REACH_SCROLL_VIEW_SET, now_seconds);
     uint32_t flags = REACH_SCROLL_VIEW_HANDLED;
-    if (view->model.target != previous)
+    if (view->model.position != previous)
         flags |= REACH_SCROLL_VIEW_CHANGED;
     return flags;
 }
@@ -311,7 +312,7 @@ reach_rect_f32 reach_scroll_view_thumb_at(const reach_scroll_view *view, double 
 {
     if (!reach_scroll_view_has_scrollbar(view))
         return reach_rect_f32{};
-    float position = view->model.target;
+    float position = view->model.position;
     if (view->config.unit > 0.0f)
         position = reach_scroll_view_value_at(view, now_seconds) / view->config.unit;
     return reach_scroll_view_bar(view, position).thumb;
