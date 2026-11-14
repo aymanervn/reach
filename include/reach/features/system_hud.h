@@ -33,7 +33,9 @@ extern "C"
         reach_rect_f32 track;
         reach_rect_f32 fill;
         reach_rect_f32 media_cover;
-        reach_rect_f32 media_action;
+        reach_rect_f32 media_previous;
+        reach_rect_f32 media_play;
+        reach_rect_f32 media_next;
     } reach_system_hud_layout;
 
     typedef struct reach_system_hud_state

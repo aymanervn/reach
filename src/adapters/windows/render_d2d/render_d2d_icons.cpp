@@ -895,6 +895,10 @@ reach_result reach_d2d_draw_blurred_image(reach_render_backend *backend,
             hr = blur->SetValue(D2D1_GAUSSIANBLUR_PROP_OPTIMIZATION,
                                 D2D1_GAUSSIANBLUR_OPTIMIZATION_SPEED);
         }
+        if (SUCCEEDED(hr))
+        {
+            hr = blur->SetValue(D2D1_GAUSSIANBLUR_PROP_BORDER_MODE, D2D1_BORDER_MODE_HARD);
+        }
 
         if (SUCCEEDED(hr))
         {

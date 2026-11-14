@@ -28,7 +28,7 @@ reach_vector_icon_id reach_wifi_signal_icon(int32_t signal_strength)
     return signal_strength < 67 ? REACH_VECTOR_ICON_WIFI_MEDIUM : REACH_VECTOR_ICON_WIFI_HIGH;
 }
 
-void reach_level_format_percent(uint16_t *dst, size_t dst_count, float level)
+void reach_level_format_whole_percent(uint16_t *dst, size_t dst_count, float level)
 {
     if (dst == nullptr || dst_count == 0)
     {
@@ -49,13 +49,9 @@ void reach_level_format_percent(uint16_t *dst, size_t dst_count, float level)
     }
 
     size_t length = 0;
-    while (digit_count > 0 && length + 2 < dst_count)
+    while (digit_count > 0 && length + 1 < dst_count)
     {
         dst[length++] = digits[--digit_count];
-    }
-    if (length + 1 < dst_count)
-    {
-        dst[length++] = '%';
     }
     dst[length] = 0;
 }

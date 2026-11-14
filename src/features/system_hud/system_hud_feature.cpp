@@ -8,7 +8,7 @@
 static const double REACH_SYSTEM_HUD_LIFETIME_SECONDS = 1.5;
 static const double REACH_SYSTEM_HUD_APP_REMOVED_LIFETIME_SECONDS =
     REACH_SYSTEM_HUD_LIFETIME_SECONDS * 2.0;
-static const float REACH_SYSTEM_HUD_MEDIA_COVER_WIDTH = 100.0f;
+static const float REACH_SYSTEM_HUD_MEDIA_COVER_SIZE = 48.0f;
 static const size_t REACH_SYSTEM_HUD_APP_NAME_MAX_CHARACTERS = 8;
 
 static double reach_system_hud_lifetime(const reach_system_hud *hud);
@@ -271,11 +271,9 @@ int32_t reach_system_hud_arrange(reach_system_hud *hud, const reach_system_hud_a
 
     float scale = ctx->dpi_scale > 0.0f ? ctx->dpi_scale : 1.0f;
     float base_width = hud->state.kind == REACH_SYSTEM_HUD_MEDIA
-                           ? 340.0f
-                           : (hud->state.kind == REACH_SYSTEM_HUD_APP_REMOVED ? 560.0f : 272.0f);
-    float base_height = hud->state.kind == REACH_SYSTEM_HUD_MEDIA
-                            ? 84.0f
-                            : (hud->state.kind == REACH_SYSTEM_HUD_APP_REMOVED ? 48.0f : 76.0f);
+                           ? 352.0f
+                           : (hud->state.kind == REACH_SYSTEM_HUD_APP_REMOVED ? 560.0f : 248.0f);
+    float base_height = hud->state.kind == REACH_SYSTEM_HUD_MEDIA ? 64.0f : 48.0f;
     float base_border = reach_theme_border_thickness(ctx->theme, 1.0f);
     float width_scale = ctx->monitor_bounds.width / (base_width + 48.0f + base_border * 2.0f);
     float height_scale = ctx->monitor_bounds.height / (base_height + 48.0f + base_border * 2.0f);
@@ -312,40 +310,49 @@ int32_t reach_system_hud_arrange(reach_system_hud *hud, const reach_system_hud_a
         next.bounds.y = maximum_y;
     }
 
-    float padding = 14.0f * scale + border;
-    float icon_size = (hud->state.kind == REACH_SYSTEM_HUD_MEDIA ? 56.0f : 40.0f) * scale;
-    float icon_y = border + (inner_height - icon_size) * 0.5f;
-    next.icon = {padding, icon_y, icon_size, icon_size};
-    next.media_cover = {border, border, REACH_SYSTEM_HUD_MEDIA_COVER_WIDTH * scale, inner_height};
-
-    reach_rect_f32 leading_visual =
-        hud->state.kind == REACH_SYSTEM_HUD_MEDIA ? next.media_cover : next.icon;
-    float content_x = leading_visual.x + leading_visual.width + 14.0f * scale;
-    float trailing = 18.0f * scale + border;
-    float content_width = width - content_x - trailing;
+    float center_y = border + inner_height * 0.5f;
+    float leading = border + 8.0f * scale;
 
     if (hud->state.kind == REACH_SYSTEM_HUD_MEDIA)
     {
-        float action_size = 28.0f * scale;
-        next.media_action = {width - trailing - action_size,
-                             border + (inner_height - action_size) * 0.5f, action_size,
-                             action_size};
-        content_width = next.media_action.x - content_x - 12.0f * scale;
-        next.title = {content_x, border + 18.0f * scale, content_width, 22.0f * scale};
-        next.subtitle = {content_x, next.title.y + 24.0f * scale, content_width, 18.0f * scale};
+        float cover_size = REACH_SYSTEM_HUD_MEDIA_COVER_SIZE * scale;
+        next.media_cover = {leading, center_y - cover_size * 0.5f, cover_size, cover_size};
+        float primary_size = 36.0f * scale;
+        float secondary_size = 32.0f * scale;
+        float button_gap = 2.0f * scale;
+        float right = width - border - 10.0f * scale;
+        next.media_next = {right - secondary_size, center_y - secondary_size * 0.5f, secondary_size,
+                           secondary_size};
+        next.media_play = {next.media_next.x - button_gap - primary_size,
+                           center_y - primary_size * 0.5f, primary_size, primary_size};
+        next.media_previous = {next.media_play.x - button_gap - secondary_size,
+                               center_y - secondary_size * 0.5f, secondary_size, secondary_size};
+        float content_x = next.media_cover.x + cover_size + 12.0f * scale;
+        float content_width = next.media_previous.x - content_x - 8.0f * scale;
+        float title_height = 18.0f * scale;
+        float subtitle_height = 15.0f * scale;
+        float text_top = center_y - (title_height + 2.0f * scale + subtitle_height) * 0.5f;
+        next.title = {content_x, text_top, content_width, title_height};
+        next.subtitle = {content_x, text_top + title_height + 2.0f * scale, content_width,
+                         subtitle_height};
     }
     else if (hud->state.kind == REACH_SYSTEM_HUD_APP_REMOVED)
     {
-        next.title = {padding, border + (inner_height - 20.0f * scale) * 0.5f,
-                      width - padding * 2.0f, 20.0f * scale};
+        float padding = 14.0f * scale + border;
+        next.title = {padding, center_y - 10.0f * scale, width - padding * 2.0f, 20.0f * scale};
     }
     else
     {
-        next.title = {content_x, border + 13.0f * scale, content_width - 54.0f * scale,
-                      20.0f * scale};
-        next.value = {content_x + content_width - 54.0f * scale, next.title.y, 54.0f * scale,
-                      next.title.height};
-        next.track = {content_x, border + 48.0f * scale, content_width, 6.0f * scale};
+        float icon_size = 32.0f * scale;
+        next.icon = {leading, center_y - icon_size * 0.5f, icon_size, icon_size};
+        float value_width = 40.0f * scale;
+        float value_height = 20.0f * scale;
+        next.value = {width - border - 16.0f * scale - value_width, center_y - value_height * 0.5f,
+                      value_width, value_height};
+        float track_x = next.icon.x + icon_size + 12.0f * scale;
+        float track_height = 8.0f * scale;
+        next.track = {track_x, center_y - track_height * 0.5f,
+                      next.value.x - 12.0f * scale - track_x, track_height};
         float level = hud->state.kind == REACH_SYSTEM_HUD_VOLUME ? hud->state.volume.level
                                                                  : hud->state.brightness.level;
         level = reach_level_clamp01(level);
