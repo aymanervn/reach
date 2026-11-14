@@ -174,10 +174,6 @@ static const reach_theme reach_theme_dark = {
     .context_menu_hover_background = REACH_DARK_STRUCTURE(1.0f),
     .context_menu_close_background = REACH_CRITICAL_RED(1.0f),
     .context_menu_close_glyph = REACH_PURE_WHITE(1.0f),
-    .menu_accent_shutdown = REACH_DARK_ACCENT_RED(1.0f),
-    .menu_accent_sleep = REACH_DARK_ACCENT_LAVENDER(1.0f),
-    .menu_accent_restart = REACH_DARK_ACCENT_GREEN(1.0f),
-    .menu_accent_lock = REACH_DARK_ACCENT_YELLOW(1.0f),
 
     .stage_backdrop = REACH_DARK_DEEP(REACH_THEME_STAGE_BACKDROP_ALPHA),
     .stage_tile_placeholder = REACH_DARK_RAISED(1.0f),
@@ -326,10 +322,6 @@ static const reach_theme reach_theme_light = {
     .context_menu_hover_background = REACH_LIGHT_MIDTONE(1.0f),
     .context_menu_close_background = REACH_CRITICAL_RED(1.0f),
     .context_menu_close_glyph = REACH_PURE_WHITE(1.0f),
-    .menu_accent_shutdown = REACH_LIGHT_ACCENT_RED(1.0f),
-    .menu_accent_sleep = REACH_LIGHT_ACCENT_LAVENDER(1.0f),
-    .menu_accent_restart = REACH_LIGHT_ACCENT_GREEN(1.0f),
-    .menu_accent_lock = REACH_LIGHT_ACCENT_YELLOW(1.0f),
 
     .stage_backdrop = REACH_LIGHT_BASE(REACH_THEME_STAGE_BACKDROP_ALPHA),
     .stage_tile_placeholder = REACH_LIGHT_RAISED(1.0f),

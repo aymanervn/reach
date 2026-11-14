@@ -181,6 +181,55 @@ static reach_result reach_app_launcher_launch(reach_app_launcher *launcher,
                                       launch_directory, out_failure);
 }
 
+static reach_result reach_app_launcher_resolve_system_tool(reach_app_launcher *launcher,
+                                                           reach_system_tool tool,
+                                                           reach_app_launch_request *out_request)
+{
+    (void)launcher;
+    if (out_request == nullptr)
+        return REACH_INVALID_ARGUMENT;
+    const wchar_t *program = nullptr;
+    const wchar_t *arguments = L"";
+    switch (tool)
+    {
+    case REACH_SYSTEM_TOOL_SYSTEM_INFORMATION:
+        program = L"msinfo32.exe";
+        break;
+    case REACH_SYSTEM_TOOL_TASK_MANAGER:
+        program = L"taskmgr.exe";
+        break;
+    case REACH_SYSTEM_TOOL_DEVICE_MANAGER:
+        program = L"mmc.exe";
+        arguments = L"devmgmt.msc";
+        break;
+    case REACH_SYSTEM_TOOL_CONTROL_PANEL:
+        program = L"control.exe";
+        break;
+    case REACH_SYSTEM_TOOL_ENVIRONMENT_VARIABLES:
+        program = L"rundll32.exe";
+        arguments = L"sysdm.cpl,EditEnvironmentVariables";
+        break;
+    case REACH_SYSTEM_TOOL_SERVICES:
+        program = L"mmc.exe";
+        arguments = L"services.msc";
+        break;
+    default:
+        return REACH_INVALID_ARGUMENT;
+    }
+    wchar_t system_directory[MAX_PATH] = {};
+    UINT length = GetSystemDirectoryW(system_directory, MAX_PATH);
+    if (length == 0 || length >= MAX_PATH)
+        return REACH_ERROR;
+    wchar_t path[MAX_PATH] = {};
+    if (!PathCombineW(path, system_directory, program))
+        return REACH_ERROR;
+    *out_request = {};
+    out_request->launch_kind = REACH_APPLICATION_LAUNCH_EXECUTABLE;
+    lstrcpynW(reinterpret_cast<wchar_t *>(out_request->path), path, 260);
+    lstrcpynW(reinterpret_cast<wchar_t *>(out_request->arguments), arguments, 260);
+    return REACH_OK;
+}
+
 static reach_result reach_terminal_build_windows_terminal_arguments(const uint16_t *command,
                                                                     const wchar_t *home_directory,
                                                                     const wchar_t *default_profile,
@@ -507,6 +556,7 @@ reach_result reach_windows_create_app_launcher(reach_app_launcher_port *out_port
 
     out_port->launcher = launcher;
     out_port->ops.launch = reach_app_launcher_launch;
+    out_port->ops.resolve_system_tool = reach_app_launcher_resolve_system_tool;
     out_port->ops.destroy = reach_app_launcher_destroy;
     return REACH_OK;
 }

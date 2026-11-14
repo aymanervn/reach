@@ -35,18 +35,20 @@ static void test_power_commands_and_text(void)
     size_t count = 0;
     reach_context_menu_build_power_commands(commands, icons, &count);
 
-    expect_true(count == 5, "power menu exposes five commands");
-    expect_true(commands[0] == REACH_CONTEXT_MENU_COMMAND_POWER_LOCK, "lock is first command");
-    expect_true(commands[3] == REACH_CONTEXT_MENU_COMMAND_POWER_SHUTDOWN,
-                "shutdown command is fourth");
-    expect_true(commands[4] == REACH_CONTEXT_MENU_COMMAND_POWER_SIGN_OUT,
+    expect_true(count == 12, "power menu exposes twelve commands");
+    expect_true(commands[0] == REACH_CONTEXT_MENU_COMMAND_SYSTEM_INFORMATION,
+                "system information is first command");
+    expect_true(commands[9] == REACH_CONTEXT_MENU_COMMAND_POWER_SHUTDOWN,
+                "shutdown command is tenth");
+    expect_true(commands[11] == REACH_CONTEXT_MENU_COMMAND_POWER_SIGN_OUT,
                 "sign out is the last command");
-    expect_true(icons[0] == REACH_VECTOR_ICON_LOCK, "lock command has lock icon");
-    expect_true(icons[4] == REACH_VECTOR_ICON_SIGN_OUT, "sign out command has sign out icon");
-    expect_true(reach_test_utf16_equals_ascii(reach_context_menu_command_text(commands[0]), "Lock"),
-                "lock command text is stable");
+    expect_true(icons[0] == REACH_VECTOR_ICON_INFO, "system information has info icon");
+    expect_true(icons[11] == REACH_VECTOR_ICON_SIGN_OUT, "sign out command has sign out icon");
+    expect_true(reach_test_utf16_equals_ascii(reach_context_menu_command_text(commands[0]),
+                                              "System Information"),
+                "system information text is stable");
     expect_true(
-        reach_test_utf16_equals_ascii(reach_context_menu_command_text(commands[4]), "Sign out"),
+        reach_test_utf16_equals_ascii(reach_context_menu_command_text(commands[11]), "Sign out"),
         "sign out command text is stable");
     expect_true(reach_test_utf16_equals_ascii(reach_context_menu_command_text(0), ""),
                 "unknown command text is empty");

@@ -501,7 +501,7 @@ void reach_host_arm_focus_restore(reach_host *host, reach_surface_id id);
 void reach_host_cancel_focus_restore(reach_host *host, reach_surface_id id);
 void reach_host_flush_focus_restore(reach_host *host, reach_surface_id id);
 void reach_host_toggle_registered_surface(reach_host *host, reach_surface_id id);
-reach_result reach_host_execute_power_command(reach_host *host, uint32_t command);
+reach_result reach_host_execute_menu_command(reach_host *host, uint32_t command);
 void reach_host_post_feature_work_ready(reach_host *host);
 void reach_host_notify_windows_changed(reach_host *host);
 void reach_host_notify_display_changed(reach_host *host);

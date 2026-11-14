@@ -92,6 +92,18 @@ static int reach_d2d_vector_icon_resource(uint64_t icon_id)
         return 241;
     case REACH_VECTOR_ICON_QUESTION:
         return 242;
+    case REACH_VECTOR_ICON_INFO:
+        return 243;
+    case REACH_VECTOR_ICON_ACTIVITY:
+        return 244;
+    case REACH_VECTOR_ICON_CHIP:
+        return 245;
+    case REACH_VECTOR_ICON_SLIDERS:
+        return 246;
+    case REACH_VECTOR_ICON_BRACES:
+        return 247;
+    case REACH_VECTOR_ICON_LAYERS:
+        return 248;
     default:
         return 0;
     }
