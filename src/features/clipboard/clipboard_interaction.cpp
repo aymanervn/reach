@@ -53,12 +53,12 @@ void reach_clipboard_pointer_down(reach_clipboard_feature *clipboard, int32_t x,
 
     reach_clipboard_hit_result hit = reach_clipboard_hit_test(&state->model, &layout, x, y);
 
-    if (hit.type == REACH_CLIPBOARD_HIT_SCROLLBAR_THUMB ||
-        hit.type == REACH_CLIPBOARD_HIT_SCROLLBAR_TRACK)
+    if (hit.type == REACH_CLIPBOARD_HIT_SCROLLBAR)
     {
-        reach_scrollbar_begin_drag(&state->model.scrollbar, &state->scrollbar_drag,
-                                   &layout.scrollbar, (float)y,
-                                   hit.type == REACH_CLIPBOARD_HIT_SCROLLBAR_THUMB);
+        float track_x = (float)x - layout.scrollbar_track.x + state->layout.scrollbar_track.x;
+        if (reach_scroll_view_pointer_down(&state->model.scroll, track_x, (float)y,
+                                           reach_motion_now_seconds()) == 0)
+            return;
         out->handled = 1;
         out->capture_pointer = 1;
         out->redraw = 1;
@@ -151,12 +151,11 @@ void reach_clipboard_scrollbar_release(reach_clipboard_feature *clipboard,
 
     reach_clipboard_state *state = reach_clipboard_feature_state_mut(clipboard);
 
-    if (!state->scrollbar_drag.active)
+    if ((reach_scroll_view_pointer_up(&state->model.scroll) & REACH_SCROLL_VIEW_RELEASE) == 0)
     {
         return;
     }
 
-    reach_scrollbar_end_drag(&state->scrollbar_drag);
     out->handled = 1;
     out->capture_pointer = -1;
 }
@@ -170,15 +169,13 @@ void reach_clipboard_scrollbar_drag_move(reach_clipboard_feature *clipboard, int
     }
 
     reach_clipboard_state *state = reach_clipboard_feature_state_mut(clipboard);
-    auto layout = reach_clipboard_feature_input_layout(clipboard, reach_motion_now_seconds());
 
-    if (!state->scrollbar_drag.active)
+    if (reach_scroll_view_pointer_move(&state->model.scroll, (float)y,
+                                       reach_motion_now_seconds()) == 0)
     {
         return;
     }
 
-    reach_scrollbar_update_drag(&state->model.scrollbar, &state->scrollbar_drag, &layout.scrollbar,
-                                (float)y);
     state->model.hovered_index = REACH_CLIPBOARD_MAX_ITEMS;
     out->handled = 1;
     out->redraw = 1;
@@ -241,7 +238,8 @@ void reach_clipboard_wheel(reach_clipboard_feature *clipboard, int32_t x, int32_
         return;
     }
 
-    reach_scrollbar_scroll(&state->model.scrollbar, wheel_delta > 0 ? -72.0f : 72.0f);
+    (void)reach_scroll_view_wheel(&state->model.scroll, (float)x, (float)y, wheel_delta,
+                                  reach_motion_now_seconds());
     state->model.hovered_index = REACH_CLIPBOARD_MAX_ITEMS;
     reach_clipboard_feature_collapse_all_hover(clipboard);
     out->handled = 1;
@@ -291,6 +289,7 @@ void reach_clipboard_confirm_restore(reach_clipboard_feature *clipboard, size_t 
 
     reach_clipboard_state *state = reach_clipboard_feature_state_mut(clipboard);
     (void)reach_clipboard_model_promote(&state->model, index);
-    state->model.scrollbar.offset = 0.0f;
-    state->model.scrollbar.target = 0.0f;
+    (void)reach_scroll_view_set_position(&state->model.scroll, 0.0f);
+    (void)reach_scroll_view_sync(&state->model.scroll, nullptr, REACH_SCROLL_VIEW_SET,
+                                 reach_motion_now_seconds());
 }

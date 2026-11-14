@@ -30,6 +30,14 @@ static size_t reach_clipboard_find_duplicate(const reach_clipboard_model *model,
     return REACH_CLIPBOARD_MAX_ITEMS;
 }
 
+static void reach_clipboard_model_reset_scroll(reach_clipboard_model *model)
+{
+    reach_scroll_view_config scroll = {};
+    scroll.unit = 1.0f;
+    scroll.wheel_delta = 72.0f;
+    reach_scroll_view_init(&model->scroll, &scroll);
+}
+
 void reach_clipboard_model_init(reach_clipboard_model *model)
 {
     if (model == nullptr)
@@ -39,7 +47,7 @@ void reach_clipboard_model_init(reach_clipboard_model *model)
 
     *model = {};
     model->hovered_index = REACH_CLIPBOARD_MAX_ITEMS;
-    reach_scrollbar_model_init(&model->scrollbar, REACH_SCROLLBAR_DRAG_FREE, 0.0f);
+    reach_clipboard_model_reset_scroll(model);
 }
 
 void reach_clipboard_model_clear_items(reach_clipboard_model *model)
@@ -57,7 +65,7 @@ void reach_clipboard_model_clear_items(reach_clipboard_model *model)
     model->count = 0;
     model->open = was_open;
     model->hovered_index = REACH_CLIPBOARD_MAX_ITEMS;
-    reach_scrollbar_model_init(&model->scrollbar, REACH_SCROLLBAR_DRAG_FREE, 0.0f);
+    reach_clipboard_model_reset_scroll(model);
 }
 
 int32_t reach_clipboard_model_promote(reach_clipboard_model *model, size_t index)
