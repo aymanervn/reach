@@ -368,8 +368,11 @@ void reach_top_bar_layout_tray_popup(reach_top_bar *top_bar, const reach_theme *
     size_t rows = (visual_count + columns - 1) / columns;
     float content_width = padding * 2.0f + (float)columns * slot_size + (float)(columns - 1) * gap;
     float content_height = padding * 2.0f + (float)rows * slot_size + (float)(rows - 1) * gap;
+    reach_popup_anchor dropdown = *anchor;
+    dropdown.bar_offset = reach_popup_hidden_notch_bar_offset_scaled(scale);
+    dropdown.has_bar_offset = 1;
     popup->placement = reach_popup_place(
-        anchor, ceilf(content_width + border_thickness * 2.0f),
+        &dropdown, ceilf(content_width + border_thickness * 2.0f),
         ceilf(content_height + notch_height + border_thickness * 2.0f), 8.0f * scale);
 
     reach_rect_f32 bounds = popup->placement.bounds;

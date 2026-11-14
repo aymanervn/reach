@@ -298,6 +298,8 @@ static void reach_context_menu_place(reach_context_menu_state *state,
         anchor.monitor = ctx->monitor;
         anchor.bar_edge_y = ctx->bar_edge_y;
         anchor.direction = ctx->drop_direction;
+        anchor.bar_offset = reach_popup_hidden_notch_bar_offset_scaled(scale);
+        anchor.has_bar_offset = state->power_open;
 
         reach_popup_placement placement =
             reach_popup_place(&anchor, popup_width, popup_height, margin);
