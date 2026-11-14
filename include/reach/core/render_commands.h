@@ -12,7 +12,7 @@ extern "C"
 #endif
 
 #define REACH_MAX_RENDER_COMMANDS 2048
-#define REACH_MAX_RENDER_GROUPS (REACH_MAX_DOCK_ITEMS + 32)
+#define REACH_MAX_RENDER_GROUPS (REACH_MAX_DOCK_ITEMS + 128)
 
     typedef enum reach_render_clip_edge
     {
