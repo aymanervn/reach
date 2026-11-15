@@ -199,6 +199,11 @@ static const reach_theme reach_theme_dark = {
     .clipboard_scrollbar_track = REACH_DARK_STRUCTURE(1.0f),
     .clipboard_scrollbar_thumb = REACH_DARK_MID_CONTRAST_GRAY(1.0f),
 
+    .screenshot_scrim = REACH_RGB8(0, 0, 0, 0.45f),
+    .screenshot_selection_border = REACH_PURE_WHITE(1.0f),
+    .screenshot_label_background = REACH_DARK_DEEP(0.92f),
+    .screenshot_label_text = REACH_DARK_HIGH_CONTRAST_WHITE(1.0f),
+
     .settings_background = REACH_DARK_DEEP(1.0f),
     .settings_nav_background = REACH_DARK_BASE(1.0f),
     .settings_text = REACH_DARK_HIGH_CONTRAST_WHITE(1.0f),
@@ -346,6 +351,11 @@ static const reach_theme reach_theme_light = {
     .clipboard_item_hover_border = REACH_LIGHT_MID_CONTRAST_GRAY(0.30f),
     .clipboard_scrollbar_track = REACH_LIGHT_MIDTONE(1.0f),
     .clipboard_scrollbar_thumb = REACH_LIGHT_MID_CONTRAST_GRAY(1.0f),
+
+    .screenshot_scrim = REACH_RGB8(0, 0, 0, 0.45f),
+    .screenshot_selection_border = REACH_PURE_WHITE(1.0f),
+    .screenshot_label_background = REACH_LIGHT_BASE(0.92f),
+    .screenshot_label_text = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.90f),
 
     .settings_background = REACH_LIGHT_RAISED(1.0f),
     .settings_nav_background = REACH_LIGHT_BASE(1.0f),

@@ -9,6 +9,7 @@
 #include "reach/ports/clock.h"
 #include "reach/ports/config_store.h"
 #include "reach/ports/image_loader.h"
+#include "reach/ports/screen_capture.h"
 #include "reach/ports/screen_hotspot.h"
 #include "reach/ports/foreground_watcher.h"
 #include "reach/ports/explorer_service.h"
@@ -124,6 +125,7 @@ extern "C"
     reach_result
     reach_windows_create_screen_hotspot_factory(reach_screen_hotspot_factory_port *out_port);
     reach_result reach_windows_create_image_loader(reach_image_loader_port *out_port);
+    reach_result reach_windows_create_screen_capture(reach_screen_capture_port *out_port);
     reach_result reach_windows_create_input_language(reach_input_language_port *out_port);
     reach_result reach_windows_create_system_stats(reach_system_stats_port *out_port);
     reach_result reach_windows_create_clock(reach_clock_port *out_port);

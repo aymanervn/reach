@@ -33,6 +33,7 @@
 #include "reach/ports/screen_hotspot.h"
 #include "reach/ports/foreground_watcher.h"
 #include "reach/ports/clipboard.h"
+#include "reach/ports/screen_capture.h"
 #include "reach/support/util.h"
 
 #ifdef __cplusplus
@@ -74,6 +75,8 @@ extern "C"
         reach_render_backend_port system_hud_renderer;
         reach_platform_window_port clipboard_window;
         reach_render_backend_port clipboard_renderer;
+        reach_platform_window_port screenshot_window;
+        reach_render_backend_port screenshot_renderer;
         reach_input_source_port input_source;
         reach_clock_port clock;
         reach_input_language_port input_language;
@@ -98,6 +101,7 @@ extern "C"
         reach_system_controls_port system_controls;
         reach_media_controls_port media_controls;
         reach_clipboard_port clipboard;
+        reach_screen_capture_port screen_capture;
     } reach_host_dependencies;
 
     reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,

@@ -208,6 +208,17 @@ static void reach_system_hud_render_app_removed(const reach_system_hud_state *st
                                REACH_TEXT_ALIGNMENT_CENTER, ctx->theme->system_hud_primary_text);
 }
 
+static void reach_system_hud_render_screenshot_copied(const reach_system_hud_state *state,
+                                                      const reach_system_hud_render_context *ctx,
+                                                      reach_render_command_buffer *commands)
+{
+    static const uint16_t message[] = {'S', 'c', 'r', 'e', 'e', 'n', 's', 'h', 'o',
+                                       't', ' ', 'c', 'o', 'p', 'i', 'e', 'd', 0};
+    reach_system_hud_push_text(commands, state->layout.title, message,
+                               REACH_TEXT_SIZE_MEDIUM * ctx->dpi_scale, REACH_TEXT_WEIGHT_NORMAL,
+                               REACH_TEXT_ALIGNMENT_CENTER, ctx->theme->system_hud_primary_text);
+}
+
 reach_result reach_system_hud_append_render_commands(const reach_system_hud *hud,
                                                      const reach_system_hud_render_context *ctx,
                                                      reach_render_command_buffer *out_commands)
@@ -271,6 +282,10 @@ reach_result reach_system_hud_append_render_commands(const reach_system_hud *hud
     else if (state->kind == REACH_SYSTEM_HUD_APP_REMOVED)
     {
         reach_system_hud_render_app_removed(state, render_ctx, out_commands);
+    }
+    else if (state->kind == REACH_SYSTEM_HUD_SCREENSHOT_COPIED)
+    {
+        reach_system_hud_render_screenshot_copied(state, render_ctx, out_commands);
     }
     else
     {

@@ -192,6 +192,8 @@ add_library(reach_features STATIC
     src/features/stage/stage_render.cpp
     src/features/system_hud/system_hud_feature.cpp
     src/features/system_hud/system_hud_render.cpp
+    src/features/screenshot/screenshot_feature.cpp
+    src/features/screenshot/screenshot_render.cpp
     src/features/top_bar/top_bar_feature.cpp
     src/features/top_bar/top_bar_now_playing.cpp
     src/features/top_bar/top_bar_window_push.cpp
@@ -277,6 +279,7 @@ add_library(reach_windows_adapters STATIC
     src/adapters/windows/clock_win32.cpp
     src/adapters/windows/system_stats_win32.cpp
     src/adapters/windows/image_loader_win32.cpp
+    src/adapters/windows/screen_capture_win32.cpp
     src/adapters/windows/screen_hotspot_win32.cpp
     src/adapters/windows/window_thumbnail_dwm.cpp
     src/adapters/windows/foreground_watcher_win32.cpp

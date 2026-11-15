@@ -106,7 +106,7 @@ seeding, and the ports that control the desktop wallpaper and its Reach-owned pr
 ## features
 
 Self-contained UI capsules — dock, launcher, switcher, quick settings, clipboard,
-settings, context menu. Each owns its state, layout, animation,
+settings, context menu, screenshot. Each owns its state, layout, animation,
 hit-testing, render composition, and interaction behind
 create/update/handle_event/append_render_commands entry points, and returns semantic
 actions instead of calling ports. Includes `services`, `ports`, `protocol`, `core` —
@@ -1468,7 +1468,17 @@ applied monitor work area, so a static reservation remains stable across game fo
 `reachctl` uses the same port when installation repairs monitor work areas. Monitor selection is not
 configuration here: the reservation follows the monitor in the current layout context.
 Clipboard declares Launcher as its anchor and likewise owns relayout, presentation, geometry,
-and command production. There is no named frame fallback: every registered surface runs the
+and command production.
+Screenshot is an overlay-class, activating, exclusive surface opened by the Win+Shift+S chord. Inside
+`set_open`, before its window is shown (`refresh_world_on_open` publishes current monitor bounds
+first), it freezes every monitor through `reach_screen_capture_port` and presents the monitor under
+the cursor that the chord event carries. While open and not dragging it holds pointer capture, so
+moves on other monitors arrive event-driven and the surface moves to the monitor under the pointer;
+a drag stays on its monitor. It draws the frozen frame through the ordinary image-id `ICON` command
+and writes the selected region through the clipboard port's `set_image`. Captured images are
+registered render resources, released after their render cache entries. A successful copy reaches
+System HUD only through its `copied` route.
+There is no named frame fallback: every registered surface runs the
 same frame function, and the architecture checker requires one runtime binding and one
 `surface_ops` contract for every registered id.
 Surfaces that take OS activation declare `BEHAVIOR_ACTIVATES`; the class rules then

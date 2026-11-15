@@ -356,7 +356,7 @@ PUBLIC_INNER_FORBIDDEN_INCLUDE_PATTERNS = [
 
 REGISTERED_FEATURE_LIFECYCLE_RE = re.compile(
     r"\breach_(dock|top_bar|launcher|clipboard_feature|quick_settings|battery|"
-    r"system_hud|context_menu|switcher|stage)_(create|destroy)\s*\("
+    r"system_hud|context_menu|switcher|stage|screenshot)_(create|destroy)\s*\("
 )
 
 INTERFEATURE_ROUTES_SEAM = "src/composition/interfeature_routes.cpp"
@@ -388,7 +388,7 @@ SURFACE_TABLE_LOOP_RE = re.compile(
 
 MIGRATED_SURFACE_FRAME_RE = re.compile(
     r"\breach_host_(frame|render)_(dock|top_bar|launcher|context_menu|stage|"
-    r"system_hud|switcher|clipboard)(?:_surface)?\b"
+    r"system_hud|switcher|clipboard|screenshot)(?:_surface)?\b"
 )
 
 FEATURE_REGISTRY_SEAM = "src/composition/feature_registry.cpp"
@@ -417,11 +417,12 @@ REGISTERED_SURFACE_IDS = (
     "REACH_SURFACE_ID_CONTEXT_MENU",
     "REACH_SURFACE_ID_SWITCHER",
     "REACH_SURFACE_ID_STAGE",
+    "REACH_SURFACE_ID_SCREENSHOT",
 )
 
 REGISTERED_CAPSULE_OPS_RE = re.compile(
     r"\breach_(dock|top_bar|launcher|clipboard_feature|quick_settings|battery|"
-    r"system_hud|context_menu|switcher|stage)_(?:tray_)?capsule_ops\s*\("
+    r"system_hud|context_menu|switcher|stage|screenshot)_(?:tray_)?capsule_ops\s*\("
 )
 
 LEGACY_FEATURE_RUNTIME_RE = re.compile(
@@ -436,7 +437,7 @@ FEATURE_RUNTIME_STRUCT_RE = re.compile(
 
 TYPED_CAPSULE_ALIAS_RE = re.compile(
     r"\b(dock|top_bar|launcher|clipboard|quick_settings|battery|system_hud|"
-    r"context_menu|switcher|stage)_capsule\s*;"
+    r"context_menu|switcher|stage|screenshot)_capsule\s*;"
 )
 
 IMMUTABLE_RUNTIME_FIELDS = (

@@ -209,15 +209,7 @@ static uint64_t reach_helper_hotkey_bit(uint32_t key)
 
 static int32_t reach_helper_is_owned_win_chord_key(uint32_t key)
 {
-    for (size_t index = 0; index < REACH_SERVICE_WIN_CHORD_COUNT; ++index)
-    {
-        if (REACH_SERVICE_WIN_CHORDS[index].hotkey == key)
-        {
-            return 1;
-        }
-    }
-
-    return 0;
+    return reach_service_find_win_chord(key, reach_helper_hotkey_modifiers()) != nullptr;
 }
 
 static int32_t reach_helper_captured_win_chord_key_down(uint32_t key)
@@ -370,12 +362,12 @@ reach_helper_handle_windows_key(const reach_helper_key_event *event)
 static reach_helper_key_decision
 reach_helper_handle_owned_win_chord(const reach_helper_key_event *event)
 {
-    if (!reach_helper_is_owned_win_chord_key(event->key))
+    const int32_t captured = reach_helper_captured_win_chord_key_down(event->key);
+    if (!captured && !reach_helper_is_owned_win_chord_key(event->key))
     {
         return REACH_HELPER_KEY_CONTINUE;
     }
 
-    const int32_t captured = reach_helper_captured_win_chord_key_down(event->key);
     if (!reach_helper_windows_key_down() && !captured)
     {
         return REACH_HELPER_KEY_CONTINUE;

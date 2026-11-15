@@ -3,6 +3,8 @@
 #include "reach/features/battery.h"
 #include "reach/features/context_menu.h"
 #include "reach/features/dock.h"
+#include "reach/features/screenshot.h"
+#include "reach/features/system_hud.h"
 #include "reach/features/top_bar.h"
 
 static reach_rect_f32 reach_host_menu_monitor(reach_host *host, reach_rect_f32 fallback)
@@ -322,6 +324,27 @@ static void reach_host_route_battery_saver_pending_changed(void *user, int32_t p
     host->dirty.render = 1;
 }
 
+static void reach_host_route_screenshot_copied(void *user)
+{
+    reach_host *host = static_cast<reach_host *>(user);
+    if (host == nullptr)
+    {
+        return;
+    }
+    reach_feature_runtime *runtime = &host->feature_runtimes[REACH_SURFACE_ID_SYSTEM_HUD];
+    int32_t was_open = reach_host_surface_is_open(runtime);
+    reach_system_hud_show_screenshot_copied(static_cast<reach_system_hud *>(runtime->capsule));
+    if (!was_open && reach_host_surface_is_open(runtime))
+    {
+        reach_host_apply_surface_open_change(host, runtime, 1);
+    }
+    reach_feature_tick_result result = {};
+    result.redraw = 1;
+    result.relayout = 1;
+    result.request_update = 1;
+    reach_host_apply_feature_tick_result(host, runtime, &result);
+}
+
 void reach_host_bind_interfeature_routes(reach_host *host)
 {
     if (host == nullptr)
@@ -355,6 +378,13 @@ void reach_host_bind_interfeature_routes(reach_host *host)
     battery.saver_pending_changed = reach_host_route_battery_saver_pending_changed;
     reach_battery_set_routes(
         reach_host_feature_capsule<reach_battery>(host, REACH_SURFACE_ID_BATTERY), &battery);
+
+    reach_screenshot_routes screenshot = {};
+    screenshot.user = host;
+    screenshot.copied = reach_host_route_screenshot_copied;
+    reach_screenshot_set_routes(
+        reach_host_feature_capsule<reach_screenshot>(host, REACH_SURFACE_ID_SCREENSHOT),
+        &screenshot);
 }
 
 void reach_host_clear_interfeature_routes(reach_host *host)
@@ -369,5 +399,8 @@ void reach_host_clear_interfeature_routes(reach_host *host)
             reach_host_feature_capsule<reach_top_bar>(host, REACH_SURFACE_ID_TOP_BAR), nullptr);
         reach_battery_set_routes(
             reach_host_feature_capsule<reach_battery>(host, REACH_SURFACE_ID_BATTERY), nullptr);
+        reach_screenshot_set_routes(
+            reach_host_feature_capsule<reach_screenshot>(host, REACH_SURFACE_ID_SCREENSHOT),
+            nullptr);
     }
 }
