@@ -185,17 +185,17 @@ static reach_result reach_config_store_load(reach_config_store *store,
             ? REACH_CONFIG_DOCK_SIZE_MIN
             : (dock_size > REACH_CONFIG_DOCK_SIZE_MAX ? REACH_CONFIG_DOCK_SIZE_MAX : dock_size);
     int32_t top_bar_style = (int32_t)GetPrivateProfileIntW(L"top_bar", L"style",
-                                                           REACH_CONFIG_TOP_BAR_STYLE_SPLIT, path);
+                                                           REACH_CONFIG_TOP_BAR_STYLE_SIMPLE, path);
     out_snapshot->top_bar_style = top_bar_style >= REACH_CONFIG_TOP_BAR_STYLE_SPLIT &&
                                           top_bar_style <= REACH_CONFIG_TOP_BAR_STYLE_SIMPLE
                                       ? (reach_config_top_bar_style)top_bar_style
-                                      : REACH_CONFIG_TOP_BAR_STYLE_SPLIT;
-    int32_t top_bar_mode = (int32_t)GetPrivateProfileIntW(L"top_bar", L"mode",
-                                                          REACH_CONFIG_TOP_BAR_MODE_DYNAMIC, path);
+                                      : REACH_CONFIG_TOP_BAR_STYLE_SIMPLE;
+    int32_t top_bar_mode =
+        (int32_t)GetPrivateProfileIntW(L"top_bar", L"mode", REACH_CONFIG_TOP_BAR_MODE_STATIC, path);
     out_snapshot->top_bar_mode = top_bar_mode >= REACH_CONFIG_TOP_BAR_MODE_DYNAMIC &&
                                          top_bar_mode <= REACH_CONFIG_TOP_BAR_MODE_STATIC
                                      ? (reach_config_top_bar_mode)top_bar_mode
-                                     : REACH_CONFIG_TOP_BAR_MODE_DYNAMIC;
+                                     : REACH_CONFIG_TOP_BAR_MODE_STATIC;
     int32_t top_bar_scrim_length = (int32_t)GetPrivateProfileIntW(
         L"top_bar", L"scrim_length", REACH_CONFIG_TOP_BAR_SCRIM_STANDARD, path);
     out_snapshot->top_bar_scrim_length =
@@ -204,7 +204,7 @@ static reach_result reach_config_store_load(reach_config_store *store,
             ? (reach_config_top_bar_scrim_length)top_bar_scrim_length
             : REACH_CONFIG_TOP_BAR_SCRIM_STANDARD;
     out_snapshot->top_bar_icon_only =
-        (int32_t)GetPrivateProfileIntW(L"top_bar", L"icon_only", 0, path) != 0;
+        (int32_t)GetPrivateProfileIntW(L"top_bar", L"icon_only", 1, path) != 0;
     out_snapshot->power_screen_off_minutes =
         (int32_t)GetPrivateProfileIntW(L"power", L"screen_off_minutes", 10, path);
     out_snapshot->power_sleep_minutes =

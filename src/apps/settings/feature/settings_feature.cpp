@@ -74,9 +74,10 @@ void reach_settings_model_init(reach_settings_model *model)
     model->account_focused_field = -1;
     model->hovered_button = REACH_SETTINGS_HIT_NONE;
     reach_motion_set(&model->theme_reach_selection, 0);
-    reach_motion_set(&model->top_bar_style_selection, 0);
+    reach_settings_model_set_top_bar_style(model, REACH_CONFIG_TOP_BAR_STYLE_SIMPLE);
     reach_settings_model_set_top_bar_scrim_length(model, REACH_CONFIG_TOP_BAR_SCRIM_STANDARD);
-    reach_motion_set(&model->top_bar_mode_toggle, 1.0f);
+    reach_settings_model_set_top_bar_mode(model, REACH_CONFIG_TOP_BAR_MODE_STATIC);
+    reach_settings_model_set_top_bar_icon_only(model, 1);
     model->dock_size = REACH_CONFIG_DOCK_SIZE_MAX;
     reach_motion_set(&model->button_press_feedback, 0.0f);
     reach_pressable_init(&model->button_pressable);

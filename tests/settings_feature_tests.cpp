@@ -611,12 +611,13 @@ static void test_top_bar_preferences(void)
     std::unique_ptr<reach_settings_model> model(new reach_settings_model());
     reach_settings_model_init(model.get());
 
-    expect_true(reach_settings_model_top_bar_style(model.get()) == REACH_CONFIG_TOP_BAR_STYLE_SPLIT,
-                "top bar defaults to split style");
-    expect_true(reach_settings_model_top_bar_mode(model.get()) == REACH_CONFIG_TOP_BAR_MODE_DYNAMIC,
-                "top bar defaults to dynamic mode");
-    expect_true(reach_motion_value(&model->top_bar_mode_toggle) == 1.0f,
-                "dynamic mode presents auto hide as enabled");
+    expect_true(reach_settings_model_top_bar_style(model.get()) ==
+                    REACH_CONFIG_TOP_BAR_STYLE_SIMPLE,
+                "top bar defaults to simple style");
+    expect_true(reach_settings_model_top_bar_mode(model.get()) == REACH_CONFIG_TOP_BAR_MODE_STATIC,
+                "top bar defaults to static mode");
+    expect_true(reach_motion_value(&model->top_bar_mode_toggle) == 0.0f,
+                "static mode presents auto hide as disabled");
 
     expect_true(
         reach_settings_model_select_top_bar_style(model.get(), REACH_CONFIG_TOP_BAR_STYLE_UNIFIED),
@@ -635,10 +636,10 @@ static void test_top_bar_preferences(void)
         !reach_settings_model_select_top_bar_style(model.get(), (reach_config_top_bar_style)99),
         "top bar style rejects invalid selections");
     expect_true(reach_settings_model_toggle_top_bar_mode(model.get()), "top bar mode can toggle");
-    expect_true(reach_settings_model_top_bar_mode(model.get()) == REACH_CONFIG_TOP_BAR_MODE_STATIC,
-                "top bar mode toggles to static");
-    expect_true(model->top_bar_mode_toggle.to == 0.0f,
-                "static mode presents auto hide as disabled");
+    expect_true(reach_settings_model_top_bar_mode(model.get()) == REACH_CONFIG_TOP_BAR_MODE_DYNAMIC,
+                "top bar mode toggles to dynamic");
+    expect_true(model->top_bar_mode_toggle.to == 1.0f,
+                "dynamic mode presents auto hide as enabled");
     expect_true(reach_motion_active(&model->top_bar_style_selection),
                 "top bar preference changes animate their toggles");
 }
