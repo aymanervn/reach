@@ -310,19 +310,11 @@ size_t reach_stage_tile_generation(const reach_stage *stage)
     return stage != nullptr ? stage->state.tile_generation : 0;
 }
 
-static reach_rect_f32 reach_stage_minimized_close_destination(const reach_stage_state *state,
-                                                              reach_rect_f32 rect)
-{
-    rect.x = state->bounds.x - rect.width;
-    rect.y = state->bounds.y - rect.height;
-    return rect;
-}
-
 static reach_rect_f32 reach_stage_close_destination(const reach_stage_state *state,
                                                     const reach_stage_tile *tile,
                                                     reach_rect_f32 minimized_rect)
 {
-    return tile->minimized ? reach_stage_minimized_close_destination(state, minimized_rect)
+    return tile->minimized ? reach_stage_minimized_offscreen_rect(state, minimized_rect)
                            : tile->source_rect;
 }
 
@@ -452,7 +444,7 @@ static int32_t reach_stage_update_closing_windows(reach_stage *stage,
         if (tile->minimized)
         {
             destination = minimized_changed
-                              ? reach_stage_minimized_close_destination(state, tile->current_rect)
+                              ? reach_stage_minimized_offscreen_rect(state, tile->current_rect)
                               : tile->close_destination_rect;
         }
         if (!reach_rect_equal(tile->close_destination_rect, destination))

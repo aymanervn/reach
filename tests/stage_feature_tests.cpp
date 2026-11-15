@@ -760,10 +760,11 @@ static void test_minimized_close_exits_top_left_without_expanding(void)
     reach_stage_open_window app = make_window(1, make_rect(0, 0, 1920, 1040));
     app.minimized = 1;
     reach_stage_open(stage, bounds, 1, &app, 1);
-    expect_near(reach_stage_state_ptr(stage)->tiles[0].current_rect.width, app.frame.width,
-                "a minimized window keeps its opening source width");
-    expect_near(reach_stage_state_ptr(stage)->tiles[0].current_rect.height, app.frame.height,
-                "a minimized window keeps its opening source height");
+    reach_rect_f32 opening = reach_stage_state_ptr(stage)->tiles[0].current_rect;
+    expect_true(opening.x + opening.width <= bounds.x,
+                "a minimized window opens from beyond the left edge");
+    expect_true(opening.y + opening.height <= bounds.y,
+                "a minimized window opens from beyond the top edge");
     advance_stage(stage, 30, 0.016);
 
     reach_rect_f32 settled = reach_stage_state_ptr(stage)->tiles[0].current_rect;
