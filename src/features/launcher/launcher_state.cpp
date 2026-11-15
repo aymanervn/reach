@@ -8,6 +8,8 @@
 #include "reach/features/common/presentation.h"
 
 static constexpr float reach_launcher_presentation_outer_scale = 1.06f;
+static constexpr size_t reach_launcher_row_overscan = 1;
+static constexpr size_t reach_launcher_row_window = REACH_LAUNCHER_ROW_CAPACITY - 4;
 #include "reach/core/blink.h"
 #include "reach/support/util.h"
 
@@ -187,7 +189,7 @@ static reach_rect_f32 reach_launcher_selection_rect(const reach_launcher *launch
     return rect;
 }
 
-static void reach_launcher_sync_rows(reach_launcher *launcher)
+static void reach_launcher_sync_rows(reach_launcher *launcher, int32_t refill = 0)
 {
     if (launcher == nullptr || !launcher->pointer_layout_valid || launcher->row_pitch <= 0.0f)
         return;
@@ -204,7 +206,7 @@ static void reach_launcher_sync_rows(reach_launcher *launcher)
     int32_t pitch_changed = launcher->synced_pitch != launcher->row_pitch;
     int32_t scroll_changed = launcher->synced_scroll != start;
     int32_t selected_changed = launcher->synced_selected != model.selected_result_index;
-    if (!results_changed && !pitch_changed && !scroll_changed && !selected_changed)
+    if (!results_changed && !pitch_changed && !scroll_changed && !selected_changed && !refill)
         return;
     double now = reach_motion_now_seconds();
     int32_t animated = !pitch_changed && reach_launcher_results_animated(launcher);
@@ -218,10 +220,11 @@ static void reach_launcher_sync_rows(reach_launcher *launcher)
         scroll_mode = REACH_SCROLL_VIEW_WHEEL;
     (void)reach_scroll_view_sync(&launcher->state.scroll, &launcher->theme, scroll_mode, now);
     reach_scroll_view_window window = reach_scroll_view_item_window(
-        &launcher->state.scroll, launcher->row_pitch, model.result_count, count, 1,
-        REACH_LAUNCHER_ROW_CAPACITY - 4);
+        &launcher->state.scroll, launcher->row_pitch, model.result_count, count,
+        reach_launcher_row_overscan, reach_launcher_row_window);
     size_t first = window.first;
-    if (results_changed || pitch_changed || scroll_changed || first != launcher->synced_first)
+    if (results_changed || pitch_changed || scroll_changed || refill ||
+        first != launcher->synced_first)
     {
         count = window.count;
         float targets[REACH_LAUNCHER_ROW_CAPACITY] = {};
@@ -400,6 +403,8 @@ int32_t reach_launcher_arrange(reach_launcher *launcher, const reach_launcher_ar
     reach_scroll_view_config scroll = launcher->state.scroll.config;
     scroll.unit = launcher->row_pitch;
     scroll.minimum_thumb = 22.0f * scale;
+    scroll.max_travel = (float)(reach_launcher_row_window - reach_launcher_row_overscan * 2 - 1 -
+                                reach_launcher_visible_result_count(&launcher->state.model));
     reach_scroll_view_configure(&launcher->state.scroll, &scroll);
     reach_scroll_view_set_extents(
         &launcher->state.scroll, (float)launcher->state.model.result_count,
@@ -1179,8 +1184,10 @@ static void reach_launcher_capsule_tick(void *capsule, double, reach_feature_tic
             reach_motion_set(&launcher->results_opacity, launcher->results_opacity.to);
             reach_scroll_view_settle(&launcher->state.scroll);
             reach_keyed_row_change released[REACH_LAUNCHER_ROW_CAPACITY];
-            (void)reach_keyed_rows_release_settled(launcher->rows, REACH_LAUNCHER_ROW_CAPACITY,
-                                                   released, REACH_LAUNCHER_ROW_CAPACITY);
+            if (reach_keyed_rows_release_settled(launcher->rows, REACH_LAUNCHER_ROW_CAPACITY,
+                                                 released, REACH_LAUNCHER_ROW_CAPACITY) > 0 &&
+                launcher->synced_revision == launcher->results_revision)
+                reach_launcher_sync_rows(launcher, 1);
             if (launcher->state.model.result_count == 0 && !reach_launcher_rows_held(launcher))
                 launcher->selection_valid = 0;
             reach_launcher_refresh_results_deadline(launcher);

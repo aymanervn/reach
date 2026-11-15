@@ -22,7 +22,7 @@ extern "C"
 {
 #endif
 
-#define REACH_LAUNCHER_ROW_CAPACITY 16
+#define REACH_LAUNCHER_ROW_CAPACITY 32
 
     typedef struct reach_launcher_state reach_launcher_state;
 
