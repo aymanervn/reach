@@ -1082,6 +1082,7 @@ static int32_t reach_context_menu_surface_arrange(void *capsule,
     arrange.bar_edge_y = ctx->anchor_bar_edge_y;
     arrange.drop_direction = ctx->anchor_direction;
     arrange.anchored = 1;
+    arrange.text_measure = ctx->text_measure;
     return reach_context_menu_reanchor(menu, &arrange);
 }
 
