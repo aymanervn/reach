@@ -303,6 +303,8 @@ static reach_render_command reach_popup_shape(const reach_popup_background_input
         shape.notch_width = 0;
         shape.notch_height = 0;
     }
+    shape.radius =
+        fminf(shape.radius, fminf(shape.rect.width, shape.rect.height - shape.notch_height) * .5f);
     return shape;
 }
 
