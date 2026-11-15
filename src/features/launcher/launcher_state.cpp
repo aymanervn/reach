@@ -29,7 +29,6 @@ struct reach_launcher
     reach_motion hover_opacity;
     size_t hover_index;
     int32_t hover_valid;
-    reach_motion search_icon_opacity;
     uint32_t results_revision;
     uint32_t synced_revision;
     size_t synced_scroll;
@@ -99,12 +98,6 @@ static int32_t reach_launcher_fade_to(reach_launcher *launcher, reach_motion *mo
                                         visible ? launcher->fade_in_spec : launcher->fade_out_spec,
                                         reach_motion_now_seconds());
     return 1;
-}
-
-static void reach_launcher_sync_search_icon(reach_launcher *launcher)
-{
-    (void)reach_launcher_fade_to(launcher, &launcher->search_icon_opacity,
-                                 launcher->state.model.query[0] == 0);
 }
 
 static int32_t reach_launcher_set_hover(reach_launcher *launcher, size_t index, int32_t hovered)
@@ -303,7 +296,6 @@ void reach_launcher_fill_row_render_input(const reach_launcher *launcher,
     input->hover_index = launcher->hover_index;
     input->has_hover =
         launcher->hover_valid && launcher->hover_index < launcher->state.model.result_count;
-    input->search_icon_opacity = launcher->search_icon_opacity;
 }
 
 static void reach_launcher_sync_results_opacity(reach_launcher *launcher, int32_t was_attached)
@@ -413,7 +405,6 @@ int32_t reach_launcher_arrange(reach_launcher *launcher, const reach_launcher_ar
                                 layout.search_result_scrollbar_track);
     reach_launcher_sync_body_height(launcher, layout.bounds.height, animate);
     reach_launcher_sync_rows(launcher);
-    reach_launcher_sync_search_icon(launcher);
     return changed;
 }
 
@@ -867,7 +858,6 @@ void reach_launcher_surface_hidden(reach_launcher *launcher)
     launcher->selection_valid = 0;
     launcher->hover_valid = 0;
     reach_motion_set(&launcher->hover_opacity, 0);
-    reach_motion_set(&launcher->search_icon_opacity, 1);
     launcher->synced_pitch = 0.0f;
     launcher->results_deadline = 0;
 }

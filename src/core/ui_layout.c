@@ -115,17 +115,17 @@ reach_result reach_launcher_layout_compute(const reach_launcher_model *launcher,
     float search_icon_size = reach_scale(20.0f, scale);
     out_layout->search_icon.width = search_icon_size;
     out_layout->search_icon.height = search_icon_size;
-    out_layout->search_icon.x = out_layout->search_box.x + border_thickness + search_content_width -
-                                search_text_padding_x - search_icon_size;
+    out_layout->search_icon.x = out_layout->search_box.x + border_thickness + search_text_padding_x;
     out_layout->search_icon.y = out_layout->search_box.y + border_thickness +
                                 (search_content_height - search_icon_size) * 0.5f +
                                 reach_scale(1.0f, scale);
     out_layout->search_text_input.x =
-        out_layout->search_box.x + border_thickness + search_text_padding_x;
+        out_layout->search_icon.x + search_icon_size + reach_scale(4.0f, scale);
     out_layout->search_text_input.y =
         out_layout->search_box.y + border_thickness + search_text_padding_y;
-    out_layout->search_text_input.width =
-        out_layout->search_icon.x - search_text_padding_x - out_layout->search_text_input.x;
+    out_layout->search_text_input.width = out_layout->search_box.x + border_thickness +
+                                          search_content_width - search_text_padding_x -
+                                          out_layout->search_text_input.x;
     if (out_layout->search_text_input.width < 0.0f)
     {
         out_layout->search_text_input.width = 0.0f;

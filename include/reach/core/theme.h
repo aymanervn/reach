@@ -136,7 +136,6 @@ extern "C"
         reach_color launcher_search_text;
         reach_color launcher_placeholder_text;
         reach_color launcher_selection_highlight;
-        reach_color launcher_search_icon;
         reach_color launcher_border;
         reach_color launcher_scrollbar_track;
         reach_color launcher_scrollbar_thumb;
