@@ -148,7 +148,7 @@ reach_result reach_context_menu_render_previews(reach_context_menu *menu,
         text.type = REACH_RENDER_COMMAND_TEXT;
         text.rect = {0, 0, ceilf(layout.label_width) + 1, layout.label_height};
         text.color = theme->context_menu_text;
-        text.text_size = REACH_TEXT_SIZE_SMALL * scale;
+        text.text_size = REACH_TEXT_SIZE_XSMALL * scale;
         text.text_weight = REACH_TEXT_WEIGHT_NORMAL;
         text.text_alignment = REACH_TEXT_ALIGNMENT_CENTER;
         text.text_ellipsis = 1;
@@ -276,7 +276,7 @@ reach_result reach_context_menu_render_previews(reach_context_menu *menu,
             text.type = REACH_RENDER_COMMAND_TEXT;
             text.rect = {8 * card_scale, 0, title_maximum, header};
             text.color = theme->context_menu_text;
-            text.text_size = REACH_TEXT_SIZE_SMALL * card_scale;
+            text.text_size = REACH_TEXT_SIZE_XSMALL * card_scale;
             text.text_weight = REACH_TEXT_WEIGHT_NORMAL;
             text.text_alignment = REACH_TEXT_ALIGNMENT_LEADING;
             text.text_ellipsis = 1;
