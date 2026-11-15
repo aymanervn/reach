@@ -41,7 +41,8 @@ extern "C"
         uintptr_t excluded_window;
         float reveal_span_inset;
         reach_motion_spec reveal;
-        float shadow_clearance;
+        float protected_clearance;
+        float hidden_clearance;
     } reach_bar_visibility_request;
 
     typedef struct reach_bar_visibility_result
@@ -79,12 +80,13 @@ extern "C"
     void reach_bar_begin_reveal_session(reach_bar_visibility_state *state);
 
     float reach_bar_hidden_position(reach_bar_edge edge, reach_rect_f32 shown_bounds,
-                                    reach_rect_f32 monitor_bounds, float shadow_clearance);
+                                    reach_rect_f32 monitor_bounds, float hidden_clearance);
     float reach_bar_reveal_progress(float animated_y, float shown_y, float hidden_y);
     float reach_bar_reserved_edge(reach_bar_edge edge, reach_rect_f32 shown_bounds,
                                   float clearance);
     reach_rect_f32 reach_bar_protected_band(reach_bar_edge edge, reach_rect_f32 shown_bounds,
-                                            reach_rect_f32 monitor_bounds, float shadow_clearance);
+                                            reach_rect_f32 monitor_bounds,
+                                            float protected_clearance);
 
     reach_bar_visibility_result
     reach_bar_update_visibility(reach_bar_visibility_state *state, reach_motion *y,

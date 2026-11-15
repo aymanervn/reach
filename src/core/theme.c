@@ -1,5 +1,7 @@
 #include "reach/core/theme.h"
 
+#include <math.h>
+
 #define REACH_RGB8(r, g, b, a) {(r) / 255.0f, (g) / 255.0f, (b) / 255.0f, (a)}
 
 #define REACH_THEME_STAGE_BACKDROP_ALPHA 1.0f
@@ -479,6 +481,31 @@ float reach_theme_shadow_extent(const reach_shadow *shadow, float dpi_scale)
     float scale = dpi_scale > 0.0f ? dpi_scale : 1.0f;
     float sigma = (shadow != 0 ? shadow->blur : 0.0f) * scale * 0.5f;
     return sigma * 3.0f;
+}
+
+float reach_theme_shadow_visible_extent(const reach_shadow *shadow, float dpi_scale)
+{
+    float extent = reach_theme_shadow_extent(shadow, dpi_scale);
+    if (shadow == 0 || extent <= 0.0f || shadow->color.a * 0.5f <= 1.0f / 255.0f)
+    {
+        return 0.0f;
+    }
+    float spread = extent / 3.0f * 1.41421356f;
+    float visible = 0.0f;
+    float hidden = extent;
+    for (int32_t step = 0; step < 24; ++step)
+    {
+        float distance = (visible + hidden) * 0.5f;
+        if (shadow->color.a * 0.5f * erfcf(distance / spread) > 1.0f / 255.0f)
+        {
+            visible = distance;
+        }
+        else
+        {
+            hidden = distance;
+        }
+    }
+    return hidden;
 }
 
 reach_shadow_pad reach_theme_shadow_pad(const reach_shadow *shadow, float dpi_scale)

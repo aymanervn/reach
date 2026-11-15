@@ -1,5 +1,7 @@
 #include "host_internal.h"
 
+#include <math.h>
+
 static int32_t reach_host_bar_forced_shown(const reach_host *host)
 {
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
@@ -91,13 +93,11 @@ float reach_host_bar_protected_clearance(const reach_host *host,
     {
         return 0.0f;
     }
+    float scale = reach_host_layout_dpi_scale(host);
     float configured = runtime->definition->surface.bar_reveal.protected_clearance_dp;
-    if (configured > 0.0f)
-    {
-        return configured * reach_host_layout_dpi_scale(host);
-    }
-    return reach_theme_shadow_extent(reach_host_surface_shadow(host, runtime->definition->id),
-                                     reach_host_layout_dpi_scale(host));
+    return configured > 0.0f ? configured * scale
+                             : reach_theme_shadow_visible_extent(
+                                   reach_host_surface_shadow(host, runtime->definition->id), scale);
 }
 
 static void reach_host_sync_pointer_move_enabled(reach_platform_window_port *window,
@@ -259,7 +259,11 @@ reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surfa
         host->theme != nullptr ? host->theme : reach_theme_default(), REACH_MOTION_PRESET_SMOOTH);
     request.reveal_span_inset = desc->definition->surface.bar_reveal.span_start_inset_dp *
                                 reach_host_layout_dpi_scale(host);
-    request.shadow_clearance = reach_host_bar_protected_clearance(host, desc);
+    request.protected_clearance = reach_host_bar_protected_clearance(host, desc);
+    request.hidden_clearance =
+        fmaxf(request.protected_clearance,
+              reach_theme_shadow_extent(reach_host_surface_shadow(host, desc->definition->id),
+                                        reach_host_layout_dpi_scale(host)));
 
     reach_bar_visibility_result result =
         desc->definition->surface.bar_reveal.ops->update_visibility(desc->capsule, &request);

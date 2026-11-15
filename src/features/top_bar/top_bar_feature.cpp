@@ -1163,7 +1163,8 @@ void reach_top_bar_invalidate_occlusion(reach_top_bar *top_bar)
 static int32_t reach_top_bar_windows_trespassing(reach_top_bar *top_bar,
                                                  reach_rect_f32 shown_bounds,
                                                  reach_rect_f32 monitor_bounds,
-                                                 float shadow_clearance, uintptr_t excluded_window)
+                                                 float protected_clearance,
+                                                 uintptr_t excluded_window)
 {
     if (top_bar == nullptr)
     {
@@ -1173,15 +1174,15 @@ static int32_t reach_top_bar_windows_trespassing(reach_top_bar *top_bar,
     if (!top_bar->occlusion_valid ||
         !reach_top_bar_rect_equal(top_bar->occlusion_shown_bounds, shown_bounds) ||
         !reach_top_bar_rect_equal(top_bar->occlusion_monitor_bounds, monitor_bounds) ||
-        fabsf(top_bar->occlusion_shadow_clearance - shadow_clearance) >= 0.5f)
+        fabsf(top_bar->occlusion_protected_clearance - protected_clearance) >= 0.5f)
     {
-        reach_rect_f32 protected_band = reach_bar_protected_band(REACH_TOP_BAR_EDGE, shown_bounds,
-                                                                 monitor_bounds, shadow_clearance);
+        reach_rect_f32 protected_band = reach_bar_protected_band(
+            REACH_TOP_BAR_EDGE, shown_bounds, monitor_bounds, protected_clearance);
         top_bar->occlusion_occluded = reach_top_bar_window_push_any_trespassing(
             top_bar->window_push, monitor_bounds, protected_band, excluded_window);
         top_bar->occlusion_shown_bounds = shown_bounds;
         top_bar->occlusion_monitor_bounds = monitor_bounds;
-        top_bar->occlusion_shadow_clearance = shadow_clearance;
+        top_bar->occlusion_protected_clearance = protected_clearance;
         top_bar->occlusion_valid = 1;
     }
     return top_bar->occlusion_occluded;
@@ -1205,7 +1206,7 @@ reach_top_bar_bar_update_visibility(void *capsule, const reach_bar_visibility_re
     bar_request.can_hide =
         request->auto_hide_active &&
         reach_top_bar_windows_trespassing(top_bar, request->shown_bounds, request->monitor_bounds,
-                                          request->shadow_clearance, request->excluded_window);
+                                          request->protected_clearance, request->excluded_window);
 
     int32_t was_target_hidden = top_bar->state.visibility.target_hidden;
     reach_bar_visibility_result result = reach_bar_update_visibility(
@@ -1214,7 +1215,7 @@ reach_top_bar_bar_update_visibility(void *capsule, const reach_bar_visibility_re
 
     top_bar->push_monitor_bounds = bar_request.monitor_bounds;
     top_bar->push_shown_bounds = bar_request.shown_bounds;
-    top_bar->push_shadow_clearance = bar_request.shadow_clearance;
+    top_bar->push_hidden_clearance = bar_request.hidden_clearance;
     top_bar->push_depth = push_depth;
     top_bar->push_can_hide = bar_request.can_hide;
     top_bar->push_hover_revealed = result.hover_revealed;
@@ -1242,7 +1243,7 @@ static void reach_top_bar_bar_position_frame(void *capsule)
 
     float hidden_y =
         reach_bar_hidden_position(REACH_TOP_BAR_EDGE, top_bar->push_shown_bounds,
-                                  top_bar->push_monitor_bounds, top_bar->push_shadow_clearance);
+                                  top_bar->push_monitor_bounds, top_bar->push_hidden_clearance);
     float animated_y =
         reach_motion_value_at(&top_bar->motions[REACH_TOP_BAR_ANIM_Y], top_bar->sampled_seconds);
     reach_top_bar_apply_window_push(
