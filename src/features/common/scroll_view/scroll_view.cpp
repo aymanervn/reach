@@ -123,6 +123,10 @@ int32_t reach_scroll_view_sync(reach_scroll_view *view, const reach_theme *theme
     }
     if (view->offset.to == target)
         return 0;
+    float travel = reach_scroll_view_pixels(view, view->config.max_travel);
+    float current = reach_motion_value_at(&view->offset, now_seconds);
+    if (travel > 0.0f && isfinite(current) && fabsf(target - current) > travel)
+        reach_motion_set(&view->offset, target - copysignf(travel, target - current));
     if (mode == REACH_SCROLL_VIEW_WHEEL)
     {
         if (reach_scroll_view_wheel_retarget(&view->offset, target, now_seconds) != REACH_OK)

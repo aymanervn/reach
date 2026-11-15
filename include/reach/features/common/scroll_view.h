@@ -36,6 +36,7 @@ extern "C"
         float step;
         float wheel_delta;
         float minimum_thumb;
+        float max_travel;
     } reach_scroll_view_config;
 
     typedef struct reach_scroll_view
