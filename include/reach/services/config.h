@@ -44,7 +44,7 @@ extern "C"
     {
         reach_config_top_bar_style style;
         reach_config_top_bar_mode mode;
-        int32_t opacity;
+        reach_config_top_bar_scrim_length scrim_length;
         int32_t icon_only;
     } reach_config_top_bar_settings;
 

@@ -110,31 +110,29 @@ static reach_result reach_top_bar_push_pill_background(const reach_theme *theme,
         dpi_scale);
 }
 
-static reach_result reach_top_bar_push_simple_background(const reach_theme *theme,
-                                                         reach_render_command_buffer *commands,
-                                                         reach_rect_f32 bounds, float dpi_scale,
-                                                         const reach_motion *opacity)
+static reach_result reach_top_bar_push_simple_scrim(const reach_theme *theme,
+                                                    reach_render_command_buffer *commands,
+                                                    reach_rect_f32 bounds, float dpi_scale,
+                                                    reach_config_top_bar_scrim_length length)
 {
-    float minimum = 0.0f, maximum = 0.0f;
-    if (reach_motion_range(opacity, &minimum, &maximum) != REACH_OK)
-        return REACH_INVALID_ARGUMENT;
-    reach_render_command shape = {};
-    shape.type = REACH_RENDER_COMMAND_RECT;
-    shape.rect = reach_render_pixel_aligned_rect(bounds);
-    shape.color = theme->top_bar_background;
-    shape.color.a = 1.0f;
-    if (maximum <= 0.0f || shape.rect.width <= 0.0f || shape.rect.height <= 0.0f)
+    const reach_top_bar_metrics &metrics = reach_top_bar_metrics_values;
+    float overhang = bounds.height * (metrics.simple_scrim_height_ratio[length] - 1);
+    REACH_ASSERT(overhang <= reach_top_bar_scrim_overhang_dp() * dpi_scale);
+    bounds.height += overhang;
+    reach_render_command scrim = {};
+    scrim.type = REACH_RENDER_COMMAND_RECT;
+    scrim.rect = reach_render_pixel_aligned_rect(bounds);
+    scrim.color = theme->top_bar_scrim;
+    scrim.fill_gradient = REACH_RENDER_FILL_EASED_FADE_DOWN;
+    if (scrim.color.a <= 0.0f || scrim.rect.width <= 0.0f || scrim.rect.height <= 0.0f)
     {
         return REACH_OK;
     }
     reach_render_group group = {};
     group.id = UINT64_C(0x10000000000) + 9;
-    group.opacity = *opacity;
     reach_result result = reach_render_command_buffer_begin_group(commands, &group);
     if (result == REACH_OK)
-        result = reach_render_push_shadow(commands, &shape, &theme->bar_shadow, dpi_scale);
-    if (result == REACH_OK)
-        result = reach_render_command_buffer_push(commands, &shape);
+        result = reach_render_command_buffer_push(commands, &scrim);
     reach_render_command_buffer_end_group(commands);
     return result;
 }
@@ -551,9 +549,9 @@ reach_result reach_top_bar_append_render_commands(reach_top_bar *top_bar,
 
     if (profile.background == REACH_TOP_BAR_BACKGROUND_SIMPLE)
     {
-        result = reach_top_bar_push_simple_background(ctx->theme, out_commands,
-                                                      reach_top_bar_background_bounds(top_bar),
-                                                      ctx->dpi_scale, &top_bar->background_opacity);
+        result = reach_top_bar_push_simple_scrim(ctx->theme, out_commands,
+                                                 reach_top_bar_background_bounds(top_bar),
+                                                 ctx->dpi_scale, state->scrim_length);
         if (result != REACH_OK)
         {
             return result;

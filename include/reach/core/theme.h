@@ -73,6 +73,7 @@ extern "C"
 
         reach_color dock_background;
         reach_color top_bar_background;
+        reach_color top_bar_scrim;
         reach_color switcher_background;
         reach_color bar_border;
         reach_shadow bar_shadow;

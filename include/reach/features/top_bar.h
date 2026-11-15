@@ -125,7 +125,7 @@ extern "C"
         reach_top_bar_layout layout;
         reach_config_top_bar_style style;
         reach_config_top_bar_mode mode;
-        int32_t opacity;
+        reach_config_top_bar_scrim_length scrim_length;
         int32_t icon_only;
         reach_bar_visibility_state visibility;
         reach_pressable pressable;
@@ -185,8 +185,10 @@ extern "C"
     void reach_top_bar_invalidate_occlusion(reach_top_bar *top_bar);
     int32_t reach_top_bar_apply_config(reach_top_bar *top_bar, reach_config_top_bar_style style,
                                        reach_config_top_bar_mode mode);
-    int32_t reach_top_bar_apply_opacity(reach_top_bar *top_bar, int32_t opacity);
     int32_t reach_top_bar_apply_icon_only(reach_top_bar *top_bar, int32_t icon_only);
+    int32_t reach_top_bar_apply_scrim_length(reach_top_bar *top_bar,
+                                             reach_config_top_bar_scrim_length scrim);
+    float reach_top_bar_scrim_overhang_dp(void);
     reach_rect_f32 reach_top_bar_background_bounds(const reach_top_bar *top_bar);
 
     void reach_top_bar_attach_status(reach_top_bar *top_bar, reach_system_status *status);

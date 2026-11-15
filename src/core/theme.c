@@ -94,6 +94,7 @@ static const reach_theme reach_theme_dark = {
 
     .dock_background = REACH_DARK_DEEP(1.0f),
     .top_bar_background = REACH_DARK_DEEP(1.0f),
+    .top_bar_scrim = REACH_RGB8(0, 0, 0, 0.35f),
     .switcher_background = REACH_DARK_DEEP(1.0f),
     .bar_border = REACH_DARK_EDGE_ON_DEEP(1.0f),
     .popup_background = REACH_DARK_BASE(1.0f),
@@ -241,6 +242,7 @@ static const reach_theme reach_theme_light = {
 
     .dock_background = REACH_LIGHT_BASE(1.0f),
     .top_bar_background = REACH_LIGHT_BASE(1.0f),
+    .top_bar_scrim = REACH_RGB8(255, 255, 255, 0.35f),
     .switcher_background = REACH_LIGHT_BASE(1.0f),
     .bar_border = REACH_LIGHT_EDGE_ON_BASE(1.0f),
     .popup_background = REACH_LIGHT_BASE(1.0f),

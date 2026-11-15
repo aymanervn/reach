@@ -31,6 +31,58 @@ int32_t reach_settings_model_select_top_bar_style(reach_settings_model *model,
     return 1;
 }
 
+static const reach_config_top_bar_scrim_length
+    reach_settings_scrim_lengths[REACH_SETTINGS_SELECTOR_ITEM_COUNT] = {
+        REACH_CONFIG_TOP_BAR_SCRIM_SHORT, REACH_CONFIG_TOP_BAR_SCRIM_STANDARD,
+        REACH_CONFIG_TOP_BAR_SCRIM_LONG};
+
+static float reach_settings_scrim_length_index(reach_config_top_bar_scrim_length length)
+{
+    for (size_t index = 0; index < REACH_SETTINGS_SELECTOR_ITEM_COUNT; ++index)
+        if (reach_settings_scrim_lengths[index] == length)
+            return (float)index;
+    return 1.0f;
+}
+
+reach_config_top_bar_scrim_length reach_settings_top_bar_scrim_length_at(size_t index)
+{
+    return index < REACH_SETTINGS_SELECTOR_ITEM_COUNT ? reach_settings_scrim_lengths[index]
+                                                      : REACH_CONFIG_TOP_BAR_SCRIM_STANDARD;
+}
+
+void reach_settings_model_set_top_bar_scrim_length(reach_settings_model *model,
+                                                   reach_config_top_bar_scrim_length length)
+{
+    if (model == nullptr || length < REACH_CONFIG_TOP_BAR_SCRIM_STANDARD ||
+        length > REACH_CONFIG_TOP_BAR_SCRIM_LONG)
+    {
+        return;
+    }
+    model->top_bar_scrim_length = length;
+    reach_motion_set(&model->top_bar_scrim_length_selection,
+                     reach_settings_scrim_length_index(length));
+}
+
+reach_config_top_bar_scrim_length
+reach_settings_model_top_bar_scrim_length(const reach_settings_model *model)
+{
+    return model != nullptr ? model->top_bar_scrim_length : REACH_CONFIG_TOP_BAR_SCRIM_STANDARD;
+}
+
+int32_t reach_settings_model_select_top_bar_scrim_length(reach_settings_model *model,
+                                                         reach_config_top_bar_scrim_length length)
+{
+    if (model == nullptr || length < REACH_CONFIG_TOP_BAR_SCRIM_STANDARD ||
+        length > REACH_CONFIG_TOP_BAR_SCRIM_LONG || model->top_bar_scrim_length == length)
+    {
+        return 0;
+    }
+    model->top_bar_scrim_length = length;
+    reach_settings_animate(&model->top_bar_scrim_length_selection,
+                           reach_settings_scrim_length_index(length), REACH_MOTION_PRESET_FADE_IN);
+    return 1;
+}
+
 void reach_settings_model_set_top_bar_mode(reach_settings_model *model,
                                            reach_config_top_bar_mode mode)
 {
@@ -89,27 +141,6 @@ int32_t reach_settings_model_toggle_top_bar_icon_only(reach_settings_model *mode
     reach_settings_animate(&model->top_bar_icon_only_toggle, model->top_bar_icon_only ? 1.0f : 0.0f,
                            REACH_MOTION_PRESET_BOUNCY);
     return 1;
-}
-
-int32_t reach_settings_model_set_top_bar_opacity(reach_settings_model *model, int32_t opacity)
-{
-    if (model == nullptr || opacity < 0 || opacity > REACH_CONFIG_TOP_BAR_OPACITY_MAX ||
-        model->top_bar_opacity == opacity)
-    {
-        return 0;
-    }
-    model->top_bar_opacity = opacity;
-    return 1;
-}
-
-int32_t reach_settings_model_top_bar_opacity(const reach_settings_model *model)
-{
-    return model != nullptr ? model->top_bar_opacity : REACH_CONFIG_TOP_BAR_OPACITY_MAX;
-}
-
-int32_t reach_settings_model_top_bar_opacity_enabled(const reach_settings_model *model)
-{
-    return model != nullptr && model->top_bar_style == REACH_CONFIG_TOP_BAR_STYLE_SIMPLE;
 }
 
 int32_t reach_settings_model_set_dock_size(reach_settings_model *model, int32_t size)

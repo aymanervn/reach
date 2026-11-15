@@ -29,12 +29,20 @@ const reach_shadow *reach_host_surface_shadow(const reach_host *host, reach_surf
 reach_shadow_pad reach_host_surface_shadow_pad(const reach_host *host, reach_surface_id id)
 {
     reach_shadow_pad pad = {};
-    const reach_shadow *shadow = reach_host_surface_shadow(host, id);
-    if (shadow == nullptr)
+    if (host == nullptr || id >= REACH_HOST_SURFACE_COUNT)
     {
         return pad;
     }
-    return reach_theme_shadow_pad(shadow, reach_host_layout_dpi_scale(host));
+    float scale = reach_host_layout_dpi_scale(host);
+    const reach_shadow *shadow = reach_host_surface_shadow(host, id);
+    if (shadow != nullptr)
+    {
+        pad = reach_theme_shadow_pad(shadow, scale);
+    }
+    float overhang =
+        ceilf(host->feature_runtimes[id].definition->surface.overhang_bottom_dp * scale);
+    pad.bottom = overhang > pad.bottom ? overhang : pad.bottom;
+    return pad;
 }
 
 static reach_rect_f32 reach_host_surface_window_bounds(reach_rect_f32 content, reach_shadow_pad pad)

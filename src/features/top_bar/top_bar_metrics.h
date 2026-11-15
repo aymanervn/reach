@@ -39,6 +39,8 @@ reach_top_bar_style_profile_for(reach_config_top_bar_style style)
 
 struct reach_top_bar_metrics
 {
+    float simple_scrim_height_ratio[3];
+
     float pill_gap;
     float pill_padding;
 
@@ -93,6 +95,10 @@ struct reach_top_bar_metrics
 static constexpr reach_top_bar_metrics reach_top_bar_make_metrics()
 {
     reach_top_bar_metrics metrics = {};
+
+    metrics.simple_scrim_height_ratio[REACH_CONFIG_TOP_BAR_SCRIM_STANDARD] = 1.2f;
+    metrics.simple_scrim_height_ratio[REACH_CONFIG_TOP_BAR_SCRIM_SHORT] = 0.9f;
+    metrics.simple_scrim_height_ratio[REACH_CONFIG_TOP_BAR_SCRIM_LONG] = 1.5f;
 
     metrics.pill_gap = 6.0f;
     metrics.pill_padding = 10.0f;
