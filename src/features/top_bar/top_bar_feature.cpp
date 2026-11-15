@@ -893,8 +893,9 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
                                       : 0.0f;
     float current_app_icon_gap = current_app_icon_size > 0.0f ? current_app_gap : 0.0f;
     float name_advance =
-        reach_top_bar_text_advance(&ctx->text_measure, top_bar->state.current_app_name, name_size,
-                                   metrics.current_app_name_text_weight);
+        ceilf(reach_top_bar_text_advance(&ctx->text_measure, top_bar->state.current_app_name,
+                                         name_size, metrics.current_app_name_text_weight)) +
+        1.0f;
     float current_app_chrome =
         border_thickness * 2.0f + padding * 2.0f + current_app_icon_size + current_app_icon_gap;
     float current_app_max_width = layout->bounds.width * metrics.current_app_max_width_ratio;
