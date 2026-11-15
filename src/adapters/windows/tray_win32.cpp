@@ -34,6 +34,7 @@ static const UINT_PTR REACH_TRAY_TASKBAR_CREATED_REBROADCAST_TIMER = 1001;
 static const size_t REACH_TRAY_TOMBSTONE_COUNT = REACH_MAX_TRAY_ITEMS;
 static const DWORD REACH_TRAY_TOMBSTONE_TTL_MS = 30000;
 static const size_t REACH_TRAY_RETIRED_ICON_COUNT = REACH_MAX_TRAY_ITEMS * 4;
+static const UINT REACH_TRAY_OWNER_EXITED_MESSAGE = WM_APP + 1;
 
 struct reach_tray_native_item
 {
@@ -66,6 +67,14 @@ struct reach_tray_tombstone
     int32_t used;
 };
 
+struct reach_tray_owner_watch
+{
+    HWND host_window;
+    DWORD process_id;
+    HANDLE process;
+    HANDLE wait;
+};
+
 struct reach_tray_provider
 {
     HWND host_window;
@@ -78,6 +87,7 @@ struct reach_tray_provider
     reach_tray_tombstone tombstones[REACH_TRAY_TOMBSTONE_COUNT];
     uint64_t retired_icons[REACH_TRAY_RETIRED_ICON_COUNT];
     size_t retired_icon_count;
+    reach_tray_owner_watch owner_watches[REACH_MAX_TRAY_ITEMS];
 };
 
 static uint32_t reach_tray_read_u32(const BYTE *bytes, size_t count, size_t offset)
@@ -626,6 +636,130 @@ static reach_result reach_tray_handle_copydata(reach_tray_provider *provider,
     return REACH_OK;
 }
 
+static void reach_tray_remove_dead_owners(reach_tray_provider *provider)
+{
+    size_t index = 0;
+    while (index < provider->item_count)
+    {
+        HWND owner = provider->items[index].owner;
+        if (owner == nullptr || !IsWindow(owner))
+        {
+            reach_tray_save_tombstone(provider, &provider->items[index], index);
+            reach_tray_remove_item_at(provider, index);
+        }
+        else
+        {
+            ++index;
+        }
+    }
+}
+
+static DWORD reach_tray_owner_process_id(const reach_tray_native_item *item)
+{
+    DWORD process_id = 0;
+    if (item->owner != nullptr)
+    {
+        (void)GetWindowThreadProcessId(item->owner, &process_id);
+    }
+    return process_id;
+}
+
+static void CALLBACK reach_tray_owner_exited(void *context, BOOLEAN timed_out)
+{
+    (void)timed_out;
+    const reach_tray_owner_watch *watch = static_cast<const reach_tray_owner_watch *>(context);
+    PostMessageW(watch->host_window, REACH_TRAY_OWNER_EXITED_MESSAGE, 0, 0);
+}
+
+static void reach_tray_unwatch_owner(reach_tray_owner_watch *watch)
+{
+    if (watch->wait != nullptr)
+    {
+        (void)UnregisterWaitEx(watch->wait, INVALID_HANDLE_VALUE);
+    }
+    if (watch->process != nullptr)
+    {
+        CloseHandle(watch->process);
+    }
+    *watch = {};
+}
+
+static void reach_tray_watch_owner(reach_tray_provider *provider, reach_tray_owner_watch *watch,
+                                   DWORD process_id)
+{
+    watch->host_window = provider->host_window;
+    watch->process_id = process_id;
+    watch->process = OpenProcess(SYNCHRONIZE, FALSE, process_id);
+    if (watch->process != nullptr &&
+        !RegisterWaitForSingleObject(&watch->wait, watch->process, reach_tray_owner_exited, watch,
+                                     INFINITE, WT_EXECUTEONLYONCE | WT_EXECUTEINWAITTHREAD))
+    {
+        watch->wait = nullptr;
+    }
+}
+
+static void reach_tray_sync_owner_watches(reach_tray_provider *provider)
+{
+    DWORD process_ids[REACH_MAX_TRAY_ITEMS] = {};
+    for (size_t index = 0; index < provider->item_count; ++index)
+    {
+        process_ids[index] = reach_tray_owner_process_id(&provider->items[index]);
+    }
+
+    for (reach_tray_owner_watch &watch : provider->owner_watches)
+    {
+        if (watch.process_id == 0)
+        {
+            continue;
+        }
+        int32_t referenced = 0;
+        for (size_t index = 0; index < provider->item_count && !referenced; ++index)
+        {
+            referenced = process_ids[index] == watch.process_id;
+        }
+        if (!referenced)
+        {
+            reach_tray_unwatch_owner(&watch);
+        }
+    }
+
+    for (size_t index = 0; index < provider->item_count; ++index)
+    {
+        DWORD process_id = process_ids[index];
+        if (process_id == 0 || process_id == GetCurrentProcessId())
+        {
+            continue;
+        }
+        reach_tray_owner_watch *free_watch = nullptr;
+        int32_t watched = 0;
+        for (reach_tray_owner_watch &watch : provider->owner_watches)
+        {
+            watched = watched || watch.process_id == process_id;
+            if (free_watch == nullptr && watch.process_id == 0)
+            {
+                free_watch = &watch;
+            }
+        }
+        if (!watched && free_watch != nullptr)
+        {
+            reach_tray_watch_owner(provider, free_watch, process_id);
+        }
+    }
+}
+
+static void reach_tray_handle_owner_exited(reach_tray_provider *provider)
+{
+    reach_tray_remove_dead_owners(provider);
+    for (reach_tray_owner_watch &watch : provider->owner_watches)
+    {
+        if (watch.process != nullptr && WaitForSingleObject(watch.process, 0) == WAIT_OBJECT_0)
+        {
+            reach_tray_unwatch_owner(&watch);
+        }
+    }
+    reach_tray_sync_owner_watches(provider);
+}
+
 static void reach_tray_broadcast_taskbar_created(reach_tray_provider *provider)
 {
     if (provider == nullptr)
@@ -659,7 +793,19 @@ static LRESULT CALLBACK reach_tray_host_proc(HWND hwnd, UINT message, WPARAM wpa
     {
         (void)reach_tray_handle_copydata(provider,
                                          reinterpret_cast<const COPYDATASTRUCT *>(lparam));
+        if (provider != nullptr)
+        {
+            reach_tray_sync_owner_watches(provider);
+        }
         return TRUE;
+    }
+    if (message == REACH_TRAY_OWNER_EXITED_MESSAGE)
+    {
+        if (provider != nullptr)
+        {
+            reach_tray_handle_owner_exited(provider);
+        }
+        return 0;
     }
     if (message == WM_TIMER && wparam == REACH_TRAY_TASKBAR_CREATED_REBROADCAST_TIMER)
     {
@@ -710,21 +856,8 @@ static reach_result reach_tray_refresh(reach_tray_provider *provider)
         return REACH_INVALID_ARGUMENT;
     }
 
-    size_t index = 0;
-    while (index < provider->item_count)
-    {
-        HWND owner = provider->items[index].owner;
-        if (owner == nullptr || !IsWindow(owner))
-        {
-            reach_tray_save_tombstone(provider, &provider->items[index], index);
-            reach_tray_remove_item_at(provider, index);
-        }
-        else
-        {
-            ++index;
-        }
-    }
-
+    reach_tray_remove_dead_owners(provider);
+    reach_tray_sync_owner_watches(provider);
     provider->dirty = 0;
     return REACH_OK;
 }
@@ -853,7 +986,8 @@ static reach_result reach_tray_activate(reach_tray_provider *provider, uint32_t 
 
         if (!IsWindow(item->owner))
         {
-            reach_tray_remove_item_at(provider, index);
+            reach_tray_remove_dead_owners(provider);
+            reach_tray_sync_owner_watches(provider);
             return REACH_INVALID_ARGUMENT;
         }
 
@@ -903,6 +1037,11 @@ static void reach_tray_destroy(reach_tray_provider *provider)
 {
     if (provider != nullptr)
     {
+        for (reach_tray_owner_watch &watch : provider->owner_watches)
+        {
+            reach_tray_unwatch_owner(&watch);
+        }
+
         for (size_t index = 0; index < provider->item_count; ++index)
         {
             reach_tray_retire_item_icon(provider, &provider->items[index]);
