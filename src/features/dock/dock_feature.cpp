@@ -4,6 +4,7 @@
 
 #include "dock_common_state.h"
 #include "dock_interaction.h"
+#include "dock_metrics.h"
 
 #include <math.h>
 #include <new>
@@ -55,6 +56,8 @@ struct reach_dock
     uint16_t action_display_name[REACH_APPLICATION_TEXT_CAPACITY];
     reach_menu_request hover_request;
     uint32_t hover_owner_key;
+    double hover_deadline;
+    int32_t hover_warm;
     reach_dock_model metrics;
     reach_motion size_scale;
     int32_t size_configured;
@@ -348,6 +351,8 @@ static void reach_dock_capsule_reset(void *capsule)
         dock->pointer_layout_valid = 0;
         dock->state.hovered_item = REACH_MAX_DOCK_ITEMS;
         dock->hover_owner_key = 0;
+        dock->hover_deadline = 0.0;
+        dock->hover_warm = 0;
         reach_draggable_init(&dock->state.drag.gesture);
         dock->state.drag.target_index = REACH_MAX_DOCK_ITEMS;
         dock->state.drag.key = {};
@@ -358,9 +363,17 @@ static void reach_dock_capsule_reset(void *capsule)
     }
 }
 
+static void reach_dock_reveal_due_hover(reach_dock *dock, double now_seconds);
+
 static void reach_dock_capsule_tick(void *capsule, double, reach_feature_tick_result *out)
 {
-    reach_dock_sample_at(static_cast<reach_dock *>(capsule), reach_motion_now_seconds(), out);
+    reach_dock *dock = static_cast<reach_dock *>(capsule);
+    double now = reach_motion_now_seconds();
+    reach_dock_sample_at(dock, now, out);
+    if (dock != nullptr)
+    {
+        reach_dock_reveal_due_hover(dock, now);
+    }
 }
 
 static int32_t reach_dock_capsule_is_open(const void *capsule)
@@ -421,6 +434,10 @@ static void reach_dock_capsule_surface_geometry(const void *capsule,
     {
         out->visible_bounds = dock->pointer_layout.bounds;
     }
+    if (dock != nullptr)
+    {
+        out->deadline_seconds = dock->hover_deadline;
+    }
 }
 
 static reach_dock_interaction_context reach_dock_capsule_interaction_context(reach_dock *dock)
@@ -463,7 +480,45 @@ static void reach_dock_notify_item_hovered(reach_dock *dock, size_t item_index)
         return;
     }
     dock->hover_owner_key = reach_dock_item_key_at(&dock->state.model, item_index);
+    dock->hover_warm = 1;
     dock->routes.item_hovered(dock->routes.user, &dock->hover_request);
+}
+
+static void reach_dock_hover_item(reach_dock *dock, size_t item_index)
+{
+    dock->state.hovered_item = item_index;
+    dock->hover_deadline = 0.0;
+    if (item_index == REACH_MAX_DOCK_ITEMS || dock->hover_warm)
+    {
+        reach_dock_notify_item_hovered(dock, item_index);
+        return;
+    }
+    dock->hover_deadline =
+        reach_motion_now_seconds() + reach_dock_metrics_values.hover_reveal_delay_seconds;
+}
+
+static void reach_dock_end_hover(reach_dock *dock)
+{
+    dock->hover_warm = 0;
+    if (dock->state.hovered_item != REACH_MAX_DOCK_ITEMS)
+    {
+        reach_dock_hover_item(dock, REACH_MAX_DOCK_ITEMS);
+    }
+    dock->hover_deadline = 0.0;
+}
+
+static void reach_dock_reveal_due_hover(reach_dock *dock, double now_seconds)
+{
+    if (dock->hover_deadline <= 0.0 || now_seconds < dock->hover_deadline)
+    {
+        return;
+    }
+    dock->hover_deadline = 0.0;
+    if (!reach_draggable_tracking(&dock->state.drag.gesture) &&
+        dock->state.hovered_item != REACH_MAX_DOCK_ITEMS)
+    {
+        reach_dock_notify_item_hovered(dock, dock->state.hovered_item);
+    }
 }
 
 static void
@@ -711,8 +766,7 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
                     : REACH_MAX_DOCK_ITEMS;
             if (hovered_item != state->hovered_item)
             {
-                state->hovered_item = hovered_item;
-                reach_dock_notify_item_hovered(dock, hovered_item);
+                reach_dock_hover_item(dock, hovered_item);
             }
         }
         if (reach_draggable_tracking(&state->drag.gesture))
@@ -744,11 +798,7 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
         reach_pressable_result pressable = {};
         reach_pressable_cancel(&state->pressable, &feedback, &pressable);
         reach_dock_capsule_apply_pressable_result(&pressable, out);
-        if (state->hovered_item != REACH_MAX_DOCK_ITEMS)
-        {
-            state->hovered_item = REACH_MAX_DOCK_ITEMS;
-            reach_dock_notify_item_hovered(dock, REACH_MAX_DOCK_ITEMS);
-        }
+        reach_dock_end_hover(dock);
         return;
     }
     if (event->kind == REACH_POINTER_EVENT_LEAVE)
@@ -756,11 +806,7 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
         reach_pressable_result pressable = {};
         reach_pressable_update(&state->pressable, REACH_PRESSABLE_TARGET_NONE, &pressable);
         reach_dock_capsule_apply_pressable_result(&pressable, out);
-        if (state->hovered_item != REACH_MAX_DOCK_ITEMS)
-        {
-            state->hovered_item = REACH_MAX_DOCK_ITEMS;
-            reach_dock_notify_item_hovered(dock, REACH_MAX_DOCK_ITEMS);
-        }
+        reach_dock_end_hover(dock);
     }
 }
 
