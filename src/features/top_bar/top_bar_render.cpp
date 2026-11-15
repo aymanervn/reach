@@ -288,7 +288,7 @@ static void reach_top_bar_push_tray_item(const reach_top_bar_render_input *input
     if (input->click_feedback_index == REACH_TOP_BAR_FEEDBACK_TRAY_BASE + index)
         (void)reach_push_icon_press_feedback_motion(
             commands, REACH_TOP_BAR_FEEDBACK_GROUP_ID, slot, slot.height * 0.5f,
-            input->tray_items[index].icon_id, input->theme->bar_tray_background,
+            input->tray_items[index].icon_id, input->theme->bar_click_feedback,
             input->click_feedback, &group);
 }
 
@@ -331,7 +331,7 @@ static void reach_top_bar_push_tray(const reach_top_bar_render_input *input,
     int32_t feedback =
         input->click_feedback_index == REACH_TOP_BAR_FEEDBACK_TRAY_OVERFLOW &&
         reach_ui_color_feedback_begin(commands, REACH_TOP_BAR_FEEDBACK_GROUP_ID, glyph,
-                                      input->theme->system_glyph, input->theme->bar_tray_background,
+                                      input->theme->system_glyph, input->theme->bar_click_feedback,
                                       input->click_feedback);
     reach_top_bar_push_vector_icon(commands, glyph,
                                    input->tray_popup_open ? REACH_VECTOR_ICON_ARROW_UP
