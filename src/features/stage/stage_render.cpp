@@ -27,7 +27,7 @@ static reach_color reach_stage_tile_border(const reach_stage_render_context *ctx
 static reach_result reach_stage_push_tile_background(const reach_stage_render_context *ctx,
                                                      reach_render_command_buffer *commands,
                                                      reach_rect_f32 item, float width, float hover,
-                                                     float alpha)
+                                                     float alpha, int32_t moving)
 {
     if (ctx == nullptr || commands == nullptr || width <= 0.0f)
     {
@@ -41,7 +41,7 @@ static reach_result reach_stage_push_tile_background(const reach_stage_render_co
 
     reach_color background = ctx->theme->stage_backdrop;
     background.a = 1.0f;
-    reach_color border = reach_stage_tile_border(ctx, hover, alpha);
+    reach_color border = moving ? reach_color{} : reach_stage_tile_border(ctx, hover, alpha);
     return reach_render_push_bordered_background(commands, &shape, background, border, width,
                                                  nullptr, ctx->dpi_scale);
 }
@@ -270,6 +270,8 @@ reach_result reach_stage_append_render_commands(reach_stage *stage,
     float eased = state->progress;
 
     float border = reach_theme_border_thickness(ctx->theme, ctx->dpi_scale);
+    int32_t moving = state->closing || state->progress < 1.0f || state->reflow < 1.0f ||
+                     state->departure_progress < 1.0f;
     for (size_t pass = 0; pass < 2; ++pass)
     {
         for (size_t index = 0; index < state->tile_count; ++index)
@@ -296,6 +298,10 @@ reach_result reach_stage_append_render_commands(reach_stage *stage,
 
             if (tile->desktop)
             {
+                if (moving)
+                {
+                    continue;
+                }
                 rect.x -= ctx->bounds.x;
                 rect.y -= ctx->bounds.y;
                 reach_result result =
@@ -314,8 +320,8 @@ reach_result reach_stage_append_render_commands(reach_stage *stage,
             item.y -= tile->current_bar.height;
             item.height += tile->current_bar.height;
             float hover = state->has_hover && state->hover_index == index ? 1.0f : 0.0f;
-            reach_result result =
-                reach_stage_push_tile_background(ctx, out_commands, item, border, hover, alpha);
+            reach_result result = reach_stage_push_tile_background(ctx, out_commands, item, border,
+                                                                   hover, alpha, moving);
             if (result != REACH_OK)
             {
                 return result;
