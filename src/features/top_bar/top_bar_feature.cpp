@@ -48,24 +48,6 @@ int32_t reach_top_bar_apply_config(reach_top_bar *top_bar, reach_config_top_bar_
     return changed;
 }
 
-int32_t reach_top_bar_apply_opacity(reach_top_bar *top_bar, int32_t opacity)
-{
-    if (top_bar == nullptr || opacity < 0 || opacity > REACH_CONFIG_TOP_BAR_OPACITY_MAX ||
-        (top_bar->opacity_configured && top_bar->state.opacity == opacity))
-    {
-        return 0;
-    }
-    float alpha = (float)opacity / (float)REACH_CONFIG_TOP_BAR_OPACITY_MAX;
-    if (top_bar->opacity_configured)
-        reach_motion_animate_spec_to_at(&top_bar->background_opacity, alpha, top_bar->fade_in_spec,
-                                        reach_motion_now_seconds());
-    else
-        reach_motion_set(&top_bar->background_opacity, alpha);
-    top_bar->opacity_configured = 1;
-    top_bar->state.opacity = opacity;
-    return 1;
-}
-
 int32_t reach_top_bar_apply_icon_only(reach_top_bar *top_bar, int32_t icon_only)
 {
     icon_only = icon_only ? 1 : 0;
@@ -75,6 +57,27 @@ int32_t reach_top_bar_apply_icon_only(reach_top_bar *top_bar, int32_t icon_only)
     }
     top_bar->state.icon_only = icon_only;
     return 1;
+}
+
+int32_t reach_top_bar_apply_scrim_length(reach_top_bar *top_bar,
+                                         reach_config_top_bar_scrim_length scrim)
+{
+    if (top_bar == nullptr || scrim < REACH_CONFIG_TOP_BAR_SCRIM_STANDARD ||
+        scrim > REACH_CONFIG_TOP_BAR_SCRIM_LONG || top_bar->state.scrim_length == scrim)
+    {
+        return 0;
+    }
+    top_bar->state.scrim_length = scrim;
+    return 1;
+}
+
+float reach_top_bar_scrim_overhang_dp(void)
+{
+    const reach_top_bar_metrics &metrics = reach_top_bar_metrics_values;
+    float ratio = 1.0f;
+    for (float length : metrics.simple_scrim_height_ratio)
+        ratio = length > ratio ? length : ratio;
+    return reach_top_bar_style_profile_for(REACH_CONFIG_TOP_BAR_STYLE_SIMPLE).height * (ratio - 1);
 }
 
 static void reach_top_bar_load_motion_specs(reach_top_bar *top_bar, const reach_theme *theme)
@@ -112,11 +115,9 @@ reach_result reach_top_bar_create(reach_top_bar **out_top_bar)
 
     for (reach_motion &motion : top_bar->motions)
         reach_motion_set(&motion, 0.0f);
-    top_bar->state.opacity = REACH_CONFIG_TOP_BAR_OPACITY_MAX;
     reach_pressable_init(&top_bar->state.pressable);
     reach_motion_set(&top_bar->press_feedback, 0.0f);
     reach_motion_set(&top_bar->power_hover, 0.0f);
-    reach_motion_set(&top_bar->background_opacity, 1.0f);
     reach_top_bar_reset_tray_drag(top_bar);
     *out_top_bar = top_bar;
     return REACH_OK;

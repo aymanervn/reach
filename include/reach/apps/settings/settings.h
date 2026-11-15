@@ -89,9 +89,9 @@ extern "C"
         REACH_SETTINGS_HIT_THEME_SCROLLBAR_TRACK,
         REACH_SETTINGS_HIT_THEME_SCROLLBAR_THUMB,
         REACH_SETTINGS_HIT_TOP_BAR_STYLE,
+        REACH_SETTINGS_HIT_TOP_BAR_SCRIM_LENGTH,
         REACH_SETTINGS_HIT_TOP_BAR_AUTO_HIDE_TOGGLE,
         REACH_SETTINGS_HIT_TOP_BAR_ICON_ONLY_TOGGLE,
-        REACH_SETTINGS_HIT_TOP_BAR_OPACITY,
         REACH_SETTINGS_HIT_DOCK_SIZE,
         REACH_SETTINGS_HIT_ACCOUNT_PASSWORD,
         REACH_SETTINGS_HIT_ACCOUNT_PASSWORD_FIELD,
@@ -284,11 +284,12 @@ extern "C"
         reach_config_theme_preference theme_windows_app_theme;
         reach_config_top_bar_style top_bar_style;
         reach_motion top_bar_style_selection;
+        reach_config_top_bar_scrim_length top_bar_scrim_length;
+        reach_motion top_bar_scrim_length_selection;
         reach_config_top_bar_mode top_bar_mode;
         reach_motion top_bar_mode_toggle;
         int32_t top_bar_icon_only;
         reach_motion top_bar_icon_only_toggle;
-        int32_t top_bar_opacity;
         int32_t dock_size;
         int32_t dragging_slider;
         int32_t hovered_button;
@@ -446,7 +447,10 @@ extern "C"
         reach_rect_f32 top_bar_style_title;
         reach_rect_f32 top_bar_style_subtitle;
         reach_rect_f32 top_bar_style_selector;
-        reach_settings_slider_card_layout top_bar_opacity;
+        reach_rect_f32 top_bar_scrim_length_card;
+        reach_rect_f32 top_bar_scrim_length_title;
+        reach_rect_f32 top_bar_scrim_length_subtitle;
+        reach_rect_f32 top_bar_scrim_length_selector;
         reach_settings_slider_card_layout dock_size;
         reach_rect_f32 top_bar_auto_hide_card;
         reach_rect_f32 top_bar_auto_hide_title;
@@ -538,6 +542,7 @@ extern "C"
         int32_t theme_light;
         reach_config_theme_preference theme_preference;
         reach_config_top_bar_style top_bar_style;
+        reach_config_top_bar_scrim_length top_bar_scrim_length;
         size_t wifi_index;
         size_t wifi_security_option;
         size_t bluetooth_index;
@@ -663,6 +668,14 @@ extern "C"
     reach_settings_model_top_bar_style(const reach_settings_model *model);
     int32_t reach_settings_model_select_top_bar_style(reach_settings_model *model,
                                                       reach_config_top_bar_style style);
+    void reach_settings_model_set_top_bar_scrim_length(reach_settings_model *model,
+                                                       reach_config_top_bar_scrim_length length);
+    reach_config_top_bar_scrim_length
+    reach_settings_model_top_bar_scrim_length(const reach_settings_model *model);
+    int32_t
+    reach_settings_model_select_top_bar_scrim_length(reach_settings_model *model,
+                                                     reach_config_top_bar_scrim_length length);
+    reach_config_top_bar_scrim_length reach_settings_top_bar_scrim_length_at(size_t index);
     void reach_settings_model_set_top_bar_mode(reach_settings_model *model,
                                                reach_config_top_bar_mode mode);
     reach_config_top_bar_mode reach_settings_model_top_bar_mode(const reach_settings_model *model);
@@ -670,9 +683,6 @@ extern "C"
     void reach_settings_model_set_top_bar_icon_only(reach_settings_model *model, int32_t icon_only);
     int32_t reach_settings_model_top_bar_icon_only(const reach_settings_model *model);
     int32_t reach_settings_model_toggle_top_bar_icon_only(reach_settings_model *model);
-    int32_t reach_settings_model_set_top_bar_opacity(reach_settings_model *model, int32_t opacity);
-    int32_t reach_settings_model_top_bar_opacity(const reach_settings_model *model);
-    int32_t reach_settings_model_top_bar_opacity_enabled(const reach_settings_model *model);
     int32_t reach_settings_model_set_dock_size(reach_settings_model *model, int32_t size);
     int32_t reach_settings_model_dock_size(const reach_settings_model *model);
     float reach_settings_slider_ratio_at(const reach_settings_slider_card_layout *slider, float x);

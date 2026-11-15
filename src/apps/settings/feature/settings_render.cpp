@@ -498,7 +498,7 @@ static void render_slider_card(const reach_settings_render_input *input,
                                reach_render_command_buffer *commands,
                                const reach_settings_slider_card_layout *slider,
                                const uint16_t *title, const uint16_t *subtitle, float ratio,
-                               int32_t percent, int32_t enabled, reach_color accent)
+                               int32_t percent, reach_color accent)
 {
     const reach_theme *theme = input->theme;
     float radius = reach_settings_scale(input, theme->radius_small);
@@ -510,9 +510,7 @@ static void render_slider_card(const reach_settings_render_input *input,
         commands, slider->subtitle, subtitle, reach_settings_scale(input, REACH_TEXT_SIZE_XSMALL),
         REACH_TEXT_WEIGHT_NORMAL, input->text_alignment_leading, theme->settings_secondary_text, 1);
 
-    reach_color level = enabled
-                            ? reach_settings_color_with_alpha(accent, 0.85f)
-                            : reach_settings_color_with_alpha(theme->settings_secondary_text, 0.5f);
+    reach_color level = reach_settings_color_with_alpha(accent, 0.85f);
     reach_rect_f32 area = slider->track;
     float track_height = reach_settings_scale(input, 4.0f);
     float thumb_size = reach_settings_scale(input, REACH_SETTINGS_SLIDER_THUMB_SIZE);
@@ -533,10 +531,9 @@ static void render_slider_card(const reach_settings_render_input *input,
     uint16_t value[8] = {};
     append_number(value, 8, (size_t)percent);
     append_text(value, 8, (const uint16_t *)u"%");
-    reach_settings_push_text(commands, slider->value, value,
-                             reach_settings_scale(input, REACH_TEXT_SIZE_SMALL),
-                             REACH_TEXT_WEIGHT_SEMIBOLD, REACH_TEXT_ALIGNMENT_TRAILING,
-                             enabled ? theme->settings_text : theme->settings_secondary_text, 1);
+    reach_settings_push_text(
+        commands, slider->value, value, reach_settings_scale(input, REACH_TEXT_SIZE_SMALL),
+        REACH_TEXT_WEIGHT_SEMIBOLD, REACH_TEXT_ALIGNMENT_TRAILING, theme->settings_text, 1);
 }
 
 static void render_theme_page(const reach_settings_render_input *input,
@@ -613,12 +610,15 @@ static void render_theme_page(const reach_settings_render_input *input,
         (const uint16_t *)u"Choose how top bar items are grouped and framed", top_bar_style_labels,
         REACH_SETTINGS_SELECTOR_ITEM_COUNT, &model->top_bar_style_selection,
         REACH_SETTINGS_HIT_TOP_BAR_STYLE, accent);
-    int32_t opacity = reach_settings_model_top_bar_opacity(model);
-    render_slider_card(input, commands, &layout->top_bar_opacity,
-                       (const uint16_t *)u"Top bar opacity",
-                       (const uint16_t *)u"Change the opacity of the simple top bar",
-                       (float)opacity / (float)REACH_CONFIG_TOP_BAR_OPACITY_MAX, opacity,
-                       reach_settings_model_top_bar_opacity_enabled(model), accent);
+    const uint16_t *scrim_length_labels[REACH_SETTINGS_SELECTOR_ITEM_COUNT] = {
+        (const uint16_t *)u"Short", (const uint16_t *)u"Standard", (const uint16_t *)u"Long"};
+    render_theme_selector_card(
+        input, commands, layout->top_bar_scrim_length_card, {}, REACH_VECTOR_ICON_NONE,
+        layout->top_bar_scrim_length_title, layout->top_bar_scrim_length_subtitle,
+        layout->top_bar_scrim_length_selector, (const uint16_t *)u"Top bar shadow length",
+        (const uint16_t *)u"How far the simple top bar's shadow reaches", scrim_length_labels,
+        REACH_SETTINGS_SELECTOR_ITEM_COUNT, &model->top_bar_scrim_length_selection,
+        REACH_SETTINGS_HIT_TOP_BAR_SCRIM_LENGTH, accent);
     theme_toggle_card auto_hide = {layout->top_bar_auto_hide_card,
                                    {},
                                    layout->top_bar_auto_hide_title,
@@ -648,7 +648,7 @@ static void render_theme_page(const reach_settings_render_input *input,
                        (const uint16_t *)u"Change the size of the dock",
                        (float)(dock_size - REACH_CONFIG_DOCK_SIZE_MIN) /
                            (float)(REACH_CONFIG_DOCK_SIZE_MAX - REACH_CONFIG_DOCK_SIZE_MIN),
-                       dock_size, 1, accent);
+                       dock_size, accent);
     reach_render_command_buffer_clear_scissor(commands);
     if (layout->theme_scrollbar_thumb.height > 0.0f)
     {

@@ -325,6 +325,7 @@ typedef struct reach_surface_spec
     reach_surface_class cls;
     uint32_t pointer_flags;
     reach_surface_shadow shadow;
+    float overhang_bottom_dp;
     uint32_t behavior_flags;
     int32_t layer;
     reach_surface_role role;

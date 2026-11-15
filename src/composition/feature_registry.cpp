@@ -317,8 +317,8 @@ static void reach_feature_notify_top_bar(void *capsule,
         out->relayout = 1;
         out->request_update = 1;
     }
-    if (reach_top_bar_apply_opacity(static_cast<reach_top_bar *>(capsule),
-                                    notification->config->top_bar_opacity))
+    if (reach_top_bar_apply_scrim_length(static_cast<reach_top_bar *>(capsule),
+                                         notification->config->top_bar_scrim_length))
     {
         out->redraw = 1;
         out->request_update = 1;
@@ -829,6 +829,8 @@ static void reach_host_init_feature_definitions(reach_host *host)
 
     definitions[REACH_SURFACE_ID_DOCK].surface.shadow = REACH_SURFACE_SHADOW_BAR;
     definitions[REACH_SURFACE_ID_TOP_BAR].surface.shadow = REACH_SURFACE_SHADOW_BAR;
+    definitions[REACH_SURFACE_ID_TOP_BAR].surface.overhang_bottom_dp =
+        reach_top_bar_scrim_overhang_dp();
     definitions[REACH_SURFACE_ID_LAUNCHER].surface.shadow = REACH_SURFACE_SHADOW_POPUP;
     definitions[REACH_SURFACE_ID_CLIPBOARD].surface.shadow = REACH_SURFACE_SHADOW_POPUP;
     definitions[REACH_SURFACE_ID_SWITCHER].surface.shadow = REACH_SURFACE_SHADOW_POPUP;
