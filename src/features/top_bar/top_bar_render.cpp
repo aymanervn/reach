@@ -196,7 +196,7 @@ static void reach_top_bar_push_clock(const reach_top_bar_render_input *input,
     reach_top_bar_push_text(commands, layout->clock_date, input->date_text,
                             metrics.clock_date_text_size * input->dpi_scale,
                             metrics.clock_date_text_weight, REACH_TEXT_ALIGNMENT_LEADING,
-                            input->theme->bar_text_secondary);
+                            input->theme->bar_text_primary);
 }
 
 static void reach_top_bar_push_button_feedback_colored(const reach_top_bar_render_input *input,
