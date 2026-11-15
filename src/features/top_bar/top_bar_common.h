@@ -63,14 +63,14 @@ struct reach_top_bar
     float stats_advances[REACH_TOP_BAR_STATS_SLOT_COUNT];
     reach_rect_f32 push_monitor_bounds;
     reach_rect_f32 push_shown_bounds;
-    float push_shadow_clearance;
+    float push_hidden_clearance;
     float push_depth;
     int32_t push_can_hide;
     int32_t push_hover_revealed;
     uintptr_t push_excluded_window;
     reach_rect_f32 occlusion_shown_bounds;
     reach_rect_f32 occlusion_monitor_bounds;
-    float occlusion_shadow_clearance;
+    float occlusion_protected_clearance;
     int32_t occlusion_valid;
     int32_t occlusion_occluded;
 };

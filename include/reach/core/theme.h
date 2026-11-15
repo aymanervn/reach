@@ -240,6 +240,7 @@ extern "C"
     reach_rect_f32 reach_theme_border_content_rect(const reach_theme *theme, float dpi_scale,
                                                    reach_rect_f32 bounds);
     float reach_theme_shadow_extent(const reach_shadow *shadow, float dpi_scale);
+    float reach_theme_shadow_visible_extent(const reach_shadow *shadow, float dpi_scale);
     reach_shadow_pad reach_theme_shadow_pad(const reach_shadow *shadow, float dpi_scale);
     float reach_theme_dock_corner_radius(const reach_theme *theme, float dock_height);
     float reach_theme_icon_box_size(const reach_theme *theme, float dock_height);

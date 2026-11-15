@@ -15,9 +15,9 @@ static int32_t reach_bar_point_in_rect(reach_point_i32 point, reach_rect_f32 rec
 }
 
 float reach_bar_hidden_position(reach_bar_edge edge, reach_rect_f32 shown_bounds,
-                                reach_rect_f32 monitor_bounds, float shadow_clearance)
+                                reach_rect_f32 monitor_bounds, float hidden_clearance)
 {
-    float clearance = 4.0f + (shadow_clearance > 0.0f ? shadow_clearance : 0.0f);
+    float clearance = 4.0f + (hidden_clearance > 0.0f ? hidden_clearance : 0.0f);
     if (edge == REACH_BAR_EDGE_TOP)
     {
         return monitor_bounds.y - shown_bounds.height - clearance;
@@ -48,10 +48,10 @@ float reach_bar_reserved_edge(reach_bar_edge edge, reach_rect_f32 shown_bounds, 
 }
 
 reach_rect_f32 reach_bar_protected_band(reach_bar_edge edge, reach_rect_f32 shown_bounds,
-                                        reach_rect_f32 monitor_bounds, float shadow_clearance)
+                                        reach_rect_f32 monitor_bounds, float protected_clearance)
 {
     float monitor_bottom = monitor_bounds.y + monitor_bounds.height;
-    float reserved_edge = reach_bar_reserved_edge(edge, shown_bounds, shadow_clearance);
+    float reserved_edge = reach_bar_reserved_edge(edge, shown_bounds, protected_clearance);
     float depth = edge == REACH_BAR_EDGE_TOP ? reserved_edge - monitor_bounds.y
                                              : monitor_bottom - reserved_edge;
     if (depth < 0.0f)
@@ -149,7 +149,7 @@ reach_bar_visibility_result reach_bar_update_visibility(reach_bar_visibility_sta
     double now = reach_motion_now_seconds();
 
     float hidden_y = reach_bar_hidden_position(request->edge, request->shown_bounds,
-                                               request->monitor_bounds, request->shadow_clearance);
+                                               request->monitor_bounds, request->hidden_clearance);
     reach_rect_f32 current_bounds = request->shown_bounds;
     if (state->animation_initialized)
     {
