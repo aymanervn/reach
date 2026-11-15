@@ -34,8 +34,8 @@ int main()
     failed += expect(snapshot->light_theme == 0);
     failed += expect(snapshot->windows_system_theme == REACH_CONFIG_THEME_FOLLOW_REACH);
     failed += expect(snapshot->windows_app_theme == REACH_CONFIG_THEME_FOLLOW_REACH);
-    failed += expect(snapshot->top_bar_style == REACH_CONFIG_TOP_BAR_STYLE_SPLIT);
-    failed += expect(snapshot->top_bar_mode == REACH_CONFIG_TOP_BAR_MODE_DYNAMIC);
+    failed += expect(snapshot->top_bar_style == REACH_CONFIG_TOP_BAR_STYLE_SIMPLE);
+    failed += expect(snapshot->top_bar_mode == REACH_CONFIG_TOP_BAR_MODE_STATIC);
 
     std::memset(snapshot.get(), 0, sizeof(*snapshot));
     snapshot->dock_height = 58.0f;
