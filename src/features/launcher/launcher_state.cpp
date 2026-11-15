@@ -6,6 +6,8 @@
 #include <new>
 
 #include "reach/features/common/presentation.h"
+
+static constexpr float reach_launcher_presentation_outer_scale = 1.06f;
 #include "reach/core/blink.h"
 #include "reach/support/util.h"
 
@@ -36,6 +38,7 @@ struct reach_launcher
     size_t synced_selected;
     float synced_pitch;
     reach_feature_transition surface_transition;
+    reach_motion presentation_scale;
     reach_blink caret;
     int32_t caret_retained;
     reach_launcher_state state;
@@ -742,6 +745,7 @@ reach_result reach_launcher_create(reach_launcher **out_launcher)
     reach_launcher_load_motion_specs(launcher, reach_theme_default());
     reach_motion_set(&launcher->body_height, 0);
     reach_motion_set(&launcher->results_opacity, 0);
+    reach_motion_set(&launcher->presentation_scale, reach_launcher_presentation_outer_scale);
     reach_launcher_state_init(&launcher->state);
     *out_launcher = launcher;
     return REACH_OK;
@@ -833,7 +837,13 @@ int32_t reach_launcher_set_open(reach_launcher *launcher, int32_t open)
         (void)reach_launcher_close_state(&launcher->state);
         reach_blink_stop(&launcher->caret);
     }
+    if (open && !reach_feature_transition_visible(&launcher->surface_transition))
+        reach_motion_set(&launcher->presentation_scale, reach_launcher_presentation_outer_scale);
     (void)reach_feature_transition_set_open(&launcher->surface_transition, open);
+    reach_motion_animate_spec_to_at(
+        &launcher->presentation_scale, open ? 1.0f : reach_launcher_presentation_outer_scale,
+        open ? launcher->height_spec : launcher->surface_transition.fade_out,
+        reach_motion_now_seconds());
     return 1;
 }
 
@@ -1516,6 +1526,9 @@ static void reach_launcher_capsule_surface_geometry(const void *capsule,
     out->has_input_bounds = 1;
     out->input_bounds = reach_launcher_body_motion(layout, &launcher->body_height);
     reach_feature_transition_presentation(&launcher->surface_transition, out);
+    out->presentation.group.scale = launcher->presentation_scale;
+    reach_motion_set(&out->presentation.center_x, out->visible_bounds.width * 0.5f);
+    reach_motion_set(&out->presentation.center_y, out->visible_bounds.height * 0.5f);
     if (launcher->results_deadline > 0 &&
         (out->deadline_seconds <= 0 || launcher->results_deadline < out->deadline_seconds))
         out->deadline_seconds = launcher->results_deadline;
