@@ -107,7 +107,7 @@ static constexpr reach_top_bar_metrics reach_top_bar_make_metrics()
 
     metrics.clock_gap = 9.0f;
     metrics.clock_time_text_size = REACH_TEXT_SIZE_MEDIUM;
-    metrics.clock_time_text_weight = REACH_TEXT_WEIGHT_SEMIBOLD;
+    metrics.clock_time_text_weight = REACH_TEXT_WEIGHT_BOLD;
     metrics.clock_date_text_size = REACH_TEXT_SIZE_SMALL;
     metrics.clock_date_text_weight = REACH_TEXT_WEIGHT_NORMAL;
 
