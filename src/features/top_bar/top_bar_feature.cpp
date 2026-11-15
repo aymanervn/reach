@@ -71,15 +71,6 @@ int32_t reach_top_bar_apply_scrim_length(reach_top_bar *top_bar,
     return 1;
 }
 
-float reach_top_bar_scrim_overhang_dp(void)
-{
-    const reach_top_bar_metrics &metrics = reach_top_bar_metrics_values;
-    float ratio = 1.0f;
-    for (float length : metrics.simple_scrim_height_ratio)
-        ratio = length > ratio ? length : ratio;
-    return reach_top_bar_style_profile_for(REACH_CONFIG_TOP_BAR_STYLE_SIMPLE).height * (ratio - 1);
-}
-
 static void reach_top_bar_load_motion_specs(reach_top_bar *top_bar, const reach_theme *theme)
 {
     top_bar->snappy_spec = reach_theme_motion_preset(theme, REACH_MOTION_PRESET_SNAPPY);
@@ -553,6 +544,7 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
         return;
     }
     reach_top_bar_load_motion_specs(top_bar, ctx->theme);
+    top_bar->scrim_color = ctx->theme->top_bar_scrim;
 
     const reach_top_bar_metrics &metrics = reach_top_bar_metrics_values;
     const reach_top_bar_style_profile profile =
@@ -1459,6 +1451,15 @@ static void reach_top_bar_capsule_surface_geometry(const void *capsule,
         out->bar_reveal_policy =
             static_mode ? REACH_FEATURE_BAR_REVEAL_FULLSCREEN : REACH_FEATURE_BAR_REVEAL_ALWAYS;
         out->force_topmost = static_mode;
+        if (top_bar->state.style == REACH_CONFIG_TOP_BAR_STYLE_SIMPLE)
+        {
+            out->shadowless = 1;
+            const reach_top_bar_layout *layout = &top_bar->state.layout;
+            out->wallpaper_top_shade_extent =
+                layout->bounds.height *
+                reach_top_bar_metrics_values.simple_scrim_height_ratio[top_bar->state.scrim_length];
+            out->wallpaper_top_shade_color = top_bar->scrim_color;
+        }
     }
 }
 

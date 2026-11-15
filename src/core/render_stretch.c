@@ -210,8 +210,6 @@ static int32_t reach_render_stretch_command_valid(const reach_render_group *sour
         command->type != REACH_RENDER_COMMAND_NOTCHED_ROUNDED_RECT &&
         command->type != REACH_RENDER_COMMAND_SHADOW)
         return 0;
-    if (command->fill_gradient != REACH_RENDER_FILL_SOLID)
-        return 0;
     if (!isfinite(command->radius) || command->radius < 0.0f || !isfinite(command->rect.x) ||
         !isfinite(command->rect.y) || !isfinite(command->rect.width) ||
         !isfinite(command->rect.height) || command->rect.width <= 0.0f ||

@@ -354,32 +354,6 @@ reach_result reach_d2d_draw_triangle(ID2D1RenderTarget *target, const reach_rend
     return SUCCEEDED(hr) ? REACH_OK : REACH_ERROR;
 }
 
-static HRESULT reach_d2d_create_eased_fade_down_brush(ID2D1RenderTarget *target, D2D1_RECT_F bounds,
-                                                      reach_color color, ID2D1Brush **out_brush)
-{
-    static const float curve[][2] = {
-        {0.000f, 1.000f}, {0.190f, 0.738f}, {0.340f, 0.541f}, {0.470f, 0.382f}, {0.565f, 0.278f},
-        {0.650f, 0.194f}, {0.730f, 0.126f}, {0.802f, 0.075f}, {0.861f, 0.042f}, {0.910f, 0.021f},
-        {0.952f, 0.008f}, {0.982f, 0.002f}, {1.000f, 0.000f}};
-    D2D1_GRADIENT_STOP stops[sizeof(curve) / sizeof(curve[0])] = {};
-    for (size_t index = 0; index < sizeof(curve) / sizeof(curve[0]); ++index)
-    {
-        stops[index].position = curve[index][0];
-        stops[index].color = D2D1::ColorF(color.r, color.g, color.b, color.a * curve[index][1]);
-    }
-    ComPtr<ID2D1GradientStopCollection> collection;
-    HRESULT hr =
-        target->CreateGradientStopCollection(stops, sizeof(curve) / sizeof(curve[0]), &collection);
-    ID2D1LinearGradientBrush *brush = nullptr;
-    if (SUCCEEDED(hr))
-        hr = target->CreateLinearGradientBrush(
-            D2D1::LinearGradientBrushProperties(D2D1::Point2F(bounds.left, bounds.top),
-                                                D2D1::Point2F(bounds.left, bounds.bottom)),
-            collection.Get(), &brush);
-    *out_brush = brush;
-    return hr;
-}
-
 reach_result reach_d2d_fill_rect_or_rounded_rect(ID2D1RenderTarget *target,
                                                  const reach_render_command *command)
 {
@@ -388,27 +362,17 @@ reach_result reach_d2d_fill_rect_or_rounded_rect(ID2D1RenderTarget *target,
         return REACH_INVALID_ARGUMENT;
     }
 
-    D2D1_RECT_F bounds =
-        D2D1::RectF(command->rect.x, command->rect.y, command->rect.x + command->rect.width,
-                    command->rect.y + command->rect.height);
-
-    ID2D1Brush *brush = nullptr;
-    HRESULT hr = S_OK;
-    if (command->fill_gradient == REACH_RENDER_FILL_EASED_FADE_DOWN)
-    {
-        hr = reach_d2d_create_eased_fade_down_brush(target, bounds, command->color, &brush);
-    }
-    else
-    {
-        ID2D1SolidColorBrush *solid = nullptr;
-        hr = target->CreateSolidColorBrush(reach_d2d_color(command->color), &solid);
-        brush = solid;
-    }
+    ID2D1SolidColorBrush *brush = nullptr;
+    HRESULT hr = target->CreateSolidColorBrush(reach_d2d_color(command->color), &brush);
 
     if (FAILED(hr) || brush == nullptr)
     {
         return REACH_ERROR;
     }
+
+    D2D1_RECT_F bounds =
+        D2D1::RectF(command->rect.x, command->rect.y, command->rect.x + command->rect.width,
+                    command->rect.y + command->rect.height);
 
     if (command->corner_mask != 0 && command->corner_mask != REACH_RENDER_CORNER_ALL)
     {

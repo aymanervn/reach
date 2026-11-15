@@ -14,8 +14,20 @@ const reach_shadow *reach_host_surface_shadow(const reach_host *host, reach_surf
         return nullptr;
     }
 
+    const reach_feature_runtime *runtime = &host->feature_runtimes[id];
+    if (runtime->definition->capsule_ops != nullptr &&
+        runtime->definition->capsule_ops->surface_geometry != nullptr)
+    {
+        reach_feature_surface_geometry geometry = {};
+        runtime->definition->capsule_ops->surface_geometry(runtime->capsule, &geometry);
+        if (geometry.shadowless)
+        {
+            return nullptr;
+        }
+    }
+
     const reach_theme *theme = host->theme != nullptr ? host->theme : reach_theme_default();
-    switch (host->feature_runtimes[id].definition->surface.shadow)
+    switch (runtime->definition->surface.shadow)
     {
     case REACH_SURFACE_SHADOW_BAR:
         return &theme->bar_shadow;
@@ -29,20 +41,12 @@ const reach_shadow *reach_host_surface_shadow(const reach_host *host, reach_surf
 reach_shadow_pad reach_host_surface_shadow_pad(const reach_host *host, reach_surface_id id)
 {
     reach_shadow_pad pad = {};
-    if (host == nullptr || id >= REACH_HOST_SURFACE_COUNT)
+    const reach_shadow *shadow = reach_host_surface_shadow(host, id);
+    if (shadow == nullptr)
     {
         return pad;
     }
-    float scale = reach_host_layout_dpi_scale(host);
-    const reach_shadow *shadow = reach_host_surface_shadow(host, id);
-    if (shadow != nullptr)
-    {
-        pad = reach_theme_shadow_pad(shadow, scale);
-    }
-    float overhang =
-        ceilf(host->feature_runtimes[id].definition->surface.overhang_bottom_dp * scale);
-    pad.bottom = overhang > pad.bottom ? overhang : pad.bottom;
-    return pad;
+    return reach_theme_shadow_pad(shadow, reach_host_layout_dpi_scale(host));
 }
 
 static reach_rect_f32 reach_host_surface_window_bounds(reach_rect_f32 content, reach_shadow_pad pad)
