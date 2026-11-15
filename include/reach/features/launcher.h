@@ -84,7 +84,6 @@ extern "C"
         reach_motion hover_opacity;
         size_t hover_index;
         int32_t has_hover;
-        reach_motion search_icon_opacity;
         float dpi_scale;
         int32_t text_alignment_leading;
 

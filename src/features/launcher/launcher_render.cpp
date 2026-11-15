@@ -97,7 +97,8 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
         command.color = transparent;
         command.radius = 0.0f;
         command.text_size = reach_launcher_scale(input, REACH_TEXT_SIZE_LARGE);
-        command.text_weight = REACH_TEXT_WEIGHT_NORMAL;
+        command.text_weight =
+            model->query[0] == 0 ? REACH_TEXT_WEIGHT_SEMIBOLD : REACH_TEXT_WEIGHT_NORMAL;
         command.text_alignment = input->text_alignment_leading;
         command.text_color = theme->launcher_search_text;
         command.placeholder_color = theme->launcher_placeholder_text;
@@ -115,30 +116,15 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
             return result;
     }
 
-    if (input->search_icon_opacity.generation == 0
-            ? model->query[0] == 0
-            : input->search_icon_opacity.to > 0.0f ||
-                  reach_motion_active(&input->search_icon_opacity))
-    {
-        size_t first = out_commands->count;
-        command = {};
-        command.type = REACH_RENDER_COMMAND_VECTOR_ICON;
-        command.rect.x = layout->search_icon.x - layout->bounds.x;
-        command.rect.y = layout->search_icon.y - layout->bounds.y;
-        command.rect.width = layout->search_icon.width;
-        command.rect.height = layout->search_icon.height;
-        command.icon_id = REACH_VECTOR_ICON_SEARCH;
-        command.color = theme->launcher_search_icon;
-        reach_render_command_buffer_push(out_commands, &command);
-        if (input->search_icon_opacity.generation != 0)
-        {
-            reach_motion fixed = {};
-            result = reach_render_retain_commands(out_commands, first, UINT64_C(0x2900000000030010),
-                                                  0, &input->search_icon_opacity, &fixed);
-            if (result != REACH_OK)
-                return result;
-        }
-    }
+    command = {};
+    command.type = REACH_RENDER_COMMAND_VECTOR_ICON;
+    command.rect.x = layout->search_icon.x - layout->bounds.x;
+    command.rect.y = layout->search_icon.y - layout->bounds.y;
+    command.rect.width = layout->search_icon.width;
+    command.rect.height = layout->search_icon.height;
+    command.icon_id = REACH_VECTOR_ICON_SEARCH;
+    command.color = theme->launcher_search_text;
+    reach_render_command_buffer_push(out_commands, &command);
 
     if (results_attached)
     {
