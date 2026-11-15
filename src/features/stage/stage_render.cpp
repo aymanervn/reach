@@ -31,25 +31,27 @@ static reach_result reach_stage_push_tile_background(const reach_stage_render_co
         return REACH_OK;
     }
 
-    width = hovered ? width * 2.0f : 0.0f;
-    reach_render_command shape = {};
-    shape.type = REACH_RENDER_COMMAND_RECT;
-    shape.rect = {item.x - width, item.y - width, item.width + width * 2.0f,
-                  item.height + width * 2.0f};
-
     reach_color background = ctx->theme->stage_backdrop;
     background.a = 1.0f;
-    reach_color border = {};
-    if (hovered)
+    reach_render_command shape = {};
+    shape.type = REACH_RENDER_COMMAND_RECT;
+    if (!hovered)
     {
-        reach_color highlight = ctx->theme->stage_tile_highlight;
-        border = ctx->theme->bar_border;
-        border.a = 1.0f;
-        float highlight_opacity = highlight.a;
-        highlight.a = 1.0f;
-        border = reach_theme_color_mix(border, highlight, highlight_opacity);
-        border = reach_theme_color_mix(background, border, alpha);
+        shape.rect = reach_render_pixel_aligned_rect(item);
+        shape.color = reach_theme_color_alpha(background, alpha);
+        return reach_render_command_buffer_push(commands, &shape);
     }
+
+    width *= 2.0f;
+    shape.rect = {item.x - width, item.y - width, item.width + width * 2.0f,
+                  item.height + width * 2.0f};
+    reach_color highlight = ctx->theme->stage_tile_highlight;
+    reach_color border = ctx->theme->bar_border;
+    border.a = 1.0f;
+    float highlight_opacity = highlight.a;
+    highlight.a = 1.0f;
+    border = reach_theme_color_mix(border, highlight, highlight_opacity);
+    border = reach_theme_color_mix(background, border, alpha);
     return reach_render_push_bordered_background(commands, &shape, background, border, width,
                                                  nullptr, ctx->dpi_scale);
 }
