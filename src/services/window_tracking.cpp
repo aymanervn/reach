@@ -160,27 +160,50 @@ int32_t reach_window_tracking_any_trespassing(const reach_window_tracking *servi
     return 0;
 }
 
-int32_t reach_window_tracking_any_non_game_fullscreen(const reach_window_tracking *service,
-                                                      reach_rect_f32 monitor_bounds)
+static int32_t reach_window_tracking_presented_on_monitor(const reach_window_tracking *service,
+                                                          const reach_window_snapshot *window,
+                                                          reach_rect_f32 monitor_bounds)
+{
+    if (window == nullptr || window->id == 0 || !window->visible || window->minimized)
+    {
+        return 0;
+    }
+    reach_rect_f32 bounds = {};
+    return service->window_manager.ops.outer_bounds(service->window_manager.manager, window->id,
+                                                    &bounds) == REACH_OK &&
+           reach_window_tracking_rect_centered_on_monitor(bounds, monitor_bounds);
+}
+
+static int32_t reach_window_tracking_non_game_fullscreen(const reach_window_snapshot *window)
+{
+    return window->fullscreen && !window->fullscreen_game;
+}
+
+int32_t reach_window_tracking_front_non_game_fullscreen(const reach_window_tracking *service,
+                                                        reach_rect_f32 monitor_bounds)
 {
     if (service == nullptr || service->window_manager.ops.outer_bounds == nullptr)
     {
         return 0;
     }
 
+    for (size_t rank = 0; rank <= service->focus_history_count; ++rank)
+    {
+        uintptr_t window_id =
+            rank == 0 ? service->foreground_window : service->focus_history[rank - 1];
+        const reach_window_snapshot *window =
+            reach_window_tracking_window_by_id(service, window_id);
+        if (reach_window_tracking_presented_on_monitor(service, window, monitor_bounds))
+        {
+            return reach_window_tracking_non_game_fullscreen(window);
+        }
+    }
+
     for (size_t index = 0; index < service->open_window_count; ++index)
     {
         const reach_window_snapshot *window = &service->open_windows[index];
-        if (window->id == 0 || !window->visible || window->minimized || !window->fullscreen ||
-            window->fullscreen_game)
-        {
-            continue;
-        }
-
-        reach_rect_f32 bounds = {};
-        if (service->window_manager.ops.outer_bounds(service->window_manager.manager, window->id,
-                                                     &bounds) == REACH_OK &&
-            reach_window_tracking_rect_centered_on_monitor(bounds, monitor_bounds))
+        if (reach_window_tracking_non_game_fullscreen(window) &&
+            reach_window_tracking_presented_on_monitor(service, window, monitor_bounds))
         {
             return 1;
         }

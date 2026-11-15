@@ -166,9 +166,9 @@ static void test_non_game_fullscreen_survives_focus_and_respects_monitor(void)
 
     reach_rect_f32 primary = {0.0f, 0.0f, 1000.0f, 800.0f};
     reach_rect_f32 secondary = {1000.0f, 0.0f, 1000.0f, 800.0f};
-    expect_true(reach_window_tracking_any_non_game_fullscreen(service, primary),
+    expect_true(reach_window_tracking_front_non_game_fullscreen(service, primary),
                 "a fullscreen app remains relevant without foreground state");
-    expect_true(reach_window_tracking_any_non_game_fullscreen(service, secondary),
+    expect_true(reach_window_tracking_front_non_game_fullscreen(service, secondary),
                 "fullscreen relevance follows the hosting monitor");
 
     windows[0].minimized = 1;
@@ -178,9 +178,9 @@ static void test_non_game_fullscreen_survives_focus_and_respects_monitor(void)
     fake_window_bounds[1] = {0.0f, 0.0f, 1000.0f, 800.0f};
     fake_window_bounds[2] = {1000.0f, 0.0f, 1000.0f, 800.0f};
     (void)reach_window_tracking_refresh(service, nullptr);
-    expect_true(!reach_window_tracking_any_non_game_fullscreen(service, primary),
+    expect_true(!reach_window_tracking_front_non_game_fullscreen(service, primary),
                 "minimized apps and fullscreen games do not activate the override");
-    expect_true(!reach_window_tracking_any_non_game_fullscreen(service, secondary),
+    expect_true(!reach_window_tracking_front_non_game_fullscreen(service, secondary),
                 "hidden fullscreen apps do not activate the override");
 
     reach_window_tracking_destroy(service);
