@@ -9,8 +9,8 @@ static constexpr float reach_preview_padding_dp = 12.0f;
 static constexpr float reach_preview_gap_dp = 12.0f;
 static constexpr float reach_preview_header_dp = 18.0f;
 static constexpr float reach_preview_header_gap_dp = 4.0f;
-static constexpr float reach_preview_label_padding_x_dp = 12.0f;
-static constexpr float reach_preview_label_padding_y_dp = 6.0f;
+static constexpr float reach_preview_label_padding_x_dp = 10.0f;
+static constexpr float reach_preview_label_padding_y_dp = 4.0f;
 
 void reach_context_menu_attach_services(reach_context_menu *menu, reach_window_tracking *windows,
                                         reach_icon_service *icons)
@@ -158,7 +158,7 @@ static int32_t reach_context_menu_arrange_previews_as(reach_context_menu *menu,
         label_mode
             ? fminf(room, ceilf(reach_text_width_or_estimate(
                               &ctx->text_measure, menu->request.label,
-                              REACH_TEXT_SIZE_SMALL * scale, REACH_TEXT_WEIGHT_NORMAL, .55f)))
+                              REACH_TEXT_SIZE_XSMALL * scale, REACH_TEXT_WEIGHT_NORMAL, .55f)))
             : 0.0f;
     height *= fit_scale;
     gap *= fit_scale;
