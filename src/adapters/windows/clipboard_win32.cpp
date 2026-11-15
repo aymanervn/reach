@@ -785,6 +785,26 @@ static LRESULT CALLBACK reach_clipboard_window_proc(HWND window, UINT message, W
     return DefWindowProcW(window, message, wparam, lparam);
 }
 
+static int32_t reach_clipboard_ensure_window(reach_clipboard_provider *provider)
+{
+    if (provider->window != nullptr)
+    {
+        return 1;
+    }
+    WNDCLASSW window_class = {};
+    window_class.lpfnWndProc = reach_clipboard_window_proc;
+    window_class.hInstance = GetModuleHandleW(nullptr);
+    window_class.lpszClassName = REACH_CLIPBOARD_WINDOW_CLASS;
+    provider->window_class = RegisterClassW(&window_class);
+    if (provider->window_class == 0 && GetLastError() != ERROR_CLASS_ALREADY_EXISTS)
+    {
+        return 0;
+    }
+    provider->window = CreateWindowExW(0, REACH_CLIPBOARD_WINDOW_CLASS, L"", 0, 0, 0, 0, 0,
+                                       HWND_MESSAGE, nullptr, GetModuleHandleW(nullptr), provider);
+    return provider->window != nullptr;
+}
+
 static reach_result reach_clipboard_start(reach_clipboard_provider *provider,
                                           reach_clipboard_changed_callback callback, void *user)
 {
@@ -794,24 +814,84 @@ static reach_result reach_clipboard_start(reach_clipboard_provider *provider,
     }
     provider->callback = callback;
     provider->callback_user = user;
-    if (provider->window == nullptr)
-    {
-        WNDCLASSW window_class = {};
-        window_class.lpfnWndProc = reach_clipboard_window_proc;
-        window_class.hInstance = GetModuleHandleW(nullptr);
-        window_class.lpszClassName = REACH_CLIPBOARD_WINDOW_CLASS;
-        provider->window_class = RegisterClassW(&window_class);
-        if (provider->window_class == 0 && GetLastError() != ERROR_CLASS_ALREADY_EXISTS)
-        {
-            return REACH_ERROR;
-        }
-        provider->window =
-            CreateWindowExW(0, REACH_CLIPBOARD_WINDOW_CLASS, L"", 0, 0, 0, 0, 0, HWND_MESSAGE,
-                            nullptr, GetModuleHandleW(nullptr), provider);
-    }
-    return provider->window != nullptr && AddClipboardFormatListener(provider->window)
+    return reach_clipboard_ensure_window(provider) && AddClipboardFormatListener(provider->window)
                ? REACH_OK
                : REACH_ERROR;
+}
+
+static HGLOBAL reach_clipboard_dib_from_image(const reach_image_view *image)
+{
+    size_t row_bytes = (size_t)image->width * 4u;
+    size_t pixel_bytes = row_bytes * image->height;
+    HGLOBAL memory = GlobalAlloc(GMEM_MOVEABLE, sizeof(BITMAPINFOHEADER) + pixel_bytes);
+    uint8_t *destination = memory != nullptr ? static_cast<uint8_t *>(GlobalLock(memory)) : nullptr;
+    if (destination == nullptr)
+    {
+        if (memory != nullptr)
+        {
+            GlobalFree(memory);
+        }
+        return nullptr;
+    }
+    BITMAPINFOHEADER *header = reinterpret_cast<BITMAPINFOHEADER *>(destination);
+    *header = {};
+    header->biSize = sizeof(BITMAPINFOHEADER);
+    header->biWidth = (LONG)image->width;
+    header->biHeight = (LONG)image->height;
+    header->biPlanes = 1;
+    header->biBitCount = 32;
+    header->biCompression = BI_RGB;
+    header->biSizeImage = (DWORD)pixel_bytes;
+    uint8_t *pixels = destination + sizeof(BITMAPINFOHEADER);
+    for (uint32_t row = 0; row < image->height; ++row)
+    {
+        const uint8_t *source = image->bgra_pixels + (size_t)row * image->stride;
+        uint8_t *target = pixels + (size_t)(image->height - 1u - row) * row_bytes;
+        memcpy(target, source, row_bytes);
+        for (size_t alpha = 3; alpha < row_bytes; alpha += 4)
+        {
+            target[alpha] = 0xFF;
+        }
+    }
+    GlobalUnlock(memory);
+    return memory;
+}
+
+static reach_result reach_clipboard_set_image(reach_clipboard_provider *provider,
+                                              const reach_image_view *image)
+{
+    if (provider == nullptr || image == nullptr || image->bgra_pixels == nullptr ||
+        image->width == 0 || image->height == 0 || image->width > 32768 || image->height > 32768 ||
+        image->stride < (size_t)image->width * 4u)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    if (!reach_clipboard_ensure_window(provider))
+    {
+        return REACH_ERROR;
+    }
+    HGLOBAL memory = reach_clipboard_dib_from_image(image);
+    if (memory == nullptr)
+    {
+        return REACH_ERROR;
+    }
+    if (!OpenClipboard(provider->window))
+    {
+        GlobalFree(memory);
+        return REACH_ERROR;
+    }
+    reach_result result = REACH_ERROR;
+    if (EmptyClipboard() && SetClipboardData(CF_DIB, memory) != nullptr)
+    {
+        memory = nullptr;
+        result = REACH_OK;
+    }
+    CloseClipboard();
+    if (memory != nullptr)
+    {
+        GlobalFree(memory);
+    }
+    return result;
 }
 
 static reach_result reach_clipboard_stop(reach_clipboard_provider *provider)
@@ -867,5 +947,6 @@ extern "C" reach_result reach_windows_create_clipboard_provider(reach_clipboard_
     out_port->ops.restore = reach_clipboard_restore;
     out_port->ops.release = reach_clipboard_release;
     out_port->ops.destroy = reach_clipboard_destroy;
+    out_port->ops.set_image = reach_clipboard_set_image;
     return REACH_OK;
 }

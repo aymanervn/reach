@@ -71,6 +71,7 @@ typedef enum reach_surface_id
     REACH_SURFACE_ID_STAGE,
     REACH_SURFACE_ID_BATTERY,
     REACH_SURFACE_ID_SYSTEM_HUD,
+    REACH_SURFACE_ID_SCREENSHOT,
     REACH_HOST_SURFACE_COUNT
 } reach_surface_id;
 
@@ -168,6 +169,7 @@ typedef struct reach_feature_dependencies
     void (*request_update)(void *user);
     void *request_update_user;
     const uint16_t *terminal_icon_ref;
+    const reach_screen_capture_port *screen_capture;
 } reach_feature_dependencies;
 
 typedef struct reach_feature_lifecycle_ops
@@ -661,6 +663,7 @@ struct reach_host
     reach_host_window_manipulation_state window_manipulation;
     reach_host_pointer_move_state pointer_move;
     reach_clipboard_port clipboard;
+    reach_screen_capture_port screen_capture;
     reach_search_service *search_service;
     reach_app_control *app_control;
     reach_host_deferred_launch deferred_launch;

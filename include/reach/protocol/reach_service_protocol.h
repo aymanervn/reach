@@ -96,6 +96,7 @@ enum reach_service_hotkey_key : uint32_t
     REACH_SERVICE_HOTKEY_ARROW_UP = 11,
     REACH_SERVICE_HOTKEY_ARROW_DOWN = 12,
     REACH_SERVICE_HOTKEY_V = 13,
+    REACH_SERVICE_HOTKEY_S = 14,
 };
 
 enum reach_service_hotkey_action : uint32_t
@@ -103,26 +104,6 @@ enum reach_service_hotkey_action : uint32_t
     REACH_SERVICE_HOTKEY_RELEASED = 0,
     REACH_SERVICE_HOTKEY_PRESSED = 1,
 };
-
-typedef struct reach_service_win_chord
-{
-    uint32_t virtual_key;
-    uint32_t hotkey;
-    uint32_t ui_event;
-} reach_service_win_chord;
-
-static const reach_service_win_chord REACH_SERVICE_WIN_CHORDS[] = {
-    {0x44, REACH_SERVICE_HOTKEY_D, REACH_UI_EVENT_MINIMIZE_ALL},
-    {0x54, REACH_SERVICE_HOTKEY_T, REACH_UI_EVENT_OPEN_TERMINAL},
-    {0x25, REACH_SERVICE_HOTKEY_ARROW_LEFT, REACH_UI_EVENT_SNAP_LEFT},
-    {0x27, REACH_SERVICE_HOTKEY_ARROW_RIGHT, REACH_UI_EVENT_SNAP_RIGHT},
-    {0x26, REACH_SERVICE_HOTKEY_ARROW_UP, REACH_UI_EVENT_SNAP_TOP},
-    {0x28, REACH_SERVICE_HOTKEY_ARROW_DOWN, REACH_UI_EVENT_SNAP_BOTTOM},
-    {0x56, REACH_SERVICE_HOTKEY_V, REACH_UI_EVENT_CLIPBOARD_TOGGLE},
-};
-
-static const size_t REACH_SERVICE_WIN_CHORD_COUNT =
-    sizeof(REACH_SERVICE_WIN_CHORDS) / sizeof(REACH_SERVICE_WIN_CHORDS[0]);
 
 enum reach_service_hotkey_modifier : uint32_t
 {
@@ -132,6 +113,43 @@ enum reach_service_hotkey_modifier : uint32_t
     REACH_SERVICE_MODIFIER_RIGHT_WIN = 1u << 3,
     REACH_SERVICE_MODIFIER_CHORD = 1u << 4,
 };
+
+typedef struct reach_service_win_chord
+{
+    uint32_t virtual_key;
+    uint32_t hotkey;
+    uint32_t ui_event;
+    uint32_t required_modifiers;
+} reach_service_win_chord;
+
+static const reach_service_win_chord REACH_SERVICE_WIN_CHORDS[] = {
+    {0x44, REACH_SERVICE_HOTKEY_D, REACH_UI_EVENT_MINIMIZE_ALL, 0},
+    {0x54, REACH_SERVICE_HOTKEY_T, REACH_UI_EVENT_OPEN_TERMINAL, 0},
+    {0x25, REACH_SERVICE_HOTKEY_ARROW_LEFT, REACH_UI_EVENT_SNAP_LEFT, 0},
+    {0x27, REACH_SERVICE_HOTKEY_ARROW_RIGHT, REACH_UI_EVENT_SNAP_RIGHT, 0},
+    {0x26, REACH_SERVICE_HOTKEY_ARROW_UP, REACH_UI_EVENT_SNAP_TOP, 0},
+    {0x28, REACH_SERVICE_HOTKEY_ARROW_DOWN, REACH_UI_EVENT_SNAP_BOTTOM, 0},
+    {0x56, REACH_SERVICE_HOTKEY_V, REACH_UI_EVENT_CLIPBOARD_TOGGLE, 0},
+    {0x53, REACH_SERVICE_HOTKEY_S, REACH_UI_EVENT_SCREENSHOT_TOGGLE, REACH_SERVICE_MODIFIER_SHIFT},
+};
+
+static const size_t REACH_SERVICE_WIN_CHORD_COUNT =
+    sizeof(REACH_SERVICE_WIN_CHORDS) / sizeof(REACH_SERVICE_WIN_CHORDS[0]);
+
+static inline const reach_service_win_chord *reach_service_find_win_chord(uint32_t hotkey,
+                                                                          uint32_t modifiers)
+{
+    for (size_t index = 0; index < REACH_SERVICE_WIN_CHORD_COUNT; ++index)
+    {
+        const reach_service_win_chord *entry = &REACH_SERVICE_WIN_CHORDS[index];
+        if (entry->hotkey == hotkey &&
+            (modifiers & entry->required_modifiers) == entry->required_modifiers)
+        {
+            return entry;
+        }
+    }
+    return nullptr;
+}
 
 struct reach_service_hotkey_record
 {

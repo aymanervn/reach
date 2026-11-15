@@ -294,7 +294,9 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
         }
         return DefWindowProcW(hwnd, message, wparam, lparam);
     case WM_SETCURSOR:
-        SetCursor(LoadCursor(nullptr, IDC_ARROW));
+        SetCursor(LoadCursor(nullptr, window != nullptr && window->role == REACH_SURFACE_SCREENSHOT
+                                          ? IDC_CROSS
+                                          : IDC_ARROW));
         return TRUE;
     case WM_ACTIVATE:
         if (window != nullptr && LOWORD(wparam) == WA_INACTIVE &&
@@ -756,7 +758,8 @@ static DWORD reach_window_ex_style(reach_surface_role role)
         role == REACH_SURFACE_SWITCHER || role == REACH_SURFACE_CONTEXT_MENU ||
         role == REACH_SURFACE_QUICK_SETTINGS || role == REACH_SURFACE_BATTERY ||
         role == REACH_SURFACE_CLIPBOARD || role == REACH_SURFACE_SETTINGS ||
-        role == REACH_SURFACE_STAGE || role == REACH_SURFACE_SYSTEM_HUD)
+        role == REACH_SURFACE_STAGE || role == REACH_SURFACE_SYSTEM_HUD ||
+        role == REACH_SURFACE_SCREENSHOT)
     {
         style |= WS_EX_NOREDIRECTIONBITMAP;
     }

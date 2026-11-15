@@ -243,6 +243,10 @@ static void reach_host_cleanup(reach_host *host)
     {
         host->clipboard.ops.destroy(host->clipboard.provider);
     }
+    if (host->screen_capture.ops.destroy != nullptr)
+    {
+        host->screen_capture.ops.destroy(host->screen_capture.capture);
+    }
 
     host->monitors = {};
     host->popup_capture = {};
@@ -270,6 +274,7 @@ static void reach_host_cleanup(reach_host *host)
     host->media_controls = {};
     host->now_playing_service = nullptr;
     host->clipboard = {};
+    host->screen_capture = {};
     host->quick_settings_system_change_flags.store(0);
     host->audio_volume_changed.store(0);
 }
@@ -421,6 +426,7 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
     }
     host->media_controls = dependencies->media_controls;
     host->clipboard = dependencies->clipboard;
+    host->screen_capture = dependencies->screen_capture;
     host->now_playing_service = nullptr;
     if (reach_now_playing_service_create(host->media_controls, reach_host_on_now_playing_ready,
                                          host, &host->now_playing_service) != REACH_OK)
@@ -446,7 +452,8 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
                                                        &host->clipboard,
                                                        reach_host_on_feature_update_requested,
                                                        host,
-                                                       terminal_icon_ref};
+                                                       terminal_icon_ref,
+                                                       &host->screen_capture};
     reach_host_attach_registered_features(host, &feature_dependencies);
     reach_host_bind_interfeature_routes(host);
     reach_system_status_refresh_system(host->system_status, 0);

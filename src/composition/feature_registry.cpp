@@ -6,6 +6,7 @@
 #include "reach/features/dock.h"
 #include "reach/features/launcher.h"
 #include "reach/features/quick_settings.h"
+#include "reach/features/screenshot.h"
 #include "reach/features/stage.h"
 #include "reach/features/switcher.h"
 #include "reach/features/system_hud.h"
@@ -102,6 +103,14 @@ static void reach_feature_attach_clipboard(void *capsule,
         dependencies != nullptr ? dependencies->clipboard : nullptr,
         dependencies != nullptr ? dependencies->request_update : nullptr,
         dependencies != nullptr ? dependencies->request_update_user : nullptr);
+}
+
+static void reach_feature_attach_screenshot(void *capsule,
+                                            const reach_feature_dependencies *dependencies)
+{
+    reach_screenshot_attach_ports(static_cast<reach_screenshot *>(capsule),
+                                  dependencies != nullptr ? dependencies->screen_capture : nullptr,
+                                  dependencies != nullptr ? dependencies->clipboard : nullptr);
 }
 
 static reach_result reach_feature_start_clipboard(void *capsule)
@@ -417,6 +426,31 @@ static int32_t reach_feature_control_clipboard_open(void *capsule, int32_t open,
     return changed;
 }
 
+static int32_t reach_feature_control_screenshot_open(void *capsule, int32_t open,
+                                                     reach_feature_tick_result *out)
+{
+    int32_t changed = reach_screenshot_set_open(static_cast<reach_screenshot *>(capsule), open);
+    if (changed && out != nullptr)
+    {
+        out->redraw = 1;
+        out->relayout = 1;
+        out->request_update = 1;
+    }
+    return changed;
+}
+
+static void reach_feature_notify_screenshot(void *capsule,
+                                            const reach_feature_notification *notification,
+                                            reach_feature_tick_result *out)
+{
+    (void)out;
+    if (notification != nullptr && notification->kind == REACH_FEATURE_NOTIFICATION_DISPLAY_CHANGED)
+    {
+        reach_screenshot_set_display(static_cast<reach_screenshot *>(capsule),
+                                     &notification->display);
+    }
+}
+
 static int32_t reach_feature_control_tray_open(void *capsule, int32_t open,
                                                reach_feature_tick_result *out)
 {
@@ -675,6 +709,62 @@ static void reach_feature_clipboard_clear_active(void *capsule)
     reach_clipboard_reset_items(static_cast<reach_clipboard_feature *>(capsule));
 }
 
+static size_t reach_feature_screenshot_take_retired(void *capsule,
+                                                    reach_feature_render_resource *out, size_t cap)
+{
+    if (out == nullptr)
+    {
+        return 0;
+    }
+    uint64_t ids[REACH_DISPLAY_MAX_MONITORS * 2] = {};
+    size_t count = reach_screenshot_take_retired_images(
+        static_cast<reach_screenshot *>(capsule), ids,
+        cap < REACH_DISPLAY_MAX_MONITORS * 2 ? cap : REACH_DISPLAY_MAX_MONITORS * 2);
+    for (size_t index = 0; index < count; ++index)
+    {
+        out[index] = {ids[index], ids[index], 1};
+    }
+    return count;
+}
+
+static size_t reach_feature_screenshot_active_count(const void *capsule)
+{
+    return reach_screenshot_image_count(static_cast<const reach_screenshot *>(capsule));
+}
+
+static int32_t reach_feature_screenshot_active_at(const void *capsule, size_t index,
+                                                  reach_feature_render_resource *out)
+{
+    uint64_t image_id =
+        reach_screenshot_image_at(static_cast<const reach_screenshot *>(capsule), index);
+    if (out == nullptr || image_id == 0)
+    {
+        return 0;
+    }
+    *out = {image_id, image_id, 1};
+    return 1;
+}
+
+static void reach_feature_screenshot_release_source(void *capsule,
+                                                    const reach_feature_render_resource *resource)
+{
+    if (resource != nullptr && resource->release_source)
+    {
+        reach_screenshot_release_image(static_cast<reach_screenshot *>(capsule),
+                                       resource->source_id);
+    }
+}
+
+static void reach_feature_screenshot_clear_active(void *capsule)
+{
+    reach_screenshot_forget_images(static_cast<reach_screenshot *>(capsule));
+}
+
+static const reach_feature_render_resource_ops reach_screenshot_resource_ops = {
+    reach_feature_screenshot_take_retired, reach_feature_screenshot_active_count,
+    reach_feature_screenshot_active_at, reach_feature_screenshot_release_source,
+    reach_feature_screenshot_clear_active};
+
 static const reach_feature_render_resource_ops reach_quick_settings_resource_ops = {
     reach_feature_quick_settings_take_retired, reach_feature_quick_settings_active_count,
     reach_feature_quick_settings_active_at, nullptr, nullptr};
@@ -711,6 +801,9 @@ static const reach_feature_control_ops reach_quick_settings_control_ops = {
     nullptr, &reach_quick_settings_resource_ops};
 static const reach_feature_control_ops reach_battery_control_ops = {
     reach_feature_control_battery_open, nullptr, nullptr, nullptr, nullptr};
+static const reach_feature_control_ops reach_screenshot_control_ops = {
+    reach_feature_control_screenshot_open, nullptr, reach_feature_notify_screenshot, nullptr,
+    &reach_screenshot_resource_ops};
 static const reach_feature_control_ops reach_system_hud_control_ops = {
     nullptr, nullptr, reach_feature_notify_system_hud, nullptr, nullptr};
 
@@ -784,6 +877,9 @@ static void reach_host_init_feature_definitions(reach_host *host)
                               reach_switcher_capsule_ops(), REACH_SURFACE_POINTER_NONE);
     reach_host_define_feature(host, REACH_SURFACE_ID_STAGE, REACH_SURFACE_CLASS_TRANSIENT, nullptr,
                               reach_stage_capsule_ops(), REACH_SURFACE_POINTER_NONE);
+    reach_host_define_feature(host, REACH_SURFACE_ID_SCREENSHOT, REACH_SURFACE_CLASS_OVERLAY,
+                              nullptr, reach_screenshot_capsule_ops(),
+                              REACH_SURFACE_POINTER_CAPTURE_CONSUMES_RELEASE);
 
     reach_feature_definition *definitions = host->feature_definitions;
 
@@ -811,6 +907,7 @@ static void reach_host_init_feature_definitions(reach_host *host)
     definitions[REACH_SURFACE_ID_SWITCHER].lifecycle.attach = reach_feature_attach_switcher;
     definitions[REACH_SURFACE_ID_SWITCHER].lifecycle.stop = reach_feature_stop_switcher;
     definitions[REACH_SURFACE_ID_STAGE].lifecycle.stop = reach_feature_stop_stage;
+    definitions[REACH_SURFACE_ID_SCREENSHOT].lifecycle.attach = reach_feature_attach_screenshot;
 
     definitions[REACH_SURFACE_ID_STAGE].control_ops = &reach_stage_control_ops;
     definitions[REACH_SURFACE_ID_STAGE].surface.refresh_world_on_open = 1;
@@ -826,6 +923,7 @@ static void reach_host_init_feature_definitions(reach_host *host)
     definitions[REACH_SURFACE_ID_QUICK_SETTINGS].control_ops = &reach_quick_settings_control_ops;
     definitions[REACH_SURFACE_ID_BATTERY].control_ops = &reach_battery_control_ops;
     definitions[REACH_SURFACE_ID_SYSTEM_HUD].control_ops = &reach_system_hud_control_ops;
+    definitions[REACH_SURFACE_ID_SCREENSHOT].control_ops = &reach_screenshot_control_ops;
 
     definitions[REACH_SURFACE_ID_DOCK].surface.shadow = REACH_SURFACE_SHADOW_BAR;
     definitions[REACH_SURFACE_ID_TOP_BAR].surface.shadow = REACH_SURFACE_SHADOW_BAR;
@@ -851,6 +949,7 @@ static void reach_host_init_feature_definitions(reach_host *host)
     definitions[REACH_SURFACE_ID_CLIPBOARD].surface.layer = 190;
     definitions[REACH_SURFACE_ID_SWITCHER].surface.layer = 200;
     definitions[REACH_SURFACE_ID_SYSTEM_HUD].surface.layer = 220;
+    definitions[REACH_SURFACE_ID_SCREENSHOT].surface.layer = 210;
 
     definitions[REACH_SURFACE_ID_CONTEXT_MENU].surface.role = REACH_SURFACE_CONTEXT_MENU;
     definitions[REACH_SURFACE_ID_CONTEXT_MENU].surface.pointer_priority = 10;
@@ -894,6 +993,12 @@ static void reach_host_init_feature_definitions(reach_host *host)
     definitions[REACH_SURFACE_ID_SYSTEM_HUD].surface.pointer_priority = 0;
     definitions[REACH_SURFACE_ID_SYSTEM_HUD].surface.behavior_flags =
         REACH_SURFACE_BEHAVIOR_GAME_MODE_VISIBLE | REACH_SURFACE_BEHAVIOR_INPUT_PASSTHROUGH;
+    definitions[REACH_SURFACE_ID_SCREENSHOT].surface.role = REACH_SURFACE_SCREENSHOT;
+    definitions[REACH_SURFACE_ID_SCREENSHOT].surface.pointer_priority = 5;
+    definitions[REACH_SURFACE_ID_SCREENSHOT].surface.refresh_world_on_open = 1;
+    definitions[REACH_SURFACE_ID_SCREENSHOT].surface.restores_focus_on_close = 1;
+    definitions[REACH_SURFACE_ID_SCREENSHOT].surface.behavior_flags =
+        REACH_SURFACE_BEHAVIOR_ACTIVATES | REACH_SURFACE_BEHAVIOR_EXCLUSIVE;
     definitions[REACH_SURFACE_ID_QUICK_SETTINGS].layout.anchor = REACH_SURFACE_ID_TOP_BAR;
     definitions[REACH_SURFACE_ID_QUICK_SETTINGS].surface.opening_origin = REACH_SURFACE_ID_TOP_BAR;
     definitions[REACH_SURFACE_ID_QUICK_SETTINGS].layout.anchor_slot =
@@ -926,6 +1031,7 @@ static void reach_host_init_feature_definitions(reach_host *host)
     definitions[REACH_SURFACE_ID_STAGE].layout.uses_reserved_bounds = 1;
     definitions[REACH_SURFACE_ID_CONTEXT_MENU].layout.priority = 70;
     definitions[REACH_SURFACE_ID_SYSTEM_HUD].layout.priority = 80;
+    definitions[REACH_SURFACE_ID_SCREENSHOT].layout.priority = 85;
 
     definitions[REACH_SURFACE_ID_LAUNCHER].toggle_events = reach_launcher_activation_events(
         &definitions[REACH_SURFACE_ID_LAUNCHER].toggle_event_count);
@@ -935,6 +1041,10 @@ static void reach_host_init_feature_definitions(reach_host *host)
         &definitions[REACH_SURFACE_ID_CLIPBOARD].toggle_event_count);
     definitions[REACH_SURFACE_ID_SWITCHER].routed_events =
         reach_switcher_routed_events(&definitions[REACH_SURFACE_ID_SWITCHER].routed_event_count);
+    definitions[REACH_SURFACE_ID_SCREENSHOT].toggle_events = reach_screenshot_activation_events(
+        &definitions[REACH_SURFACE_ID_SCREENSHOT].toggle_event_count);
+    definitions[REACH_SURFACE_ID_SCREENSHOT].routed_events = reach_screenshot_routed_events(
+        &definitions[REACH_SURFACE_ID_SCREENSHOT].routed_event_count);
 }
 
 static int32_t reach_prearranged_surface_arrange(void *capsule,
@@ -1337,6 +1447,25 @@ static reach_result reach_clipboard_surface_render(void *capsule,
                                                   ctx->theme, ctx->dpi_scale, out_commands);
 }
 
+static int32_t reach_screenshot_surface_arrange(void *capsule,
+                                                const reach_feature_surface_context *ctx)
+{
+    return reach_screenshot_arrange(static_cast<reach_screenshot *>(capsule), ctx->monitor_bounds);
+}
+
+static reach_result reach_screenshot_surface_render(void *capsule,
+                                                    const reach_feature_surface_context *ctx,
+                                                    reach_render_command_buffer *out_commands)
+{
+    return reach_screenshot_append_render_commands(static_cast<const reach_screenshot *>(capsule),
+                                                   ctx->theme, ctx->dpi_scale, out_commands);
+}
+
+static const reach_feature_surface_ops reach_screenshot_surface_ops = {
+    reach_screenshot_surface_arrange,
+    reach_screenshot_surface_render,
+};
+
 static const reach_feature_surface_ops reach_clipboard_surface_ops = {
     reach_clipboard_surface_arrange,
     reach_clipboard_surface_render,
@@ -1553,6 +1682,10 @@ void reach_host_init_feature_registry(reach_host *host)
     definitions[REACH_SURFACE_ID_STAGE].factory = {
         reach_feature_create<reach_stage, reach_stage_create>,
         reach_feature_destroy<reach_stage, reach_stage_destroy>};
+    definitions[REACH_SURFACE_ID_SCREENSHOT].factory = {
+        reach_feature_create<reach_screenshot, reach_screenshot_create>,
+        reach_feature_destroy<reach_screenshot, reach_screenshot_destroy>};
+    definitions[REACH_SURFACE_ID_SCREENSHOT].surface_ops = &reach_screenshot_surface_ops;
     definitions[REACH_SURFACE_ID_DOCK].surface_ops = &reach_dock_surface_ops;
     definitions[REACH_SURFACE_ID_TOP_BAR].surface_ops = &reach_top_bar_surface_ops;
     definitions[REACH_SURFACE_ID_LAUNCHER].surface_ops = &reach_launcher_surface_ops;
@@ -1601,6 +1734,8 @@ void reach_host_bind_registered_surface_ports(reach_host *host,
     host->surfaces[REACH_SURFACE_ID_SYSTEM_HUD].renderer = dependencies->system_hud_renderer;
     host->surfaces[REACH_SURFACE_ID_CLIPBOARD].window = dependencies->clipboard_window;
     host->surfaces[REACH_SURFACE_ID_CLIPBOARD].renderer = dependencies->clipboard_renderer;
+    host->surfaces[REACH_SURFACE_ID_SCREENSHOT].window = dependencies->screenshot_window;
+    host->surfaces[REACH_SURFACE_ID_SCREENSHOT].renderer = dependencies->screenshot_renderer;
 
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {

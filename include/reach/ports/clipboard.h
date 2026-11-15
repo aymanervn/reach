@@ -2,6 +2,7 @@
 #define REACH_PORTS_CLIPBOARD_H
 
 #include "reach/core/clipboard.h"
+#include "reach/core/image.h"
 #include "reach/support/util.h"
 
 #ifdef __cplusplus
@@ -22,6 +23,8 @@ extern "C"
         reach_result (*restore)(reach_clipboard_provider *provider, uint64_t item_id);
         void (*release)(reach_clipboard_provider *provider, uint64_t item_id);
         void (*destroy)(reach_clipboard_provider *provider);
+        reach_result (*set_image)(reach_clipboard_provider *provider,
+                                  const reach_image_view *image);
     } reach_clipboard_provider_ops;
 
     typedef struct reach_clipboard_port

@@ -338,18 +338,15 @@ static int32_t reach_input_try_post_win_chord_event(reach_input_source *source,
         return 0;
     }
 
-    for (size_t index = 0; index < REACH_SERVICE_WIN_CHORD_COUNT; ++index)
+    const reach_service_win_chord *entry =
+        reach_service_find_win_chord(record->key, record->modifiers);
+    if (entry == nullptr)
     {
-        const reach_service_win_chord *entry = &REACH_SERVICE_WIN_CHORDS[index];
-        if (entry->hotkey == record->key)
-        {
-            source->windows_key_chord = 1;
-            reach_input_post_ui_event(source, (reach_ui_event_type)entry->ui_event, 0);
-            return 1;
-        }
+        return 0;
     }
-
-    return 0;
+    source->windows_key_chord = 1;
+    reach_input_post_ui_event(source, (reach_ui_event_type)entry->ui_event, 0);
+    return 1;
 }
 
 static void reach_input_reset_hotkey_state(reach_input_source *source)
@@ -549,6 +546,15 @@ static LRESULT CALLBACK reach_input_window_proc(HWND hwnd, UINT message, WPARAM 
             event.x = source->pointer_regions[event.id].point.x;
             event.y = source->pointer_regions[event.id].point.y;
             ReleaseSRWLockShared(&source->pointer_region_lock);
+        }
+        else
+        {
+            POINT cursor = {};
+            if (GetCursorPos(&cursor))
+            {
+                event.x = cursor.x;
+                event.y = cursor.y;
+            }
         }
         source->callback(source->user, &event);
         return 0;

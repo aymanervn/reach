@@ -121,6 +121,14 @@ void reach_system_hud_show_app_removed(reach_system_hud *hud, const uint16_t *ap
     reach_system_hud_begin_show(hud, REACH_SYSTEM_HUD_APP_REMOVED);
 }
 
+void reach_system_hud_show_screenshot_copied(reach_system_hud *hud)
+{
+    if (hud != nullptr)
+    {
+        reach_system_hud_begin_show(hud, REACH_SYSTEM_HUD_SCREENSHOT_COPIED);
+    }
+}
+
 static double reach_system_hud_lifetime(const reach_system_hud *hud)
 {
     return hud != nullptr && hud->state.kind == REACH_SYSTEM_HUD_APP_REMOVED
@@ -270,9 +278,19 @@ int32_t reach_system_hud_arrange(reach_system_hud *hud, const reach_system_hud_a
     }
 
     float scale = ctx->dpi_scale > 0.0f ? ctx->dpi_scale : 1.0f;
-    float base_width = hud->state.kind == REACH_SYSTEM_HUD_MEDIA
-                           ? 352.0f
-                           : (hud->state.kind == REACH_SYSTEM_HUD_APP_REMOVED ? 560.0f : 248.0f);
+    float base_width = 248.0f;
+    if (hud->state.kind == REACH_SYSTEM_HUD_MEDIA)
+    {
+        base_width = 352.0f;
+    }
+    else if (hud->state.kind == REACH_SYSTEM_HUD_APP_REMOVED)
+    {
+        base_width = 560.0f;
+    }
+    else if (hud->state.kind == REACH_SYSTEM_HUD_SCREENSHOT_COPIED)
+    {
+        base_width = 200.0f;
+    }
     float base_height = hud->state.kind == REACH_SYSTEM_HUD_MEDIA ? 64.0f : 48.0f;
     float base_border = reach_theme_border_thickness(ctx->theme, 1.0f);
     float width_scale = ctx->monitor_bounds.width / (base_width + 48.0f + base_border * 2.0f);
@@ -336,7 +354,8 @@ int32_t reach_system_hud_arrange(reach_system_hud *hud, const reach_system_hud_a
         next.subtitle = {content_x, text_top + title_height + 2.0f * scale, content_width,
                          subtitle_height};
     }
-    else if (hud->state.kind == REACH_SYSTEM_HUD_APP_REMOVED)
+    else if (hud->state.kind == REACH_SYSTEM_HUD_APP_REMOVED ||
+             hud->state.kind == REACH_SYSTEM_HUD_SCREENSHOT_COPIED)
     {
         float padding = 14.0f * scale + border;
         next.title = {padding, center_y - 10.0f * scale, width - padding * 2.0f, 20.0f * scale};

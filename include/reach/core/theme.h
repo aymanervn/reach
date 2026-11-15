@@ -176,6 +176,11 @@ extern "C"
         reach_color clipboard_scrollbar_track;
         reach_color clipboard_scrollbar_thumb;
 
+        reach_color screenshot_scrim;
+        reach_color screenshot_selection_border;
+        reach_color screenshot_label_background;
+        reach_color screenshot_label_text;
+
         reach_color settings_background;
         reach_color settings_nav_background;
         reach_color settings_text;

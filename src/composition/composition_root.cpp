@@ -191,6 +191,21 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
     }
     if (result == REACH_OK)
     {
+        result = reach_windows_create_platform_window(REACH_SURFACE_SCREENSHOT,
+                                                      &dependencies.screenshot_window);
+    }
+    if (result == REACH_OK)
+    {
+        result = reach_windows_create_dcomp_render_backend(app->render_device,
+                                                           dependencies.screenshot_window.window,
+                                                           &dependencies.screenshot_renderer);
+    }
+    if (result == REACH_OK)
+    {
+        result = reach_windows_create_screen_capture(&dependencies.screen_capture);
+    }
+    if (result == REACH_OK)
+    {
         result = reach_windows_create_search_provider(&dependencies.search_provider);
     }
     if (result == REACH_OK)
@@ -295,6 +310,9 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
             dependencies.clipboard_window = {};
             dependencies.clipboard_renderer = {};
             dependencies.clipboard = {};
+            dependencies.screenshot_window = {};
+            dependencies.screenshot_renderer = {};
+            dependencies.screen_capture = {};
             dependencies.foreground_watcher = {};
         }
     }
@@ -335,6 +353,18 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
         if (dependencies.clipboard.ops.destroy != nullptr)
         {
             dependencies.clipboard.ops.destroy(dependencies.clipboard.provider);
+        }
+        if (dependencies.screenshot_window.ops.destroy != nullptr)
+        {
+            dependencies.screenshot_window.ops.destroy(dependencies.screenshot_window.window);
+        }
+        if (dependencies.screenshot_renderer.ops.destroy != nullptr)
+        {
+            dependencies.screenshot_renderer.ops.destroy(dependencies.screenshot_renderer.backend);
+        }
+        if (dependencies.screen_capture.ops.destroy != nullptr)
+        {
+            dependencies.screen_capture.ops.destroy(dependencies.screen_capture.capture);
         }
         if (dependencies.dock_renderer.ops.destroy != nullptr)
         {
