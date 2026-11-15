@@ -538,8 +538,19 @@ reach_result reach_popup_push_width_background(const reach_popup_background_inpu
                             (input->notch_side == REACH_NOTCH_SIDE_TOP ? notch_height : 0));
         stretch.bottom = ceilf(pad.bottom + radius + extent +
                                (input->notch_side == REACH_NOTCH_SIDE_BOTTOM ? notch_height : 0));
-        source.bounds.height = stretch.top + stretch.bottom + 1;
-        stretch.height = reach_motion_affine(height, 1, pad.top + pad.bottom);
+        if (!height_changes &&
+            height_maximum + pad.top + pad.bottom < stretch.top + stretch.bottom + 1)
+        {
+            source.bounds.height = ceilf(height_maximum + pad.top + pad.bottom);
+            stretch.top = 0;
+            stretch.bottom = 0;
+            reach_motion_set(&stretch.height, source.bounds.height);
+        }
+        else
+        {
+            source.bounds.height = stretch.top + stretch.bottom + 1;
+            stretch.height = reach_motion_affine(height, 1, pad.top + pad.bottom);
+        }
     }
     else
         reach_motion_set(&stretch.height, source.bounds.height);

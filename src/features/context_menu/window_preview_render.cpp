@@ -127,6 +127,8 @@ reach_result reach_context_menu_render_previews(reach_context_menu *menu,
     popup.notch_side = reach_popup_notch_side(state.drop_direction);
     popup.dpi_scale = scale;
     popup.hide_notch = 1;
+    popup.background_color_override = theme->dock_background;
+    popup.has_background_color_override = 1;
     if (result == REACH_OK)
         result = reach_popup_push_width_background(&popup, &layout.body.width, &layout.body.height,
                                                    &layout.notch, body.id, 8, out);
@@ -183,7 +185,7 @@ reach_result reach_context_menu_render_previews(reach_context_menu *menu,
                                      close_width * .8f, header * .8f};
         reach_rect_f32 glyph_rect = {card.source_width - close_width * .66f,
                                      header * .5f - close_width * .16f, glyph, glyph};
-        reach_color base = theme->popup_background, outline = theme->context_menu_hover_background;
+        reach_color base = theme->dock_background, outline = theme->context_menu_hover_background;
         base.a = outline.a = 1;
 
         reach_render_group frame = {};
