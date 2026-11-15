@@ -512,11 +512,6 @@ reach_result reach_render_command_buffer_validate_groups(const reach_render_comm
         const reach_render_command *command = &buffer->commands[index];
         if (command->rect_fit_to_clip != 0 && command->rect_fit_to_clip != 1)
             return REACH_INVALID_ARGUMENT;
-        if (command->fill_gradient != REACH_RENDER_FILL_SOLID &&
-            (command->fill_gradient != REACH_RENDER_FILL_EASED_FADE_DOWN ||
-             command->type != REACH_RENDER_COMMAND_RECT || command->rect_fit_to_clip ||
-             command->stroke_width != 0.0f))
-            return REACH_INVALID_ARGUMENT;
         if (command->rect_fit_to_clip)
         {
             const reach_render_group *source =

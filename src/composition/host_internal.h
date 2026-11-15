@@ -327,7 +327,6 @@ typedef struct reach_surface_spec
     reach_surface_class cls;
     uint32_t pointer_flags;
     reach_surface_shadow shadow;
-    float overhang_bottom_dp;
     uint32_t behavior_flags;
     int32_t layer;
     reach_surface_role role;
@@ -646,6 +645,11 @@ struct reach_host
     reach_icon_service *icon_service;
     reach_wallpaper_service_port wallpaper_service;
     reach_wallpaper_surface_port wallpaper_surface;
+    int32_t wallpaper_shade_owned;
+    reach_surface_id wallpaper_shade_owner;
+    reach_rect_f32 wallpaper_shade_bounds;
+    float wallpaper_shade_extent;
+    reach_color wallpaper_shade_color;
     reach_power_session_port power_session;
     reach_idle_watch *idle_watch;
     const reach_theme *theme;

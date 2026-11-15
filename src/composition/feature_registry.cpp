@@ -927,8 +927,6 @@ static void reach_host_init_feature_definitions(reach_host *host)
 
     definitions[REACH_SURFACE_ID_DOCK].surface.shadow = REACH_SURFACE_SHADOW_BAR;
     definitions[REACH_SURFACE_ID_TOP_BAR].surface.shadow = REACH_SURFACE_SHADOW_BAR;
-    definitions[REACH_SURFACE_ID_TOP_BAR].surface.overhang_bottom_dp =
-        reach_top_bar_scrim_overhang_dp();
     definitions[REACH_SURFACE_ID_LAUNCHER].surface.shadow = REACH_SURFACE_SHADOW_POPUP;
     definitions[REACH_SURFACE_ID_CLIPBOARD].surface.shadow = REACH_SURFACE_SHADOW_POPUP;
     definitions[REACH_SURFACE_ID_SWITCHER].surface.shadow = REACH_SURFACE_SHADOW_POPUP;
