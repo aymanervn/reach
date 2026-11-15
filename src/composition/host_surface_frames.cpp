@@ -48,7 +48,8 @@ static int32_t reach_host_bar_auto_hide_active(const reach_host *host,
     }
     if (geometry->bar_reveal_policy == REACH_FEATURE_BAR_REVEAL_FULLSCREEN)
     {
-        return reach_window_tracking_any_non_game_fullscreen(host->window_tracking, monitor_bounds);
+        return reach_window_tracking_front_non_game_fullscreen(host->window_tracking,
+                                                               monitor_bounds);
     }
     return 0;
 }
