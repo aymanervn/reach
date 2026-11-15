@@ -17,27 +17,26 @@ Reach replaces Windows Explorer, nothing gets deleted, only an entry in the regi
 
 - Animated wallpapers through Wallpaper Engine are supported
 - Split screen: WIN + arrow keys snaps the focused window, pressing again maximizes it. Works both horizontally and vertically
-- Clipboard history supporting text and image previews
-- Windows security updates can be searched and installed from Reach's own settings app
-- No distractions: no ads, no widgets, no news. Reach suppresses ambient UI during a game session while keeping the Switcher and system HUD available; Alt-Tab minimizes the game
-- Clean and minimalistic top bar design, includes the clock, current app, now playing, tray icons, keyboard layout, quick settings, volume, power controls and now playing media controls
-- Uses JetBrains Mono font as the default
-- Stage manager with window thumbnails, close buttons and smooth open and close animations
-- Adaptive dock sizing with more room for pinned and running apps, plus drag-to-reorder support for dock apps and tray icons.
-- Wifi, Bluetooth, startup apps, system and reach updates in the bundled settings app
-- Controls for the system and app themes, including follow Reach, light and dark modes
+- Screenshots: WIN + Shift + S lets you select a region of the screen and copies it straight to the clipboard
+- Clipboard history supporting text and image previews, items slide into place when the list changes
+- Windows security updates can be searched and installed from Reach's settings app
+- No distractions
+- Clean design with beautiful spring based animations
+- Multiple theme, style and font selection options and supports both dark and light themes
+- Enhanced features, a lot of quality of life improvements over Windows explorer
+- Stage manager with live window thumbnails and smooth animations.
 - Configurable screen off, sleep, shutdown and restart timer
-- System HUD for hardware keys such as brightness, audio cotrols and media
-- You can run commands directly from the launcher, start by typing ! followed by a command to run it in the windows terminal if available
-- The app style is specifically made for good visibility and smooth animations that are consistent across the whole desktop experience 
-- See all instances of an open app by hovering on its icon on the dock, and also close it
-- Dock and topbar move out of the screen to leave room for windows in case of an overlap during drag or resize events
+- System HUD for hardware keys such as brightness, audio controls and media
+- You can run commands directly from the launcher, start by typing ! followed by a command to run it in the windows terminal if its installed
+- Most animations are GPU composed
+- Auto hide top bar feature
 - Topbar displays live system statistics such as network speed, CPU and RAM usage
-- Now playing feature has animated text UI to show the full media title
-- Supports up to 120fps animations, can also be set to follow the screen's refresh rate if below 120Hz.
+- Animations run at your screen's max refresh rate and drop to 60fps when battery saver is on
 - Keyboard language switch button
 - Hovering the top of the screen pulls down the topbar and moves full screen window further below in a smooth animation
-- Very low idle CPU usage <0.3% on my system
+- Built to never visibly break: if the GPU driver resets, Reach recovers in place and stays on the GPU. If Reach itself crashes, a watchdog quietly restarts it, and only falls back to Explorer if it keeps crashing
+- No idle CPU usage, and very low usage overrall. base memory usage depends on the number of monitors, clipboard size and the number of apps on dock
+
 
 ## Requirements
 
