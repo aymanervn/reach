@@ -70,12 +70,23 @@ static float reach_stage_tile_aspect(const reach_stage_tile *tile)
                : REACH_STAGE_BOX_LONG / REACH_STAGE_BOX_SHORT;
 }
 
+static float reach_stage_tile_height(const reach_stage_tile *tile, float content_height)
+{
+    if (content_height <= 0.0f)
+    {
+        return 0.0f;
+    }
+    return tile->source_rect.height > 0.0f && tile->source_rect.height < content_height
+               ? tile->source_rect.height
+               : content_height;
+}
+
 static float reach_stage_tile_layout_width(const reach_stage_tile *tile, float box_height,
                                            float bar_height, float border_thickness)
 {
-    float height =
-        box_height - reach_stage_box_bar(box_height, bar_height) - border_thickness * 2.0f;
-    return height > 0.0f ? height * reach_stage_tile_aspect(tile) : 0.0f;
+    float height = reach_stage_tile_height(
+        tile, box_height - reach_stage_box_bar(box_height, bar_height) - border_thickness * 2.0f);
+    return height * reach_stage_tile_aspect(tile);
 }
 
 static reach_rect_f32 reach_stage_content_area(reach_rect_f32 monitor_bounds, float dpi_scale)
@@ -354,11 +365,12 @@ static void reach_stage_place_section(reach_stage_state *state, const reach_stag
         for (size_t index = 0; index < count; ++index)
         {
             reach_stage_tile *tile = &state->tiles[section->indices[begin + index]];
+            float tile_height = reach_stage_tile_height(tile, height);
             tile->bar_height = bar;
             tile->target_rect.x = x;
-            tile->target_rect.y = y + bar + border_thickness;
-            tile->target_rect.width = height * reach_stage_tile_aspect(tile);
-            tile->target_rect.height = height;
+            tile->target_rect.y = y + bar + border_thickness + (height - tile_height) * 0.5f;
+            tile->target_rect.width = tile_height * reach_stage_tile_aspect(tile);
+            tile->target_rect.height = tile_height;
             x += tile->target_rect.width + tile_gap;
         }
     }

@@ -987,7 +987,7 @@ static void test_single_app_uses_the_available_stage_area(void)
 {
     reach_stage *stage = nullptr;
     reach_stage_create(&stage);
-    reach_stage_open_window app = make_window(1, make_rect(0, 0, 1600, 900));
+    reach_stage_open_window app = make_window(1, make_rect(0, 0, 1920, 1080));
     reach_stage_open(stage, make_rect(0, 0, 1920, 1080), 1, &app, 1);
     advance_stage(stage, 30, 0.016);
 
@@ -1051,8 +1051,8 @@ static reach_stage *open_golden_stage(float dpi)
 {
     reach_stage *stage = nullptr;
     reach_stage_create(&stage);
-    reach_stage_open_window windows[3] = {make_window(1, make_rect(100, 120, 640, 480)),
-                                          make_window(2, make_rect(300, 220, 800, 500)),
+    reach_stage_open_window windows[3] = {make_window(1, make_rect(100, 120, 1280, 960)),
+                                          make_window(2, make_rect(300, 220, 1600, 1000)),
                                           make_desktop(5, make_rect(0, 0, 1920, 1080))};
     windows[0].label = golden_alpha_label;
     windows[1].label = golden_beta_label;
