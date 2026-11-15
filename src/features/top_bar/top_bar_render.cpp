@@ -113,22 +113,30 @@ static reach_result reach_top_bar_push_pill_background(const reach_theme *theme,
 static reach_result reach_top_bar_push_simple_background(const reach_theme *theme,
                                                          reach_render_command_buffer *commands,
                                                          reach_rect_f32 bounds, float dpi_scale,
-                                                         int32_t opacity)
+                                                         const reach_motion *opacity)
 {
-    float alpha = (float)opacity / (float)REACH_CONFIG_TOP_BAR_OPACITY_MAX;
+    float minimum = 0.0f, maximum = 0.0f;
+    if (reach_motion_range(opacity, &minimum, &maximum) != REACH_OK)
+        return REACH_INVALID_ARGUMENT;
     reach_render_command shape = {};
     shape.type = REACH_RENDER_COMMAND_RECT;
     shape.rect = reach_render_pixel_aligned_rect(bounds);
     shape.color = theme->top_bar_background;
-    shape.color.a = alpha;
-    if (alpha <= 0.0f || shape.rect.width <= 0.0f || shape.rect.height <= 0.0f)
+    shape.color.a = 1.0f;
+    if (maximum <= 0.0f || shape.rect.width <= 0.0f || shape.rect.height <= 0.0f)
     {
         return REACH_OK;
     }
-    reach_shadow shadow = theme->bar_shadow;
-    shadow.color.a *= alpha;
-    reach_result result = reach_render_push_shadow(commands, &shape, &shadow, dpi_scale);
-    return result == REACH_OK ? reach_render_command_buffer_push(commands, &shape) : result;
+    reach_render_group group = {};
+    group.id = UINT64_C(0x10000000000) + 9;
+    group.opacity = *opacity;
+    reach_result result = reach_render_command_buffer_begin_group(commands, &group);
+    if (result == REACH_OK)
+        result = reach_render_push_shadow(commands, &shape, &theme->bar_shadow, dpi_scale);
+    if (result == REACH_OK)
+        result = reach_render_command_buffer_push(commands, &shape);
+    reach_render_command_buffer_end_group(commands);
+    return result;
 }
 
 static reach_rect_f32 reach_top_bar_render_pill(const reach_top_bar_layout *layout, size_t index)
@@ -542,7 +550,7 @@ reach_result reach_top_bar_append_render_commands(reach_top_bar *top_bar,
     {
         result = reach_top_bar_push_simple_background(ctx->theme, out_commands,
                                                       reach_top_bar_background_bounds(top_bar),
-                                                      ctx->dpi_scale, state->opacity);
+                                                      ctx->dpi_scale, &top_bar->background_opacity);
         if (result != REACH_OK)
         {
             return result;

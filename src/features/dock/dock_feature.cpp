@@ -56,7 +56,8 @@ struct reach_dock
     reach_menu_request hover_request;
     uint32_t hover_owner_key;
     reach_dock_model metrics;
-    float size_scale;
+    reach_motion size_scale;
+    int32_t size_configured;
     uint32_t next_app_key;
     reach_dock_routes routes;
     const reach_theme *pointer_theme;
@@ -68,6 +69,14 @@ struct reach_dock
     int32_t coverage_valid;
     int32_t coverage_trespassed;
 };
+
+static reach_motion_spec reach_dock_motion_preset(const reach_dock *dock,
+                                                  reach_motion_preset preset);
+
+static int32_t reach_dock_size_animating(const reach_dock *dock)
+{
+    return reach_motion_active_at(&dock->size_scale, dock->sampled_seconds);
+}
 
 void reach_dock_set_routes(reach_dock *dock, const reach_dock_routes *routes)
 {
@@ -158,7 +167,7 @@ reach_result reach_dock_create(reach_dock **out_animations)
         return REACH_ERROR;
     }
     reach_dock_model_defaults(&animations->metrics);
-    animations->size_scale = 1.0f;
+    reach_motion_set(&animations->size_scale, 1.0f);
     reach_motion_set(&animations->y_motion, 0.0f);
     for (reach_motion &motion : animations->slot_motions)
         reach_motion_set(&motion, 0.0f);
@@ -192,7 +201,8 @@ static void reach_dock_sample_at(reach_dock *animations, double now_seconds,
         return;
     }
     reach_dock_state *state = &animations->state;
-    int32_t slots_were_animating = reach_dock_slots_animating(animations);
+    int32_t slots_were_animating =
+        reach_dock_slots_animating(animations) || reach_dock_size_animating(animations);
 
     animations->sampled_seconds = now_seconds;
 
@@ -202,7 +212,8 @@ static void reach_dock_sample_at(reach_dock *animations, double now_seconds,
     reach_pressable_settle_feedback(&state->pressable, &feedback);
 
     reach_dock_settle_slots(animations);
-    if (slots_were_animating || reach_dock_slots_animating(animations))
+    if (slots_were_animating || reach_dock_slots_animating(animations) ||
+        reach_dock_size_animating(animations))
     {
         redraw = 1;
         if (out != nullptr)
@@ -377,7 +388,7 @@ static int32_t reach_dock_capsule_needs_frame(const void *capsule)
     for (const reach_motion &motion : dock->slot_motions)
         if (reach_motion_active_at(&motion, dock->sampled_seconds))
             return 1;
-    return 0;
+    return reach_dock_size_animating(dock);
 }
 
 static int32_t reach_dock_capsule_pointer_sequence_active(const void *capsule)
@@ -794,7 +805,15 @@ void reach_dock_apply_config(reach_dock *dock, float height, int32_t size)
     }
     if (size >= REACH_CONFIG_DOCK_SIZE_MIN && size <= REACH_CONFIG_DOCK_SIZE_MAX)
     {
-        dock->size_scale = (float)size / (float)REACH_CONFIG_DOCK_SIZE_MAX;
+        float scale = (float)size / (float)REACH_CONFIG_DOCK_SIZE_MAX;
+        if (!dock->size_configured)
+            reach_motion_set(&dock->size_scale, scale);
+        else if (dock->size_scale.to != scale)
+            reach_motion_animate_spec_to_at(
+                &dock->size_scale, scale,
+                reach_dock_motion_preset(dock, REACH_MOTION_PRESET_SMOOTH),
+                reach_motion_now_seconds());
+        dock->size_configured = 1;
     }
 }
 
@@ -832,7 +851,7 @@ int32_t reach_dock_arrange(reach_dock *dock, const reach_dock_arrange_context *c
     build.dpi_scale = ctx->dpi_scale;
     build.icon_size = dock->metrics.icon_size;
     build.gap = dock->metrics.gap;
-    build.size_scale = dock->size_scale;
+    build.size_scale = reach_motion_value_at(&dock->size_scale, dock->sampled_seconds);
     build.pinned_apps = dock->pinned_apps;
     build.pinned_app_count = dock->pinned_app_count;
 
@@ -974,7 +993,8 @@ static reach_bar_reveal_animation reach_dock_bar_animation(const void *capsule)
 
     animation.position_animating = reach_motion_active_at(&dock->y_motion, dock->sampled_seconds);
     animation.animated_y = reach_motion_value_at(&dock->y_motion, dock->sampled_seconds);
-    animation.content_animating = reach_dock_slots_animating(dock);
+    animation.content_animating =
+        reach_dock_slots_animating(dock) || reach_dock_size_animating(dock);
     return animation;
 }
 

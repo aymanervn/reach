@@ -51,10 +51,17 @@ int32_t reach_top_bar_apply_config(reach_top_bar *top_bar, reach_config_top_bar_
 int32_t reach_top_bar_apply_opacity(reach_top_bar *top_bar, int32_t opacity)
 {
     if (top_bar == nullptr || opacity < 0 || opacity > REACH_CONFIG_TOP_BAR_OPACITY_MAX ||
-        top_bar->state.opacity == opacity)
+        (top_bar->opacity_configured && top_bar->state.opacity == opacity))
     {
         return 0;
     }
+    float alpha = (float)opacity / (float)REACH_CONFIG_TOP_BAR_OPACITY_MAX;
+    if (top_bar->opacity_configured)
+        reach_motion_animate_spec_to_at(&top_bar->background_opacity, alpha, top_bar->fade_in_spec,
+                                        reach_motion_now_seconds());
+    else
+        reach_motion_set(&top_bar->background_opacity, alpha);
+    top_bar->opacity_configured = 1;
     top_bar->state.opacity = opacity;
     return 1;
 }
@@ -98,6 +105,7 @@ reach_result reach_top_bar_create(reach_top_bar **out_top_bar)
     reach_pressable_init(&top_bar->state.pressable);
     reach_motion_set(&top_bar->press_feedback, 0.0f);
     reach_motion_set(&top_bar->power_hover, 0.0f);
+    reach_motion_set(&top_bar->background_opacity, 1.0f);
     reach_top_bar_reset_tray_drag(top_bar);
     *out_top_bar = top_bar;
     return REACH_OK;

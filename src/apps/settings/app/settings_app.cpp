@@ -2116,32 +2116,39 @@ static void reach_settings_handle_bluetooth_action(reach_settings_app *app,
 
 static void reach_settings_drag_slider(reach_settings_app *app, float x)
 {
+    int32_t changed = 0;
     if (app->model.dragging_slider == REACH_SETTINGS_HIT_TOP_BAR_OPACITY)
     {
         float ratio = reach_settings_slider_ratio_at(&app->layout.top_bar_opacity, x);
-        if (reach_settings_model_set_top_bar_opacity(
-                &app->model, (int32_t)lroundf(ratio * (float)REACH_CONFIG_TOP_BAR_OPACITY_MAX)))
-        {
-            reach_settings_save_top_bar_config(app);
-            app->dirty = 1;
-        }
+        changed = reach_settings_model_set_top_bar_opacity(
+            &app->model, (int32_t)lroundf(ratio * (float)REACH_CONFIG_TOP_BAR_OPACITY_MAX));
     }
     else if (app->model.dragging_slider == REACH_SETTINGS_HIT_DOCK_SIZE)
     {
         float ratio = reach_settings_slider_ratio_at(&app->layout.dock_size, x);
-        int32_t size = REACH_CONFIG_DOCK_SIZE_MIN +
-                       (int32_t)lroundf(ratio * (float)(REACH_CONFIG_DOCK_SIZE_MAX -
-                                                        REACH_CONFIG_DOCK_SIZE_MIN));
-        if (reach_settings_model_set_dock_size(&app->model, size) && app->config_service != nullptr)
-        {
-            (void)reach_config_service_set_dock_size(app->config_service, size);
-            app->dirty = 1;
-        }
+        changed = reach_settings_model_set_dock_size(
+            &app->model, REACH_CONFIG_DOCK_SIZE_MIN +
+                             (int32_t)lroundf(ratio * (float)(REACH_CONFIG_DOCK_SIZE_MAX -
+                                                              REACH_CONFIG_DOCK_SIZE_MIN)));
+    }
+    if (changed)
+    {
+        app->dirty = 1;
     }
 }
 
 static void reach_settings_end_slider_drag(reach_settings_app *app)
 {
+    if (app->model.dragging_slider == REACH_SETTINGS_HIT_TOP_BAR_OPACITY)
+    {
+        reach_settings_save_top_bar_config(app);
+    }
+    else if (app->model.dragging_slider == REACH_SETTINGS_HIT_DOCK_SIZE &&
+             app->config_service != nullptr)
+    {
+        (void)reach_config_service_set_dock_size(app->config_service,
+                                                 reach_settings_model_dock_size(&app->model));
+    }
     app->model.dragging_slider = REACH_SETTINGS_HIT_NONE;
     if (app->window.ops.set_pointer_capture != nullptr)
     {
@@ -2673,7 +2680,8 @@ static void reach_settings_handle_event(void *user, const reach_ui_event *event)
         reach_scroll_view *dragging = reach_settings_model_dragging_scroll(&app->model);
         if (dragging != nullptr)
             (void)reach_scroll_view_pointer_up(dragging);
-        app->model.dragging_slider = REACH_SETTINGS_HIT_NONE;
+        if (app->model.dragging_slider != REACH_SETTINGS_HIT_NONE)
+            reach_settings_end_slider_drag(app);
         if (reach_settings_model_set_hovered_button(&app->model, REACH_SETTINGS_HIT_NONE))
         {
             app->dirty = 1;
