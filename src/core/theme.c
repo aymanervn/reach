@@ -50,6 +50,10 @@
 #define REACH_LIGHT_ACCENT_ORANGE(a) REACH_RGB8(194, 97, 20, a)
 #define REACH_LIGHT_ACCENT_YELLOW(a) REACH_RGB8(168, 122, 15, a)
 #define REACH_LIGHT_ACCENT_RED(a) REACH_RGB8(199, 61, 46, a)
+#define REACH_LIGHT_STATS_CPU(a) REACH_RGB8(8, 68, 99, a)
+#define REACH_LIGHT_STATS_MEMORY(a) REACH_RGB8(72, 44, 138, a)
+#define REACH_LIGHT_STATS_DOWNLOAD(a) REACH_RGB8(12, 73, 35, a)
+#define REACH_LIGHT_STATS_UPLOAD(a) REACH_RGB8(101, 49, 8, a)
 #define REACH_LIGHT_BATTERY_BLUE(a) REACH_RGB8(126, 190, 245, a)
 #define REACH_LIGHT_BATTERY_GREEN(a) REACH_RGB8(106, 214, 143, a)
 #define REACH_LIGHT_BATTERY_YELLOW(a) REACH_RGB8(242, 207, 98, a)
@@ -277,10 +281,10 @@ static const reach_theme reach_theme_light = {
     .bar_battery_low = REACH_LIGHT_BATTERY_RED(1.0f),
     .bar_battery_saver = REACH_LIGHT_BATTERY_YELLOW(1.0f),
     .bar_battery_charging = REACH_LIGHT_BATTERY_BLUE(1.0f),
-    .bar_stats_cpu = REACH_LIGHT_ACCENT_CYAN(1.0f),
-    .bar_stats_memory = REACH_LIGHT_ACCENT_LAVENDER(1.0f),
-    .bar_stats_download = REACH_LIGHT_ACCENT_GREEN(1.0f),
-    .bar_stats_upload = REACH_LIGHT_ACCENT_ORANGE(1.0f),
+    .bar_stats_cpu = REACH_LIGHT_STATS_CPU(1.0f),
+    .bar_stats_memory = REACH_LIGHT_STATS_MEMORY(1.0f),
+    .bar_stats_download = REACH_LIGHT_STATS_DOWNLOAD(1.0f),
+    .bar_stats_upload = REACH_LIGHT_STATS_UPLOAD(1.0f),
     .dock_running_indicator = REACH_LIGHT_MID_CONTRAST_GRAY(1.0f),
     .bar_click_feedback = REACH_LIGHT_RAISED(1.0f),
     .bar_separator_dot = REACH_LIGHT_MID_CONTRAST_GRAY(1.0f),
