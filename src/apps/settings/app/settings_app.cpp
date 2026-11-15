@@ -660,6 +660,7 @@ static void reach_settings_load_top_bar_config(reach_settings_app *app)
     reach_settings_model_set_top_bar_style(&app->model, snapshot->top_bar_style);
     reach_settings_model_set_top_bar_mode(&app->model, snapshot->top_bar_mode);
     (void)reach_settings_model_set_top_bar_opacity(&app->model, snapshot->top_bar_opacity);
+    reach_settings_model_set_top_bar_icon_only(&app->model, snapshot->top_bar_icon_only);
     (void)reach_settings_model_set_dock_size(&app->model, snapshot->dock_size);
 }
 
@@ -673,6 +674,7 @@ static void reach_settings_save_top_bar_config(reach_settings_app *app)
     settings.style = reach_settings_model_top_bar_style(&app->model);
     settings.mode = reach_settings_model_top_bar_mode(&app->model);
     settings.opacity = reach_settings_model_top_bar_opacity(&app->model);
+    settings.icon_only = reach_settings_model_top_bar_icon_only(&app->model);
     (void)reach_config_service_set_top_bar(app->config_service, &settings);
 }
 
@@ -2362,6 +2364,12 @@ static void reach_settings_handle_pointer_up(reach_settings_app *app, const reac
         else if (hit.type == REACH_SETTINGS_HIT_TOP_BAR_AUTO_HIDE_TOGGLE)
         {
             (void)reach_settings_model_toggle_top_bar_mode(&app->model);
+            reach_settings_save_top_bar_config(app);
+            app->dirty = 1;
+        }
+        else if (hit.type == REACH_SETTINGS_HIT_TOP_BAR_ICON_ONLY_TOGGLE)
+        {
+            (void)reach_settings_model_toggle_top_bar_icon_only(&app->model);
             reach_settings_save_top_bar_config(app);
             app->dirty = 1;
         }

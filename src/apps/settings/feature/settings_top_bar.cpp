@@ -64,6 +64,33 @@ int32_t reach_settings_model_toggle_top_bar_mode(reach_settings_model *model)
     return 1;
 }
 
+void reach_settings_model_set_top_bar_icon_only(reach_settings_model *model, int32_t icon_only)
+{
+    if (model == nullptr)
+    {
+        return;
+    }
+    model->top_bar_icon_only = icon_only ? 1 : 0;
+    reach_motion_set(&model->top_bar_icon_only_toggle, model->top_bar_icon_only ? 1.0f : 0.0f);
+}
+
+int32_t reach_settings_model_top_bar_icon_only(const reach_settings_model *model)
+{
+    return model != nullptr && model->top_bar_icon_only;
+}
+
+int32_t reach_settings_model_toggle_top_bar_icon_only(reach_settings_model *model)
+{
+    if (model == nullptr)
+    {
+        return 0;
+    }
+    model->top_bar_icon_only = model->top_bar_icon_only ? 0 : 1;
+    reach_settings_animate(&model->top_bar_icon_only_toggle, model->top_bar_icon_only ? 1.0f : 0.0f,
+                           REACH_MOTION_PRESET_BOUNCY);
+    return 1;
+}
+
 int32_t reach_settings_model_set_top_bar_opacity(reach_settings_model *model, int32_t opacity)
 {
     if (model == nullptr || opacity < 0 || opacity > REACH_CONFIG_TOP_BAR_OPACITY_MAX ||

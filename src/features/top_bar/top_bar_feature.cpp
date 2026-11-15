@@ -66,6 +66,17 @@ int32_t reach_top_bar_apply_opacity(reach_top_bar *top_bar, int32_t opacity)
     return 1;
 }
 
+int32_t reach_top_bar_apply_icon_only(reach_top_bar *top_bar, int32_t icon_only)
+{
+    icon_only = icon_only ? 1 : 0;
+    if (top_bar == nullptr || top_bar->state.icon_only == icon_only)
+    {
+        return 0;
+    }
+    top_bar->state.icon_only = icon_only;
+    return 1;
+}
+
 static void reach_top_bar_load_motion_specs(reach_top_bar *top_bar, const reach_theme *theme)
 {
     top_bar->snappy_spec = reach_theme_motion_preset(theme, REACH_MOTION_PRESET_SNAPPY);
@@ -899,11 +910,15 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
     float current_app_icon_size = reach_top_bar_has_current_app_icon(top_bar)
                                       ? height * metrics.current_app_icon_scale
                                       : 0.0f;
-    float current_app_icon_gap = current_app_icon_size > 0.0f ? current_app_gap : 0.0f;
+    int32_t current_app_icon_only = top_bar->state.icon_only && current_app_icon_size > 0.0f;
+    float current_app_icon_gap =
+        current_app_icon_size > 0.0f && !current_app_icon_only ? current_app_gap : 0.0f;
     float name_advance =
-        ceilf(reach_top_bar_text_advance(&ctx->text_measure, top_bar->state.current_app_name,
-                                         name_size, metrics.current_app_name_text_weight)) +
-        1.0f;
+        current_app_icon_only
+            ? 0.0f
+            : ceilf(reach_top_bar_text_advance(&ctx->text_measure, top_bar->state.current_app_name,
+                                               name_size, metrics.current_app_name_text_weight)) +
+                  1.0f;
     float current_app_chrome =
         border_thickness * 2.0f + padding * 2.0f + current_app_icon_size + current_app_icon_gap;
     float current_app_max_width = layout->bounds.width * metrics.current_app_max_width_ratio;
@@ -955,7 +970,7 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
     }
     float current_app_text_advance =
         current_app.x + current_app.width - border_thickness - padding - current_app_text_x;
-    if (current_app_text_advance < 0.0f)
+    if (current_app_text_advance < 0.0f || current_app_icon_only)
     {
         current_app_text_advance = 0.0f;
     }

@@ -127,10 +127,12 @@ static reach_result reach_config_apply_operation(reach_config_snapshot *snapshot
     case REACH_CONFIG_OPERATION_SET_TOP_BAR:
         *out_changed = snapshot->top_bar_style != operation->top_bar.style ||
                        snapshot->top_bar_mode != operation->top_bar.mode ||
-                       snapshot->top_bar_opacity != operation->top_bar.opacity;
+                       snapshot->top_bar_opacity != operation->top_bar.opacity ||
+                       snapshot->top_bar_icon_only != operation->top_bar.icon_only;
         snapshot->top_bar_style = operation->top_bar.style;
         snapshot->top_bar_mode = operation->top_bar.mode;
         snapshot->top_bar_opacity = operation->top_bar.opacity;
+        snapshot->top_bar_icon_only = operation->top_bar.icon_only;
         return REACH_OK;
     case REACH_CONFIG_OPERATION_SET_DOCK_SIZE:
         *out_changed = snapshot->dock_size != operation->dock_size;

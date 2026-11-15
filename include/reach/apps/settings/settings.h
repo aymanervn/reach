@@ -90,6 +90,7 @@ extern "C"
         REACH_SETTINGS_HIT_THEME_SCROLLBAR_THUMB,
         REACH_SETTINGS_HIT_TOP_BAR_STYLE,
         REACH_SETTINGS_HIT_TOP_BAR_AUTO_HIDE_TOGGLE,
+        REACH_SETTINGS_HIT_TOP_BAR_ICON_ONLY_TOGGLE,
         REACH_SETTINGS_HIT_TOP_BAR_OPACITY,
         REACH_SETTINGS_HIT_DOCK_SIZE,
         REACH_SETTINGS_HIT_ACCOUNT_PASSWORD,
@@ -285,6 +286,8 @@ extern "C"
         reach_motion top_bar_style_selection;
         reach_config_top_bar_mode top_bar_mode;
         reach_motion top_bar_mode_toggle;
+        int32_t top_bar_icon_only;
+        reach_motion top_bar_icon_only_toggle;
         int32_t top_bar_opacity;
         int32_t dock_size;
         int32_t dragging_slider;
@@ -449,6 +452,10 @@ extern "C"
         reach_rect_f32 top_bar_auto_hide_title;
         reach_rect_f32 top_bar_auto_hide_subtitle;
         reach_rect_f32 top_bar_auto_hide_toggle;
+        reach_rect_f32 top_bar_icon_only_card;
+        reach_rect_f32 top_bar_icon_only_title;
+        reach_rect_f32 top_bar_icon_only_subtitle;
+        reach_rect_f32 top_bar_icon_only_toggle;
         reach_rect_f32 account_card;
         reach_rect_f32 account_avatar;
         reach_rect_f32 account_name;
@@ -660,6 +667,9 @@ extern "C"
                                                reach_config_top_bar_mode mode);
     reach_config_top_bar_mode reach_settings_model_top_bar_mode(const reach_settings_model *model);
     int32_t reach_settings_model_toggle_top_bar_mode(reach_settings_model *model);
+    void reach_settings_model_set_top_bar_icon_only(reach_settings_model *model, int32_t icon_only);
+    int32_t reach_settings_model_top_bar_icon_only(const reach_settings_model *model);
+    int32_t reach_settings_model_toggle_top_bar_icon_only(reach_settings_model *model);
     int32_t reach_settings_model_set_top_bar_opacity(reach_settings_model *model, int32_t opacity);
     int32_t reach_settings_model_top_bar_opacity(const reach_settings_model *model);
     int32_t reach_settings_model_top_bar_opacity_enabled(const reach_settings_model *model);
