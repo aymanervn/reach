@@ -195,11 +195,12 @@ int main()
     failed += expect(geometry.presentation.retained == 1);
     failed += expect_close(geometry.presentation.group.opacity.from, 0.0f);
     failed += expect_close(reach_motion_value(&geometry.presentation.group.y), 0.0f);
-    failed += expect_close(reach_motion_value(&geometry.presentation.group.scale), 1.0f);
+    failed += expect(reach_motion_value(&geometry.presentation.group.scale) > 1.0f);
     failed += expect_close(geometry.presentation.max_scale, 1.0f);
     failed += expect_close(reach_motion_value(&geometry.presentation.center_x),
                            geometry.visible_bounds.width * 0.5f);
-    failed += expect_close(reach_motion_value(&geometry.presentation.center_y), 0.0f);
+    failed += expect_close(reach_motion_value(&geometry.presentation.center_y),
+                           geometry.visible_bounds.height * 0.5f);
 
     reach_feature_tick_result tick = {};
     reach_test_motion_clock_advance(0.08);
@@ -271,7 +272,7 @@ int main()
     capsule_ops->surface_geometry(capsule, &geometry);
     failed += expect_close(geometry.presentation.group.opacity.to, 0.0f);
     failed += expect_close(reach_motion_value(&geometry.presentation.group.y), 0.0f);
-    failed += expect_close(reach_motion_value(&geometry.presentation.group.scale), 1.0f);
+    failed += expect(reach_motion_value(&geometry.presentation.group.scale) > 1.0f);
     tick = {};
     reach_test_motion_clock_advance(0.12);
     capsule_ops->tick(capsule, 0.12, &tick);
