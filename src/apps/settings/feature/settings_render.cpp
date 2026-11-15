@@ -631,6 +631,18 @@ static void render_theme_page(const reach_settings_render_input *input,
                                    &model->top_bar_mode_toggle,
                                    REACH_SETTINGS_HIT_TOP_BAR_AUTO_HIDE_TOGGLE};
     render_theme_toggle_card(input, commands, &toggle_style, &auto_hide);
+    theme_toggle_card icon_only = {layout->top_bar_icon_only_card,
+                                   {},
+                                   layout->top_bar_icon_only_title,
+                                   layout->top_bar_icon_only_subtitle,
+                                   layout->top_bar_icon_only_toggle,
+                                   REACH_VECTOR_ICON_NONE,
+                                   nullptr,
+                                   L"Show only app icon",
+                                   L"Hide the app name in the center of the top bar",
+                                   &model->top_bar_icon_only_toggle,
+                                   REACH_SETTINGS_HIT_TOP_BAR_ICON_ONLY_TOGGLE};
+    render_theme_toggle_card(input, commands, &toggle_style, &icon_only);
     int32_t dock_size = reach_settings_model_dock_size(model);
     render_slider_card(input, commands, &layout->dock_size, (const uint16_t *)u"Dock size",
                        (const uint16_t *)u"Change the size of the dock",

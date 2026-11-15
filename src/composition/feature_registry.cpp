@@ -323,6 +323,13 @@ static void reach_feature_notify_top_bar(void *capsule,
         out->redraw = 1;
         out->request_update = 1;
     }
+    if (reach_top_bar_apply_icon_only(static_cast<reach_top_bar *>(capsule),
+                                      notification->config->top_bar_icon_only))
+    {
+        out->redraw = 1;
+        out->relayout = 1;
+        out->request_update = 1;
+    }
 }
 
 static int32_t reach_feature_control_launcher_open(void *capsule, int32_t open,

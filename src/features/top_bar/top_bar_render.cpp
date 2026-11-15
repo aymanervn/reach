@@ -238,7 +238,7 @@ static void reach_top_bar_push_current_app(const reach_top_bar_render_input *inp
 {
     const reach_top_bar_metrics &metrics = reach_top_bar_metrics_values;
     reach_rect_f32 text = input->layout->current_app_text;
-    if (text.width <= 0.0f)
+    if (input->layout->pills[REACH_TOP_BAR_PILL_CURRENT_APP].width <= 0.0f)
     {
         return;
     }
@@ -253,10 +253,13 @@ static void reach_top_bar_push_current_app(const reach_top_bar_render_input *inp
         reach_render_command_buffer_push(commands, &icon);
     }
 
-    reach_top_bar_push_text(commands, text, input->current_app_name,
-                            metrics.current_app_name_text_size * input->dpi_scale,
-                            metrics.current_app_name_text_weight, REACH_TEXT_ALIGNMENT_LEADING,
-                            input->theme->bar_text_primary);
+    if (text.width > 0.0f)
+    {
+        reach_top_bar_push_text(commands, text, input->current_app_name,
+                                metrics.current_app_name_text_size * input->dpi_scale,
+                                metrics.current_app_name_text_weight, REACH_TEXT_ALIGNMENT_LEADING,
+                                input->theme->bar_text_primary);
+    }
 }
 
 static void reach_top_bar_push_tray_item(const reach_top_bar_render_input *input,
