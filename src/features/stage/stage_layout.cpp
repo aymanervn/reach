@@ -388,12 +388,28 @@ static reach_rect_f32 reach_stage_scale_rect(reach_rect_f32 rect, float scale)
 
 reach_rect_f32 reach_stage_interpolate_rect(reach_rect_f32 from, reach_rect_f32 to, float factor)
 {
+    if (factor >= 1.0f)
+    {
+        return to;
+    }
+    if (factor <= 0.0f)
+    {
+        return from;
+    }
     reach_rect_f32 out = {};
     out.x = from.x + (to.x - from.x) * factor;
     out.y = from.y + (to.y - from.y) * factor;
     out.width = from.width + (to.width - from.width) * factor;
     out.height = from.height + (to.height - from.height) * factor;
     return out;
+}
+
+reach_rect_f32 reach_stage_minimized_offscreen_rect(const reach_stage_state *state,
+                                                    reach_rect_f32 rect)
+{
+    rect.x = state->bounds.x - rect.width;
+    rect.y = state->bounds.y - rect.height;
+    return rect;
 }
 
 void reach_stage_rebuild_layout(reach_stage *stage)
@@ -493,8 +509,10 @@ void reach_stage_apply_progress(reach_stage *stage)
         }
         else
         {
-            tile->current_rect =
-                reach_stage_interpolate_rect(tile->source_rect, resolved, progress);
+            reach_rect_f32 from = tile->minimized && !tile->desktop
+                                      ? reach_stage_minimized_offscreen_rect(state, resolved)
+                                      : tile->source_rect;
+            tile->current_rect = reach_stage_interpolate_rect(from, resolved, progress);
         }
 
         float bar = tile->bar_height * progress * tile->presence;

@@ -55,6 +55,8 @@ struct reach_stage
 };
 
 reach_rect_f32 reach_stage_interpolate_rect(reach_rect_f32 from, reach_rect_f32 to, float factor);
+reach_rect_f32 reach_stage_minimized_offscreen_rect(const reach_stage_state *state,
+                                                    reach_rect_f32 rect);
 void reach_stage_rebuild_layout(reach_stage *stage);
 
 static inline void reach_stage_track_to(reach_stage *stage, size_t track, float target,
