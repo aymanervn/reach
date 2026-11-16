@@ -882,8 +882,8 @@ velocity zeros, within the existing 32-piece cap; exhausted budgets return no cu
 springs and normalized products of zero-span springs are rejected without output mutation.
 
 Reach has one motion vocabulary: `reach_theme.motion_presets`, indexed by `reach_motion_preset`
-and read through `reach_theme_motion_preset`. Springs `snappy`, `smooth`, `bouncy`, `press` and
-`release` store only response and damping, so their settle time stays derived by the engine; the
+and read through `reach_theme_motion_preset`. Springs `snappy`, `smooth`, `bouncy`, `press`,
+`release` and `bar_reveal` store only response and damping, so their settle time stays derived by the engine; the
 `fade_in`, `fade_out`, `card_fade_in` and `card_fade_out` ease-out curves store a duration. `reach_motion_spec_scaled`
 multiplies response and duration by one time scale, and `reach_theme_stage_motion_scale` derives
 that scale from the persisted Stage duration relative to `stage_motion_reference_seconds`.
@@ -891,13 +891,14 @@ that scale from the persisted Stage duration relative to `stage_motion_reference
 Every feature transition reads a preset; no feature owns a literal duration or easing for a
 transition, and the clock-reading fixed-curve entry points (`reach_motion_start`,
 `reach_motion_animate_to`) and the animation manager are removed. The preset per event:
-popup and panel geometry, list survivors, resizes, bar reveal, Dock slots and Stage tiles use
-`smooth`; compact bar widths, tray reorder and drag snaps use `snappy`; one-step selection pills,
+popup and panel geometry, list survivors, resizes, Dock slots and Stage tiles use
+`smooth`; the Dock and Top Bar reveal use `bar_reveal` (0.28 s); compact bar widths, tray reorder and drag snaps use `snappy`; one-step selection pills,
 toggle knobs and the adjacent Settings sidebar step use `bouncy`; hover, tint and content opacity use
 `fade_in`/`fade_out`; cards appear with `card_fade_in` (0.05 s) and leave with `card_fade_out`
-(0.35 s); presses use `press`/`release`. Bounce never appears on popups, panels, Stage,
-the Top Bar or opacity. Stage open and close scale `smooth` by `reach_theme_stage_motion_scale`
-(configured duration over the theme reference), so the default follows the natural `smooth` settle.
+(0.18 s); presses use `press`/`release`. Bounce never appears on popups, panels, Stage,
+the Top Bar or opacity. Stage open, close and reflow scale `smooth` by `reach_theme_stage_motion_scale`
+(configured duration over the theme reference, which is the 0.38 s `smooth` response), so the default
+0.30 s Stage duration yields a 0.30 s spring response.
 Scalars sampled on the CPU (Stage, Dock slots, bar reveal, Top Bar widths, Clipboard height, Settings
 rows) carry the same presets through `reach_motion_animate_spec_to_at`. Drag gestures
 feed `reach_drag_velocity` (`features/common/draggable`) with the value they display and hand its

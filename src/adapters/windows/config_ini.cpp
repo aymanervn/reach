@@ -236,7 +236,7 @@ static reach_result reach_config_store_load(reach_config_store *store,
                                           ? (reach_config_theme_preference)windows_app_theme
                                           : REACH_CONFIG_THEME_FOLLOW_REACH;
     out_snapshot->stage_animation_ms =
-        (int32_t)GetPrivateProfileIntW(L"stage", L"animation_ms", 280, path);
+        (int32_t)GetPrivateProfileIntW(L"stage", L"animation_ms", 300, path);
     GetPrivateProfileStringW(L"wallpaper", L"path", L"",
                              reinterpret_cast<wchar_t *>(out_snapshot->wallpaper_path), 260, path);
     for (size_t index = 0; index < REACH_MAX_WALLPAPER_MONITORS; ++index)

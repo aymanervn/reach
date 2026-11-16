@@ -74,7 +74,7 @@
     .tray_slot_size_ratio = 0.605f, .bar_separator_dot_size = 4.0f, .bar_separator_dot_gap = 9.0f, \
     .now_playing_width = 220.0f, .now_playing_padding = 9.0f, .now_playing_gap = 6.0f,             \
     .now_playing_control_gap = 8.0f, .now_playing_play_button_width = 20.0f,                       \
-    .now_playing_prev_next_button_width = 13.2f, .stage_animation_seconds = 0.28f
+    .now_playing_prev_next_button_width = 13.2f, .stage_animation_seconds = 0.30f
 
 #define REACH_THEME_SPRING(response, damping) {REACH_EASING_SPRING, (response), (damping), 0.0}
 #define REACH_THEME_FADE(seconds) {REACH_EASING_EASE_OUT, 0.0f, 0.0f, (seconds)}
@@ -93,7 +93,7 @@
             [REACH_MOTION_PRESET_CARD_FADE_OUT] = REACH_THEME_FADE(0.18),                          \
             [REACH_MOTION_PRESET_BAR_REVEAL] = REACH_THEME_SPRING(0.28f, 1.0f),                    \
         },                                                                                         \
-    .stage_motion_reference_seconds = 0.28f
+    .stage_motion_reference_seconds = 0.38f
 
 static const reach_theme reach_theme_dark = {
     .mode = REACH_THEME_MODE_DARK,
