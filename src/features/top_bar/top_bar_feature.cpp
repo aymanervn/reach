@@ -25,8 +25,8 @@ int32_t reach_top_bar_apply_config(reach_top_bar *top_bar, reach_config_top_bar_
                                    reach_config_top_bar_mode mode)
 {
     if (top_bar == nullptr || style < REACH_CONFIG_TOP_BAR_STYLE_SPLIT ||
-        style > REACH_CONFIG_TOP_BAR_STYLE_TRANSPARENT || mode < REACH_CONFIG_TOP_BAR_MODE_DYNAMIC ||
-        mode > REACH_CONFIG_TOP_BAR_MODE_STATIC)
+        style > REACH_CONFIG_TOP_BAR_STYLE_TRANSPARENT ||
+        mode < REACH_CONFIG_TOP_BAR_MODE_DYNAMIC || mode > REACH_CONFIG_TOP_BAR_MODE_STATIC)
     {
         return 0;
     }
@@ -62,8 +62,6 @@ int32_t reach_top_bar_apply_icon_only(reach_top_bar *top_bar, int32_t icon_only)
 static void reach_top_bar_load_motion_specs(reach_top_bar *top_bar, const reach_theme *theme)
 {
     top_bar->snappy_spec = reach_theme_motion_preset(theme, REACH_MOTION_PRESET_SNAPPY);
-    top_bar->fade_in_spec = reach_theme_motion_preset(theme, REACH_MOTION_PRESET_FADE_IN);
-    top_bar->fade_out_spec = reach_theme_motion_preset(theme, REACH_MOTION_PRESET_FADE_OUT);
 }
 
 reach_result reach_top_bar_create(reach_top_bar **out_top_bar)
@@ -96,7 +94,6 @@ reach_result reach_top_bar_create(reach_top_bar **out_top_bar)
         reach_motion_set(&motion, 0.0f);
     reach_pressable_init(&top_bar->state.pressable);
     reach_motion_set(&top_bar->press_feedback, 0.0f);
-    reach_motion_set(&top_bar->power_hover, 0.0f);
     reach_top_bar_reset_tray_drag(top_bar);
     *out_top_bar = top_bar;
     return REACH_OK;
@@ -1291,8 +1288,6 @@ static void reach_top_bar_capsule_reset(void *capsule)
     {
         reach_motion_set(&top_bar->tray_x[index], 0.0f);
     }
-    top_bar->state.power_hovered = 0;
-    reach_motion_set(&top_bar->power_hover, 0.0f);
     top_bar->state.bluetooth_absence_deadline = 0.0;
 }
 
@@ -1309,8 +1304,6 @@ static void reach_top_bar_capsule_on_game_mode(void *capsule, int32_t enabled)
     reach_pressable_feedback_style feedback = reach_top_bar_pressable_feedback(top_bar);
     reach_pressable_reset(&top_bar->state.pressable, &feedback);
     reach_top_bar_reset_tray_drag(top_bar);
-    top_bar->state.power_hovered = 0;
-    reach_motion_set(&top_bar->power_hover, 0.0f);
 }
 
 static void reach_top_bar_capsule_tick(void *capsule, double delta_seconds,

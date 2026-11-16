@@ -202,24 +202,18 @@ int32_t reach_settings_model_set_hovered_button(reach_settings_model *model, int
 const reach_settings_nav_item *reach_settings_nav_items(size_t *out_count)
 {
     static const reach_settings_nav_item items[REACH_SETTINGS_NAV_ITEM_COUNT] = {
-        {REACH_SETTINGS_PAGE_WIFI, REACH_VECTOR_ICON_WIFI_HIGH, (const uint16_t *)L"Wi-Fi",
-         REACH_THEME_ACCENT_GREEN},
+        {REACH_SETTINGS_PAGE_WIFI, REACH_VECTOR_ICON_WIFI_HIGH, (const uint16_t *)L"Wi-Fi"},
         {REACH_SETTINGS_PAGE_BLUETOOTH, REACH_VECTOR_ICON_BLUETOOTH_ON,
-         (const uint16_t *)L"Bluetooth", REACH_THEME_ACCENT_BLUE},
-        {REACH_SETTINGS_PAGE_ACCOUNT, REACH_VECTOR_ICON_LOCK, (const uint16_t *)L"Account",
-         REACH_THEME_ACCENT_TEAL},
+         (const uint16_t *)L"Bluetooth"},
+        {REACH_SETTINGS_PAGE_ACCOUNT, REACH_VECTOR_ICON_LOCK, (const uint16_t *)L"Account"},
         {REACH_SETTINGS_PAGE_STARTUP_APPS, REACH_VECTOR_ICON_QUICK_SETTINGS,
-         (const uint16_t *)L"Startup Apps", REACH_THEME_ACCENT_PURPLE},
+         (const uint16_t *)L"Startup Apps"},
         {REACH_SETTINGS_PAGE_APPLICATIONS, REACH_VECTOR_ICON_EXECUTABLE,
-         (const uint16_t *)L"Applications", REACH_THEME_ACCENT_BLUE},
-        {REACH_SETTINGS_PAGE_POWER_SLEEP, REACH_VECTOR_ICON_SLEEP, (const uint16_t *)L"Energy",
-         REACH_THEME_ACCENT_ORANGE},
-        {REACH_SETTINGS_PAGE_THEME, REACH_VECTOR_ICON_BRIGHTNESS, (const uint16_t *)L"Theme",
-         REACH_THEME_ACCENT_YELLOW},
-        {REACH_SETTINGS_PAGE_DISPLAY, REACH_VECTOR_ICON_RESIZE, (const uint16_t *)L"Display",
-         REACH_THEME_ACCENT_TEAL},
-        {REACH_SETTINGS_PAGE_UPDATE, REACH_VECTOR_ICON_RESTART, (const uint16_t *)L"Updates",
-         REACH_THEME_ACCENT_CYAN},
+         (const uint16_t *)L"Applications"},
+        {REACH_SETTINGS_PAGE_POWER_SLEEP, REACH_VECTOR_ICON_SLEEP, (const uint16_t *)L"Energy"},
+        {REACH_SETTINGS_PAGE_THEME, REACH_VECTOR_ICON_BRIGHTNESS, (const uint16_t *)L"Theme"},
+        {REACH_SETTINGS_PAGE_DISPLAY, REACH_VECTOR_ICON_RESIZE, (const uint16_t *)L"Display"},
+        {REACH_SETTINGS_PAGE_UPDATE, REACH_VECTOR_ICON_RESTART, (const uint16_t *)L"Updates"},
     };
 
     if (out_count != nullptr)
@@ -779,7 +773,26 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
             &layout.theme_reach_selector, &layout.theme_reach_icon, area_x, theme_card_y,
             area_width, theme_card_height, 176.0f, scale);
 
-        float section_y = theme_card_y + theme_card_height + 18.0f * scale;
+        float accent_card_y = theme_card_y + theme_card_height + card_spacing;
+        float accent_selector_width =
+            REACH_SETTINGS_ACCENT_SWATCH_PITCH * (REACH_ACCENT_PRESET_COUNT - 1) +
+            REACH_SETTINGS_ACCENT_SWATCH_SIZE + REACH_SETTINGS_ACCENT_RING_INSET * 2.0f;
+        reach_settings_layout_selector_card(
+            &layout.theme_accent_card, &layout.theme_accent_title, &layout.theme_accent_subtitle,
+            &layout.theme_accent_selector, &layout.theme_accent_icon, area_x, accent_card_y,
+            area_width, theme_card_height, accent_selector_width, scale);
+        float swatch_size = REACH_SETTINGS_ACCENT_SWATCH_SIZE * scale;
+        for (size_t index = 0; index < REACH_ACCENT_PRESET_COUNT; ++index)
+        {
+            layout.theme_accent_swatches[index] = reach_settings_rect(
+                layout.theme_accent_selector.x + REACH_SETTINGS_ACCENT_RING_INSET * scale +
+                    REACH_SETTINGS_ACCENT_SWATCH_PITCH * scale * (float)index,
+                layout.theme_accent_selector.y +
+                    (layout.theme_accent_selector.height - swatch_size) * 0.5f,
+                swatch_size, swatch_size);
+        }
+
+        float section_y = accent_card_y + theme_card_height + 18.0f * scale;
         layout.theme_windows_section_title =
             reach_settings_rect(area_x, section_y, area_width, 18.0f * scale);
         float appearance_y = section_y + 26.0f * scale;
@@ -1139,6 +1152,21 @@ reach_settings_hit_result reach_settings_hit_test(const reach_settings_layout *l
         result.type = REACH_SETTINGS_HIT_THEME_REACH;
         result.theme_light = option == 1;
         return result;
+    }
+    for (size_t index = 0; theme_pointer && index < REACH_ACCENT_PRESET_COUNT; ++index)
+    {
+        reach_rect_f32 swatch = layout->theme_accent_swatches[index];
+        float margin = (REACH_SETTINGS_ACCENT_SWATCH_PITCH - REACH_SETTINGS_ACCENT_SWATCH_SIZE) *
+                       0.5f * swatch.width / REACH_SETTINGS_ACCENT_SWATCH_SIZE;
+        reach_rect_f32 target = {swatch.x - margin, layout->theme_accent_selector.y,
+                                 swatch.width + margin * 2.0f,
+                                 layout->theme_accent_selector.height};
+        if (swatch.width > 0.0f && reach_settings_rect_contains(target, x, y))
+        {
+            result.type = REACH_SETTINGS_HIT_THEME_ACCENT;
+            result.accent_preset = (int32_t)index;
+            return result;
+        }
     }
     if (theme_pointer && layout->top_bar_auto_hide_toggle.width > 0.0f &&
         (reach_settings_rect_contains(layout->top_bar_auto_hide_toggle, x, y) ||

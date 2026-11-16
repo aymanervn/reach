@@ -185,8 +185,8 @@ reach_result reach_context_menu_render_previews(reach_context_menu *menu,
                                      close_width * .8f, header * .8f};
         reach_rect_f32 glyph_rect = {card.source_width - close_width * .66f,
                                      header * .5f - close_width * .16f, glyph, glyph};
-        reach_color base = theme->dock_background, outline = theme->context_menu_hover_background;
-        base.a = outline.a = 1;
+        reach_color base = theme->dock_background;
+        base.a = 1;
 
         reach_render_group frame = {};
         frame.parent_id = body.id;
@@ -211,39 +211,11 @@ reach_result reach_context_menu_render_previews(reach_context_menu *menu,
         reach_motion_set(&hover, 0);
         if (state.hovered_index == card.index)
             hover = menu->hover;
-        if (interactive)
-        {
-            reach_render_group underlay = frame;
-            underlay.id = card.render_id + 13;
-            result = reach_render_command_buffer_begin_group(out, &underlay);
-            reach_render_command_buffer_end_group(out);
-            if (result != REACH_OK)
-                return result;
-            reach_preview_border_geometry(out, underlay.id, border, &outer, &rect);
-            reach_rect_motion strip = {};
-            reach_motion_set(&strip.x, 0);
-            reach_motion_set(&strip.y, 0);
-            reach_motion_set(&strip.width, card.source_width);
-            reach_motion_set(&strip.height, header);
-            result = reach_preview_fill(
-                out, card.render_id + 1, underlay.id, strip, card.source_width, header,
-                header * .5f, reach_theme_color_alpha(theme->context_menu_hover_background, 1),
-                &hover);
-            if (result == REACH_OK)
-                result = reach_preview_fill(out, card.render_id + 3, underlay.id, outer,
-                                            card.source_width + border * 2 + 1,
-                                            card.source_height + border * 2 + 1, 0, {1, 1, 1, 1},
-                                            nullptr, &hover, base, outline);
-            if (result != REACH_OK)
-                return result;
-        }
-
         frame.id = card.render_id;
         result = reach_render_command_buffer_begin_group(out, &frame);
         if (result != REACH_OK)
             return result;
-        if (!interactive)
-            reach_preview_border_geometry(out, frame.id, border, &outer, &rect);
+        reach_preview_border_geometry(out, frame.id, border, &outer, &rect);
         auto push = [&](reach_render_command command)
         {
             if (result == REACH_OK)
@@ -252,11 +224,8 @@ reach_result reach_context_menu_render_previews(reach_context_menu *menu,
         reach_render_command shape = {};
         shape.type = REACH_RENDER_COMMAND_RECT;
         shape.color = base;
-        if (!interactive)
-        {
-            shape.rect = reach_rect_motion_value_at(&outer, 0);
-            push(shape);
-        }
+        shape.rect = reach_rect_motion_value_at(&outer, 0);
+        push(shape);
         shape.rect = reach_rect_motion_value_at(&rect, 0);
         push(shape);
         if (icon != 0)

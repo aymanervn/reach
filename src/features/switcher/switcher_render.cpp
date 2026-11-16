@@ -90,9 +90,8 @@ reach_result reach_switcher_append_render_commands(reach_switcher *switcher,
         pill.parent_id = anchor.id;
         pill.bounds = {0, 0, fmaxf(1, ceilf(width)), fmaxf(1, ceilf(height))};
         if (result == REACH_OK)
-            result =
-                reach_render_push_rect_motion(out_commands, &pill, &layout.selection, pill_radius,
-                                              theme->switcher_selection_background);
+            result = reach_render_push_rect_motion(out_commands, &pill, &layout.selection,
+                                                   pill_radius, theme->accent);
         if (result != REACH_OK)
             return result;
     }

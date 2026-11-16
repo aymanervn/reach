@@ -36,6 +36,10 @@ extern "C"
 #define REACH_SETTINGS_POWER_FIELD_MINUTES 1
 #define REACH_SETTINGS_POWER_FIELD_COUNT 2
 #define REACH_SETTINGS_SLIDER_THUMB_SIZE 14.0f
+#define REACH_SETTINGS_ACCENT_SWATCH_SIZE 24.0f
+#define REACH_SETTINGS_ACCENT_SWATCH_PITCH 34.0f
+#define REACH_SETTINGS_ACCENT_RING_INSET 4.0f
+#define REACH_SETTINGS_ACCENT_RING_WIDTH 2.0f
 #define REACH_SETTINGS_ACCOUNT_NAME_CAPACITY 128
 #define REACH_SETTINGS_ACCOUNT_PASSWORD_CAPACITY 64
 #define REACH_SETTINGS_ACCOUNT_FIELD_CURRENT 0
@@ -84,6 +88,7 @@ extern "C"
         REACH_SETTINGS_HIT_THEME_FPS_TOGGLE,
         REACH_SETTINGS_HIT_THEME_FONT_TOGGLE,
         REACH_SETTINGS_HIT_THEME_REACH,
+        REACH_SETTINGS_HIT_THEME_ACCENT,
         REACH_SETTINGS_HIT_THEME_WINDOWS_SYSTEM_THEME,
         REACH_SETTINGS_HIT_THEME_WINDOWS_APP_THEME,
         REACH_SETTINGS_HIT_THEME_SCROLLBAR_TRACK,
@@ -279,6 +284,8 @@ extern "C"
         reach_motion theme_font_toggle;
         int32_t theme_light;
         reach_motion theme_reach_selection;
+        int32_t theme_accent;
+        reach_motion theme_accent_selection;
         reach_config_theme_preference theme_windows_system_theme;
         reach_config_theme_preference theme_windows_app_theme;
         reach_config_top_bar_style top_bar_style;
@@ -331,7 +338,6 @@ extern "C"
         reach_settings_page page;
         uint32_t icon_id;
         const uint16_t *label;
-        reach_theme_accent accent;
     } reach_settings_nav_item;
 
     typedef struct reach_settings_nav_item_layout
@@ -430,6 +436,12 @@ extern "C"
         reach_rect_f32 theme_reach_title;
         reach_rect_f32 theme_reach_subtitle;
         reach_rect_f32 theme_reach_selector;
+        reach_rect_f32 theme_accent_card;
+        reach_rect_f32 theme_accent_icon;
+        reach_rect_f32 theme_accent_title;
+        reach_rect_f32 theme_accent_subtitle;
+        reach_rect_f32 theme_accent_selector;
+        reach_rect_f32 theme_accent_swatches[REACH_ACCENT_PRESET_COUNT];
         reach_rect_f32 theme_windows_section_title;
         reach_rect_f32 theme_windows_system_card;
         reach_rect_f32 theme_windows_system_title;
@@ -533,6 +545,7 @@ extern "C"
         size_t startup_index;
         size_t installed_app_index;
         int32_t theme_light;
+        int32_t accent_preset;
         reach_config_theme_preference theme_preference;
         reach_config_top_bar_style top_bar_style;
         size_t wifi_index;
@@ -640,6 +653,9 @@ extern "C"
     void reach_settings_model_set_light_theme(reach_settings_model *model, int32_t enabled);
     int32_t reach_settings_model_light_theme(const reach_settings_model *model);
     int32_t reach_settings_model_select_light_theme(reach_settings_model *model, int32_t enabled);
+    void reach_settings_model_set_accent_preset(reach_settings_model *model, int32_t preset);
+    int32_t reach_settings_model_accent_preset(const reach_settings_model *model);
+    int32_t reach_settings_model_select_accent_preset(reach_settings_model *model, int32_t preset);
     void reach_settings_model_set_windows_system_theme(reach_settings_model *model,
                                                        reach_config_theme_preference preference);
     reach_config_theme_preference

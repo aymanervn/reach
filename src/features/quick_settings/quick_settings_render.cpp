@@ -320,12 +320,10 @@ struct reach_quick_settings_tile_colors
 };
 
 static reach_quick_settings_tile_colors
-reach_quick_settings_tile_colors_for(int32_t active, reach_theme_accent accent_id,
-                                     const reach_theme *theme)
+reach_quick_settings_tile_colors_for(int32_t active, const reach_theme *theme)
 {
     reach_quick_settings_tile_colors colors = {};
-    colors.foreground =
-        active ? reach_theme_accent_color(theme, accent_id) : theme->quick_settings_secondary_text;
+    colors.foreground = active ? theme->accent_text : theme->quick_settings_secondary_text;
     colors.icon_background = reach_theme_color_alpha(colors.foreground, theme->accent_tint_alpha);
     colors.background = active ? colors.icon_background : theme->quick_settings_button_background;
     return colors;
@@ -366,14 +364,13 @@ static size_t reach_quick_settings_tile_part_commands(
 
 static void reach_quick_settings_push_system_tile_commands(
     reach_render_command_buffer *commands, const reach_quick_settings_tile_layout *layout,
-    uint32_t icon_id, const uint16_t *label, int32_t active, reach_theme_accent accent_id,
-    const reach_theme *theme, const reach_quick_settings_metrics *metrics,
-    const reach_text_measure_port *text_measure, float dpi_scale)
+    uint32_t icon_id, const uint16_t *label, int32_t active, const reach_theme *theme,
+    const reach_quick_settings_metrics *metrics, const reach_text_measure_port *text_measure,
+    float dpi_scale)
 {
     if (commands == nullptr || layout == nullptr || theme == nullptr || metrics == nullptr)
         return;
-    reach_quick_settings_tile_colors colors =
-        reach_quick_settings_tile_colors_for(active, accent_id, theme);
+    reach_quick_settings_tile_colors colors = reach_quick_settings_tile_colors_for(active, theme);
     reach_render_command parts[4];
     size_t count = reach_quick_settings_tile_part_commands(parts, layout, icon_id, label, &colors,
                                                            theme, metrics, text_measure, dpi_scale);
@@ -383,14 +380,12 @@ static void reach_quick_settings_push_system_tile_commands(
 
 static reach_result reach_quick_settings_push_tinted_system_tile(
     reach_render_command_buffer *commands, const reach_quick_settings_tile_layout *layout,
-    uint32_t icon_id, const uint16_t *label, const reach_motion *state,
-    reach_theme_accent accent_id, const reach_theme *theme,
+    uint32_t icon_id, const uint16_t *label, const reach_motion *state, const reach_theme *theme,
     const reach_quick_settings_metrics *metrics, const reach_text_measure_port *text_measure,
     float dpi_scale, uint64_t first_id, uint64_t parent)
 {
-    reach_quick_settings_tile_colors off =
-        reach_quick_settings_tile_colors_for(0, accent_id, theme);
-    reach_quick_settings_tile_colors on = reach_quick_settings_tile_colors_for(1, accent_id, theme);
+    reach_quick_settings_tile_colors off = reach_quick_settings_tile_colors_for(0, theme);
+    reach_quick_settings_tile_colors on = reach_quick_settings_tile_colors_for(1, theme);
     reach_render_command parts[4];
     size_t count = reach_quick_settings_tile_part_commands(parts, layout, icon_id, label, &on,
                                                            theme, metrics, text_measure, dpi_scale);
@@ -545,7 +540,7 @@ static reach_result reach_quick_settings_push_volume_pill_commands_with_label(
                                    values->pill_label_text_weight, 0, theme->primary_text);
 
     reach_color slider_fill_color =
-        model->muted ? theme->quick_settings_slider_muted_fill : theme->quick_settings_slider_fill;
+        model->muted ? theme->quick_settings_slider_muted_fill : theme->accent;
     reach_rect_f32 origin = {0.0f, 0.0f, 0.0f, 0.0f};
 
     return reach_progress_bar_build_render_commands(pill.slider_track, pill.slider_fill, origin,
@@ -602,7 +597,7 @@ static reach_result reach_quick_settings_push_output_device_row_commands(
         check.type = REACH_RENDER_COMMAND_VECTOR_ICON;
         check.rect = layout->checkmark;
         check.icon_id = REACH_VECTOR_ICON_CHECK;
-        check.color = theme->system_glyph;
+        check.color = theme->accent_text;
         (void)reach_render_command_buffer_push(commands, &check);
     }
 
@@ -655,8 +650,8 @@ static reach_result reach_quick_settings_push_app_volume_row_commands(
                                           theme->primary_text, text_measure);
 
     reach_color line_color = theme->quick_settings_app_volume_track;
-    reach_color level_color = session->muted ? theme->quick_settings_app_volume_muted_fill
-                                             : theme->quick_settings_app_volume_fill;
+    reach_color level_color =
+        session->muted ? theme->quick_settings_app_volume_muted_fill : theme->accent;
 
     reach_quick_settings_push_rounded_rect(commands, layout->slider_full_range_line,
                                            layout->slider_full_range_line.height * 0.5f,
@@ -829,13 +824,13 @@ reach_quick_settings_build_render_commands(const reach_quick_settings_render_inp
     if (reach_quick_settings_push_tinted_system_tile(
             commands, &input->layout.network_tile,
             reach_quick_settings_network_icon_id(&input->model.network), network_label,
-            &input->network_tile_state, REACH_THEME_ACCENT_GREEN, &input->theme, &metrics,
-            &input->text_measure, input->dpi_scale, 600, 8) != REACH_OK ||
+            &input->network_tile_state, &input->theme, &metrics, &input->text_measure,
+            input->dpi_scale, 600, 8) != REACH_OK ||
         reach_quick_settings_push_tinted_system_tile(
             commands, &input->layout.bluetooth_tile,
             bluetooth_enabled ? REACH_VECTOR_ICON_BLUETOOTH_ON : REACH_VECTOR_ICON_BLUETOOTH_OFF,
-            bluetooth_label, &input->bluetooth_tile_state, REACH_THEME_ACCENT_BLUE, &input->theme,
-            &metrics, &input->text_measure, input->dpi_scale, 603, 8) != REACH_OK)
+            bluetooth_label, &input->bluetooth_tile_state, &input->theme, &metrics,
+            &input->text_measure, input->dpi_scale, 603, 8) != REACH_OK)
         return REACH_ERROR;
 
     reach_render_group base = {};
@@ -847,7 +842,7 @@ reach_quick_settings_build_render_commands(const reach_quick_settings_render_inp
     static const uint16_t project_label[] = {'P', 'r', 'o', 'j', 'e', 'c', 't', 0};
     reach_quick_settings_push_system_tile_commands(
         commands, &input->layout.project_tile, REACH_VECTOR_ICON_PROJECT, project_label, 0,
-        REACH_THEME_ACCENT_YELLOW, &input->theme, &metrics, &input->text_measure, input->dpi_scale);
+        &input->theme, &metrics, &input->text_measure, input->dpi_scale);
 
     if (input->model.brightness.available)
     {

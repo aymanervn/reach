@@ -37,7 +37,6 @@ typedef struct reach_top_bar_render_input
     int32_t battery_percent;
     int32_t battery_saver_on;
     int32_t battery_charging;
-    const reach_motion *power_hover;
     size_t click_feedback_index;
     const reach_motion *click_feedback;
     reach_motion tray_motion[REACH_TOP_BAR_MAX_TRAY_ICONS];
@@ -111,8 +110,8 @@ static reach_result reach_top_bar_push_pill_background(const reach_theme *theme,
 }
 
 static reach_result reach_top_bar_push_transparent_scrim(const reach_theme *theme,
-                                                    reach_render_command_buffer *commands,
-                                                    reach_rect_f32 bounds)
+                                                         reach_render_command_buffer *commands,
+                                                         reach_rect_f32 bounds)
 {
     reach_render_command scrim = {};
     scrim.type = REACH_RENDER_COMMAND_RECT;
@@ -152,22 +151,12 @@ static void reach_top_bar_push_power_button(const reach_top_bar_render_input *in
         return;
     }
 
-    int32_t background = reach_ui_color_feedback_begin(
-        commands, UINT64_C(0x10000000000) + 1, power_box, theme->bar_button_background,
-        theme->bar_power_hover_background, input->power_hover);
-    reach_top_bar_push_rect(commands, power_box,
-                            background ? reach_color{1, 1, 1, 1} : theme->bar_button_background,
+    reach_top_bar_push_rect(commands, power_box, theme->bar_button_background,
                             power_box.height * 0.5f);
-    if (background)
-        reach_render_command_buffer_end_group(commands);
-    reach_render_group glyph = {};
-    glyph.id = UINT64_C(0x10000000000) + 8;
-    reach_render_command_buffer_begin_group(commands, &glyph);
     reach_top_bar_push_vector_icon(
         commands,
         reach_top_bar_center_square(power_box, power_box.height * metrics.power_glyph_scale),
         REACH_VECTOR_ICON_POWER, theme->system_glyph);
-    reach_render_command_buffer_end_group(commands);
 
     if (input->click_feedback_index == REACH_TOP_BAR_FEEDBACK_POWER_BUTTON)
     {
@@ -479,9 +468,9 @@ static void reach_top_bar_push_glyph_button(const reach_top_bar_render_input *in
 }
 
 static reach_color reach_top_bar_status_glyph_color(const reach_top_bar_render_input *input,
-                                                    int32_t active, reach_theme_accent accent)
+                                                    int32_t active)
 {
-    return active ? reach_theme_accent_color(input->theme, accent) : input->theme->system_glyph;
+    return active ? input->theme->accent_text : input->theme->system_glyph;
 }
 
 static void reach_top_bar_push_quick_settings(const reach_top_bar_render_input *input,
@@ -497,9 +486,9 @@ static void reach_top_bar_push_quick_settings(const reach_top_bar_render_input *
 
     reach_top_bar_push_rect(commands, button, input->theme->bar_button_background,
                             button.height * 0.5f);
-    reach_top_bar_push_vector_icon(commands, layout->network_icon, input->network_icon_id,
-                                   reach_top_bar_status_glyph_color(input, input->network_connected,
-                                                                    REACH_THEME_ACCENT_GREEN));
+    reach_top_bar_push_vector_icon(
+        commands, layout->network_icon, input->network_icon_id,
+        reach_top_bar_status_glyph_color(input, input->network_connected));
     if (layout->network_label.width > 0.0f)
     {
         reach_top_bar_push_text(commands, layout->network_label, input->network_name,
@@ -509,10 +498,9 @@ static void reach_top_bar_push_quick_settings(const reach_top_bar_render_input *
     }
     if (input->bluetooth_icon_id != REACH_VECTOR_ICON_NONE)
     {
-        reach_top_bar_push_vector_icon(commands, layout->bluetooth_icon, input->bluetooth_icon_id,
-                                       reach_top_bar_status_glyph_color(input,
-                                                                        input->bluetooth_enabled,
-                                                                        REACH_THEME_ACCENT_BLUE));
+        reach_top_bar_push_vector_icon(
+            commands, layout->bluetooth_icon, input->bluetooth_icon_id,
+            reach_top_bar_status_glyph_color(input, input->bluetooth_enabled));
     }
     if (layout->volume_label.width > 0.0f)
     {
@@ -545,7 +533,7 @@ reach_result reach_top_bar_append_render_commands(reach_top_bar *top_bar,
     if (profile.background == REACH_TOP_BAR_BACKGROUND_TRANSPARENT)
     {
         result = reach_top_bar_push_transparent_scrim(ctx->theme, out_commands,
-                                                 reach_top_bar_background_bounds(top_bar));
+                                                      reach_top_bar_background_bounds(top_bar));
         if (result != REACH_OK)
         {
             return result;
@@ -590,7 +578,6 @@ reach_result reach_top_bar_append_render_commands(reach_top_bar *top_bar,
     input.battery_saver_on = state->battery_saver_pending ? state->battery_saver_pending_enabled
                                                           : state->battery_saver_on;
     input.battery_charging = state->battery_charging;
-    input.power_hover = &top_bar->power_hover;
     input.click_feedback_index = reach_pressable_feedback_index(&state->pressable);
     input.click_feedback = &top_bar->press_feedback;
     for (size_t index = 0; index < state->layout.tray_icon_count; ++index)

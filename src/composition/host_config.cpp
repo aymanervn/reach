@@ -228,15 +228,18 @@ void reach_host_apply_ui_font(reach_host *host, int32_t bundled_font)
     reach_host_request_update(host);
 }
 
-void reach_host_apply_theme_mode(reach_host *host, int32_t light_theme)
+void reach_host_apply_theme(reach_host *host, int32_t light_theme, int32_t accent_preset)
 {
     if (host == nullptr)
     {
         return;
     }
-    const reach_theme *previous = host->theme;
-    reach_host_set_theme_mode(host, light_theme ? REACH_THEME_MODE_LIGHT : REACH_THEME_MODE_DARK);
-    if (host->theme == previous)
+    const uint32_t previous = host->theme_revision;
+    const reach_accent_pair accent =
+        reach_accent_preset_pair(reach_accent_preset_clamp(accent_preset));
+    reach_host_set_theme(host, light_theme ? REACH_THEME_MODE_LIGHT : REACH_THEME_MODE_DARK,
+                         &accent);
+    if (host->theme_revision == previous)
     {
         return;
     }
@@ -274,7 +277,7 @@ void reach_host_apply_display_config(reach_host *host, const reach_config_snapsh
 
     host->high_refresh_rate = snapshot->high_refresh_rate ? 1 : 0;
     reach_host_apply_ui_font(host, snapshot->bundled_font);
-    reach_host_apply_theme_mode(host, snapshot->light_theme);
+    reach_host_apply_theme(host, snapshot->light_theme, snapshot->accent_preset);
 
     if (host->system_controls.set_theme_modes == nullptr)
     {

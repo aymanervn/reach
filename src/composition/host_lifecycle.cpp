@@ -457,7 +457,8 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
     reach_host_attach_registered_features(host, &feature_dependencies);
     reach_host_bind_interfeature_routes(host);
     reach_system_status_refresh_system(host->system_status, 0);
-    host->theme = reach_theme_default();
+    host->theme_storage = *reach_theme_default();
+    host->theme = &host->theme_storage;
 
     if (host->monitors.list == nullptr || host->clipboard.provider == nullptr ||
         host->surfaces[REACH_SURFACE_ID_CLIPBOARD].window.window == nullptr)

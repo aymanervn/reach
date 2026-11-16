@@ -34,11 +34,10 @@ static const uint16_t *reach_settings_wifi_row_detail(const reach_settings_model
 static void reach_settings_wifi_render_key_field(const reach_settings_render_input *input,
                                                  reach_render_command_buffer *commands,
                                                  reach_rect_f32 field, const reach_text_edit *edit,
-                                                 int32_t focused, const uint16_t *placeholder,
-                                                 reach_color accent)
+                                                 int32_t focused, const uint16_t *placeholder)
 {
     const reach_settings_model *model = input->model;
-    reach_ui_selection_item_style style = reach_settings_pill_style(input, accent);
+    reach_ui_selection_item_style style = reach_settings_pill_style(input);
     style.background = input->theme->settings_input_background;
     style.text_size = reach_settings_scale(input, REACH_TEXT_SIZE_XSMALL);
     reach_ui_selection_item_backdrop_render(commands, field, &style, focused ? 1.0f : 0.0f);
@@ -73,15 +72,14 @@ static void reach_settings_wifi_render_key_field(const reach_settings_render_inp
     state.text_color = input->theme->settings_text;
     state.placeholder_color =
         reach_settings_color_with_alpha(input->theme->settings_secondary_text, 0.55f);
-    state.selection_color = reach_settings_color_with_alpha(accent, 0.30f);
+    state.selection_color = input->theme->accent_selection;
     float inset = reach_settings_scale(input, 13.0f);
     reach_rect_f32 text_rect = {field.x + inset, field.y, field.width - inset * 2.0f, field.height};
     reach_ui_textbox_render(commands, text_rect, &style, focused ? 1.0f : 0.0f, &state);
 }
 
 static void reach_settings_wifi_render_add_row(const reach_settings_render_input *input,
-                                               reach_render_command_buffer *commands,
-                                               reach_color accent)
+                                               reach_render_command_buffer *commands)
 {
     const reach_settings_model *model = input->model;
     const reach_settings_layout *layout = input->layout;
@@ -109,7 +107,7 @@ static void reach_settings_wifi_render_add_row(const reach_settings_render_input
         return;
     }
 
-    reach_ui_selection_item_style name_style = reach_settings_pill_style(input, accent);
+    reach_ui_selection_item_style name_style = reach_settings_pill_style(input);
     name_style.background = input->theme->settings_input_background;
     name_style.text_size = reach_settings_scale(input, REACH_TEXT_SIZE_XSMALL);
     int32_t name_focused = model->wifi_focused_field == REACH_SETTINGS_WIFI_FIELD_ADD_NAME;
@@ -134,7 +132,7 @@ static void reach_settings_wifi_render_add_row(const reach_settings_render_input
     name_state.text_color = input->theme->settings_text;
     name_state.placeholder_color =
         reach_settings_color_with_alpha(input->theme->settings_secondary_text, 0.55f);
-    name_state.selection_color = reach_settings_color_with_alpha(accent, 0.30f);
+    name_state.selection_color = input->theme->accent_selection;
     float name_inset = reach_settings_scale(input, 13.0f);
     reach_rect_f32 name_rect = {
         layout->wifi_add_name_field.x + name_inset, layout->wifi_add_name_field.y,
@@ -142,7 +140,7 @@ static void reach_settings_wifi_render_add_row(const reach_settings_render_input
     reach_ui_textbox_render(commands, name_rect, &name_style, name_focused ? 1.0f : 0.0f,
                             &name_state);
 
-    reach_ui_selection_item_style option_style = reach_settings_pill_style(input, accent);
+    reach_ui_selection_item_style option_style = reach_settings_pill_style(input);
     for (size_t option = 0; option < REACH_SETTINGS_WIFI_SECURITY_OPTION_COUNT; ++option)
     {
         float selected =
@@ -157,7 +155,7 @@ static void reach_settings_wifi_render_add_row(const reach_settings_render_input
         reach_settings_wifi_render_key_field(
             input, commands, layout->wifi_add_key_field, &model->wifi_add_key_edit,
             model->wifi_focused_field == REACH_SETTINGS_WIFI_FIELD_ADD_KEY,
-            (const uint16_t *)u"Password", accent);
+            (const uint16_t *)u"Password");
         reach_ui_button_style show_style =
             reach_settings_button_style(input, input->theme->settings_input_background);
         show_style.text_size = reach_settings_scale(input, REACH_TEXT_SIZE_SMALL);
@@ -170,7 +168,7 @@ static void reach_settings_wifi_render_add_row(const reach_settings_render_input
 
     reach_ui_toggle_style toggle_style = {};
     toggle_style.track_off = input->theme->settings_toggle_track_off;
-    toggle_style.track_on = reach_settings_color_with_alpha(accent, 0.85f);
+    toggle_style.track_on = input->theme->accent;
     toggle_style.knob = input->theme->settings_toggle_knob;
     reach_ui_toggle_render(commands, layout->wifi_add_auto_toggle, &toggle_style,
                            model->wifi_connect_automatically ? 1.0f : 0.0f);
@@ -184,8 +182,7 @@ static void reach_settings_wifi_render_add_row(const reach_settings_render_input
                              REACH_TEXT_WEIGHT_NORMAL, input->text_alignment_leading,
                              input->theme->settings_secondary_text, 1);
 
-    reach_ui_button_style submit_style =
-        reach_settings_button_style(input, input->theme->settings_button_primary);
+    reach_ui_button_style submit_style = reach_settings_accent_button_style(input);
     reach_ui_button_render(
         commands, layout->wifi_add_submit_button, (const uint16_t *)u"Add", &submit_style,
         reach_settings_model_wifi_add_ready(model), 2,
@@ -207,9 +204,7 @@ static void reach_settings_wifi_render_row(const reach_settings_render_input *in
     const reach_rect_f32 row = layout->wifi_rows[row_index];
 
     reach_color background =
-        network->connected
-            ? reach_settings_color_with_alpha(accent, input->theme->accent_tint_alpha)
-            : input->theme->settings_card_background;
+        network->connected ? input->theme->accent_tint : input->theme->settings_card_background;
     reach_settings_push_rect(commands, row, reach_settings_scale(input, input->theme->radius_small),
                              background);
 
@@ -269,7 +264,7 @@ static void reach_settings_wifi_render_row(const reach_settings_render_input *in
         reach_settings_wifi_render_key_field(
             input, commands, layout->wifi_key_field, &model->wifi_key_edit,
             model->wifi_focused_field == REACH_SETTINGS_WIFI_FIELD_KEY,
-            (const uint16_t *)u"Password", accent);
+            (const uint16_t *)u"Password");
         reach_ui_button_style show_style =
             reach_settings_button_style(input, input->theme->settings_input_background);
         show_style.text_size = reach_settings_scale(input, REACH_TEXT_SIZE_SMALL);
@@ -281,7 +276,7 @@ static void reach_settings_wifi_render_row(const reach_settings_render_input *in
 
         reach_ui_toggle_style toggle_style = {};
         toggle_style.track_off = input->theme->settings_toggle_track_off;
-        toggle_style.track_on = reach_settings_color_with_alpha(accent, 0.85f);
+        toggle_style.track_on = input->theme->accent;
         toggle_style.knob = input->theme->settings_toggle_knob;
         reach_ui_toggle_render(commands, layout->wifi_auto_toggle, &toggle_style,
                                model->wifi_connect_automatically ? 1.0f : 0.0f);
@@ -298,8 +293,7 @@ static void reach_settings_wifi_render_row(const reach_settings_render_input *in
 
     if (layout->wifi_connect_button.width > 0.0f)
     {
-        reach_ui_button_style connect_style =
-            reach_settings_button_style(input, input->theme->settings_button_primary);
+        reach_ui_button_style connect_style = reach_settings_accent_button_style(input);
         reach_ui_button_render(
             commands, layout->wifi_connect_button, (const uint16_t *)u"Connect", &connect_style,
             reach_settings_model_wifi_connect_ready(model) &&
@@ -330,12 +324,11 @@ void reach_settings_render_wifi_page(const reach_settings_render_input *input,
 {
     const reach_settings_model *model = input->model;
     const reach_settings_layout *layout = input->layout;
-    reach_color accent = reach_theme_accent_color(input->theme, REACH_THEME_ACCENT_GREEN);
+    reach_color accent = input->theme->accent_text;
 
     if (layout->wifi_back_button.width > 0.0f)
     {
-        reach_ui_button_style back_style =
-            reach_settings_button_style(input, input->theme->settings_button_success);
+        reach_ui_button_style back_style = reach_settings_accent_button_style(input);
         reach_ui_button_render(
             commands, layout->wifi_back_button, (const uint16_t *)u"Return", &back_style, 1, 2,
             reach_settings_model_button_press_motion(model, REACH_SETTINGS_HIT_WIFI_BACK));
@@ -383,7 +376,7 @@ void reach_settings_render_wifi_page(const reach_settings_render_input *input,
 
         reach_ui_toggle_style toggle_style = {};
         toggle_style.track_off = input->theme->settings_toggle_track_off;
-        toggle_style.track_on = reach_settings_color_with_alpha(accent, 0.85f);
+        toggle_style.track_on = input->theme->accent;
         toggle_style.knob = input->theme->settings_toggle_knob;
         reach_ui_toggle_motion_render(
             commands, layout->wifi_radio_toggle, &toggle_style,
@@ -391,8 +384,7 @@ void reach_settings_render_wifi_page(const reach_settings_render_input *input,
             &model->wifi_radio_toggle);
 
         int32_t enabled = model->wifi_radio == REACH_WIFI_RADIO_ON;
-        reach_ui_button_style scan_style =
-            reach_settings_button_style(input, input->theme->settings_button_success);
+        reach_ui_button_style scan_style = reach_settings_accent_button_style(input);
         reach_ui_button_render(
             commands, layout->wifi_scan_button,
             model->wifi_status == REACH_SETTINGS_WIFI_STATUS_SCANNING
@@ -448,7 +440,7 @@ void reach_settings_render_wifi_page(const reach_settings_render_input *input,
     {
         reach_render_command_buffer_set_scissor(commands, layout->wifi_add_clip);
         size_t first_command = commands->count;
-        reach_settings_wifi_render_add_row(input, commands, accent);
+        reach_settings_wifi_render_add_row(input, commands);
         float progress = reach_motion_value_at(&model->wifi_row_motions[REACH_WIFI_MAX_NETWORKS],
                                                layout->scroll_time);
         reach_section_reveal_apply(commands, first_command, progress,

@@ -243,6 +243,7 @@ typedef struct reach_feature_control_ops
 typedef struct reach_feature_surface_context
 {
     const reach_theme *theme;
+    uint32_t theme_revision;
     reach_rect_f32 monitor_bounds;
     reach_rect_f32 available_bounds;
     reach_rect_f32 anchor_bounds;
@@ -648,6 +649,8 @@ struct reach_host
     reach_power_session_port power_session;
     reach_idle_watch *idle_watch;
     const reach_theme *theme;
+    reach_theme theme_storage;
+    uint32_t theme_revision;
 
     reach_window_tracking *window_tracking;
     void (*pointer_moved_route)(void *user, reach_point_i32 point);
@@ -921,7 +924,7 @@ void reach_host_reload_wallpaper(reach_host *host, int32_t force);
 
 void reach_host_apply_ui_font(reach_host *host, int32_t bundled_font);
 
-void reach_host_apply_theme_mode(reach_host *host, int32_t light_theme);
+void reach_host_apply_theme(reach_host *host, int32_t light_theme, int32_t accent_preset);
 
 void reach_host_apply_display_config(reach_host *host, const reach_config_snapshot *snapshot);
 

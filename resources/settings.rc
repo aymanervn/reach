@@ -25,6 +25,7 @@ IDI_SETTINGS_ICON ICON DISCARDABLE "settings.ico"
 234 RCDATA "extra/minimize.svg"
 235 RCDATA "extra/close.svg"
 236 RCDATA "extra/resize.svg"
+249 RCDATA "system/accent.svg"
 
 #include "fonts.rc"
 

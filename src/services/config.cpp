@@ -1,5 +1,6 @@
 #include "reach/services/config.h"
 
+#include "reach/core/theme.h"
 #include "reach/services/pin_config.h"
 
 #include <condition_variable>
@@ -116,11 +117,13 @@ static reach_result reach_config_apply_operation(reach_config_snapshot *snapshot
         *out_changed = snapshot->high_refresh_rate != operation->display.high_refresh_rate ||
                        snapshot->bundled_font != operation->display.bundled_font ||
                        snapshot->light_theme != operation->display.light_theme ||
+                       snapshot->accent_preset != operation->display.accent_preset ||
                        snapshot->windows_system_theme != operation->display.windows_system_theme ||
                        snapshot->windows_app_theme != operation->display.windows_app_theme;
         snapshot->high_refresh_rate = operation->display.high_refresh_rate;
         snapshot->bundled_font = operation->display.bundled_font;
         snapshot->light_theme = operation->display.light_theme;
+        snapshot->accent_preset = operation->display.accent_preset;
         snapshot->windows_system_theme = operation->display.windows_system_theme;
         snapshot->windows_app_theme = operation->display.windows_app_theme;
         return REACH_OK;
@@ -634,7 +637,9 @@ reach_result reach_config_service_set_power(reach_config_service *service,
 reach_result reach_config_service_set_display(reach_config_service *service,
                                               const reach_config_display_settings *settings)
 {
-    if (settings == nullptr || settings->windows_system_theme < REACH_CONFIG_THEME_FOLLOW_REACH ||
+    if (settings == nullptr || settings->accent_preset < 0 ||
+        settings->accent_preset >= REACH_ACCENT_PRESET_COUNT ||
+        settings->windows_system_theme < REACH_CONFIG_THEME_FOLLOW_REACH ||
         settings->windows_system_theme > REACH_CONFIG_THEME_DARK ||
         settings->windows_app_theme < REACH_CONFIG_THEME_FOLLOW_REACH ||
         settings->windows_app_theme > REACH_CONFIG_THEME_DARK)

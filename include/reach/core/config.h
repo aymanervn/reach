@@ -58,6 +58,7 @@ extern "C"
         int32_t high_refresh_rate;
         int32_t bundled_font;
         int32_t light_theme;
+        int32_t accent_preset;
         reach_config_theme_preference windows_system_theme;
         reach_config_theme_preference windows_app_theme;
         int32_t stage_animation_ms;

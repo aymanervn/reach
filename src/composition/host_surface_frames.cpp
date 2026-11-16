@@ -136,6 +136,7 @@ static void reach_host_fill_surface_context(reach_host *host, const reach_featur
 {
     *out = {};
     out->theme = host->theme != nullptr ? host->theme : reach_theme_default();
+    out->theme_revision = host->theme_revision;
     out->monitor_bounds = ctx != nullptr ? ctx->monitor_bounds : reach_rect_f32{};
     out->available_bounds = out->monitor_bounds;
     if (ctx != nullptr && desc->definition != nullptr &&
@@ -611,7 +612,8 @@ static void reach_host_sync_surface_pointer_observation(reach_host *host,
 static int32_t reach_host_surface_layout_context_equal(const reach_feature_surface_context *a,
                                                        const reach_feature_surface_context *b)
 {
-    return a->theme == b->theme && reach_rect_equal(a->monitor_bounds, b->monitor_bounds) &&
+    return a->theme == b->theme && a->theme_revision == b->theme_revision &&
+           reach_rect_equal(a->monitor_bounds, b->monitor_bounds) &&
            reach_rect_equal(a->available_bounds, b->available_bounds) &&
            reach_rect_equal(a->anchor_bounds, b->anchor_bounds) &&
            a->text_measure.context == b->text_measure.context &&
