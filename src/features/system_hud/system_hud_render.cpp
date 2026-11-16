@@ -146,7 +146,7 @@ static void reach_system_hud_render_level(const reach_system_hud_state *state,
         reach_system_hud_centered_glyph(state->layout.icon, state->layout.icon.height * 0.56f),
         icon, muted ? theme->system_hud_secondary_text : theme->system_hud_glyph);
 
-    reach_color fill = muted ? theme->system_hud_muted_fill : theme->system_hud_fill;
+    reach_color fill = muted ? theme->system_hud_muted_fill : theme->accent;
     reach_rect_f32 origin = {};
     (void)reach_progress_bar_build_render_commands(state->layout.track, state->layout.fill, origin,
                                                    theme->system_hud_track, fill, commands);

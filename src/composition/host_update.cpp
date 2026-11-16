@@ -406,20 +406,26 @@ reach_theme_mode reach_host_theme_mode(const reach_host *host)
     return theme->mode;
 }
 
-void reach_host_set_theme_mode(reach_host *host, reach_theme_mode mode)
+void reach_host_set_theme(reach_host *host, reach_theme_mode mode, const reach_accent_pair *accent)
 {
     if (host == nullptr)
     {
         return;
     }
 
-    const reach_theme *theme = reach_theme_for_mode(mode);
-    if (host->theme == theme)
+    reach_theme resolved = {};
+    reach_theme_resolve(mode, accent, &resolved);
+    const reach_theme *current = host->theme;
+    if (current == &host->theme_storage && current->mode == resolved.mode &&
+        current->accent.r == resolved.accent.r && current->accent.g == resolved.accent.g &&
+        current->accent.b == resolved.accent.b)
     {
         return;
     }
 
-    host->theme = theme;
+    host->theme_storage = resolved;
+    host->theme = &host->theme_storage;
+    ++host->theme_revision;
     host->dirty.layout = 1;
     host->dirty.render = 1;
 }

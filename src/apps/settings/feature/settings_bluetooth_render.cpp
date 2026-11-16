@@ -35,7 +35,7 @@ static const uint16_t *reach_settings_bluetooth_row_detail(const reach_bluetooth
 
 static void reach_settings_bluetooth_render_row(const reach_settings_render_input *input,
                                                 reach_render_command_buffer *commands,
-                                                size_t row_index, reach_color accent)
+                                                size_t row_index)
 {
     const reach_settings_model *model = input->model;
     const reach_settings_layout *layout = input->layout;
@@ -48,8 +48,7 @@ static void reach_settings_bluetooth_render_row(const reach_settings_render_inpu
     const reach_rect_f32 row = layout->bluetooth_rows[row_index];
 
     reach_color background =
-        device->connected ? reach_settings_color_with_alpha(accent, input->theme->accent_tint_alpha)
-                          : input->theme->settings_card_background;
+        device->connected ? input->theme->accent_tint : input->theme->settings_card_background;
     reach_settings_push_rect(commands, row, reach_settings_scale(input, input->theme->radius_small),
                              background);
 
@@ -115,8 +114,7 @@ static void reach_settings_bluetooth_render_row(const reach_settings_render_inpu
             REACH_TEXT_WEIGHT_SEMIBOLD, input->text_alignment_leading, input->theme->settings_text,
             1);
 
-        reach_ui_button_style accept_style =
-            reach_settings_button_style(input, input->theme->settings_button_primary);
+        reach_ui_button_style accept_style = reach_settings_accent_button_style(input);
         reach_ui_button_render(commands, layout->bluetooth_pin_accept_button,
                                (const uint16_t *)u"Yes", &accept_style, 1, 2,
                                reach_settings_model_button_press_motion(
@@ -132,9 +130,10 @@ static void reach_settings_bluetooth_render_row(const reach_settings_render_inpu
 
     if (layout->bluetooth_action_button.width > 0.0f)
     {
-        reach_ui_button_style action_style = reach_settings_button_style(
-            input, device->paired ? input->theme->settings_button_danger
-                                  : input->theme->settings_button_primary);
+        reach_ui_button_style action_style =
+            device->paired
+                ? reach_settings_button_style(input, input->theme->settings_button_danger)
+                : reach_settings_accent_button_style(input);
         reach_ui_button_render(
             commands, layout->bluetooth_action_button,
             device->paired ? (const uint16_t *)u"Remove" : (const uint16_t *)u"Pair", &action_style,
@@ -148,7 +147,7 @@ void reach_settings_render_bluetooth_page(const reach_settings_render_input *inp
 {
     const reach_settings_model *model = input->model;
     const reach_settings_layout *layout = input->layout;
-    reach_color accent = reach_theme_accent_color(input->theme, REACH_THEME_ACCENT_BLUE);
+    reach_color accent = input->theme->accent_text;
     int32_t enabled = model->bluetooth_radio.available && model->bluetooth_radio.enabled;
 
     reach_settings_push_rect(commands, layout->bluetooth_radio_card,
@@ -183,15 +182,14 @@ void reach_settings_render_bluetooth_page(const reach_settings_render_input *inp
 
     reach_ui_toggle_style toggle_style = {};
     toggle_style.track_off = input->theme->settings_toggle_track_off;
-    toggle_style.track_on = reach_settings_color_with_alpha(accent, 0.85f);
+    toggle_style.track_on = input->theme->accent;
     toggle_style.knob = input->theme->settings_toggle_knob;
     reach_ui_toggle_motion_render(
         commands, layout->bluetooth_radio_toggle, &toggle_style,
         reach_settings_control_group_id(REACH_SETTINGS_HIT_BLUETOOTH_RADIO_TOGGLE, 0),
         &model->bluetooth_radio_toggle);
 
-    reach_ui_button_style scan_style =
-        reach_settings_button_style(input, input->theme->settings_button_primary);
+    reach_ui_button_style scan_style = reach_settings_accent_button_style(input);
     reach_ui_button_render(
         commands, layout->bluetooth_scan_button,
         model->bluetooth_scanning ? (const uint16_t *)u"Stop scanning" : (const uint16_t *)u"Scan",
@@ -241,7 +239,7 @@ void reach_settings_render_bluetooth_page(const reach_settings_render_input *inp
     }
     for (size_t row_index = 0; row_index < layout->bluetooth_row_count; ++row_index)
     {
-        reach_settings_bluetooth_render_row(input, commands, row_index, accent);
+        reach_settings_bluetooth_render_row(input, commands, row_index);
     }
     reach_render_command_buffer_clear_scissor(commands);
 

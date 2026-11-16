@@ -1,6 +1,7 @@
 #include "windows_adapters_internal.h"
 #include "shortcut_win32.h"
 
+#include "reach/core/theme.h"
 #include "reach/ports/config_store.h"
 #include "reach/protocol/version.h"
 
@@ -184,8 +185,8 @@ static reach_result reach_config_store_load(reach_config_store *store,
         dock_size < REACH_CONFIG_DOCK_SIZE_MIN
             ? REACH_CONFIG_DOCK_SIZE_MIN
             : (dock_size > REACH_CONFIG_DOCK_SIZE_MAX ? REACH_CONFIG_DOCK_SIZE_MAX : dock_size);
-    int32_t top_bar_style = (int32_t)GetPrivateProfileIntW(L"top_bar", L"style",
-                                                           REACH_CONFIG_TOP_BAR_STYLE_TRANSPARENT, path);
+    int32_t top_bar_style = (int32_t)GetPrivateProfileIntW(
+        L"top_bar", L"style", REACH_CONFIG_TOP_BAR_STYLE_TRANSPARENT, path);
     out_snapshot->top_bar_style = top_bar_style >= REACH_CONFIG_TOP_BAR_STYLE_SPLIT &&
                                           top_bar_style <= REACH_CONFIG_TOP_BAR_STYLE_TRANSPARENT
                                       ? (reach_config_top_bar_style)top_bar_style
@@ -220,6 +221,8 @@ static reach_result reach_config_store_load(reach_config_store *store,
         (int32_t)GetPrivateProfileIntW(L"display", L"bundled_font", 1, path) != 0;
     out_snapshot->light_theme =
         (int32_t)GetPrivateProfileIntW(L"display", L"light_theme", 0, path) != 0;
+    out_snapshot->accent_preset = reach_accent_preset_clamp(
+        (int32_t)GetPrivateProfileIntW(L"display", L"accent", REACH_ACCENT_PRESET_BLUE, path));
     int32_t windows_system_theme =
         (int32_t)GetPrivateProfileIntW(L"display", L"windows_system_theme", 0, path);
     out_snapshot->windows_system_theme = windows_system_theme >= REACH_CONFIG_THEME_FOLLOW_REACH &&
@@ -372,6 +375,8 @@ static reach_result reach_config_store_save(reach_config_store *store,
     text.append(std::to_wstring(snapshot->bundled_font ? 1 : 0));
     text.append(L"\r\nlight_theme=");
     text.append(std::to_wstring(snapshot->light_theme ? 1 : 0));
+    text.append(L"\r\naccent=");
+    text.append(std::to_wstring(reach_accent_preset_clamp(snapshot->accent_preset)));
     text.append(L"\r\nwindows_system_theme=");
     text.append(std::to_wstring((int32_t)snapshot->windows_system_theme));
     text.append(L"\r\nwindows_app_theme=");

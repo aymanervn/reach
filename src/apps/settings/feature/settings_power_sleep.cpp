@@ -21,15 +21,15 @@ const reach_settings_power_row_style *reach_settings_power_row_styles(void)
 {
     static const reach_settings_power_row_style styles[REACH_SETTINGS_POWER_TIMER_COUNT] = {
         {REACH_VECTOR_ICON_BRIGHTNESS, (const uint16_t *)L"Screen off",
-         (const uint16_t *)L"Turn off the screen when idle for", REACH_THEME_ACCENT_BLUE},
+         (const uint16_t *)L"Turn off the screen when idle for"},
         {REACH_VECTOR_ICON_SLEEP, (const uint16_t *)L"Sleep",
-         (const uint16_t *)L"Put the device to sleep when idle for", REACH_THEME_ACCENT_LAVENDER},
+         (const uint16_t *)L"Put the device to sleep when idle for"},
         {REACH_VECTOR_ICON_LOCK, (const uint16_t *)L"Auto lock",
-         (const uint16_t *)L"Lock Windows when idle for", REACH_THEME_ACCENT_TEAL},
+         (const uint16_t *)L"Lock Windows when idle for"},
         {REACH_VECTOR_ICON_SHUTDOWN, (const uint16_t *)L"Shutdown",
-         (const uint16_t *)L"Shut down the device when idle for", REACH_THEME_ACCENT_RED},
+         (const uint16_t *)L"Shut down the device when idle for"},
         {REACH_VECTOR_ICON_RESTART, (const uint16_t *)L"Restart",
-         (const uint16_t *)L"Restart the device when idle for", REACH_THEME_ACCENT_CYAN},
+         (const uint16_t *)L"Restart the device when idle for"},
     };
     return styles;
 }

@@ -104,6 +104,8 @@ static int reach_d2d_vector_icon_resource(uint64_t icon_id)
         return 247;
     case REACH_VECTOR_ICON_LAYERS:
         return 248;
+    case REACH_VECTOR_ICON_ACCENT:
+        return 249;
     default:
         return 0;
     }

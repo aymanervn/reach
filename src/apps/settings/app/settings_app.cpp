@@ -144,7 +144,7 @@ struct reach_settings_app
     reach_settings_layout layout;
     reach_render_command_buffer render_commands;
     reach_rect_f32 bounds;
-    const reach_theme *theme;
+    reach_theme theme;
     reach_settings_update_worker update_worker;
     reach_settings_reach_worker reach_worker;
     reach_settings_startup_worker startup_worker;
@@ -404,8 +404,8 @@ static void reach_settings_refresh_layout(reach_settings_app *app)
     }
     reach_rect_f32 local = {0.0f, 0.0f, app->bounds.width, app->bounds.height};
     reach_workload_add(REACH_WORKLOAD_LAYOUTS, 1);
-    app->layout = reach_settings_layout_for_bounds(local, app->theme, reach_settings_app_scale(app),
-                                                   &app->model);
+    app->layout = reach_settings_layout_for_bounds(local, &app->theme,
+                                                   reach_settings_app_scale(app), &app->model);
     reach_settings_apply_caption(app);
 }
 
@@ -495,7 +495,7 @@ static reach_result reach_settings_render(reach_settings_app *app)
     }
 
     reach_settings_render_input input = {};
-    input.theme = app->theme;
+    input.theme = &app->theme;
     input.model = &app->model;
     input.layout = &app->layout;
     input.dpi_scale = reach_settings_app_scale(app);
@@ -602,9 +602,11 @@ static void reach_settings_apply_theme(reach_settings_app *app)
     {
         return;
     }
-    app->theme =
-        reach_theme_for_mode(reach_settings_model_light_theme(&app->model) ? REACH_THEME_MODE_LIGHT
-                                                                           : REACH_THEME_MODE_DARK);
+    const reach_accent_pair accent = reach_accent_preset_pair(
+        reach_accent_preset_clamp(reach_settings_model_accent_preset(&app->model)));
+    reach_theme_resolve(reach_settings_model_light_theme(&app->model) ? REACH_THEME_MODE_LIGHT
+                                                                      : REACH_THEME_MODE_DARK,
+                        &accent, &app->theme);
     reach_settings_refresh_layout(app);
     app->dirty = 1;
 }
@@ -625,6 +627,7 @@ static void reach_settings_load_theme_config(reach_settings_app *app)
     reach_settings_model_set_bundled_font(&app->model, snapshot->bundled_font);
     reach_settings_apply_ui_font(app);
     reach_settings_model_set_light_theme(&app->model, snapshot->light_theme);
+    reach_settings_model_set_accent_preset(&app->model, snapshot->accent_preset);
     reach_settings_model_set_windows_system_theme(&app->model, snapshot->windows_system_theme);
     reach_settings_model_set_windows_app_theme(&app->model, snapshot->windows_app_theme);
     reach_settings_apply_theme(app);
@@ -640,6 +643,7 @@ static void reach_settings_save_theme_config(reach_settings_app *app)
     settings.high_refresh_rate = reach_settings_model_high_refresh_rate(&app->model);
     settings.bundled_font = reach_settings_model_bundled_font(&app->model);
     settings.light_theme = reach_settings_model_light_theme(&app->model);
+    settings.accent_preset = reach_settings_model_accent_preset(&app->model);
     settings.windows_system_theme = reach_settings_model_windows_system_theme(&app->model);
     settings.windows_app_theme = reach_settings_model_windows_app_theme(&app->model);
     (void)reach_config_service_set_display(app->config_service, &settings);
@@ -1873,6 +1877,9 @@ static uint64_t reach_settings_pressable_target(reach_settings_hit_result hit)
     case REACH_SETTINGS_HIT_THEME_REACH:
         detail = (uint32_t)hit.theme_light;
         break;
+    case REACH_SETTINGS_HIT_THEME_ACCENT:
+        detail = (uint32_t)hit.accent_preset;
+        break;
     case REACH_SETTINGS_HIT_TOP_BAR_STYLE:
         detail = (uint32_t)hit.top_bar_style;
         break;
@@ -2380,6 +2387,14 @@ static void reach_settings_handle_pointer_up(reach_settings_app *app, const reac
                 reach_settings_apply_theme(app);
             }
         }
+        else if (hit.type == REACH_SETTINGS_HIT_THEME_ACCENT)
+        {
+            if (reach_settings_model_select_accent_preset(&app->model, hit.accent_preset))
+            {
+                reach_settings_save_theme_config(app);
+                reach_settings_apply_theme(app);
+            }
+        }
         else if (hit.type == REACH_SETTINGS_HIT_THEME_WINDOWS_SYSTEM_THEME)
         {
             if (reach_settings_model_select_windows_system_theme(&app->model, hit.theme_preference))
@@ -2806,7 +2821,7 @@ reach_result reach_settings_app_create(reach_settings_app **out_app,
     }
     app->notify = notify;
     app->notify_user = notify_user;
-    app->theme = reach_theme_default();
+    app->theme = *reach_theme_default();
     reach_settings_model_init(&app->model);
 
     reach_result result = reach_windows_create_render_device(&app->render_device);

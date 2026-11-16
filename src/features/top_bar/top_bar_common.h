@@ -36,10 +36,7 @@ struct reach_top_bar
     double sampled_seconds;
     reach_top_bar_state state;
     reach_motion press_feedback;
-    reach_motion power_hover;
     reach_motion_spec snappy_spec;
-    reach_motion_spec fade_in_spec;
-    reach_motion_spec fade_out_spec;
     reach_top_bar_now_playing *now_playing_subfeature;
     reach_top_bar_window_push *window_push;
     reach_top_bar_tray_popup *tray_popup;

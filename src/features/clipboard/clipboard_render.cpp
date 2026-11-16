@@ -701,15 +701,15 @@ reach_result reach_clipboard_build_render_commands(const reach_clipboard_render_
             result = reach_ui_bordered_motion_color_feedback_render(
                 commands, feedback_id + 16, &visible,
                 reach_clipboard_scale_value(theme->radius_small, input->dpi_scale),
-                border_thickness, theme->clipboard_item_background,
-                theme->clipboard_item_hover_background, theme->clipboard_item_hover_border, &hover);
+                border_thickness, theme->clipboard_item_background, theme->accent, theme->accent,
+                &hover);
         }
         else
             result = reach_ui_bordered_color_feedback_render(
                 commands, feedback_id, local_visible_item,
                 reach_clipboard_scale_value(theme->radius_small, input->dpi_scale),
-                border_thickness, theme->clipboard_item_background,
-                theme->clipboard_item_hover_background, theme->clipboard_item_hover_border, &hover);
+                border_thickness, theme->clipboard_item_background, theme->accent, theme->accent,
+                &hover);
         if (result != REACH_OK)
             return result;
 

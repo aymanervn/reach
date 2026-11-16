@@ -95,8 +95,8 @@ static void reach_dock_push_running_indicator(const reach_dock_render_input *inp
     }
 
     reach_color color = reach_theme_color_alpha(
-        input->theme->dock_running_indicator, focused ? metrics.running_indicator_focused_alpha
-                                                      : metrics.running_indicator_unfocused_alpha);
+        input->theme->accent_text, focused ? metrics.running_indicator_focused_alpha
+                                           : metrics.running_indicator_unfocused_alpha);
 
     reach_dock_push_rect(commands,
                          reach_dock_rect(icon_box.x + (icon_box.width - indicator_size) * 0.5f,

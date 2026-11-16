@@ -100,6 +100,34 @@ int32_t reach_settings_model_select_light_theme(reach_settings_model *model, int
     return 1;
 }
 
+void reach_settings_model_set_accent_preset(reach_settings_model *model, int32_t preset)
+{
+    if (model == nullptr)
+    {
+        return;
+    }
+    model->theme_accent = reach_accent_preset_clamp(preset);
+    reach_motion_set(&model->theme_accent_selection, (float)model->theme_accent);
+}
+
+int32_t reach_settings_model_accent_preset(const reach_settings_model *model)
+{
+    return model != nullptr ? model->theme_accent : REACH_ACCENT_PRESET_BLUE;
+}
+
+int32_t reach_settings_model_select_accent_preset(reach_settings_model *model, int32_t preset)
+{
+    if (model == nullptr || preset < 0 || preset >= REACH_ACCENT_PRESET_COUNT ||
+        model->theme_accent == preset)
+    {
+        return 0;
+    }
+    model->theme_accent = preset;
+    reach_settings_animate(&model->theme_accent_selection, (float)preset,
+                           REACH_MOTION_PRESET_SNAPPY);
+    return 1;
+}
+
 static int32_t reach_settings_theme_preference_valid(reach_config_theme_preference preference)
 {
     return preference >= REACH_CONFIG_THEME_FOLLOW_REACH && preference <= REACH_CONFIG_THEME_DARK;

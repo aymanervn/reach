@@ -108,6 +108,13 @@ reach_ui_button_style reach_settings_button_style(const reach_settings_render_in
     return style;
 }
 
+reach_ui_button_style reach_settings_accent_button_style(const reach_settings_render_input *input)
+{
+    reach_ui_button_style style = reach_settings_button_style(input, input->theme->accent);
+    style.text = input->theme->settings_text;
+    return style;
+}
+
 reach_ui_button_style reach_settings_muted_button_style(const reach_settings_render_input *input)
 {
     reach_ui_button_style style =
@@ -116,12 +123,11 @@ reach_ui_button_style reach_settings_muted_button_style(const reach_settings_ren
     return style;
 }
 
-reach_ui_selection_item_style reach_settings_pill_style(const reach_settings_render_input *input,
-                                                        reach_color accent)
+reach_ui_selection_item_style reach_settings_pill_style(const reach_settings_render_input *input)
 {
     reach_ui_selection_item_style style = {};
     style.background = input->theme->settings_pill_background;
-    style.accent = accent;
+    style.accent = input->theme->accent_text;
     style.text = input->theme->settings_secondary_text;
     style.border_width = reach_settings_scale(input, 1.0f);
     style.text_size = reach_settings_scale(input, REACH_TEXT_SIZE_MEDIUM);

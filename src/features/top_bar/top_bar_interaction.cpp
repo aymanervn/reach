@@ -585,20 +585,6 @@ void reach_top_bar_pointer_move(reach_top_bar *top_bar, int32_t local_x, int32_t
         }
         out->handled = 1;
     }
-
-    int32_t hovered = reach_top_bar_hit_test(&state->layout, local_x, local_y) ==
-                      REACH_TOP_BAR_POINTER_REGION_POWER_BUTTON;
-    if (hovered == state->power_hovered)
-    {
-        return;
-    }
-
-    state->power_hovered = hovered;
-    reach_motion_animate_spec_to_at(&top_bar->power_hover, hovered ? 1.0f : 0.0f,
-                                    hovered ? top_bar->fade_in_spec : top_bar->fade_out_spec,
-                                    reach_motion_now_seconds());
-    out->handled = 1;
-    out->redraw = 1;
 }
 
 void reach_top_bar_pointer_cancel(reach_top_bar *top_bar, reach_top_bar_event_result *out)
@@ -627,13 +613,4 @@ void reach_top_bar_pointer_leave(reach_top_bar *top_bar, reach_top_bar_event_res
     reach_pressable_result pressable = {};
     reach_pressable_update(&state->pressable, REACH_PRESSABLE_TARGET_NONE, &pressable);
     reach_top_bar_apply_pressable_result(&pressable, out);
-    if (!state->power_hovered)
-    {
-        return;
-    }
-
-    state->power_hovered = 0;
-    reach_motion_animate_spec_to_at(&top_bar->power_hover, 0.0f, top_bar->fade_out_spec,
-                                    reach_motion_now_seconds());
-    out->redraw = 1;
 }

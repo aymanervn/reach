@@ -119,7 +119,8 @@ extern "C"
     int32_t reach_host_frame_rate_hz(const reach_host *host);
     uint32_t reach_host_idle_wait_ms(const reach_host *host);
     reach_theme_mode reach_host_theme_mode(const reach_host *host);
-    void reach_host_set_theme_mode(reach_host *host, reach_theme_mode mode);
+    void reach_host_set_theme(reach_host *host, reach_theme_mode mode,
+                              const reach_accent_pair *accent);
 
 #ifdef __cplusplus
 }

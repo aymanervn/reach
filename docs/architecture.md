@@ -22,6 +22,29 @@ the standard library. Surface background colors are semantic theme tokens rather
 value-based aliases: Dock, top bar and switcher each read their named background, while
 all popup capsules share the popup background contract.
 
+The user's accent color is one theme token family, not per-feature colors. A preset is a
+`reach_accent_pair` of a deep and a bright shade (`reach_accent_preset_pair`). UI text never
+changes color to compensate for the accent; the scheme adapts instead. `reach_theme_resolve`
+copies the dark or light base theme and derives two shades by contrast, so any future pair source,
+such as wallpaper extraction, needs no per-color tuning:
+- `accent` (fill): the deep shade in the dark theme and the bright shade in the light theme,
+  darkened or lightened until the theme's `primary_text` reaches 4.5:1 on it. Toggles, sliders,
+  segmented selections, primary buttons, checkboxes, the Quick Settings and System HUD slider fills,
+  and every solid hover or selection surface (context-menu rows including the power menu, Switcher
+  and Launcher selection pills, Launcher row hover, clipboard item hover) use it. Content on these
+  surfaces keeps its normal theme text, glyph and knob colors.
+- `accent_text` (ink): the opposite shade, lightened or darkened until it reaches 4.5:1 against
+  the theme's raised surface. Accent-colored glyphs, text and thin marks on neutral surfaces use
+  it: top-bar status glyphs, active Quick Settings tiles, the output-device checkmark, Settings nav
+  icons, pill and focused-field text, account avatar, loaders, the Dock running indicator, the
+  Stage tile border, and the accent swatch selection ring.
+- `accent_tint` and `accent_selection` are the fill at 20% and 30% for tinted rows, the Settings
+  nav indicator and text selection.
+Status colors (battery, success, error, danger, window controls) and top-bar stats series keep
+their own tokens. Display config stores the preset as `[display] accent`; composition owns the
+resolved theme and bumps `theme_revision` on change so surface layout reuse cannot keep stale
+colors, and the Settings process resolves the same way for its own surface.
+
 Rounded border-bearing shapes use `reach_render_push_bordered_background`: it pixel-aligns
 the outer shape, emits an opaque border-color fill, then emits an opaque background fill
 inset by the border thickness. Features append content after that pair. Normal primitive
@@ -292,9 +315,9 @@ body/card rectangles. Pointer observation covers the envelope and owner corridor
 uses the sampled body. Closing freezes width and reflow, hide/reset retires ownership, and fresh
 presentation or changed monitor/DPI constraints cuts stale layout intent. One deadline cleans up
 layout; the scalar width manager, periodic width tick/frame demand and sampled render rectangles
-are removed. Source extents and header heights remain endpoint layout data. Hovering anywhere
-on a card highlights its fixed header pill and square thumbnail border with the shared
-`context_menu_hover_background` theme color. The dark theme uses its darker structure shade.
+are removed. Source extents and header heights remain endpoint layout data. Hovering a card
+changes neither its header, title nor thumbnail border; revealing the close control is the only
+hover cue.
 The title has 8dp left padding; the close control renders at 80% of its hit-region dimensions
 without moving the title on hover. The theme-scaled outline sits outside native preview bounds
 and uses the shared bordered-background renderer so DWM content cannot obscure it.
@@ -964,9 +987,8 @@ for moving icons. Shared UI feedback owns the group descriptor; the icon helper 
 original alpha-mask tint, while trigger and overflow glyphs use RGBA tint. Press feedback no longer
 owns scalar tracks, sampled render values, capsule frame demand or bar content-frame blockers.
 Original-target capture and context-feedback latching still use the shared pressable contract.
-Top Bar power hover publishes retained RGBA tint over fixed rounded background coverage, with
-its glyph in a separate cached group. Enter/leave retarget the canonical motion; reset and game
-mode clear it. Power hover has no scalar track, periodic capsule frame or bar frame blocker.
+The Top Bar power button has no hover state; like the Quick Settings button it shows only the
+shared press feedback, so it never keeps an accent fill while its menu is open.
 
 Stage close hover uses the shared RGBA tint with separate background and glyph coverage for its
 current target. Pointer events publish changes directly, including interruption; settled movement

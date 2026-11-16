@@ -128,7 +128,6 @@ extern "C"
         int32_t icon_only;
         reach_bar_visibility_state visibility;
         reach_pressable pressable;
-        int32_t power_hovered;
 
         uint16_t clock_time_text[32];
         uint16_t clock_date_text[64];

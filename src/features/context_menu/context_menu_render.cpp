@@ -61,7 +61,7 @@ reach_result reach_context_menu_build_render_commands(const reach_context_menu_r
             command = {};
             command.type = REACH_RENDER_COMMAND_RECT;
             command.rect = item;
-            command.color = input->theme->context_menu_hover_background;
+            command.color = input->theme->accent;
             command.radius = reach_context_menu_scale(input, input->theme->radius_small);
             reach_render_command_buffer_push(out_commands, &command);
         }

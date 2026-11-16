@@ -102,7 +102,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
         command.text_alignment = input->text_alignment_leading;
         command.text_color = theme->launcher_search_text;
         command.placeholder_color = theme->launcher_placeholder_text;
-        command.selection_color = theme->launcher_selection_highlight;
+        command.selection_color = theme->accent_selection;
         command.caret_index = input->caret_index;
         command.caret_visible = input->caret_visible;
         command.selection_start = input->selection_start;
@@ -190,8 +190,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
             pill.bounds = {0, 0, fmaxf(1, ceilf(width)), fmaxf(1, ceilf(height))};
             pill.opacity = opacity;
             result = reach_render_push_rect_motion(out_commands, &pill, &input->selection,
-                                                   row_selected_radius,
-                                                   theme->launcher_row_selected_background);
+                                                   row_selected_radius, theme->accent);
             if (result != REACH_OK)
                 return result;
         }
@@ -211,11 +210,9 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
             reach_render_group placement = {};
             placement.bounds = hover;
             placement.parent_id = content_id;
-            result = reach_ui_feedback_render(
-                out_commands, UINT64_C(0x2900000000060030), hover, row_selected_radius,
-                reach_theme_color_alpha(theme->launcher_row_selected_background,
-                                        theme->launcher_row_selected_background.a * 0.5f),
-                &input->hover_opacity, &placement);
+            result = reach_ui_feedback_render(out_commands, UINT64_C(0x2900000000060030), hover,
+                                              row_selected_radius, theme->accent,
+                                              &input->hover_opacity, &placement);
             if (result != REACH_OK)
                 return result;
         }
@@ -324,7 +321,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
             command.rect.y = row_y + row_path_y;
             command.rect.width = row_width - row_text_x - row_text_right_padding;
             command.rect.height = row_path_height;
-            command.color = selected ? theme->launcher_row_path_selected : theme->launcher_row_path;
+            command.color = theme->launcher_row_path;
             command.text_size = row_path_size;
             command.text_alignment = input->text_alignment_leading;
             command.text_ellipsis = 1;
