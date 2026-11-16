@@ -407,7 +407,7 @@ is a `shell:` location or a filesystem path.
 **Accepted coupling (by design — do not “fix”):** the top bar cluster. The top
 bar hosts the tray / quick-settings / power buttons, so its private tray overflow UI and the
 other popup features may take the top bar layout directly; no anchor indirection is wanted
-between them. Split, unified, and simple top-bar styles are chrome and edge-geometry treatments
+between them. Split, unified, and transparent top-bar styles are chrome and edge-geometry treatments
 over that same capsule, layout, control set, and action routing: the style profile changes the
 background, border, screen inset, app clearance, and input-region composition without duplicating
 controls. Now Playing is not a

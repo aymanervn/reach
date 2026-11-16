@@ -127,11 +127,9 @@ static reach_result reach_config_apply_operation(reach_config_snapshot *snapshot
     case REACH_CONFIG_OPERATION_SET_TOP_BAR:
         *out_changed = snapshot->top_bar_style != operation->top_bar.style ||
                        snapshot->top_bar_mode != operation->top_bar.mode ||
-                       snapshot->top_bar_scrim_length != operation->top_bar.scrim_length ||
                        snapshot->top_bar_icon_only != operation->top_bar.icon_only;
         snapshot->top_bar_style = operation->top_bar.style;
         snapshot->top_bar_mode = operation->top_bar.mode;
-        snapshot->top_bar_scrim_length = operation->top_bar.scrim_length;
         snapshot->top_bar_icon_only = operation->top_bar.icon_only;
         return REACH_OK;
     case REACH_CONFIG_OPERATION_SET_DOCK_SIZE:
@@ -653,11 +651,9 @@ reach_result reach_config_service_set_top_bar(reach_config_service *service,
                                               const reach_config_top_bar_settings *settings)
 {
     if (settings == nullptr || settings->style < REACH_CONFIG_TOP_BAR_STYLE_SPLIT ||
-        settings->style > REACH_CONFIG_TOP_BAR_STYLE_SIMPLE ||
+        settings->style > REACH_CONFIG_TOP_BAR_STYLE_TRANSPARENT ||
         settings->mode < REACH_CONFIG_TOP_BAR_MODE_DYNAMIC ||
-        settings->mode > REACH_CONFIG_TOP_BAR_MODE_STATIC ||
-        settings->scrim_length < REACH_CONFIG_TOP_BAR_SCRIM_STANDARD ||
-        settings->scrim_length > REACH_CONFIG_TOP_BAR_SCRIM_LONG)
+        settings->mode > REACH_CONFIG_TOP_BAR_MODE_STATIC)
     {
         return REACH_INVALID_ARGUMENT;
     }

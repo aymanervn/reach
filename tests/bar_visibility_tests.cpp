@@ -80,27 +80,90 @@ static void test_top_bar_styles_publish_their_clearance(void)
     expect_true(split_geometry.bar_reveal_policy == REACH_FEATURE_BAR_REVEAL_FULLSCREEN,
                 "static top bar enables auto hide only for fullscreen apps");
 
-    (void)reach_top_bar_apply_config(top_bar, REACH_CONFIG_TOP_BAR_STYLE_SIMPLE,
+    (void)reach_top_bar_apply_config(top_bar, REACH_CONFIG_TOP_BAR_STYLE_TRANSPARENT,
                                      REACH_CONFIG_TOP_BAR_MODE_STATIC);
     reach_top_bar_build_layout(top_bar, &context);
-    const reach_top_bar_state *simple = reach_top_bar_state_ptr(top_bar);
-    reach_feature_surface_geometry simple_geometry = {};
-    reach_top_bar_capsule_ops()->surface_geometry(top_bar, &simple_geometry);
+    const reach_top_bar_state *transparent = reach_top_bar_state_ptr(top_bar);
+    reach_feature_surface_geometry transparent_geometry = {};
+    reach_top_bar_capsule_ops()->surface_geometry(top_bar, &transparent_geometry);
     reach_rect_f32 background = reach_top_bar_background_bounds(top_bar);
-    expect_true(simple->layout.bounds.y == 50.0f && simple->layout.app_clearance == 0.0f,
-                "simple top bar reaches the screen edge without app clearance");
+    expect_true(transparent->layout.bounds.y == 50.0f && transparent->layout.app_clearance == 0.0f,
+                "transparent top bar reaches the screen edge without app clearance");
     expect_true(background.x == 0.0f && background.width == context.monitor_bounds.width,
-                "simple top bar background spans the monitor width");
-    expect_true(simple_geometry.reserve_monitor_work_area &&
-                    simple_geometry.work_area_clearance == 0.0f,
-                "simple top bar publishes zero extra work-area clearance");
+                "transparent top bar background spans the monitor width");
+    expect_true(transparent_geometry.reserve_monitor_work_area &&
+                    transparent_geometry.work_area_clearance == 0.0f,
+                "transparent top bar publishes zero extra work-area clearance");
 
-    (void)reach_top_bar_apply_config(top_bar, REACH_CONFIG_TOP_BAR_STYLE_SIMPLE,
+    (void)reach_top_bar_apply_config(top_bar, REACH_CONFIG_TOP_BAR_STYLE_TRANSPARENT,
                                      REACH_CONFIG_TOP_BAR_MODE_DYNAMIC);
     reach_feature_surface_geometry dynamic_geometry = {};
     reach_top_bar_capsule_ops()->surface_geometry(top_bar, &dynamic_geometry);
     expect_true(dynamic_geometry.bar_reveal_policy == REACH_FEATURE_BAR_REVEAL_ALWAYS,
                 "dynamic top bar keeps auto hide active for ordinary app overlap");
+
+    reach_top_bar_destroy(top_bar);
+}
+
+static void test_transparent_top_bar_scrim_renders_within_budget(void)
+{
+    reach_top_bar *top_bar = nullptr;
+    expect_true(reach_top_bar_create(&top_bar) == REACH_OK, "top bar is created");
+    if (top_bar == nullptr)
+    {
+        return;
+    }
+
+    static reach_render_command_buffer buffer;
+    const reach_theme_mode modes[] = {REACH_THEME_MODE_DARK, REACH_THEME_MODE_LIGHT};
+    const float dpis[] = {1.0f, 1.25f, 1.5f, 2.0f, 3.0f};
+    const reach_rect_f32 monitors[] = {{0.0f, 0.0f, 7680.0f, 4320.0f},
+                                       {0.0f, 0.0f, 360.0f, 280.0f}};
+    const reach_config_top_bar_mode bar_modes[] = {REACH_CONFIG_TOP_BAR_MODE_STATIC,
+                                                   REACH_CONFIG_TOP_BAR_MODE_DYNAMIC};
+    int32_t all_ok = 1;
+    for (reach_theme_mode mode : modes)
+    {
+        for (reach_config_top_bar_mode bar_mode : bar_modes)
+        {
+            (void)reach_top_bar_apply_config(top_bar, REACH_CONFIG_TOP_BAR_STYLE_TRANSPARENT, bar_mode);
+            for (float dpi : dpis)
+            {
+                for (reach_rect_f32 monitor : monitors)
+                {
+                    for (int32_t retained = 0; retained <= 1; ++retained)
+                    {
+                        reach_top_bar_build_context build = {};
+                        build.theme = reach_theme_for_mode(mode);
+                        build.monitor_bounds = monitor;
+                        build.dpi_scale = dpi;
+                        reach_top_bar_build_layout(top_bar, &build);
+                        reach_top_bar_render_context render = {};
+                        render.theme = build.theme;
+                        render.dpi_scale = dpi;
+                        render.icon_size_px = (int32_t)(16.0f * dpi);
+                        render.retained_supported = retained;
+                        if (reach_top_bar_append_render_commands(top_bar, &render, &buffer) !=
+                                REACH_OK ||
+                            buffer.group_count > REACH_MAX_RENDER_GROUPS ||
+                            buffer.count > REACH_MAX_RENDER_COMMANDS ||
+                            reach_render_command_buffer_validate_groups(&buffer) != REACH_OK)
+                        {
+                            all_ok = 0;
+                        }
+                        int32_t scrim_found = 0;
+                        for (size_t index = 0; index < buffer.count; ++index)
+                        {
+                            scrim_found |= buffer.commands[index].fill_gradient ==
+                                           REACH_RENDER_FILL_EASED_FADE_DOWN;
+                        }
+                        all_ok &= scrim_found;
+                    }
+                }
+            }
+        }
+    }
+    expect_true(all_ok, "transparent top bar with its scrim renders within the render budget");
 
     reach_top_bar_destroy(top_bar);
 }
@@ -201,6 +264,7 @@ int main(void)
 {
     test_protected_bands_are_symmetric();
     test_top_bar_styles_publish_their_clearance();
+    test_transparent_top_bar_scrim_renders_within_budget();
     test_forced_hide_animates_and_suppresses_reveal();
     test_stage_force_show_precedes_manipulation();
     test_pointer_observation_wakes_hover_exit();

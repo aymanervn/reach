@@ -659,7 +659,6 @@ static void reach_settings_load_top_bar_config(reach_settings_app *app)
     }
     reach_settings_model_set_top_bar_style(&app->model, snapshot->top_bar_style);
     reach_settings_model_set_top_bar_mode(&app->model, snapshot->top_bar_mode);
-    reach_settings_model_set_top_bar_scrim_length(&app->model, snapshot->top_bar_scrim_length);
     reach_settings_model_set_top_bar_icon_only(&app->model, snapshot->top_bar_icon_only);
     (void)reach_settings_model_set_dock_size(&app->model, snapshot->dock_size);
 }
@@ -673,7 +672,6 @@ static void reach_settings_save_top_bar_config(reach_settings_app *app)
     reach_config_top_bar_settings settings = {};
     settings.style = reach_settings_model_top_bar_style(&app->model);
     settings.mode = reach_settings_model_top_bar_mode(&app->model);
-    settings.scrim_length = reach_settings_model_top_bar_scrim_length(&app->model);
     settings.icon_only = reach_settings_model_top_bar_icon_only(&app->model);
     (void)reach_config_service_set_top_bar(app->config_service, &settings);
 }
@@ -1878,9 +1876,6 @@ static uint64_t reach_settings_pressable_target(reach_settings_hit_result hit)
     case REACH_SETTINGS_HIT_TOP_BAR_STYLE:
         detail = (uint32_t)hit.top_bar_style;
         break;
-    case REACH_SETTINGS_HIT_TOP_BAR_SCRIM_LENGTH:
-        detail = (uint32_t)hit.top_bar_scrim_length;
-        break;
     case REACH_SETTINGS_HIT_WIFI_ROW:
         detail = (uint32_t)hit.wifi_index;
         break;
@@ -2348,15 +2343,6 @@ static void reach_settings_handle_pointer_up(reach_settings_app *app, const reac
         if (hit.type == REACH_SETTINGS_HIT_TOP_BAR_STYLE)
         {
             if (reach_settings_model_select_top_bar_style(&app->model, hit.top_bar_style))
-            {
-                reach_settings_save_top_bar_config(app);
-                app->dirty = 1;
-            }
-        }
-        else if (hit.type == REACH_SETTINGS_HIT_TOP_BAR_SCRIM_LENGTH)
-        {
-            if (reach_settings_model_select_top_bar_scrim_length(&app->model,
-                                                                 hit.top_bar_scrim_length))
             {
                 reach_settings_save_top_bar_config(app);
                 app->dirty = 1;

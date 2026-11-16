@@ -625,48 +625,6 @@ static int32_t reach_host_surface_layout_context_equal(const reach_feature_surfa
            a->preferred_front_source == b->preferred_front_source;
 }
 
-static int32_t reach_host_color_equal(reach_color a, reach_color b)
-{
-    return a.r == b.r && a.g == b.g && a.b == b.b && a.a == b.a;
-}
-
-static void reach_host_sync_wallpaper_shade(reach_host *host, const reach_feature_runtime *desc,
-                                            const reach_feature_surface_geometry *geometry,
-                                            reach_rect_f32 monitor_bounds)
-{
-    if (host == nullptr || desc == nullptr || geometry == nullptr ||
-        host->wallpaper_surface.ops.set_top_shade == nullptr)
-    {
-        return;
-    }
-    reach_surface_id id = desc->definition->id;
-    int32_t owner = host->wallpaper_shade_owned && host->wallpaper_shade_owner == id;
-    float extent = geometry->wallpaper_top_shade_extent;
-    if (extent <= 0.0f)
-    {
-        if (owner)
-        {
-            host->wallpaper_shade_owned = 0;
-            (void)host->wallpaper_surface.ops.set_top_shade(host->wallpaper_surface.surface,
-                                                            monitor_bounds, 0.0f, {});
-        }
-        return;
-    }
-    if (owner && reach_rect_equal(host->wallpaper_shade_bounds, monitor_bounds) &&
-        host->wallpaper_shade_extent == extent &&
-        reach_host_color_equal(host->wallpaper_shade_color, geometry->wallpaper_top_shade_color))
-    {
-        return;
-    }
-    host->wallpaper_shade_owned = 1;
-    host->wallpaper_shade_owner = id;
-    host->wallpaper_shade_bounds = monitor_bounds;
-    host->wallpaper_shade_extent = extent;
-    host->wallpaper_shade_color = geometry->wallpaper_top_shade_color;
-    (void)host->wallpaper_surface.ops.set_top_shade(host->wallpaper_surface.surface, monitor_bounds,
-                                                    extent, geometry->wallpaper_top_shade_color);
-}
-
 static int32_t reach_host_surface_geometry_equal(const reach_feature_surface_geometry *a,
                                                  const reach_feature_surface_geometry *b)
 {
@@ -681,8 +639,6 @@ static int32_t reach_host_surface_geometry_equal(const reach_feature_surface_geo
            a->manage_monitor_work_area == b->manage_monitor_work_area &&
            a->reserve_monitor_work_area == b->reserve_monitor_work_area &&
            a->work_area_clearance == b->work_area_clearance && a->shadowless == b->shadowless &&
-           a->wallpaper_top_shade_extent == b->wallpaper_top_shade_extent &&
-           reach_host_color_equal(a->wallpaper_top_shade_color, b->wallpaper_top_shade_color) &&
            a->bar_reveal_policy == b->bar_reveal_policy && a->force_topmost == b->force_topmost &&
            a->notch_anchor_x == b->notch_anchor_x && a->notch_side == b->notch_side &&
            a->deadline_seconds == b->deadline_seconds &&
@@ -757,9 +713,7 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
         reach_feature_surface_geometry hidden_geometry = {};
         desc->definition->capsule_ops->surface_geometry(desc->capsule, &hidden_geometry);
         hidden_geometry.reserve_monitor_work_area = 0;
-        hidden_geometry.wallpaper_top_shade_extent = 0.0f;
         reach_host_sync_work_area_reservation(host, desc, &hidden_geometry, ctx->monitor_bounds);
-        reach_host_sync_wallpaper_shade(host, desc, &hidden_geometry, ctx->monitor_bounds);
         reach_host_release_native_overlay(host, desc);
         reach_host_sync_surface_pointer_observation(host, desc);
         return REACH_OK;
@@ -883,7 +837,6 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
     desc->resolved_bounds_valid = 1;
     surface_ctx.visible_bounds = geometry.visible_bounds;
     reach_host_sync_work_area_reservation(host, desc, &geometry, ctx->monitor_bounds);
-    reach_host_sync_wallpaper_shade(host, desc, &geometry, ctx->monitor_bounds);
 
     reach_rect_f32 bounds = geometry.visible_bounds;
     if (desc->definition->surface.bar_reveal.ops != nullptr)

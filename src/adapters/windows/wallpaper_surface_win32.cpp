@@ -24,8 +24,6 @@ struct reach_wallpaper_monitor
     int bitmap_width;
     int bitmap_height;
     uint32_t render_generation;
-    float bitmap_shade_extent;
-    reach_color bitmap_shade_color;
 };
 
 struct reach_wallpaper_prepared_bitmap
@@ -45,8 +43,6 @@ struct reach_wallpaper_render_job
     uint16_t path[260];
     int target_width;
     int target_height;
-    float shade_extent;
-    reach_color shade_color;
 };
 
 struct reach_wallpaper_render_result
@@ -57,8 +53,6 @@ struct reach_wallpaper_render_result
     uint16_t path[260];
     reach_result result;
     reach_wallpaper_prepared_bitmap bitmap;
-    float shade_extent;
-    reach_color shade_color;
 };
 
 struct reach_wallpaper_surface
@@ -76,16 +70,12 @@ struct reach_wallpaper_surface
     std::vector<reach_wallpaper_render_result> render_results;
     int32_t render_thread_started;
     int32_t render_stop_requested;
-    reach_rect_f32 shade_bounds;
-    float shade_extent;
-    reach_color shade_color;
 };
 
 static void reach_wallpaper_destroy_prepared_bitmap(reach_wallpaper_prepared_bitmap *bitmap);
 static reach_result reach_wallpaper_prepare_bitmap(IWICImagingFactory *wic_factory,
                                                    const uint16_t *path, int target_width,
-                                                   int target_height, float shade_extent,
-                                                   reach_color shade_color,
+                                                   int target_height,
                                                    reach_wallpaper_prepared_bitmap *out_bitmap);
 static int32_t reach_wallpaper_apply_render_results(reach_wallpaper_surface *surface);
 
@@ -173,14 +163,11 @@ static void reach_wallpaper_render_thread_main(reach_wallpaper_surface *surface)
         result.monitor_index = job.monitor_index;
         result.generation = job.generation;
         reach_copy_utf16(result.path, 260, job.path);
-        result.shade_extent = job.shade_extent;
-        result.shade_color = job.shade_color;
 
         if (SUCCEEDED(factory_hr) && worker_wic_factory != nullptr)
         {
             result.result = reach_wallpaper_prepare_bitmap(
-                worker_wic_factory, job.path, job.target_width, job.target_height, job.shade_extent,
-                job.shade_color, &result.bitmap);
+                worker_wic_factory, job.path, job.target_width, job.target_height, &result.bitmap);
         }
         else
         {
@@ -386,16 +373,10 @@ static void reach_wallpaper_unload_bitmap(reach_wallpaper_surface *surface,
     reach_wallpaper_destroy_prepared_bitmap(&orphan);
 }
 
-static int32_t reach_wallpaper_color_equal(reach_color a, reach_color b)
-{
-    return a.r == b.r && a.g == b.g && a.b == b.b && a.a == b.a;
-}
-
 static void reach_wallpaper_apply_prepared_bitmap(reach_wallpaper_surface *surface,
                                                   reach_wallpaper_monitor *monitor,
                                                   reach_wallpaper_prepared_bitmap *prepared,
-                                                  const uint16_t *path, float shade_extent,
-                                                  reach_color shade_color)
+                                                  const uint16_t *path)
 {
     if (monitor == nullptr || prepared == nullptr)
     {
@@ -410,8 +391,6 @@ static void reach_wallpaper_apply_prepared_bitmap(reach_wallpaper_surface *surfa
     monitor->old_bitmap = prepared->old_bitmap;
     monitor->bitmap_width = prepared->width;
     monitor->bitmap_height = prepared->height;
-    monitor->bitmap_shade_extent = shade_extent;
-    monitor->bitmap_shade_color = shade_color;
 
     prepared->memory_dc = nullptr;
     prepared->bitmap = nullptr;
@@ -508,55 +487,9 @@ static reach_result reach_wallpaper_create_dib(int width, int height,
     return REACH_OK;
 }
 
-static float reach_wallpaper_shade_curve(float t)
-{
-    static const float curve[][2] = {
-        {0.000f, 1.000f}, {0.190f, 0.738f}, {0.340f, 0.541f}, {0.470f, 0.382f}, {0.565f, 0.278f},
-        {0.650f, 0.194f}, {0.730f, 0.126f}, {0.802f, 0.075f}, {0.861f, 0.042f}, {0.910f, 0.021f},
-        {0.952f, 0.008f}, {0.982f, 0.002f}, {1.000f, 0.000f}};
-    for (size_t index = 1; index < sizeof(curve) / sizeof(curve[0]); ++index)
-    {
-        if (t <= curve[index][0])
-        {
-            float span = curve[index][0] - curve[index - 1][0];
-            float local = span > 0.0f ? (t - curve[index - 1][0]) / span : 0.0f;
-            return curve[index - 1][1] + (curve[index][1] - curve[index - 1][1]) * local;
-        }
-    }
-    return 0.0f;
-}
-
-static void reach_wallpaper_apply_top_shade(BYTE *pixels, UINT stride, int width, int height,
-                                            float extent, reach_color color)
-{
-    if (pixels == nullptr || extent <= 0.0f || color.a <= 0.0f)
-    {
-        return;
-    }
-    int rows = (int)ceilf(extent);
-    rows = rows < height ? rows : height;
-    float channels[3] = {color.b * 255.0f, color.g * 255.0f, color.r * 255.0f};
-    for (int y = 0; y < rows; ++y)
-    {
-        float alpha = color.a * reach_wallpaper_shade_curve(((float)y + 0.5f) / extent);
-        BYTE *row = pixels + (size_t)y * stride;
-        for (int x = 0; x < width; ++x)
-        {
-            BYTE *pixel = row + (size_t)x * 4u;
-            for (int channel = 0; channel < 3; ++channel)
-            {
-                pixel[channel] = (BYTE)lroundf((float)pixel[channel] * (1.0f - alpha) +
-                                               channels[channel] * alpha);
-            }
-            pixel[3] = (BYTE)lroundf((float)pixel[3] * (1.0f - alpha) + 255.0f * alpha);
-        }
-    }
-}
-
 static reach_result reach_wallpaper_prepare_bitmap(IWICImagingFactory *wic_factory,
                                                    const uint16_t *path, int target_width,
-                                                   int target_height, float shade_extent,
-                                                   reach_color shade_color,
+                                                   int target_height,
                                                    reach_wallpaper_prepared_bitmap *out_bitmap)
 {
     if (wic_factory == nullptr || path == nullptr || path[0] == 0 || target_width <= 0 ||
@@ -668,11 +601,6 @@ static reach_result reach_wallpaper_prepare_bitmap(IWICImagingFactory *wic_facto
     {
         hr = converter->CopyPixels(nullptr, stride, buffer_size, static_cast<BYTE *>(pixels));
     }
-    if (SUCCEEDED(hr))
-    {
-        reach_wallpaper_apply_top_shade(static_cast<BYTE *>(pixels), stride, target_width,
-                                        target_height, shade_extent, shade_color);
-    }
 
     reach_wallpaper_release(&converter);
     reach_wallpaper_release(&scaler);
@@ -706,22 +634,6 @@ static const uint16_t *reach_wallpaper_path_for_monitor(reach_wallpaper_surface 
     return surface->path[0] != 0 ? surface->path : nullptr;
 }
 
-static int32_t reach_wallpaper_bounds_equal(reach_rect_f32 a, reach_rect_f32 b);
-
-static void reach_wallpaper_shade_for_monitor(const reach_wallpaper_surface *surface,
-                                              const reach_wallpaper_monitor *monitor,
-                                              float *out_extent, reach_color *out_color)
-{
-    *out_extent = 0.0f;
-    *out_color = {};
-    if (surface->shade_extent > 0.0f && monitor->bounds_valid &&
-        reach_wallpaper_bounds_equal(monitor->last_bounds, surface->shade_bounds))
-    {
-        *out_extent = surface->shade_extent;
-        *out_color = surface->shade_color;
-    }
-}
-
 static reach_result reach_wallpaper_schedule_render(reach_wallpaper_surface *surface,
                                                     reach_wallpaper_monitor *monitor,
                                                     size_t monitor_index, const uint16_t *path)
@@ -739,14 +651,8 @@ static reach_result reach_wallpaper_schedule_render(reach_wallpaper_surface *sur
         return size_result;
     }
 
-    float shade_extent = 0.0f;
-    reach_color shade_color = {};
-    reach_wallpaper_shade_for_monitor(surface, monitor, &shade_extent, &shade_color);
-
     if (monitor->bitmap != nullptr && monitor->bitmap_width == target_width &&
-        monitor->bitmap_height == target_height && reach_path_equals(monitor->bitmap_path, path) &&
-        monitor->bitmap_shade_extent == shade_extent &&
-        reach_wallpaper_color_equal(monitor->bitmap_shade_color, shade_color))
+        monitor->bitmap_height == target_height && reach_path_equals(monitor->bitmap_path, path))
     {
         return REACH_OK;
     }
@@ -763,9 +669,7 @@ static reach_result reach_wallpaper_schedule_render(reach_wallpaper_surface *sur
         {
             if (job.monitor == monitor && job.monitor_index == monitor_index &&
                 job.generation == monitor->render_generation && job.target_width == target_width &&
-                job.target_height == target_height && reach_path_equals(job.path, path) &&
-                job.shade_extent == shade_extent &&
-                reach_wallpaper_color_equal(job.shade_color, shade_color))
+                job.target_height == target_height && reach_path_equals(job.path, path))
             {
                 return REACH_OK;
             }
@@ -777,8 +681,6 @@ static reach_result reach_wallpaper_schedule_render(reach_wallpaper_surface *sur
         job.generation = monitor->render_generation;
         job.target_width = target_width;
         job.target_height = target_height;
-        job.shade_extent = shade_extent;
-        job.shade_color = shade_color;
         (void)reach_copy_utf16(job.path, 260, path);
 
         surface->render_jobs.push_back(job);
@@ -1136,33 +1038,6 @@ static reach_result reach_wallpaper_surface_clear(reach_wallpaper_surface *surfa
 
     return reach_wallpaper_render_all(surface);
 }
-static reach_result reach_wallpaper_surface_set_top_shade(reach_wallpaper_surface *surface,
-                                                          reach_rect_f32 monitor_bounds,
-                                                          float extent, reach_color color)
-{
-    if (surface == nullptr)
-    {
-        return REACH_INVALID_ARGUMENT;
-    }
-    surface->shade_bounds = monitor_bounds;
-    surface->shade_extent = extent > 0.0f && color.a > 0.0f ? extent : 0.0f;
-    surface->shade_color = surface->shade_extent > 0.0f ? color : reach_color{};
-    for (size_t index = 0; index < surface->monitors.size(); ++index)
-    {
-        reach_wallpaper_monitor *monitor = surface->monitors[index];
-        float shade_extent = 0.0f;
-        reach_color shade_color = {};
-        reach_wallpaper_shade_for_monitor(surface, monitor, &shade_extent, &shade_color);
-        if (monitor->bitmap_shade_extent != shade_extent ||
-            !reach_wallpaper_color_equal(monitor->bitmap_shade_color, shade_color))
-        {
-            ++monitor->render_generation;
-            (void)reach_wallpaper_render_monitor(surface, monitor, index);
-        }
-    }
-    return REACH_OK;
-}
-
 static void reach_wallpaper_surface_destroy(reach_wallpaper_surface *surface)
 {
     if (surface == nullptr)
@@ -1244,7 +1119,6 @@ reach_result reach_windows_create_wallpaper_surface(reach_wallpaper_surface_port
     out_port->ops.set_monitor_wallpaper = reach_wallpaper_surface_set_monitor_wallpaper;
     out_port->ops.clear_monitor_wallpaper = reach_wallpaper_surface_clear_monitor_wallpaper;
     out_port->ops.clear = reach_wallpaper_surface_clear;
-    out_port->ops.set_top_shade = reach_wallpaper_surface_set_top_shade;
     out_port->ops.desktop_window = reach_wallpaper_surface_desktop_window;
     out_port->ops.destroy = reach_wallpaper_surface_destroy;
     return REACH_OK;
@@ -1298,8 +1172,7 @@ static int32_t reach_wallpaper_apply_render_results(reach_wallpaper_surface *sur
             if (current_path != nullptr && reach_path_equals(current_path, result.path))
             {
                 reach_wallpaper_apply_prepared_bitmap(surface, result.monitor, &result.bitmap,
-                                                      result.path, result.shade_extent,
-                                                      result.shade_color);
+                                                      result.path);
                 used = 1;
                 applied = 1;
             }
