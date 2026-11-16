@@ -35,6 +35,26 @@ int32_t reach_battery_is_open(const reach_battery *battery)
     return battery != nullptr && battery->state.open;
 }
 
+static void reach_battery_settle_time_reveal(reach_battery *battery)
+{
+    reach_motion_set(&battery->time_reveal_opacity, 1.0f);
+    reach_motion_set(&battery->time_reveal_y, 0.0f);
+}
+
+static void reach_battery_reveal_time(reach_battery *battery)
+{
+    if (!battery->state.open)
+    {
+        reach_battery_settle_time_reveal(battery);
+        return;
+    }
+    double now = reach_motion_now_seconds();
+    reach_motion_start_spec_at(&battery->time_reveal_opacity, 0.0f, 1.0f, 0.0f,
+                               battery->fade_in_spec, now);
+    reach_motion_start_spec_at(&battery->time_reveal_y, battery->time_reveal_offset, 0.0f, 0.0f,
+                               battery->smooth_spec, now);
+}
+
 int32_t reach_battery_set_open(reach_battery *battery, int32_t open)
 {
     if (battery == nullptr)
@@ -48,7 +68,9 @@ int32_t reach_battery_set_open(reach_battery *battery, int32_t open)
     }
     if (next)
     {
+        reach_system_status_refresh_system(battery->status, REACH_SYSTEM_CONTROLS_CHANGE_POWER);
         (void)reach_battery_refresh_power(battery);
+        reach_battery_settle_time_reveal(battery);
     }
     else
     {
@@ -77,7 +99,9 @@ void reach_battery_reset(reach_battery *battery)
     }
     reach_battery_reset_pressable(battery);
     battery->state = {};
+    battery->state.model.seconds_remaining = -1;
     battery->saver_pending_deadline = 0.0;
+    reach_battery_settle_time_reveal(battery);
     reach_feature_transition_reset(&battery->popup_transition);
 }
 
@@ -130,6 +154,76 @@ void reach_battery_format_percent(uint16_t *dst, size_t dst_count, int32_t perce
     dst[length] = 0;
 }
 
+static size_t reach_battery_append_number(uint16_t *dst, size_t dst_count, size_t length,
+                                          int32_t value, uint16_t unit)
+{
+    uint16_t digits[10] = {};
+    size_t digit_count = 0;
+    do
+    {
+        digits[digit_count++] = (uint16_t)('0' + value % 10);
+        value /= 10;
+    } while (value > 0 && digit_count < 10);
+    while (digit_count > 0 && length + 2 < dst_count)
+    {
+        dst[length++] = digits[--digit_count];
+    }
+    if (length + 1 < dst_count)
+    {
+        dst[length++] = unit;
+    }
+    dst[length] = 0;
+    return length;
+}
+
+void reach_battery_format_time_remaining(uint16_t *dst, size_t dst_count,
+                                         const reach_battery_model *model)
+{
+    static const uint16_t fully_charged[] = {'F', 'u', 'l', 'l', 'y', ' ', 'c',
+                                             'h', 'a', 'r', 'g', 'e', 'd', 0};
+    static const uint16_t charging[] = {'C', 'h', 'a', 'r', 'g', 'i', 'n', 'g', 0};
+    static const uint16_t estimating[] = {'E', 's', 't', 'i', 'm',    'a',
+                                          't', 'i', 'n', 'g', 0x2026, 0};
+    if (dst == nullptr || dst_count == 0)
+    {
+        return;
+    }
+    dst[0] = 0;
+    if (model == nullptr)
+    {
+        return;
+    }
+    if (model->plugged_in)
+    {
+        reach_copy_utf16(dst, dst_count, model->percent >= 100 ? fully_charged : charging);
+        return;
+    }
+    if (model->seconds_remaining < 0)
+    {
+        reach_copy_utf16(dst, dst_count, estimating);
+        return;
+    }
+    int32_t minutes = (model->seconds_remaining + 30) / 60;
+    if (minutes < 1)
+    {
+        minutes = 1;
+    }
+    size_t length = 0;
+    if (minutes >= 60)
+    {
+        length = reach_battery_append_number(dst, dst_count, length, minutes / 60, 'h');
+        if (minutes % 60 != 0 && length + 1 < dst_count)
+        {
+            dst[length++] = ' ';
+            dst[length] = 0;
+        }
+    }
+    if (minutes < 60 || minutes % 60 != 0)
+    {
+        (void)reach_battery_append_number(dst, dst_count, length, minutes % 60, 'm');
+    }
+}
+
 void reach_battery_attach_services(reach_battery *battery, reach_system_status *status)
 {
     if (battery != nullptr)
@@ -162,8 +256,40 @@ int32_t reach_battery_refresh_power(reach_battery *battery)
 
     int32_t has_reading =
         snapshot.power_valid && snapshot.power.has_battery && snapshot.power.battery_percent >= 0;
-    return reach_battery_set_power(battery, has_reading ? snapshot.power.battery_percent : 0,
-                                   snapshot.power_valid && snapshot.power.battery_saver_on ? 1 : 0);
+    int32_t power_changed =
+        reach_battery_set_power(battery, has_reading ? snapshot.power.battery_percent : 0,
+                                snapshot.power_valid && snapshot.power.battery_saver_on ? 1 : 0);
+    int32_t time_changed = reach_battery_set_time_remaining(
+        battery, snapshot.power.battery_charging, snapshot.power.battery_seconds_remaining);
+    return power_changed || time_changed;
+}
+
+int32_t reach_battery_set_time_remaining(reach_battery *battery, int32_t plugged_in,
+                                         int32_t seconds_remaining)
+{
+    if (battery == nullptr)
+    {
+        return 0;
+    }
+    reach_battery_model *model = &battery->state.model;
+    int32_t next_plugged = plugged_in ? 1 : 0;
+    int32_t next_seconds = !next_plugged && seconds_remaining >= 0 ? seconds_remaining : -1;
+    if (model->plugged_in == next_plugged && model->seconds_remaining == next_seconds)
+    {
+        return 0;
+    }
+
+    uint16_t before[REACH_BATTERY_TIME_TEXT_CAPACITY] = {};
+    reach_battery_format_time_remaining(before, REACH_BATTERY_TIME_TEXT_CAPACITY, model);
+    model->plugged_in = next_plugged;
+    model->seconds_remaining = next_seconds;
+    uint16_t after[REACH_BATTERY_TIME_TEXT_CAPACITY] = {};
+    reach_battery_format_time_remaining(after, REACH_BATTERY_TIME_TEXT_CAPACITY, model);
+    if (!reach_utf16_equal(before, after))
+    {
+        reach_battery_reveal_time(battery);
+    }
+    return 1;
 }
 
 int32_t reach_battery_set_power(reach_battery *battery, int32_t percent, int32_t saver_on)
@@ -243,7 +369,7 @@ static void reach_battery_place(reach_battery_state *state, const reach_battery_
     float margin = metrics.screen_margin * scale;
     float notch_height = reach_popup_notch_height_scaled(scale);
 
-    float body_height = padding * 2.0f + row_height * 2.0f + row_gap * 2.0f + separator_height;
+    float body_height = padding * 2.0f + row_height * 3.0f + row_gap * 3.0f + separator_height;
     float popup_height = body_height + notch_height + border_thickness * 2.0f;
 
     reach_popup_anchor anchor = {};
@@ -269,6 +395,9 @@ static void reach_battery_place(reach_battery_state *state, const reach_battery_
     state->percent_label = {content_x, content_y, content_width, row_height};
     content_y += row_height + row_gap;
 
+    state->time_label = {content_x, content_y, content_width, row_height};
+    content_y += row_height + row_gap;
+
     state->separator = reach_ui_horizontal_separator_bounds(
         border_thickness + separator_inset, content_y, body_width - separator_inset * 2.0f, scale);
     content_y += separator_height + row_gap;
@@ -284,6 +413,15 @@ static void reach_battery_place(reach_battery_state *state, const reach_battery_
                            toggle_height};
 }
 
+static void reach_battery_configure_motion(reach_battery *battery,
+                                           const reach_battery_open_context *ctx)
+{
+    float scale = ctx->dpi_scale > 0.0f ? ctx->dpi_scale : 1.0f;
+    battery->fade_in_spec = reach_theme_motion_preset(ctx->theme, REACH_MOTION_PRESET_FADE_IN);
+    battery->smooth_spec = reach_theme_motion_preset(ctx->theme, REACH_MOTION_PRESET_SMOOTH);
+    battery->time_reveal_offset = reach_battery_metrics_values.time_reveal_offset * scale;
+}
+
 void reach_battery_open(reach_battery *battery, const reach_battery_open_context *ctx)
 {
     if (battery == nullptr || ctx == nullptr)
@@ -292,6 +430,7 @@ void reach_battery_open(reach_battery *battery, const reach_battery_open_context
     }
     reach_battery_reset_pressable(battery);
     reach_battery_place(&battery->state, ctx);
+    reach_battery_configure_motion(battery, ctx);
     reach_feature_transition_configure(&battery->popup_transition, ctx->theme, ctx->dpi_scale,
                                        ctx->drop_direction);
     reach_feature_transition_set_trigger(&battery->popup_transition, battery->state.bounds,
@@ -307,6 +446,7 @@ void reach_battery_relayout(reach_battery *battery, const reach_battery_open_con
         return;
     }
     reach_battery_place(&battery->state, ctx);
+    reach_battery_configure_motion(battery, ctx);
     reach_feature_transition_configure(&battery->popup_transition, ctx->theme, ctx->dpi_scale,
                                        ctx->drop_direction);
     reach_feature_transition_set_trigger(&battery->popup_transition, battery->state.bounds,

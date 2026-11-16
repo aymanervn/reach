@@ -917,6 +917,10 @@ static reach_result reach_system_controls_get_power_state(void *userdata,
         status.BatteryLifePercent == 255 ? -1 : (int32_t)status.BatteryLifePercent;
     out_state->battery_saver_on = status.SystemStatusFlag == 1 ? 1 : 0;
     out_state->battery_charging = out_state->has_battery && status.ACLineStatus == 1 ? 1 : 0;
+    out_state->battery_seconds_remaining =
+        out_state->has_battery && status.ACLineStatus == 0 && status.BatteryLifeTime != (DWORD)-1
+            ? (int32_t)status.BatteryLifeTime
+            : -1;
     return REACH_OK;
 }
 
