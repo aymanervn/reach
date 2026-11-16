@@ -100,7 +100,6 @@ void reach_quick_settings_model_init(reach_quick_settings_model *model)
     model->light_theme = 0;
     model->display_name[0] = 0;
     model->picture_image_id = 0;
-    model->wallpaper_image_id = 0;
     model->uptime_minutes = -1;
     model->power = {};
     model->power.battery_seconds_remaining = -1;
@@ -245,10 +244,15 @@ static float reach_quick_settings_rail_height(const reach_quick_settings_metrics
                REACH_QUICK_SETTINGS_PAGE_COUNT, metrics->rail_item_size, metrics->rail_item_gap);
 }
 
+static float
+reach_quick_settings_header_background_height(const reach_quick_settings_metrics *metrics)
+{
+    return metrics->avatar_inset * 2.0f + metrics->avatar_size + metrics->avatar_ring * 2.0f;
+}
+
 static float reach_quick_settings_header_height(const reach_quick_settings_metrics *metrics)
 {
-    return metrics->banner_height - metrics->surface_padding + metrics->identity_height +
-           metrics->identity_gap;
+    return reach_quick_settings_header_background_height(metrics) - metrics->surface_padding;
 }
 
 static float reach_quick_settings_overview_height(const reach_quick_settings_model *model,
@@ -422,27 +426,29 @@ reach_quick_settings_app_volume_row_layout_at(reach_rect_f32 panel, float top, f
         &metrics);
 }
 static void reach_quick_settings_place_header(reach_quick_settings_layout *layout,
-                                              reach_rect_f32 content_bounds,
                                               const reach_quick_settings_metrics *metrics)
 {
-    float banner_x = layout->rail.x + layout->rail.width;
-    layout->banner = reach_quick_settings_rect(
-        banner_x, layout->interior.y, layout->interior.x + layout->interior.width - banner_x,
-        metrics->banner_height);
+    float header_x = layout->rail.x + layout->rail.width;
+    layout->header = reach_quick_settings_rect(
+        header_x, layout->interior.y, layout->interior.x + layout->interior.width - header_x,
+        reach_quick_settings_header_background_height(metrics));
     float ring = metrics->avatar_size + metrics->avatar_ring * 2.0f;
-    layout->avatar_ring = reach_quick_settings_rect(
-        layout->banner.x + metrics->avatar_inset - metrics->avatar_ring,
-        layout->banner.y + layout->banner.height - metrics->avatar_overlap - metrics->avatar_ring,
-        ring, ring);
+    layout->avatar_ring =
+        reach_quick_settings_rect(layout->header.x + metrics->avatar_inset,
+                                  layout->header.y + metrics->avatar_inset, ring, ring);
     layout->avatar = reach_quick_settings_rect(layout->avatar_ring.x + metrics->avatar_ring,
                                                layout->avatar_ring.y + metrics->avatar_ring,
                                                metrics->avatar_size, metrics->avatar_size);
-    float text_x = layout->avatar_ring.x + ring + metrics->overview_row_gap;
-    float text_width = content_bounds.x + content_bounds.width - metrics->content_padding - text_x;
-    float text_top = layout->banner.y + layout->banner.height +
-                     (metrics->identity_height - metrics->identity_name_height -
-                      metrics->identity_detail_height) *
-                         0.5f;
+    float button = metrics->rail_item_size;
+    float header_right = layout->header.x + layout->header.width - metrics->avatar_inset;
+    layout->settings_button = reach_quick_settings_rect(
+        header_right - button, layout->avatar_ring.y + (ring - button) * 0.5f, button, button);
+    float text_x = layout->avatar_ring.x + ring + metrics->identity_gap;
+    float text_width =
+        reach_quick_settings_clamp_min0(layout->settings_button.x - metrics->identity_gap - text_x);
+    float text_top =
+        layout->avatar_ring.y +
+        (ring - metrics->identity_name_height - metrics->identity_detail_height) * 0.5f;
     layout->identity_name =
         reach_quick_settings_rect(text_x, text_top, text_width, metrics->identity_name_height);
     layout->identity_detail =
@@ -800,7 +806,7 @@ reach_quick_settings_layout reach_quick_settings_layout_for_sections_scaled(
         content_bounds.height + metrics.surface_padding * 2.0f);
 
     reach_quick_settings_place_rail(&layout, &metrics);
-    reach_quick_settings_place_header(&layout, content_bounds, &metrics);
+    reach_quick_settings_place_header(&layout, &metrics);
     reach_rect_f32 body_bounds = content_bounds;
     float header_height = reach_quick_settings_header_height(&metrics);
     body_bounds.y += header_height;
@@ -877,7 +883,6 @@ struct reach_quick_settings
     reach_wifi_session wifi_session;
     reach_profile_service *profile;
     const reach_power_session_port *power_session;
-    uint16_t wallpaper_path[REACH_PROFILE_PATH_CAPACITY];
     double uptime_deadline;
     reach_quick_settings_routes routes;
 
@@ -2374,6 +2379,11 @@ static void reach_quick_settings_capsule_perform_action(reach_quick_settings *qu
         out->action.kind = REACH_FEATURE_ACTION_CLOSE_SELF;
         break;
 
+    case REACH_QUICK_SETTINGS_ACTION_OPEN_SETTINGS:
+        out->action.kind = REACH_FEATURE_ACTION_OPEN_SETTINGS_APP;
+        out->action.flags |= REACH_FEATURE_ACTION_FLAG_CLOSE_SELF_FIRST;
+        break;
+
     case REACH_QUICK_SETTINGS_ACTION_SET_OUTPUT_DEVICE:
     {
         const uint16_t *output_device_id =
@@ -2653,19 +2663,6 @@ static int32_t reach_quick_settings_refresh_uptime(reach_quick_settings *quick_s
     return 1;
 }
 
-static void reach_quick_settings_request_profile(reach_quick_settings *quick_settings)
-{
-    if (quick_settings->profile == nullptr || !quick_settings->layout_initialized)
-    {
-        return;
-    }
-    reach_quick_settings_metrics metrics =
-        reach_quick_settings_metrics_for_scale(quick_settings->layout_dpi);
-    float width = metrics.panel_width - reach_quick_settings_rail_full_width(&metrics);
-    reach_profile_service_request(quick_settings->profile, quick_settings->wallpaper_path,
-                                  (int32_t)ceilf(width), (int32_t)ceilf(metrics.banner_height));
-}
-
 void reach_quick_settings_set_routes(reach_quick_settings *quick_settings,
                                      const reach_quick_settings_routes *routes)
 {
@@ -2675,24 +2672,13 @@ void reach_quick_settings_set_routes(reach_quick_settings *quick_settings,
     }
 }
 
-int32_t reach_quick_settings_apply_config(reach_quick_settings *quick_settings, int32_t light_theme,
-                                          const uint16_t *wallpaper_path)
+int32_t reach_quick_settings_apply_config(reach_quick_settings *quick_settings, int32_t light_theme)
 {
     if (quick_settings == nullptr)
     {
         return 0;
     }
     int32_t changed = 0;
-    if (wallpaper_path != nullptr &&
-        !reach_utf16_equal(quick_settings->wallpaper_path, wallpaper_path))
-    {
-        reach_copy_utf16(quick_settings->wallpaper_path, REACH_PROFILE_PATH_CAPACITY,
-                         wallpaper_path);
-        if (quick_settings->state.open)
-        {
-            reach_quick_settings_request_profile(quick_settings);
-        }
-    }
     int32_t next = light_theme ? 1 : 0;
     if (quick_settings->state.model.light_theme != next)
     {
@@ -2888,7 +2874,6 @@ void reach_quick_settings_process_changes(reach_quick_settings *quick_settings,
         reach_copy_utf16(state->model.display_name, REACH_USER_ACCOUNT_NAME_CAPACITY,
                          profile.display_name);
         state->model.picture_image_id = profile.picture_image_id;
-        state->model.wallpaper_image_id = profile.wallpaper_image_id;
         out->redraw = 1;
         out->request_update = 1;
     }
@@ -3290,10 +3275,6 @@ void reach_quick_settings_refresh_layout(reach_quick_settings *quick_settings,
     quick_settings->layout_dpi = ctx->dpi_scale;
     quick_settings->layout_context = *ctx;
     quick_settings->layout_initialized = 1;
-    if (state.open)
-    {
-        reach_quick_settings_request_profile(quick_settings);
-    }
     reach_quick_settings_sample_input_layout(quick_settings, now);
 }
 

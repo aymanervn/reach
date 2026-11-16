@@ -288,7 +288,6 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
     reach_host_tick_features(host, delta_seconds);
     reach_host_drain_registered_render_resources(host);
     reach_host_drain_now_playing_retired_covers(host);
-    reach_host_drain_profile_retired_images(host);
     reach_host_process_deferred_launch(host);
     reach_host_sync_bar_layout_conditions(host);
     if (reach_host_can_move_bars_without_redraw(host))

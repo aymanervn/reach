@@ -146,20 +146,6 @@ void reach_host_release_registered_render_resources(reach_host *host)
     }
 }
 
-void reach_host_drain_profile_retired_images(reach_host *host)
-{
-    if (host == nullptr || host->profile_service == nullptr)
-    {
-        return;
-    }
-    uint64_t image_id = 0;
-    while (reach_profile_service_take_retired_image(host->profile_service, &image_id))
-    {
-        reach_host_release_render_icon(host, image_id);
-        reach_profile_service_release_image(host->profile_service, image_id);
-    }
-}
-
 void reach_host_drain_now_playing_retired_covers(reach_host *host)
 {
     if (host == nullptr || host->now_playing_service == nullptr)

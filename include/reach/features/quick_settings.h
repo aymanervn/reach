@@ -81,7 +81,6 @@ extern "C"
         int32_t light_theme;
         uint16_t display_name[REACH_USER_ACCOUNT_NAME_CAPACITY];
         uint64_t picture_image_id;
-        uint64_t wallpaper_image_id;
         int64_t uptime_minutes;
         reach_power_state power;
     } reach_quick_settings_model;
@@ -118,7 +117,8 @@ extern "C"
         reach_rect_f32 interior;
         reach_rect_f32 page_bounds;
 
-        reach_rect_f32 banner;
+        reach_rect_f32 header;
+        reach_rect_f32 settings_button;
         reach_rect_f32 avatar_ring;
         reach_rect_f32 avatar;
         reach_rect_f32 identity_name;
@@ -368,7 +368,7 @@ extern "C"
     void reach_quick_settings_set_routes(reach_quick_settings *quick_settings,
                                          const reach_quick_settings_routes *routes);
     int32_t reach_quick_settings_apply_config(reach_quick_settings *quick_settings,
-                                              int32_t light_theme, const uint16_t *wallpaper_path);
+                                              int32_t light_theme);
     int32_t reach_quick_settings_select_page(reach_quick_settings *quick_settings,
                                              reach_quick_settings_page page);
     const reach_ui_event_type *reach_quick_settings_routed_events(size_t *out_count);

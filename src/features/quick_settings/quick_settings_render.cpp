@@ -484,31 +484,32 @@ static reach_result reach_quick_settings_push_header(const reach_quick_settings_
     reach_render_group group = {};
     group.id = 40;
     group.parent_id = 8;
-    group.bounds = layout.banner;
-    group.bounds.height =
-        layout.identity_detail.y + layout.identity_detail.height - layout.banner.y;
+    group.bounds = layout.header;
     reach_result result = reach_render_command_buffer_begin_group(commands, &group);
     if (result == REACH_OK)
     {
-        if (input->model.wallpaper_image_id != 0)
-        {
-            reach_render_command banner = {};
-            banner.type = REACH_RENDER_COMMAND_ICON;
-            banner.rect = layout.banner;
-            banner.icon_id = input->model.wallpaper_image_id;
-            banner.icon_crop_to_fill = 1;
-            banner.color.a = 1.0f;
-            (void)reach_render_command_buffer_push(commands, &banner);
-        }
-        else
-        {
-            reach_quick_settings_push_rounded_rect(commands, layout.banner, 0.0f,
-                                                   theme.quick_settings_button_background);
-        }
+        reach_render_command tint = {};
+        tint.type = REACH_RENDER_COMMAND_RECT;
+        tint.rect = layout.header;
+        tint.color = reach_theme_color_alpha(theme.accent, 0.6f);
+        tint.fill_gradient = REACH_RENDER_FILL_EASED_FADE_DOWN;
+        (void)reach_render_command_buffer_push(commands, &tint);
+
+        reach_quick_settings_push_rounded_rect(commands, layout.settings_button,
+                                               layout.settings_button.height * 0.5f,
+                                               theme.quick_settings_button_background);
+        float inset = (layout.settings_button.width - metrics->toggle_icon_size) * 0.5f;
+        reach_render_command settings = {};
+        settings.type = REACH_RENDER_COMMAND_VECTOR_ICON;
+        settings.rect = {layout.settings_button.x + inset, layout.settings_button.y + inset,
+                         metrics->toggle_icon_size, metrics->toggle_icon_size};
+        settings.icon_id = REACH_VECTOR_ICON_SETTINGS;
+        settings.color = theme.system_glyph;
+        (void)reach_render_command_buffer_push(commands, &settings);
 
         reach_quick_settings_push_rounded_rect(commands, layout.avatar_ring,
                                                layout.avatar_ring.width * 0.5f,
-                                               theme.top_bar_dropdown_background);
+                                               theme.bar_button_background);
         if (input->model.picture_image_id != 0)
         {
             reach_render_command avatar = {};
@@ -1319,6 +1320,7 @@ static int32_t reach_quick_settings_feedback_slot(uint64_t target)
     switch (reach_quick_settings_pressable_target_kind(target))
     {
     case REACH_QUICK_SETTINGS_PRESS_TARGET_RAIL_ITEM:
+    case REACH_QUICK_SETTINGS_PRESS_TARGET_SETTINGS_BUTTON:
         return REACH_QUICK_SETTINGS_FEEDBACK_TRAILING;
     case REACH_QUICK_SETTINGS_PRESS_TARGET_SOUND_PAGE_BUTTON:
     case REACH_QUICK_SETTINGS_PRESS_TARGET_TOGGLE:
@@ -1360,6 +1362,8 @@ reach_quick_settings_press_feedback_bounds(const reach_quick_settings_render_inp
     case REACH_QUICK_SETTINGS_PRESS_TARGET_RAIL_ITEM:
         return index < REACH_QUICK_SETTINGS_PAGE_COUNT ? layout.rail_items[index]
                                                        : reach_rect_f32{};
+    case REACH_QUICK_SETTINGS_PRESS_TARGET_SETTINGS_BUTTON:
+        return layout.settings_button;
     case REACH_QUICK_SETTINGS_PRESS_TARGET_SOUND_PAGE_BUTTON:
         return layout.sound_page_button;
     case REACH_QUICK_SETTINGS_PRESS_TARGET_TOGGLE:
