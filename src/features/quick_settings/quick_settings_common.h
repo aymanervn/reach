@@ -26,7 +26,10 @@ typedef enum reach_quick_settings_hit_type
     REACH_QUICK_SETTINGS_HIT_WIFI_SWITCH,
     REACH_QUICK_SETTINGS_HIT_WIFI_ROW,
     REACH_QUICK_SETTINGS_HIT_WIFI_KEY_FIELD,
-    REACH_QUICK_SETTINGS_HIT_WIFI_KEY_CONNECT
+    REACH_QUICK_SETTINGS_HIT_WIFI_KEY_CONNECT,
+    REACH_QUICK_SETTINGS_HIT_BLUETOOTH_SWITCH,
+    REACH_QUICK_SETTINGS_HIT_BLUETOOTH_ROW,
+    REACH_QUICK_SETTINGS_HIT_BLUETOOTH_ACTION
 } reach_quick_settings_hit_type;
 
 enum
@@ -48,7 +51,10 @@ typedef enum reach_quick_settings_press_target_kind
     REACH_QUICK_SETTINGS_PRESS_TARGET_WIFI_SWITCH,
     REACH_QUICK_SETTINGS_PRESS_TARGET_WIFI_ROW,
     REACH_QUICK_SETTINGS_PRESS_TARGET_WIFI_KEY_FIELD,
-    REACH_QUICK_SETTINGS_PRESS_TARGET_WIFI_KEY_CONNECT
+    REACH_QUICK_SETTINGS_PRESS_TARGET_WIFI_KEY_CONNECT,
+    REACH_QUICK_SETTINGS_PRESS_TARGET_BLUETOOTH_SWITCH,
+    REACH_QUICK_SETTINGS_PRESS_TARGET_BLUETOOTH_ROW,
+    REACH_QUICK_SETTINGS_PRESS_TARGET_BLUETOOTH_ACTION
 } reach_quick_settings_press_target_kind;
 #ifdef __cplusplus
 extern "C"
@@ -81,6 +87,14 @@ extern "C"
                                       reach_keyed_row out_rows[REACH_QUICK_SETTINGS_WIFI_ROWS],
                                       reach_wifi_network out_items[REACH_QUICK_SETTINGS_WIFI_ROWS],
                                       reach_motion *out_switch, reach_blink *out_caret);
+    void reach_quick_settings_bluetooth_motions(
+        const reach_quick_settings *quick_settings,
+        reach_keyed_row out_rows[REACH_QUICK_SETTINGS_BLUETOOTH_ROWS],
+        reach_bluetooth_device out_items[REACH_QUICK_SETTINGS_BLUETOOTH_ROWS],
+        reach_motion *out_switch);
+    void reach_quick_settings_bluetooth_action_rects(
+        reach_rect_f32 row, int32_t pin, const struct reach_quick_settings_metrics *metrics,
+        reach_rect_f32 *out_label, reach_rect_f32 out_buttons[2]);
     void reach_quick_settings_wifi_key_rects(reach_rect_f32 row,
                                              const struct reach_quick_settings_metrics *metrics,
                                              reach_rect_f32 *out_field,
@@ -114,7 +128,9 @@ typedef enum reach_quick_settings_action_type
     REACH_QUICK_SETTINGS_ACTION_SET_INPUT_VOLUME,
     REACH_QUICK_SETTINGS_ACTION_CONNECT_WIFI,
     REACH_QUICK_SETTINGS_ACTION_FOCUS_WIFI_KEY,
-    REACH_QUICK_SETTINGS_ACTION_SUBMIT_WIFI_KEY
+    REACH_QUICK_SETTINGS_ACTION_SUBMIT_WIFI_KEY,
+    REACH_QUICK_SETTINGS_ACTION_SELECT_BLUETOOTH,
+    REACH_QUICK_SETTINGS_ACTION_BLUETOOTH_ACTION
 } reach_quick_settings_action_type;
 
 typedef struct reach_quick_settings_hit_result

@@ -3063,6 +3063,58 @@ static void test_quick_settings_section_motion_renders_worst_case(void)
                         step(0.016);
                     wifi->radio = REACH_WIFI_RADIO_ON;
                     (void)reach_quick_settings_apply_wifi_snapshot(quick_settings, wifi.get());
+
+                    set_system(1);
+                    auto bluetooth = std::make_unique<reach_bluetooth_snapshot>();
+                    bluetooth->devices.count = REACH_BLUETOOTH_MAX_DEVICES;
+                    for (size_t index = 0; index < REACH_BLUETOOTH_MAX_DEVICES; ++index)
+                    {
+                        reach_bluetooth_device &device = bluetooth->devices.devices[index];
+                        device.id[0] = (uint16_t)('A' + index % 26);
+                        device.id[1] = (uint16_t)('0' + index / 26);
+                        for (size_t at = 0; at + 1 < 60; ++at)
+                            device.name[at] = (uint16_t)('a' + (index + at) % 26);
+                        device.kind = (reach_bluetooth_device_kind)(index % 8);
+                        device.paired = index < 3;
+                        device.connected = index == 1;
+                        device.can_pair = index >= 3;
+                    }
+                    (void)reach_quick_settings_apply_bluetooth_snapshot(quick_settings,
+                                                                        bluetooth.get());
+                    click(reach_quick_settings_state_ptr(quick_settings)
+                              ->layout.rail_items[REACH_QUICK_SETTINGS_PAGE_BLUETOOTH]);
+                    for (size_t frame = 0; frame < 20; ++frame)
+                        step(0.016);
+                    click(reach_quick_settings_state_ptr(quick_settings)
+                              ->layout.bluetooth_rows[1]
+                              .bounds);
+                    for (size_t frame = 0; frame < 6; ++frame)
+                        step(0.016);
+                    click(reach_quick_settings_state_ptr(quick_settings)
+                              ->layout.bluetooth_action_buttons[0]);
+                    bluetooth->pairing.active = 1;
+                    bluetooth->pairing.needs_confirmation = 1;
+                    reach_copy_utf16(bluetooth->pairing.device_id,
+                                     REACH_BLUETOOTH_DEVICE_ID_CAPACITY,
+                                     bluetooth->devices.devices[5].id);
+                    for (size_t at = 0; at < 6; ++at)
+                        bluetooth->pairing.pin[at] = (uint16_t)('1' + at);
+                    (void)reach_quick_settings_apply_bluetooth_snapshot(quick_settings,
+                                                                        bluetooth.get());
+                    for (size_t frame = 0; frame < 6; ++frame)
+                        step(0.016);
+                    click(reach_quick_settings_state_ptr(quick_settings)
+                              ->layout.bluetooth_action_buttons[0]);
+                    bluetooth->pairing = {};
+                    for (size_t index = 0; index < REACH_BLUETOOTH_MAX_DEVICES; ++index)
+                        bluetooth->devices.devices[index].paired = index % 7 == 0;
+                    (void)reach_quick_settings_apply_bluetooth_snapshot(quick_settings,
+                                                                        bluetooth.get());
+                    for (size_t frame = 0; frame < 10; ++frame)
+                        step(0.016);
+                    set_system(0);
+                    for (size_t frame = 0; frame < 10; ++frame)
+                        step(0.016);
                     (void)reach_quick_settings_select_page(quick_settings,
                                                            REACH_QUICK_SETTINGS_PAGE_SOUND);
                     step(0.6);
@@ -3162,7 +3214,7 @@ static void test_quick_settings_section_motion_renders_worst_case(void)
     }
     expect_true(presentation_render_failures == 0,
                 "every Quick Settings section-motion render stays valid");
-    expect_true(presentation_render_count == 4 * 3 * 2 * 230,
+    expect_true(presentation_render_count == 4 * 3 * 2 * 302,
                 "Quick Settings renders every section-motion step at every DPI and monitor");
     const size_t largest_rows = (size_t)REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES * 5 +
                                 (size_t)REACH_AUDIO_VOLUME_MAX_SESSIONS * 5;
