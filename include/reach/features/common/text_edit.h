@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "reach/core/ui_events.h"
+
 #ifdef __cplusplus
 extern "C"
 {
@@ -69,6 +71,9 @@ extern "C"
                                           size_t capacity);
 
     int32_t reach_text_edit_delete_selection(reach_text_edit *edit);
+
+    int32_t reach_text_edit_apply_ui_event(reach_text_edit *edit, const reach_ui_event *event,
+                                           reach_text_edit_event *out_event);
 
 #ifdef __cplusplus
 }

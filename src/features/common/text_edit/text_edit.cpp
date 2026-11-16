@@ -342,3 +342,63 @@ reach_text_edit_event reach_text_edit_handle_key(reach_text_edit *edit, reach_te
         return REACH_TEXT_EDIT_EVENT_NONE;
     }
 }
+
+int32_t reach_text_edit_apply_ui_event(reach_text_edit *edit, const reach_ui_event *event,
+                                       reach_text_edit_event *out_event)
+{
+    reach_text_edit_event result = REACH_TEXT_EDIT_EVENT_NONE;
+    if (out_event != nullptr)
+    {
+        *out_event = result;
+    }
+    if (edit == nullptr || event == nullptr)
+    {
+        return 0;
+    }
+    if (event->type == REACH_UI_EVENT_TEXT_CHAR)
+    {
+        result = reach_text_edit_insert_char(edit, (uint16_t)event->id);
+    }
+    else if (event->type == REACH_UI_EVENT_TEXT_EDIT)
+    {
+        reach_text_edit_modifiers mods = {};
+        mods.shift = (event->modifiers & REACH_UI_EVENT_MODIFIER_SHIFT) ? 1 : 0;
+        mods.ctrl = (event->modifiers & REACH_UI_EVENT_MODIFIER_CTRL) ? 1 : 0;
+        switch ((reach_ui_edit_key)event->id)
+        {
+        case REACH_UI_EDIT_KEY_BACKSPACE:
+            result = reach_text_edit_handle_key(edit, REACH_TEXT_EDIT_KEY_BACKSPACE, mods);
+            break;
+        case REACH_UI_EDIT_KEY_DELETE:
+            result = reach_text_edit_handle_key(edit, REACH_TEXT_EDIT_KEY_DELETE, mods);
+            break;
+        case REACH_UI_EDIT_KEY_LEFT:
+            result = reach_text_edit_handle_key(edit, REACH_TEXT_EDIT_KEY_LEFT, mods);
+            break;
+        case REACH_UI_EDIT_KEY_RIGHT:
+            result = reach_text_edit_handle_key(edit, REACH_TEXT_EDIT_KEY_RIGHT, mods);
+            break;
+        case REACH_UI_EDIT_KEY_HOME:
+            result = reach_text_edit_handle_key(edit, REACH_TEXT_EDIT_KEY_HOME, mods);
+            break;
+        case REACH_UI_EDIT_KEY_END:
+            result = reach_text_edit_handle_key(edit, REACH_TEXT_EDIT_KEY_END, mods);
+            break;
+        case REACH_UI_EDIT_KEY_SELECT_ALL:
+            reach_text_edit_select_all(edit);
+            break;
+        case REACH_UI_EDIT_KEY_NONE:
+        default:
+            return 0;
+        }
+    }
+    else
+    {
+        return 0;
+    }
+    if (out_event != nullptr)
+    {
+        *out_event = result;
+    }
+    return 1;
+}

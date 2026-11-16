@@ -95,6 +95,7 @@ extern "C"
         reach_result (*set_input_presentation)(
             reach_platform_window *window,
             const reach_platform_window_input_presentation *presentation);
+        reach_result (*take_keyboard_focus)(reach_platform_window *window);
     } reach_platform_window_ops;
 
     typedef struct reach_platform_window_port

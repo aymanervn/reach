@@ -626,6 +626,7 @@ struct reach_host
     reach_render_command_buffer popup_render_commands;
     uintptr_t focus_restore_window[REACH_HOST_SURFACE_COUNT];
     int32_t focus_restore_pending[REACH_HOST_SURFACE_COUNT];
+    int32_t keyboard_focus_taken[REACH_HOST_SURFACE_COUNT];
 
     reach_feature_definition feature_definitions[REACH_HOST_SURFACE_COUNT];
     reach_feature_runtime feature_runtimes[REACH_HOST_SURFACE_COUNT];
@@ -936,6 +937,7 @@ void reach_host_apply_theme(reach_host *host, int32_t light_theme, int32_t accen
 
 void reach_host_apply_display_config(reach_host *host, const reach_config_snapshot *snapshot);
 void reach_host_set_light_theme(reach_host *host, int32_t light_theme);
+void reach_host_take_keyboard_focus(reach_host *host, reach_feature_runtime *runtime);
 
 int32_t reach_host_game_mode_enabled(const reach_host *host);
 reach_result reach_host_update_game_mode(reach_host *host);

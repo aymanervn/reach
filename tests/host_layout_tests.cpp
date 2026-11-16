@@ -3017,6 +3017,39 @@ static void test_quick_settings_section_motion_renders_worst_case(void)
                     const reach_quick_settings_layout &page =
                         reach_quick_settings_state_ptr(quick_settings)->layout;
                     click(page.wifi_rows[2].bounds);
+                    const reach_quick_settings_model &wifi_model =
+                        reach_quick_settings_state_ptr(quick_settings)->model;
+                    for (size_t row = 0; row < wifi_model.wifi_row_count; ++row)
+                    {
+                        if (wifi_model.wifi_rows[row].saved ||
+                            wifi_model.wifi_rows[row].security == REACH_WIFI_SECURITY_OPEN ||
+                            wifi_model.wifi_rows[row].connected)
+                            continue;
+                        click(page.wifi_rows[row].bounds);
+                        for (size_t frame = 0; frame < 6; ++frame)
+                            step(0.016);
+                        for (uint16_t ch = 'a'; ch < 'a' + 12; ++ch)
+                        {
+                            reach_ui_event typed = {};
+                            typed.type = REACH_UI_EVENT_TEXT_CHAR;
+                            typed.id = ch;
+                            reach_capsule_event_result handled = {};
+                            ops->handle_event(capsule, &typed, &handled);
+                        }
+                        step(0.016);
+                        click(reach_quick_settings_state_ptr(quick_settings)
+                                  ->layout.wifi_key_connect);
+                        reach_ui_event key = {};
+                        key.type = REACH_UI_EVENT_ENTER;
+                        reach_capsule_event_result handled = {};
+                        ops->handle_event(capsule, &key, &handled);
+                        step(0.016);
+                        key.type = REACH_UI_EVENT_ESCAPE;
+                        ops->handle_event(capsule, &key, &handled);
+                        for (size_t frame = 0; frame < 6; ++frame)
+                            step(0.016);
+                        break;
+                    }
                     click(page.wifi_switch);
                     for (size_t index = 0; index < REACH_WIFI_MAX_NETWORKS; ++index)
                         wifi->networks.networks[index].signal_strength =
@@ -3129,7 +3162,7 @@ static void test_quick_settings_section_motion_renders_worst_case(void)
     }
     expect_true(presentation_render_failures == 0,
                 "every Quick Settings section-motion render stays valid");
-    expect_true(presentation_render_count == 4 * 3 * 2 * 206,
+    expect_true(presentation_render_count == 4 * 3 * 2 * 230,
                 "Quick Settings renders every section-motion step at every DPI and monitor");
     const size_t largest_rows = (size_t)REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES * 5 +
                                 (size_t)REACH_AUDIO_VOLUME_MAX_SESSIONS * 5;
