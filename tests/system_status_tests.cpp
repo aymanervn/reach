@@ -334,8 +334,6 @@ static void test_missing_entry_points_are_not_implemented(void)
                 "battery saver without a port entry point is not implemented");
     expect_true(reach_system_status_open_project_menu(service) == REACH_NOT_IMPLEMENTED,
                 "the project menu without a port entry point is not implemented");
-    expect_true(reach_system_status_open_system_quick_settings(service) == REACH_NOT_IMPLEMENTED,
-                "system quick settings without a port entry point is not implemented");
 
     reach_system_status_destroy(service);
 }

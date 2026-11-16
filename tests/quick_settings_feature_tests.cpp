@@ -261,6 +261,8 @@ static void test_expansion_keeps_popup_anchor_position(void)
                 "quick settings content width stays stable across border widths");
     const float initial_y = state->bounds.y;
 
+    (void)reach_quick_settings_select_page(quick_settings, REACH_QUICK_SETTINGS_PAGE_SOUND);
+    reach_quick_settings_relayout(quick_settings, &ctx, 0);
     (void)reach_quick_settings_toggle_expanded(quick_settings);
     reach_quick_settings_relayout(quick_settings, &ctx, 1);
     expect_true(reach_quick_settings_state_ptr(quick_settings)->target_bounds.height >
@@ -305,8 +307,9 @@ static void test_capsule_accepts_surface_local_pointer(void)
     (void)reach_quick_settings_set_open(quick_settings, 1);
     reach_quick_settings_refresh_layout(quick_settings, &ctx);
 
-    const reach_rect_f32 tile =
-        reach_quick_settings_state_ptr(quick_settings)->layout.network_tile.bounds;
+    const reach_rect_f32 tile = reach_quick_settings_state_ptr(quick_settings)
+                                    ->layout.toggles[REACH_QUICK_SETTINGS_TOGGLE_PROJECT]
+                                    .bounds;
     reach_pointer_event pointer = {};
     pointer.kind = REACH_POINTER_EVENT_DOWN;
     pointer.coordinate_space = REACH_POINTER_COORDINATE_SURFACE_LOCAL;

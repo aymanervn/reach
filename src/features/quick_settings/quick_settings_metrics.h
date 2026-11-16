@@ -9,13 +9,31 @@ struct reach_quick_settings_metrics
     float content_padding;
     float text_padding;
 
-    float system_grid_tile_height;
-    float system_grid_gap;
-    float system_grid_bottom_gap;
-    float system_tile_icon_box;
-    float system_tile_icon_inset;
-    float system_tile_icon_size;
-    float system_tile_icon_gap;
+    float panel_width;
+    float rail_width;
+    float rail_item_size;
+    float rail_item_gap;
+    float rail_padding;
+    float page_shift;
+
+    float overview_pill_height;
+    float overview_row_gap;
+    float overview_pill_icon_size;
+    float overview_pill_icon_inset;
+    float overview_pill_value_inset;
+    float overview_pill_value_width;
+
+    float toggle_grid_gap;
+    float toggle_height;
+    float toggle_gap;
+    float toggle_icon_size;
+    float toggle_leading_padding;
+    float toggle_trailing_padding;
+    float toggle_divider_leading_gap;
+    float toggle_divider_trailing_gap;
+    float toggle_divider_height;
+    float toggle_title_height;
+    float toggle_status_height;
 
     float pill_header_icon_size;
     float pill_header_label_gap;
@@ -50,7 +68,9 @@ struct reach_quick_settings_metrics
     float expand_button_height;
     float chevron_icon_size;
 
-    float system_tile_text_size;
+    float toggle_title_text_size;
+    float toggle_status_text_size;
+    float overview_pill_value_text_size;
     float default_pill_label_text_size;
     float master_pill_label_text_size;
     int pill_label_text_weight;
@@ -81,13 +101,31 @@ static constexpr reach_quick_settings_metrics reach_quick_settings_make_metrics(
     metrics.content_padding = 8.0f;
     metrics.text_padding = 12.0f;
 
-    metrics.system_grid_tile_height = 46.0f;
-    metrics.system_grid_gap = 8.0f;
-    metrics.system_grid_bottom_gap = 10.0f;
-    metrics.system_tile_icon_box = 28.0f;
-    metrics.system_tile_icon_inset = 8.0f;
-    metrics.system_tile_icon_size = 16.0f;
-    metrics.system_tile_icon_gap = 10.0f;
+    metrics.panel_width = 340.0f;
+    metrics.rail_width = 38.0f;
+    metrics.rail_item_size = 28.0f;
+    metrics.rail_item_gap = 6.0f;
+    metrics.rail_padding = 5.0f;
+    metrics.page_shift = 12.0f;
+
+    metrics.overview_pill_height = 32.0f;
+    metrics.overview_row_gap = 8.0f;
+    metrics.overview_pill_icon_size = 16.0f;
+    metrics.overview_pill_icon_inset = 10.0f;
+    metrics.overview_pill_value_inset = 12.0f;
+    metrics.overview_pill_value_width = 44.0f;
+
+    metrics.toggle_grid_gap = 10.0f;
+    metrics.toggle_height = 40.0f;
+    metrics.toggle_gap = 6.0f;
+    metrics.toggle_icon_size = 16.0f;
+    metrics.toggle_leading_padding = 13.0f;
+    metrics.toggle_trailing_padding = 10.0f;
+    metrics.toggle_divider_leading_gap = 9.0f;
+    metrics.toggle_divider_trailing_gap = 6.0f;
+    metrics.toggle_divider_height = 20.0f;
+    metrics.toggle_title_height = 15.0f;
+    metrics.toggle_status_height = 13.0f;
 
     metrics.pill_header_icon_size = 22.0f;
     metrics.pill_header_label_gap = 6.0f;
@@ -122,7 +160,9 @@ static constexpr reach_quick_settings_metrics reach_quick_settings_make_metrics(
     metrics.expand_button_height = 34.0f;
     metrics.chevron_icon_size = 14.0f;
 
-    metrics.system_tile_text_size = REACH_TEXT_SIZE_SMALL;
+    metrics.toggle_title_text_size = REACH_TEXT_SIZE_SMALL;
+    metrics.toggle_status_text_size = REACH_TEXT_SIZE_XSMALL;
+    metrics.overview_pill_value_text_size = REACH_TEXT_SIZE_XSMALL;
     metrics.default_pill_label_text_size = REACH_TEXT_SIZE_MEDIUM;
     metrics.master_pill_label_text_size = REACH_TEXT_SIZE_MEDIUM;
     metrics.pill_label_text_weight = REACH_TEXT_WEIGHT_DEMIBOLD;
@@ -163,20 +203,6 @@ static inline reach_quick_settings_metrics reach_quick_settings_metrics_for_scal
     metrics.content_padding =
         reach_quick_settings_metric_scale_value(metrics.content_padding, dpi_scale);
     metrics.text_padding = reach_quick_settings_metric_scale_value(metrics.text_padding, dpi_scale);
-    metrics.system_grid_tile_height =
-        reach_quick_settings_metric_scale_value(metrics.system_grid_tile_height, dpi_scale);
-    metrics.system_grid_gap =
-        reach_quick_settings_metric_scale_value(metrics.system_grid_gap, dpi_scale);
-    metrics.system_grid_bottom_gap =
-        reach_quick_settings_metric_scale_value(metrics.system_grid_bottom_gap, dpi_scale);
-    metrics.system_tile_icon_box =
-        reach_quick_settings_metric_scale_value(metrics.system_tile_icon_box, dpi_scale);
-    metrics.system_tile_icon_inset =
-        reach_quick_settings_metric_scale_value(metrics.system_tile_icon_inset, dpi_scale);
-    metrics.system_tile_icon_size =
-        reach_quick_settings_metric_scale_value(metrics.system_tile_icon_size, dpi_scale);
-    metrics.system_tile_icon_gap =
-        reach_quick_settings_metric_scale_value(metrics.system_tile_icon_gap, dpi_scale);
     metrics.pill_header_icon_size =
         reach_quick_settings_metric_scale_value(metrics.pill_header_icon_size, dpi_scale);
     metrics.pill_header_label_gap =
@@ -234,8 +260,6 @@ static inline reach_quick_settings_metrics reach_quick_settings_metrics_for_scal
         reach_quick_settings_metric_scale_value(metrics.expand_button_height, dpi_scale);
     metrics.chevron_icon_size =
         reach_quick_settings_metric_scale_value(metrics.chevron_icon_size, dpi_scale);
-    metrics.system_tile_text_size =
-        reach_quick_settings_metric_scale_value(metrics.system_tile_text_size, dpi_scale);
     metrics.default_pill_label_text_size =
         reach_quick_settings_metric_scale_value(metrics.default_pill_label_text_size, dpi_scale);
     metrics.master_pill_label_text_size =
@@ -270,6 +294,54 @@ static inline reach_quick_settings_metrics reach_quick_settings_metrics_for_scal
         reach_quick_settings_metric_scale_value(metrics.app_row_percent_text_size, dpi_scale);
     metrics.expand_button_text_size =
         reach_quick_settings_metric_scale_value(metrics.expand_button_text_size, dpi_scale);
+
+    metrics.panel_width = reach_quick_settings_metric_scale_value(metrics.panel_width, dpi_scale);
+    metrics.rail_width = reach_quick_settings_metric_scale_value(metrics.rail_width, dpi_scale);
+    metrics.rail_item_size =
+        reach_quick_settings_metric_scale_value(metrics.rail_item_size, dpi_scale);
+    metrics.rail_item_gap =
+        reach_quick_settings_metric_scale_value(metrics.rail_item_gap, dpi_scale);
+    metrics.rail_padding = reach_quick_settings_metric_scale_value(metrics.rail_padding, dpi_scale);
+    metrics.page_shift = reach_quick_settings_metric_scale_value(metrics.page_shift, dpi_scale);
+    metrics.overview_pill_height =
+        reach_quick_settings_metric_scale_value(metrics.overview_pill_height, dpi_scale);
+    metrics.overview_row_gap =
+        reach_quick_settings_metric_scale_value(metrics.overview_row_gap, dpi_scale);
+    metrics.overview_pill_icon_size =
+        reach_quick_settings_metric_scale_value(metrics.overview_pill_icon_size, dpi_scale);
+    metrics.overview_pill_icon_inset =
+        reach_quick_settings_metric_scale_value(metrics.overview_pill_icon_inset, dpi_scale);
+    metrics.overview_pill_value_inset =
+        reach_quick_settings_metric_scale_value(metrics.overview_pill_value_inset, dpi_scale);
+    metrics.overview_pill_value_width =
+        reach_quick_settings_metric_scale_value(metrics.overview_pill_value_width, dpi_scale);
+    metrics.toggle_grid_gap =
+        reach_quick_settings_metric_scale_value(metrics.toggle_grid_gap, dpi_scale);
+    metrics.toggle_height =
+        reach_quick_settings_metric_scale_value(metrics.toggle_height, dpi_scale);
+    metrics.toggle_gap = reach_quick_settings_metric_scale_value(metrics.toggle_gap, dpi_scale);
+    metrics.toggle_icon_size =
+        reach_quick_settings_metric_scale_value(metrics.toggle_icon_size, dpi_scale);
+    metrics.toggle_leading_padding =
+        reach_quick_settings_metric_scale_value(metrics.toggle_leading_padding, dpi_scale);
+    metrics.toggle_trailing_padding =
+        reach_quick_settings_metric_scale_value(metrics.toggle_trailing_padding, dpi_scale);
+    metrics.toggle_divider_leading_gap =
+        reach_quick_settings_metric_scale_value(metrics.toggle_divider_leading_gap, dpi_scale);
+    metrics.toggle_divider_trailing_gap =
+        reach_quick_settings_metric_scale_value(metrics.toggle_divider_trailing_gap, dpi_scale);
+    metrics.toggle_divider_height =
+        reach_quick_settings_metric_scale_value(metrics.toggle_divider_height, dpi_scale);
+    metrics.toggle_title_height =
+        reach_quick_settings_metric_scale_value(metrics.toggle_title_height, dpi_scale);
+    metrics.toggle_status_height =
+        reach_quick_settings_metric_scale_value(metrics.toggle_status_height, dpi_scale);
+    metrics.toggle_title_text_size =
+        reach_quick_settings_metric_scale_value(metrics.toggle_title_text_size, dpi_scale);
+    metrics.toggle_status_text_size =
+        reach_quick_settings_metric_scale_value(metrics.toggle_status_text_size, dpi_scale);
+    metrics.overview_pill_value_text_size =
+        reach_quick_settings_metric_scale_value(metrics.overview_pill_value_text_size, dpi_scale);
 
     return metrics;
 }

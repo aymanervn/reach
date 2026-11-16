@@ -30,6 +30,7 @@
 #include "reach/services/input_language.h"
 #include "reach/services/system_stats.h"
 #include "reach/services/system_status.h"
+#include "reach/services/wifi.h"
 #include "reach/services/window_tracking.h"
 #include "reach/services/wallpaper.h"
 #include "reach/support/motion.h"
@@ -165,6 +166,7 @@ typedef struct reach_feature_dependencies
     reach_tray_service *tray;
     reach_app_control *app_control;
     reach_system_status *system_status;
+    reach_wifi_service *wifi;
     const reach_clipboard_port *clipboard;
     void (*request_update)(void *user);
     void *request_update_user;
@@ -684,6 +686,7 @@ struct reach_host
     std::atomic<uint32_t> quick_settings_system_change_flags;
     std::atomic<uint32_t> audio_volume_changed;
     reach_system_status *system_status;
+    reach_wifi_service *wifi_service;
     reach_system_stats *system_stats;
     reach_popup_capture_port popup_capture;
 };
@@ -927,6 +930,7 @@ void reach_host_apply_ui_font(reach_host *host, int32_t bundled_font);
 void reach_host_apply_theme(reach_host *host, int32_t light_theme, int32_t accent_preset);
 
 void reach_host_apply_display_config(reach_host *host, const reach_config_snapshot *snapshot);
+void reach_host_set_light_theme(reach_host *host, int32_t light_theme);
 
 int32_t reach_host_game_mode_enabled(const reach_host *host);
 reach_result reach_host_update_game_mode(reach_host *host);

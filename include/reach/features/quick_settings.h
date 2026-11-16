@@ -9,6 +9,7 @@
 #include "reach/ports/system_controls.h"
 #include "reach/ports/text_measure.h"
 #include "reach/services/system_status.h"
+#include "reach/services/wifi.h"
 #include "reach/support/util.h"
 
 #include <stdint.h>
@@ -18,8 +19,25 @@ extern "C"
 {
 #endif
 
+    typedef enum reach_quick_settings_page
+    {
+        REACH_QUICK_SETTINGS_PAGE_OVERVIEW = 0,
+        REACH_QUICK_SETTINGS_PAGE_SOUND,
+        REACH_QUICK_SETTINGS_PAGE_COUNT
+    } reach_quick_settings_page;
+
+    typedef enum reach_quick_settings_toggle
+    {
+        REACH_QUICK_SETTINGS_TOGGLE_WIFI = 0,
+        REACH_QUICK_SETTINGS_TOGGLE_BLUETOOTH,
+        REACH_QUICK_SETTINGS_TOGGLE_DARK_MODE,
+        REACH_QUICK_SETTINGS_TOGGLE_PROJECT,
+        REACH_QUICK_SETTINGS_TOGGLE_COUNT
+    } reach_quick_settings_toggle;
+
     typedef struct reach_quick_settings_model
     {
+        reach_quick_settings_page page;
         float main_volume_level;
         int32_t main_muted;
         int32_t expanded;
@@ -31,6 +49,8 @@ extern "C"
         int32_t bluetooth_pending;
         int32_t bluetooth_pending_enabled;
         reach_brightness_state brightness;
+        reach_wifi_radio_state wifi_radio;
+        int32_t light_theme;
     } reach_quick_settings_model;
 
     typedef struct reach_quick_settings_volume_pill_model
@@ -72,27 +92,31 @@ extern "C"
         reach_rect_f32 separator;
     } reach_quick_settings_output_device_row_layout;
 
-    typedef struct reach_quick_settings_tile_layout
+    typedef struct reach_quick_settings_toggle_layout
     {
         reach_rect_f32 bounds;
-        reach_rect_f32 icon_background;
         reach_rect_f32 icon;
-        reach_rect_f32 label;
-    } reach_quick_settings_tile_layout;
+        reach_rect_f32 divider;
+        reach_rect_f32 title;
+        reach_rect_f32 status;
+    } reach_quick_settings_toggle_layout;
 
     typedef struct reach_quick_settings_layout
     {
         reach_rect_f32 content_bounds;
+        reach_rect_f32 page_bounds;
 
-        reach_rect_f32 system_grid_bounds;
-        reach_quick_settings_tile_layout network_tile;
-        reach_quick_settings_tile_layout bluetooth_tile;
-        reach_quick_settings_tile_layout project_tile;
-        size_t system_tile_count;
+        reach_rect_f32 rail;
+        reach_rect_f32 rail_items[REACH_QUICK_SETTINGS_PAGE_COUNT];
 
-        reach_quick_settings_volume_pill_layout brightness_pill;
-        reach_rect_f32 brightness_slider_track;
-        reach_rect_f32 brightness_slider_fill;
+        reach_rect_f32 overview_volume;
+        reach_rect_f32 overview_volume_icon;
+        reach_rect_f32 overview_volume_value;
+        reach_rect_f32 sound_page_button;
+        reach_rect_f32 overview_brightness;
+        reach_rect_f32 overview_brightness_icon;
+        reach_rect_f32 overview_brightness_value;
+        reach_quick_settings_toggle_layout toggles[REACH_QUICK_SETTINGS_TOGGLE_COUNT];
 
         reach_quick_settings_volume_pill_layout main_volume_pill;
         reach_rect_f32 main_slider_track;
@@ -147,8 +171,10 @@ extern "C"
             output_device_row_items[REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES];
         reach_keyed_row app_volume_row_motions[REACH_AUDIO_VOLUME_MAX_SESSIONS];
         reach_quick_settings_app_volume_row app_volume_row_items[REACH_AUDIO_VOLUME_MAX_SESSIONS];
-        reach_motion network_tile_state;
-        reach_motion bluetooth_tile_state;
+        reach_motion toggle_states[REACH_QUICK_SETTINGS_TOGGLE_COUNT];
+        reach_motion page_opacity[REACH_QUICK_SETTINGS_PAGE_COUNT];
+        reach_motion page_shift[REACH_QUICK_SETTINGS_PAGE_COUNT];
+        reach_motion rail_marker;
         reach_rect_motion surface_motion;
         reach_motion scroll_motion;
         reach_rect_f32 render_bounds;
@@ -311,8 +337,21 @@ extern "C"
                                                   int32_t bluetooth_valid, uint32_t change_flags,
                                                   reach_quick_settings_system_apply_result *out);
 
-    void reach_quick_settings_attach_status(reach_quick_settings *quick_settings,
-                                            reach_system_status *status);
+    typedef struct reach_quick_settings_routes
+    {
+        void *user;
+        void (*set_light_theme)(void *user, int32_t light_theme);
+    } reach_quick_settings_routes;
+
+    void reach_quick_settings_attach_services(reach_quick_settings *quick_settings,
+                                              reach_system_status *status,
+                                              reach_wifi_service *wifi);
+    void reach_quick_settings_set_routes(reach_quick_settings *quick_settings,
+                                         const reach_quick_settings_routes *routes);
+    int32_t reach_quick_settings_apply_light_theme(reach_quick_settings *quick_settings,
+                                                   int32_t light_theme);
+    int32_t reach_quick_settings_select_page(reach_quick_settings *quick_settings,
+                                             reach_quick_settings_page page);
 
     void reach_quick_settings_refresh_audio(reach_quick_settings *quick_settings);
     void reach_quick_settings_refresh_system(reach_quick_settings *quick_settings,

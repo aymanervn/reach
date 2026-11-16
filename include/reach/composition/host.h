@@ -25,6 +25,7 @@
 #include "reach/ports/system_controls.h"
 #include "reach/ports/tray_provider.h"
 #include "reach/ports/wallpaper_service.h"
+#include "reach/ports/wifi.h"
 #include "reach/ports/wallpaper_surface.h"
 #include "reach/ports/window_manager.h"
 #include "reach/ports/window_thumbnail.h"
@@ -99,6 +100,7 @@ extern "C"
         reach_power_session_port power_session;
         reach_audio_volume_port audio_volume;
         reach_system_controls_port system_controls;
+        reach_wifi_port wifi;
         reach_media_controls_port media_controls;
         reach_clipboard_port clipboard;
         reach_screen_capture_port screen_capture;

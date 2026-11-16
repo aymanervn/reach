@@ -228,6 +228,31 @@ void reach_host_apply_ui_font(reach_host *host, int32_t bundled_font)
     reach_host_request_update(host);
 }
 
+void reach_host_set_light_theme(reach_host *host, int32_t light_theme)
+{
+    if (host == nullptr || host->config_service == nullptr)
+    {
+        return;
+    }
+    std::unique_ptr<reach_config_snapshot> snapshot(new (std::nothrow) reach_config_snapshot());
+    if (snapshot == nullptr ||
+        reach_config_service_snapshot(host->config_service, snapshot.get()) != REACH_OK)
+    {
+        return;
+    }
+    reach_config_display_settings settings = {};
+    settings.high_refresh_rate = snapshot->high_refresh_rate;
+    settings.bundled_font = snapshot->bundled_font;
+    settings.light_theme = light_theme ? 1 : 0;
+    settings.accent_preset = snapshot->accent_preset;
+    settings.windows_system_theme = snapshot->windows_system_theme;
+    settings.windows_app_theme = snapshot->windows_app_theme;
+    if (reach_config_service_set_display(host->config_service, &settings) == REACH_OK)
+    {
+        reach_host_request_update(host);
+    }
+}
+
 void reach_host_apply_theme(reach_host *host, int32_t light_theme, int32_t accent_preset)
 {
     if (host == nullptr)

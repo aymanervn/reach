@@ -16,9 +16,10 @@ typedef enum reach_quick_settings_hit_type
     REACH_QUICK_SETTINGS_HIT_MAIN_SLIDER,
     REACH_QUICK_SETTINGS_HIT_SESSION_SLIDER,
     REACH_QUICK_SETTINGS_HIT_BRIGHTNESS_SLIDER,
-    REACH_QUICK_SETTINGS_HIT_NETWORK_TILE,
-    REACH_QUICK_SETTINGS_HIT_BLUETOOTH_TILE,
-    REACH_QUICK_SETTINGS_HIT_PROJECT_TILE,
+    REACH_QUICK_SETTINGS_HIT_OVERVIEW_VOLUME_SLIDER,
+    REACH_QUICK_SETTINGS_HIT_RAIL_ITEM,
+    REACH_QUICK_SETTINGS_HIT_SOUND_PAGE_BUTTON,
+    REACH_QUICK_SETTINGS_HIT_TOGGLE,
     REACH_QUICK_SETTINGS_HIT_OUTPUT_DEVICE_BUTTON,
     REACH_QUICK_SETTINGS_HIT_OUTPUT_DEVICE_ROW,
     REACH_QUICK_SETTINGS_HIT_EXPAND_BUTTON
@@ -27,9 +28,9 @@ typedef enum reach_quick_settings_hit_type
 typedef enum reach_quick_settings_press_target_kind
 {
     REACH_QUICK_SETTINGS_PRESS_TARGET_NONE = 0,
-    REACH_QUICK_SETTINGS_PRESS_TARGET_NETWORK_TILE,
-    REACH_QUICK_SETTINGS_PRESS_TARGET_BLUETOOTH_TILE,
-    REACH_QUICK_SETTINGS_PRESS_TARGET_PROJECT_TILE,
+    REACH_QUICK_SETTINGS_PRESS_TARGET_RAIL_ITEM,
+    REACH_QUICK_SETTINGS_PRESS_TARGET_SOUND_PAGE_BUTTON,
+    REACH_QUICK_SETTINGS_PRESS_TARGET_TOGGLE,
     REACH_QUICK_SETTINGS_PRESS_TARGET_OUTPUT_DEVICE_BUTTON,
     REACH_QUICK_SETTINGS_PRESS_TARGET_OUTPUT_DEVICE_ROW,
     REACH_QUICK_SETTINGS_PRESS_TARGET_EXPAND_BUTTON
@@ -47,9 +48,12 @@ extern "C"
     uint64_t reach_quick_settings_press_feedback_target(const reach_quick_settings *quick_settings);
     reach_motion
     reach_quick_settings_press_feedback_motion(const reach_quick_settings *quick_settings);
-    void reach_quick_settings_tile_state_motions(const reach_quick_settings *quick_settings,
-                                                 reach_motion *out_network,
-                                                 reach_motion *out_bluetooth);
+    void reach_quick_settings_page_motions(
+        const reach_quick_settings *quick_settings,
+        reach_motion out_toggles[REACH_QUICK_SETTINGS_TOGGLE_COUNT],
+        reach_motion out_page_opacity[REACH_QUICK_SETTINGS_PAGE_COUNT],
+        reach_motion out_page_shift[REACH_QUICK_SETTINGS_PAGE_COUNT],
+        reach_motion *out_rail_marker);
     void reach_quick_settings_row_motions(
         const reach_quick_settings *quick_settings,
         reach_keyed_row out_output_motions[REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES],
@@ -77,8 +81,10 @@ typedef enum reach_quick_settings_action_type
     REACH_QUICK_SETTINGS_ACTION_SET_MAIN_VOLUME,
     REACH_QUICK_SETTINGS_ACTION_SET_SESSION_VOLUME,
     REACH_QUICK_SETTINGS_ACTION_SET_BRIGHTNESS,
-    REACH_QUICK_SETTINGS_ACTION_NETWORK_TILE,
+    REACH_QUICK_SETTINGS_ACTION_SELECT_PAGE,
+    REACH_QUICK_SETTINGS_ACTION_TOGGLE_WIFI,
     REACH_QUICK_SETTINGS_ACTION_TOGGLE_BLUETOOTH,
+    REACH_QUICK_SETTINGS_ACTION_TOGGLE_DARK_MODE,
     REACH_QUICK_SETTINGS_ACTION_OPEN_PROJECT,
     REACH_QUICK_SETTINGS_ACTION_TOGGLE_OUTPUT_DEVICES,
     REACH_QUICK_SETTINGS_ACTION_SET_OUTPUT_DEVICE,
@@ -88,6 +94,7 @@ typedef enum reach_quick_settings_action_type
 typedef struct reach_quick_settings_hit_result
 {
     reach_quick_settings_hit_type type;
+    size_t item_index;
     float volume_level;
     size_t session_index;
     size_t output_device_index;
@@ -98,6 +105,7 @@ typedef struct reach_quick_settings_hit_result
 typedef struct reach_quick_settings_action
 {
     reach_quick_settings_action_type type;
+    size_t item_index;
     float volume_level;
     size_t session_index;
     size_t output_device_index;

@@ -75,9 +75,10 @@ static void reach_feature_attach_switcher(void *capsule,
 static void reach_feature_attach_quick_settings(void *capsule,
                                                 const reach_feature_dependencies *dependencies)
 {
-    reach_quick_settings_attach_status(static_cast<reach_quick_settings *>(capsule),
-                                       dependencies != nullptr ? dependencies->system_status
-                                                               : nullptr);
+    reach_quick_settings_attach_services(static_cast<reach_quick_settings *>(capsule),
+                                         dependencies != nullptr ? dependencies->system_status
+                                                                 : nullptr,
+                                         dependencies != nullptr ? dependencies->wifi : nullptr);
 }
 
 static void reach_feature_attach_battery(void *capsule,
@@ -491,8 +492,21 @@ static void reach_feature_notify_quick_settings(void *capsule,
                                                 reach_feature_tick_result *out)
 {
     reach_quick_settings *quick_settings = static_cast<reach_quick_settings *>(capsule);
-    if (quick_settings == nullptr || notification == nullptr || out == nullptr ||
-        !reach_quick_settings_is_open(quick_settings))
+    if (quick_settings == nullptr || notification == nullptr || out == nullptr)
+    {
+        return;
+    }
+    if (notification->kind == REACH_FEATURE_NOTIFICATION_CONFIG_CHANGED &&
+        notification->config != nullptr)
+    {
+        if (reach_quick_settings_apply_light_theme(quick_settings,
+                                                   notification->config->light_theme))
+        {
+            out->redraw = 1;
+        }
+        return;
+    }
+    if (!reach_quick_settings_is_open(quick_settings))
     {
         return;
     }

@@ -3,6 +3,7 @@
 #include "reach/features/battery.h"
 #include "reach/features/context_menu.h"
 #include "reach/features/dock.h"
+#include "reach/features/quick_settings.h"
 #include "reach/features/screenshot.h"
 #include "reach/features/system_hud.h"
 #include "reach/features/top_bar.h"
@@ -324,6 +325,11 @@ static void reach_host_route_battery_saver_pending_changed(void *user, int32_t p
     host->dirty.render = 1;
 }
 
+static void reach_host_route_quick_settings_light_theme(void *user, int32_t light_theme)
+{
+    reach_host_set_light_theme(static_cast<reach_host *>(user), light_theme);
+}
+
 static void reach_host_route_screenshot_copied(void *user)
 {
     reach_host *host = static_cast<reach_host *>(user);
@@ -379,6 +385,13 @@ void reach_host_bind_interfeature_routes(reach_host *host)
     reach_battery_set_routes(
         reach_host_feature_capsule<reach_battery>(host, REACH_SURFACE_ID_BATTERY), &battery);
 
+    reach_quick_settings_routes quick_settings = {};
+    quick_settings.user = host;
+    quick_settings.set_light_theme = reach_host_route_quick_settings_light_theme;
+    reach_quick_settings_set_routes(
+        reach_host_feature_capsule<reach_quick_settings>(host, REACH_SURFACE_ID_QUICK_SETTINGS),
+        &quick_settings);
+
     reach_screenshot_routes screenshot = {};
     screenshot.user = host;
     screenshot.copied = reach_host_route_screenshot_copied;
@@ -397,6 +410,9 @@ void reach_host_clear_interfeature_routes(reach_host *host)
                               nullptr);
         reach_top_bar_set_routes(
             reach_host_feature_capsule<reach_top_bar>(host, REACH_SURFACE_ID_TOP_BAR), nullptr);
+        reach_quick_settings_set_routes(
+            reach_host_feature_capsule<reach_quick_settings>(host, REACH_SURFACE_ID_QUICK_SETTINGS),
+            nullptr);
         reach_battery_set_routes(
             reach_host_feature_capsule<reach_battery>(host, REACH_SURFACE_ID_BATTERY), nullptr);
         reach_screenshot_set_routes(

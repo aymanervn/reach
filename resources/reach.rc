@@ -50,6 +50,8 @@ IDI_ICON1 ICON DISCARDABLE "favicon.ico"
 246 RCDATA "system/sliders.svg"
 247 RCDATA "system/braces.svg"
 248 RCDATA "system/layers.svg"
+249 RCDATA "system/accent.svg"
+250 RCDATA "quick_settings/arrow_right.svg"
 
 #include "fonts.rc"
 
