@@ -244,6 +244,11 @@ reach_quick_settings_hit_test(const reach_quick_settings_layout *layout,
             return result;
         }
     }
+    if (reach_quick_settings_point_in_rect(layout->settings_button, x, y))
+    {
+        result.type = REACH_QUICK_SETTINGS_HIT_SETTINGS_BUTTON;
+        return result;
+    }
     switch (model->page)
     {
     case REACH_QUICK_SETTINGS_PAGE_OVERVIEW:
@@ -284,6 +289,9 @@ reach_quick_settings_action reach_quick_settings_action_for_hit(reach_quick_sett
         break;
     case REACH_QUICK_SETTINGS_HIT_RAIL_ITEM:
         action.type = REACH_QUICK_SETTINGS_ACTION_SELECT_PAGE;
+        break;
+    case REACH_QUICK_SETTINGS_HIT_SETTINGS_BUTTON:
+        action.type = REACH_QUICK_SETTINGS_ACTION_OPEN_SETTINGS;
         break;
     case REACH_QUICK_SETTINGS_HIT_SOUND_PAGE_BUTTON:
         action.type = REACH_QUICK_SETTINGS_ACTION_SELECT_PAGE;
@@ -393,6 +401,9 @@ uint64_t reach_quick_settings_pressable_target(reach_quick_settings_hit_result h
     case REACH_QUICK_SETTINGS_HIT_RAIL_ITEM:
         kind = REACH_QUICK_SETTINGS_PRESS_TARGET_RAIL_ITEM;
         index = hit.item_index;
+        break;
+    case REACH_QUICK_SETTINGS_HIT_SETTINGS_BUTTON:
+        kind = REACH_QUICK_SETTINGS_PRESS_TARGET_SETTINGS_BUTTON;
         break;
     case REACH_QUICK_SETTINGS_HIT_SOUND_PAGE_BUTTON:
         kind = REACH_QUICK_SETTINGS_PRESS_TARGET_SOUND_PAGE_BUTTON;

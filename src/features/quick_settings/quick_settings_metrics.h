@@ -9,12 +9,9 @@ struct reach_quick_settings_metrics
     float surface_padding;
     float content_padding;
     float panel_width;
-    float banner_height;
     float avatar_size;
     float avatar_ring;
-    float avatar_overlap;
     float avatar_inset;
-    float identity_height;
     float identity_gap;
     float identity_name_height;
     float identity_detail_height;
@@ -80,12 +77,9 @@ static constexpr reach_quick_settings_metrics reach_quick_settings_make_metrics(
     metrics.surface_padding = 4.0f;
     metrics.content_padding = 8.0f;
     metrics.panel_width = 340.0f;
-    metrics.banner_height = 84.0f;
     metrics.avatar_size = 40.0f;
     metrics.avatar_ring = 2.0f;
-    metrics.avatar_overlap = 16.0f;
     metrics.avatar_inset = 10.0f;
-    metrics.identity_height = 34.0f;
     metrics.identity_gap = 8.0f;
     metrics.identity_name_height = 17.0f;
     metrics.identity_detail_height = 14.0f;
@@ -162,15 +156,9 @@ static inline reach_quick_settings_metrics reach_quick_settings_metrics_for_scal
     metrics.content_padding =
         reach_quick_settings_metric_scale_value(metrics.content_padding, dpi_scale);
     metrics.panel_width = reach_quick_settings_metric_scale_value(metrics.panel_width, dpi_scale);
-    metrics.banner_height =
-        reach_quick_settings_metric_scale_value(metrics.banner_height, dpi_scale);
     metrics.avatar_size = reach_quick_settings_metric_scale_value(metrics.avatar_size, dpi_scale);
     metrics.avatar_ring = reach_quick_settings_metric_scale_value(metrics.avatar_ring, dpi_scale);
-    metrics.avatar_overlap =
-        reach_quick_settings_metric_scale_value(metrics.avatar_overlap, dpi_scale);
     metrics.avatar_inset = reach_quick_settings_metric_scale_value(metrics.avatar_inset, dpi_scale);
-    metrics.identity_height =
-        reach_quick_settings_metric_scale_value(metrics.identity_height, dpi_scale);
     metrics.identity_gap = reach_quick_settings_metric_scale_value(metrics.identity_gap, dpi_scale);
     metrics.identity_name_height =
         reach_quick_settings_metric_scale_value(metrics.identity_name_height, dpi_scale);

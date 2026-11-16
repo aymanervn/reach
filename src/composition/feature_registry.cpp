@@ -502,8 +502,7 @@ static void reach_feature_notify_quick_settings(void *capsule,
     if (notification->kind == REACH_FEATURE_NOTIFICATION_CONFIG_CHANGED &&
         notification->config != nullptr)
     {
-        if (reach_quick_settings_apply_config(quick_settings, notification->config->light_theme,
-                                              notification->config->wallpaper_path))
+        if (reach_quick_settings_apply_config(quick_settings, notification->config->light_theme))
         {
             out->redraw = 1;
         }

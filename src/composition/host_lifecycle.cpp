@@ -428,9 +428,8 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
         result = REACH_ERROR;
     }
     host->profile_service = nullptr;
-    if (reach_profile_service_create(dependencies->user_account, &host->image_loader,
-                                     reach_host_on_system_status_ready, host,
-                                     &host->profile_service) != REACH_OK)
+    if (reach_profile_service_create(dependencies->user_account, reach_host_on_system_status_ready,
+                                     host, &host->profile_service) != REACH_OK)
     {
         result = REACH_ERROR;
     }

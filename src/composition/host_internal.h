@@ -865,7 +865,6 @@ void reach_host_drain_icon_evictions(reach_host *host);
 void reach_host_drain_registered_render_resources(reach_host *host);
 void reach_host_release_registered_render_resources(reach_host *host);
 void reach_host_drain_now_playing_retired_covers(reach_host *host);
-void reach_host_drain_profile_retired_images(reach_host *host);
 reach_result reach_host_refresh_open_windows(reach_host *host, int32_t *out_changed);
 void reach_host_note_foreground_window(reach_host *host, uintptr_t foreground_window);
 void reach_host_apply_foreground_change(reach_host *host);
