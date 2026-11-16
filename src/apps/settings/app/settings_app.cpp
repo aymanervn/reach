@@ -86,6 +86,7 @@ struct reach_settings_reach_worker
     reach_settings_reach_work_type pending_work;
     reach_settings_reach_work_type completed_work;
     uint16_t url[REACH_APP_UPDATE_URL_CAPACITY];
+    uint16_t digest[REACH_APP_UPDATE_DIGEST_CAPACITY];
     uint16_t dest[260];
     reach_app_update_info info;
     reach_result work_result;
@@ -1115,6 +1116,7 @@ static void reach_settings_reach_worker_main(reach_settings_app *app)
     {
         reach_settings_reach_work_type work = REACH_SETTINGS_REACH_WORK_NONE;
         uint16_t url[REACH_APP_UPDATE_URL_CAPACITY] = {};
+        uint16_t digest[REACH_APP_UPDATE_DIGEST_CAPACITY] = {};
         uint16_t dest[260] = {};
         {
             std::unique_lock<std::mutex> lock(worker->mutex);
@@ -1125,6 +1127,7 @@ static void reach_settings_reach_worker_main(reach_settings_app *app)
             }
             work = worker->pending_work;
             reach_copy_utf16(url, REACH_APP_UPDATE_URL_CAPACITY, worker->url);
+            reach_copy_utf16(digest, REACH_APP_UPDATE_DIGEST_CAPACITY, worker->digest);
             reach_copy_utf16(dest, 260, worker->dest);
             worker->pending = 0;
             worker->in_flight = 1;
@@ -1139,7 +1142,7 @@ static void reach_settings_reach_worker_main(reach_settings_app *app)
         }
         else if (work == REACH_SETTINGS_REACH_WORK_DOWNLOAD && app->app_update.download != nullptr)
         {
-            result = app->app_update.download(app->app_update.userdata, url, dest,
+            result = app->app_update.download(app->app_update.userdata, url, digest, dest,
                                               reach_settings_reach_progress, app);
         }
 
@@ -1202,7 +1205,7 @@ static void reach_settings_schedule_reach_download(reach_settings_app *app)
 {
     if (app == nullptr || app->app_update.download == nullptr ||
         app->model.reach_update_info.download_url[0] == 0 ||
-        reach_settings_reach_worker_busy(app) ||
+        app->model.reach_update_info.digest[0] == 0 || reach_settings_reach_worker_busy(app) ||
         reach_settings_ensure_reach_worker(app) != REACH_OK)
     {
         return;
@@ -1222,6 +1225,8 @@ static void reach_settings_schedule_reach_download(reach_settings_app *app)
         app->reach_worker.total = 0;
         reach_copy_utf16(app->reach_worker.url, REACH_APP_UPDATE_URL_CAPACITY,
                          app->model.reach_update_info.download_url);
+        reach_copy_utf16(app->reach_worker.digest, REACH_APP_UPDATE_DIGEST_CAPACITY,
+                         app->model.reach_update_info.digest);
         reach_copy_utf16(app->reach_worker.dest, 260,
                          reinterpret_cast<const uint16_t *>(zip.c_str()));
         app->reach_worker.pending_work = REACH_SETTINGS_REACH_WORK_DOWNLOAD;
@@ -1231,12 +1236,12 @@ static void reach_settings_schedule_reach_download(reach_settings_app *app)
     app->dirty = 1;
 }
 
-static void reach_settings_launch_updater(reach_settings_app *app)
+static int32_t reach_settings_launch_updater(reach_settings_app *app)
 {
     wchar_t module[MAX_PATH] = {};
     if (GetModuleFileNameW(nullptr, module, MAX_PATH) == 0)
     {
-        return;
+        return 0;
     }
     wchar_t install_dir[MAX_PATH] = {};
     reach_copy_utf16(reinterpret_cast<uint16_t *>(install_dir), MAX_PATH,
@@ -1253,7 +1258,7 @@ static void reach_settings_launch_updater(reach_settings_app *app)
     std::wstring temp_updater = std::wstring(temp) + L"reachUpdater.exe";
     if (!CopyFileW(source_updater, temp_updater.c_str(), FALSE))
     {
-        return;
+        return 0;
     }
 
     std::wstring parameters = L"\"";
@@ -1261,8 +1266,13 @@ static void reach_settings_launch_updater(reach_settings_app *app)
     parameters += L"\" \"";
     parameters += install_dir;
     parameters += L"\" 0";
-    ShellExecuteW(nullptr, L"open", temp_updater.c_str(), parameters.c_str(), nullptr, SW_HIDE);
+    if ((INT_PTR)ShellExecuteW(nullptr, L"open", temp_updater.c_str(), parameters.c_str(), nullptr,
+                               SW_HIDE) <= 32)
+    {
+        return 0;
+    }
     reach_settings_app_request_close(app);
+    return 1;
 }
 
 static void reach_settings_apply_reach_progress(reach_settings_app *app)
@@ -1302,15 +1312,8 @@ static void reach_settings_apply_reach_result(reach_settings_app *app)
     }
     else if (work == REACH_SETTINGS_REACH_WORK_DOWNLOAD)
     {
-        if (result == REACH_OK)
-        {
-            reach_settings_model_apply_reach_download(&app->model, 1);
-            reach_settings_launch_updater(app);
-        }
-        else
-        {
-            reach_settings_model_apply_reach_download(&app->model, 0);
-        }
+        reach_settings_model_apply_reach_download(
+            &app->model, result == REACH_OK && reach_settings_launch_updater(app));
     }
     app->dirty = 1;
 }

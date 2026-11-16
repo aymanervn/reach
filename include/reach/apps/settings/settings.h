@@ -193,7 +193,8 @@ extern "C"
         REACH_SETTINGS_REACH_UPDATE_UP_TO_DATE,
         REACH_SETTINGS_REACH_UPDATE_AVAILABLE,
         REACH_SETTINGS_REACH_UPDATE_DOWNLOADING,
-        REACH_SETTINGS_REACH_UPDATE_ERROR
+        REACH_SETTINGS_REACH_UPDATE_ERROR,
+        REACH_SETTINGS_REACH_UPDATE_FAILED
     } reach_settings_reach_update_state;
 
     typedef enum reach_settings_wifi_view

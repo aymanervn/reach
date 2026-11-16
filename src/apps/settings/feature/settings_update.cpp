@@ -95,7 +95,7 @@ void reach_settings_model_apply_reach_download(reach_settings_model *model, int3
     if (model == nullptr)
         return;
     model->reach_update_state =
-        success ? REACH_SETTINGS_REACH_UPDATE_AVAILABLE : REACH_SETTINGS_REACH_UPDATE_ERROR;
+        success ? REACH_SETTINGS_REACH_UPDATE_AVAILABLE : REACH_SETTINGS_REACH_UPDATE_FAILED;
 }
 
 int32_t reach_settings_model_reach_update_action_enabled(const reach_settings_model *model)
@@ -119,6 +119,8 @@ const uint16_t *reach_settings_model_reach_update_status(const reach_settings_mo
         return (const uint16_t *)u"Downloading update...";
     case REACH_SETTINGS_REACH_UPDATE_ERROR:
         return (const uint16_t *)u"Unable to check for updates";
+    case REACH_SETTINGS_REACH_UPDATE_FAILED:
+        return (const uint16_t *)u"Update failed. Nothing was changed";
     case REACH_SETTINGS_REACH_UPDATE_IDLE:
     default:
         return (const uint16_t *)u"Check for the latest Reach release";
@@ -139,6 +141,8 @@ const uint16_t *reach_settings_model_reach_update_button_label(const reach_setti
         return (const uint16_t *)u"Updating...";
     case REACH_SETTINGS_REACH_UPDATE_UP_TO_DATE:
         return (const uint16_t *)u"Up to date";
+    case REACH_SETTINGS_REACH_UPDATE_FAILED:
+        return (const uint16_t *)u"Retry";
     default:
         return (const uint16_t *)u"Check";
     }

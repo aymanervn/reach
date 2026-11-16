@@ -12,14 +12,14 @@ extern "C"
 #define REACH_APP_UPDATE_VERSION_CAPACITY 32
 #define REACH_APP_UPDATE_URL_CAPACITY 512
 #define REACH_APP_UPDATE_NAME_CAPACITY 128
-#define REACH_APP_UPDATE_NOTES_CAPACITY 1024
+#define REACH_APP_UPDATE_DIGEST_CAPACITY 80
 
     typedef struct reach_app_update_info
     {
         uint16_t version[REACH_APP_UPDATE_VERSION_CAPACITY];
         uint16_t asset_name[REACH_APP_UPDATE_NAME_CAPACITY];
         uint16_t download_url[REACH_APP_UPDATE_URL_CAPACITY];
-        uint16_t notes[REACH_APP_UPDATE_NOTES_CAPACITY];
+        uint16_t digest[REACH_APP_UPDATE_DIGEST_CAPACITY];
         uint64_t asset_size;
         int32_t has_release;
     } reach_app_update_info;
