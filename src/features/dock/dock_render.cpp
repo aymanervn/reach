@@ -86,7 +86,6 @@ static void reach_dock_push_running_indicator(const reach_dock_render_input *inp
     const float indicator_size = metrics.running_indicator_size * content_scale;
     const float indicator_gap = metrics.running_indicator_gap * content_scale;
     const float indicator_bottom_inset = metrics.running_indicator_bottom_inset * content_scale;
-    int32_t focused = input->model->items[index].window == input->focused_window;
     float indicator_y = icon_box.y + icon_box.height + indicator_gap;
     float max_indicator_y = input->layout->bounds.height - indicator_size - indicator_bottom_inset;
     if (indicator_y > max_indicator_y)
@@ -94,9 +93,8 @@ static void reach_dock_push_running_indicator(const reach_dock_render_input *inp
         indicator_y = max_indicator_y;
     }
 
-    reach_color color = reach_theme_color_alpha(
-        input->theme->accent_text, focused ? metrics.running_indicator_focused_alpha
-                                           : metrics.running_indicator_unfocused_alpha);
+    reach_color color =
+        reach_theme_color_alpha(input->theme->accent_text, metrics.running_indicator_alpha);
 
     reach_dock_push_rect(commands,
                          reach_dock_rect(icon_box.x + (icon_box.width - indicator_size) * 0.5f,
@@ -365,7 +363,6 @@ reach_result reach_dock_append_render_commands(reach_dock *dock,
     input.item_motion = item_motion;
     input.item_reveal = item_reveal;
     input.item_reveal_count = REACH_MAX_DOCK_ITEMS;
-    input.focused_window = ctx->focused_window;
     input.dragged_render_index = dragged_render_index;
     input.click_feedback_index = reach_pressable_feedback_index(&state->pressable);
     input.click_feedback = reach_dock_press_feedback(dock);

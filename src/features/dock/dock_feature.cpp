@@ -1931,8 +1931,6 @@ reach_result reach_dock_append_surface_render_commands(reach_dock *dock,
     reach_dock_render_context render = {};
     render.theme = ctx->theme;
     render.layout = &layout;
-    render.focused_window =
-        dock->windows != nullptr ? reach_window_tracking_foreground(dock->windows) : 0;
     render.icon_size_px = ctx->icon_size_px;
     render.dpi_scale = ctx->dpi_scale;
     return reach_dock_append_render_commands(dock, &render, out_commands);

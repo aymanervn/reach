@@ -101,7 +101,6 @@ extern "C"
 
         const float *item_reveal;
         size_t item_reveal_count;
-        uintptr_t focused_window;
         size_t dragged_render_index;
         size_t click_feedback_index;
         const reach_motion *click_feedback;
@@ -231,7 +230,6 @@ extern "C"
     {
         const reach_theme *theme;
         const reach_dock_layout *layout;
-        uintptr_t focused_window;
         int32_t icon_size_px;
         float dpi_scale;
     } reach_dock_render_context;
