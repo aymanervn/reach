@@ -2918,6 +2918,8 @@ void reach_quick_settings_process_changes(reach_quick_settings *quick_settings,
     }
 }
 
+static const float reach_quick_settings_surface_padding = 4.0f;
+
 reach_rect_f32 reach_quick_settings_content_bounds_for(reach_rect_f32 surface_bounds,
                                                        const reach_theme *theme, float dpi_scale,
                                                        int32_t drop_direction)
@@ -2925,15 +2927,13 @@ reach_rect_f32 reach_quick_settings_content_bounds_for(reach_rect_f32 surface_bo
     reach_rect_f32 bounds = reach_theme_border_content_rect(theme, dpi_scale, surface_bounds);
 
     float scale = dpi_scale > 0.0f ? dpi_scale : 1.0f;
-    const float horizontal_padding = 8.0f * scale;
-    const float top_padding = 8.0f * scale;
-    const float bottom_padding = 12.0f * scale;
+    const float padding = reach_quick_settings_surface_padding * scale;
     const float notch_height = reach_popup_notch_height_scaled(scale);
 
-    bounds.x += horizontal_padding;
-    bounds.y += top_padding + (drop_direction == REACH_POPUP_DROP_DOWN ? notch_height : 0.0f);
-    bounds.width -= horizontal_padding * 2.0f;
-    bounds.height -= top_padding + bottom_padding + notch_height;
+    bounds.x += padding;
+    bounds.y += padding + (drop_direction == REACH_POPUP_DROP_DOWN ? notch_height : 0.0f);
+    bounds.width -= padding * 2.0f;
+    bounds.height -= padding * 2.0f + notch_height;
 
     if (bounds.width < 0.0f)
     {
@@ -2952,7 +2952,8 @@ static void reach_quick_settings_target_size(reach_quick_settings *quick_setting
                                              float *out_width, float *out_height)
 {
     float border_thickness = reach_theme_border_thickness(theme, scale);
-    const float surface_vertical_padding = border_thickness * 2.0f + 8.0f * scale + 12.0f * scale +
+    const float surface_vertical_padding = border_thickness * 2.0f +
+                                           reach_quick_settings_surface_padding * scale * 2.0f +
                                            reach_popup_notch_height_scaled(scale);
     float content_height = reach_quick_settings_content_height_for_model_scaled(
         &reach_quick_settings_state_mut(quick_settings)->model, scale);
