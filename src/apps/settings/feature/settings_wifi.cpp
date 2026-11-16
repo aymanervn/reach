@@ -32,7 +32,7 @@ static reach_text_edit *reach_settings_wifi_focused_edit(reach_settings_model *m
     switch (model->wifi_focused_field)
     {
     case REACH_SETTINGS_WIFI_FIELD_KEY:
-        return &model->wifi_key_edit;
+        return &model->wifi.key_edit;
     case REACH_SETTINGS_WIFI_FIELD_ADD_NAME:
         return &model->wifi_add_name_edit;
     case REACH_SETTINGS_WIFI_FIELD_ADD_KEY:
@@ -44,93 +44,71 @@ static reach_text_edit *reach_settings_wifi_focused_edit(reach_settings_model *m
 
 int32_t reach_settings_model_wifi_row_visible(const reach_settings_model *model, size_t index)
 {
-    if (model == nullptr || index >= model->wifi_networks.count)
+    if (model == nullptr || index >= model->wifi.networks.count)
     {
         return 0;
     }
     if (model->wifi_view == REACH_SETTINGS_WIFI_VIEW_KNOWN)
     {
-        return model->wifi_networks.networks[index].saved;
+        return model->wifi.networks.networks[index].saved;
     }
-    return model->wifi_networks.networks[index].in_range;
+    return model->wifi.networks.networks[index].in_range;
 }
 
-void reach_settings_model_set_wifi_radio(reach_settings_model *model, reach_wifi_radio_state radio)
+static void reach_settings_wifi_sync_row_motions(reach_settings_model *model)
 {
-    if (model == nullptr)
+    for (size_t index = 0; index <= REACH_WIFI_MAX_NETWORKS; ++index)
     {
-        return;
-    }
-    model->wifi_radio = radio;
-    float target = radio == REACH_WIFI_RADIO_ON ? 1.0f : 0.0f;
-    if (!model->wifi_loaded)
-    {
-        reach_motion_set(&model->wifi_radio_toggle, target);
-    }
-    else if (model->wifi_radio_toggle.to != target)
-    {
-        reach_settings_animate(&model->wifi_radio_toggle, target, REACH_MOTION_PRESET_BOUNCY);
+        float target = reach_settings_wifi_track_target(model->wifi.selected, index);
+        if (model->wifi_row_motions[index].to != target)
+            reach_settings_animate(&model->wifi_row_motions[index], target,
+                                   REACH_MOTION_PRESET_SMOOTH);
     }
 }
 
 int32_t reach_settings_model_toggle_wifi_radio(reach_settings_model *model)
 {
-    if (model == nullptr || model->wifi_radio == REACH_WIFI_RADIO_UNAVAILABLE)
+    if (model == nullptr || !reach_wifi_session_toggle_radio(&model->wifi))
     {
         return 0;
     }
-    model->wifi_radio =
-        model->wifi_radio == REACH_WIFI_RADIO_ON ? REACH_WIFI_RADIO_OFF : REACH_WIFI_RADIO_ON;
     reach_settings_animate(&model->wifi_radio_toggle,
-                           model->wifi_radio == REACH_WIFI_RADIO_ON ? 1.0f : 0.0f,
+                           model->wifi.radio == REACH_WIFI_RADIO_ON ? 1.0f : 0.0f,
                            REACH_MOTION_PRESET_BOUNCY);
     return 1;
 }
 
-void reach_settings_model_apply_wifi(reach_settings_model *model, reach_wifi_radio_state radio,
-                                     const reach_wifi_network_list *networks)
+void reach_settings_model_apply_wifi_snapshot(reach_settings_model *model,
+                                              const reach_wifi_snapshot *snapshot)
 {
-    if (model == nullptr)
+    if (model == nullptr || snapshot == nullptr)
     {
         return;
     }
 
-    uint16_t expanded_ssid[REACH_WIFI_SSID_CAPACITY] = {};
-    if (model->wifi_expanded_row >= 0 &&
-        (size_t)model->wifi_expanded_row < model->wifi_networks.count)
+    int32_t was_loaded = model->wifi.loaded;
+    int32_t connected = reach_wifi_session_apply_snapshot(&model->wifi, snapshot);
+
+    float radio_target = model->wifi.radio == REACH_WIFI_RADIO_ON ? 1.0f : 0.0f;
+    if (!was_loaded)
     {
-        reach_copy_utf16(expanded_ssid, REACH_WIFI_SSID_CAPACITY,
-                         model->wifi_networks.networks[model->wifi_expanded_row].ssid);
+        reach_motion_set(&model->wifi_radio_toggle, radio_target);
+    }
+    else if (model->wifi_radio_toggle.to != radio_target)
+    {
+        reach_settings_animate(&model->wifi_radio_toggle, radio_target, REACH_MOTION_PRESET_BOUNCY);
     }
 
-    reach_settings_model_set_wifi_radio(model, radio);
-    model->wifi_networks = networks != nullptr ? *networks : reach_wifi_network_list{};
-    model->wifi_loaded = 1;
-
-    /* The list is re-sorted on every publish, so the open row follows its network, not its slot. */
-    if (expanded_ssid[0] != 0)
+    if (connected)
     {
-        size_t found = reach_wifi_network_list_find(&model->wifi_networks, expanded_ssid);
-        model->wifi_expanded_row =
-            found < model->wifi_networks.count ? (int32_t)found : REACH_SETTINGS_WIFI_ROW_NONE;
+        reach_settings_model_wifi_clear_secrets(model);
+        reach_settings_model_wifi_expand_row(model, REACH_WIFI_SESSION_SELECTION_NONE);
     }
-    else if (model->wifi_expanded_row >= 0)
-    {
-        model->wifi_expanded_row = REACH_SETTINGS_WIFI_ROW_NONE;
-    }
-
-    if (model->wifi_expanded_row == REACH_SETTINGS_WIFI_ROW_NONE)
+    if (model->wifi.selected == REACH_WIFI_SESSION_SELECTION_NONE)
     {
         reach_settings_model_wifi_blur(model);
     }
-
-    for (size_t index = 0; index <= REACH_WIFI_MAX_NETWORKS; ++index)
-    {
-        float target = reach_settings_wifi_track_target(model->wifi_expanded_row, index);
-        if (model->wifi_row_motions[index].to != target)
-            reach_settings_animate(&model->wifi_row_motions[index], target,
-                                   REACH_MOTION_PRESET_SMOOTH);
-    }
+    reach_settings_wifi_sync_row_motions(model);
 }
 
 void reach_settings_model_set_wifi_view(reach_settings_model *model, reach_settings_wifi_view view)
@@ -140,58 +118,22 @@ void reach_settings_model_set_wifi_view(reach_settings_model *model, reach_setti
         return;
     }
     model->wifi_view = view;
-    reach_settings_model_wifi_expand_row(model, REACH_SETTINGS_WIFI_ROW_NONE);
+    reach_settings_model_wifi_expand_row(model, REACH_WIFI_SESSION_SELECTION_NONE);
     reach_settings_scroll_init(&model->wifi_scroll);
 }
 
-void reach_settings_model_set_wifi_status(reach_settings_model *model, int32_t status,
-                                          const uint16_t *ssid)
+void reach_settings_model_set_wifi_status(reach_settings_model *model,
+                                          reach_wifi_session_status status, const uint16_t *ssid)
 {
     if (model == nullptr)
     {
         return;
     }
-    model->wifi_status = status;
-    model->wifi_status_ssid[0] = 0;
-    if (ssid != nullptr)
-    {
-        reach_copy_utf16(model->wifi_status_ssid, REACH_WIFI_SSID_CAPACITY, ssid);
-    }
-    if (status == REACH_SETTINGS_WIFI_STATUS_SCANNING)
+    reach_wifi_session_set_status(&model->wifi, status, ssid);
+    if (status == REACH_WIFI_SESSION_STATUS_SCANNING)
     {
         reach_loader_model_reset(&model->wifi_loader);
     }
-}
-
-const uint16_t *reach_settings_wifi_status_message(int32_t status)
-{
-    switch (status)
-    {
-    case REACH_SETTINGS_WIFI_STATUS_SCANNING:
-        return (const uint16_t *)u"Searching for networks...";
-    case REACH_SETTINGS_WIFI_STATUS_CONNECTING:
-        return (const uint16_t *)u"Connecting...";
-    case REACH_SETTINGS_WIFI_STATUS_CONNECTED:
-        return (const uint16_t *)u"Connected";
-    case REACH_SETTINGS_WIFI_STATUS_INVALID_KEY:
-        return (const uint16_t *)u"That password did not work";
-    case REACH_SETTINGS_WIFI_STATUS_NOT_FOUND:
-        return (const uint16_t *)u"That network is out of range";
-    case REACH_SETTINGS_WIFI_STATUS_FAILED:
-        return (const uint16_t *)u"Could not connect to this network";
-    case REACH_SETTINGS_WIFI_STATUS_SCAN_FAILED:
-        return (const uint16_t *)u"Could not search for networks";
-    case REACH_SETTINGS_WIFI_STATUS_FORGET_FAILED:
-        return (const uint16_t *)u"Could not forget this network";
-    default:
-        return (const uint16_t *)u"";
-    }
-}
-
-int32_t reach_settings_model_wifi_busy(const reach_settings_model *model)
-{
-    return model != nullptr && (model->wifi_status == REACH_SETTINGS_WIFI_STATUS_SCANNING ||
-                                model->wifi_status == REACH_SETTINGS_WIFI_STATUS_CONNECTING);
 }
 
 void reach_settings_model_wifi_expand_row(reach_settings_model *model, int32_t row)
@@ -200,27 +142,10 @@ void reach_settings_model_wifi_expand_row(reach_settings_model *model, int32_t r
     {
         return;
     }
-    if (model->wifi_expanded_row == row)
-    {
-        row = REACH_SETTINGS_WIFI_ROW_NONE;
-    }
-    model->wifi_expanded_row = row;
+    reach_wifi_session_select(&model->wifi, row);
     reach_settings_model_wifi_blur(model);
     reach_settings_model_wifi_clear_secrets(model);
-    model->wifi_show_key = 0;
-    model->wifi_connect_automatically = 1;
-    if (model->wifi_status != REACH_SETTINGS_WIFI_STATUS_SCANNING)
-    {
-        reach_settings_model_set_wifi_status(model, REACH_SETTINGS_WIFI_STATUS_IDLE, nullptr);
-    }
-
-    for (size_t index = 0; index <= REACH_WIFI_MAX_NETWORKS; ++index)
-    {
-        float target = reach_settings_wifi_track_target(row, index);
-        if (model->wifi_row_motions[index].to != target)
-            reach_settings_animate(&model->wifi_row_motions[index], target,
-                                   REACH_MOTION_PRESET_SMOOTH);
-    }
+    reach_settings_wifi_sync_row_motions(model);
 }
 
 void reach_settings_model_wifi_focus_field(reach_settings_model *model, int32_t field)
@@ -254,7 +179,7 @@ int32_t reach_settings_model_wifi_toggle_show_key(reach_settings_model *model)
     {
         return 0;
     }
-    model->wifi_show_key = model->wifi_show_key ? 0 : 1;
+    model->wifi.show_key = model->wifi.show_key ? 0 : 1;
     return 1;
 }
 
@@ -264,7 +189,7 @@ int32_t reach_settings_model_wifi_toggle_auto(reach_settings_model *model)
     {
         return 0;
     }
-    model->wifi_connect_automatically = model->wifi_connect_automatically ? 0 : 1;
+    model->wifi.connect_automatically = model->wifi.connect_automatically ? 0 : 1;
     return 1;
 }
 
@@ -335,25 +260,6 @@ int32_t reach_settings_model_wifi_handle_edit_key(reach_settings_model *model,
     return 1;
 }
 
-int32_t reach_settings_model_wifi_connect_ready(const reach_settings_model *model)
-{
-    if (model == nullptr || model->wifi_expanded_row < 0 ||
-        (size_t)model->wifi_expanded_row >= model->wifi_networks.count)
-    {
-        return 0;
-    }
-    const reach_wifi_network *network = &model->wifi_networks.networks[model->wifi_expanded_row];
-    if (!reach_wifi_security_is_supported(network->security))
-    {
-        return 0;
-    }
-    if (!reach_wifi_security_needs_key(network->security) || network->saved)
-    {
-        return 1;
-    }
-    return reach_wifi_key_length_valid(network->security, model->wifi_key_edit.length);
-}
-
 int32_t reach_settings_model_wifi_add_ready(const reach_settings_model *model)
 {
     if (model == nullptr || model->wifi_add_name_edit.length == 0)
@@ -361,26 +267,6 @@ int32_t reach_settings_model_wifi_add_ready(const reach_settings_model *model)
         return 0;
     }
     return reach_wifi_key_length_valid(model->wifi_add_security, model->wifi_add_key_edit.length);
-}
-
-int32_t reach_settings_model_wifi_build_connect(const reach_settings_model *model, size_t index,
-                                                reach_wifi_connect_request *out_request)
-{
-    if (model == nullptr || out_request == nullptr || index >= model->wifi_networks.count)
-    {
-        return 0;
-    }
-    const reach_wifi_network *network = &model->wifi_networks.networks[index];
-    *out_request = {};
-    reach_copy_utf16(out_request->ssid, REACH_WIFI_SSID_CAPACITY, network->ssid);
-    out_request->security = network->security;
-    out_request->connect_automatically = model->wifi_connect_automatically;
-    out_request->hidden = network->hidden;
-    if (model->wifi_key_edit.length > 0)
-    {
-        reach_copy_utf16(out_request->key, REACH_WIFI_KEY_CAPACITY, model->wifi_key_edit.text);
-    }
-    return 1;
 }
 
 int32_t reach_settings_model_wifi_build_add(const reach_settings_model *model,
@@ -394,7 +280,7 @@ int32_t reach_settings_model_wifi_build_add(const reach_settings_model *model,
     reach_copy_utf16(out_request->ssid, REACH_WIFI_SSID_CAPACITY, model->wifi_add_name_edit.text);
     reach_copy_utf16(out_request->key, REACH_WIFI_KEY_CAPACITY, model->wifi_add_key_edit.text);
     out_request->security = model->wifi_add_security;
-    out_request->connect_automatically = model->wifi_connect_automatically;
+    out_request->connect_automatically = model->wifi.connect_automatically;
     out_request->hidden = 1;
     return 1;
 }
@@ -405,8 +291,7 @@ void reach_settings_model_wifi_clear_secrets(reach_settings_model *model)
     {
         return;
     }
-    memset(model->wifi_key_edit.text, 0, sizeof(model->wifi_key_edit.text));
-    reach_text_edit_clear(&model->wifi_key_edit);
+    reach_wifi_session_clear_secrets(&model->wifi);
     memset(model->wifi_add_key_edit.text, 0, sizeof(model->wifi_add_key_edit.text));
     reach_text_edit_clear(&model->wifi_add_key_edit);
 }
