@@ -384,7 +384,7 @@ static reach_result reach_quick_settings_push_toggle(
         icon.color = theme->primary_text;
         (void)reach_render_command_buffer_push(commands, &icon);
         reach_quick_settings_push_rounded_rect(commands, layout->divider, 0.0f,
-                                               theme->quick_settings_separator);
+                                               theme->primary_text);
         reach_quick_settings_push_fitted_text(
             commands, layout->title, title, metrics->toggle_title_text_size,
             REACH_TEXT_WEIGHT_SEMIBOLD, REACH_TEXT_ALIGNMENT_CENTER, theme->primary_text,
@@ -1067,7 +1067,7 @@ static reach_result reach_quick_settings_push_wifi(const reach_quick_settings_re
         if (model.wifi_radio != REACH_WIFI_RADIO_UNAVAILABLE)
         {
             reach_ui_toggle_style style = {};
-            style.track_off = theme.toggle_track_off;
+            style.track_off = theme.quick_settings_toggle_track_off;
             style.track_on = theme.accent;
             style.knob = theme.toggle_knob;
             result = reach_ui_toggle_motion_render(commands, layout.wifi_switch, &style, 700,
@@ -1246,7 +1246,7 @@ reach_quick_settings_push_bluetooth(const reach_quick_settings_render_input *inp
         if (model.bluetooth.available)
         {
             reach_ui_toggle_style style = {};
-            style.track_off = theme.toggle_track_off;
+            style.track_off = theme.quick_settings_toggle_track_off;
             style.track_on = theme.accent;
             style.knob = theme.toggle_knob;
             result = reach_ui_toggle_motion_render(commands, layout.bluetooth_switch, &style, 704,

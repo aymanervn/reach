@@ -1344,6 +1344,7 @@ static void reach_quick_settings_sync_tile_states(reach_quick_settings *quick_se
         model.bluetooth_pending ? model.bluetooth_pending_enabled : model.bluetooth.enabled;
     int32_t active[REACH_QUICK_SETTINGS_TOGGLE_COUNT] = {};
     active[REACH_QUICK_SETTINGS_TOGGLE_WIFI] = model.wifi_radio == REACH_WIFI_RADIO_ON ? 1 : 0;
+    active[REACH_QUICK_SETTINGS_TOGGLE_BLUETOOTH] = bluetooth ? 1 : 0;
     float bluetooth_switch = active[REACH_QUICK_SETTINGS_TOGGLE_BLUETOOTH] ? 1.0f : 0.0f;
     if (!animate)
         reach_motion_set(&quick_settings->bluetooth_switch, bluetooth_switch);
@@ -1364,7 +1365,6 @@ static void reach_quick_settings_sync_tile_states(reach_quick_settings *quick_se
             reach_theme_motion_preset(reach_quick_settings_motion_theme(quick_settings),
                                       REACH_MOTION_PRESET_BOUNCY),
             reach_motion_now_seconds());
-    active[REACH_QUICK_SETTINGS_TOGGLE_BLUETOOTH] = bluetooth ? 1 : 0;
     active[REACH_QUICK_SETTINGS_TOGGLE_DARK_MODE] = model.light_theme ? 0 : 1;
     double now_seconds = reach_motion_now_seconds();
     for (size_t index = 0; index < REACH_QUICK_SETTINGS_TOGGLE_COUNT; ++index)
