@@ -490,7 +490,8 @@ static reach_result reach_quick_settings_push_header(const reach_quick_settings_
     reach_result result = reach_render_command_buffer_begin_group(commands, &group);
     if (result == REACH_OK)
     {
-        float radius = theme.radius_large * input->dpi_scale;
+        float radius = reach_nested_radius(reach_popup_radius_scaled(&theme, input->dpi_scale),
+                                           layout.banner.x - input->render_bounds.x);
         if (input->model.wallpaper_image_id != 0)
         {
             reach_render_command banner = {};

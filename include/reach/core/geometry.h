@@ -72,6 +72,11 @@ extern "C"
                fabsf(a.width - b.width) < 0.5f && fabsf(a.height - b.height) < 0.5f;
     }
 
+    static inline float reach_nested_radius(float outer_radius, float gap)
+    {
+        return fmaxf(0.0f, outer_radius - gap);
+    }
+
 #ifdef __cplusplus
 }
 #endif

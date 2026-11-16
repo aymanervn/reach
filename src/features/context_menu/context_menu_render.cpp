@@ -41,6 +41,10 @@ reach_result reach_context_menu_build_render_commands(const reach_context_menu_r
     }
 
     reach_render_command_buffer_set_scissor(out_commands, input->item_viewport);
+    float hover_radius =
+        reach_nested_radius(reach_popup_radius_scaled(input->theme, input->dpi_scale),
+                            reach_theme_border_thickness(input->theme, input->dpi_scale) +
+                                reach_context_menu_scale(input, metrics->padding));
 
     for (size_t index = 0; index < input->item_count; ++index)
     {
@@ -62,7 +66,7 @@ reach_result reach_context_menu_build_render_commands(const reach_context_menu_r
             command.type = REACH_RENDER_COMMAND_RECT;
             command.rect = item;
             command.color = input->theme->accent;
-            command.radius = reach_context_menu_scale(input, input->theme->radius_small);
+            command.radius = hover_radius;
             reach_render_command_buffer_push(out_commands, &command);
         }
 
