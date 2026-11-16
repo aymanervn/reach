@@ -16,6 +16,8 @@ extern "C"
 {
 #endif
 
+#define REACH_BATTERY_TIME_TEXT_CAPACITY 32
+
     typedef enum reach_battery_pointer_action_kind
     {
         REACH_BATTERY_POINTER_ACTION_NONE = 0,
@@ -30,6 +32,8 @@ extern "C"
         int32_t saver_on;
         int32_t saver_pending;
         int32_t saver_pending_enabled;
+        int32_t plugged_in;
+        int32_t seconds_remaining;
     } reach_battery_model;
 
     typedef struct reach_battery_state
@@ -38,6 +42,7 @@ extern "C"
         reach_battery_model model;
         reach_rect_f32 bounds;
         reach_rect_f32 percent_label;
+        reach_rect_f32 time_label;
         reach_rect_f32 separator;
         reach_rect_f32 saver_row;
         reach_rect_f32 saver_label;
@@ -90,12 +95,16 @@ extern "C"
     void reach_battery_relayout(reach_battery *battery, const reach_battery_open_context *ctx);
 
     int32_t reach_battery_set_power(reach_battery *battery, int32_t percent, int32_t saver_on);
+    int32_t reach_battery_set_time_remaining(reach_battery *battery, int32_t plugged_in,
+                                             int32_t seconds_remaining);
     void reach_battery_set_saver_pending(reach_battery *battery, int32_t pending,
                                          int32_t pending_enabled);
     int32_t reach_battery_saver_pending(const reach_battery *battery);
 
     int32_t reach_battery_model_saver_effective(const reach_battery_model *model);
     void reach_battery_format_percent(uint16_t *dst, size_t dst_count, int32_t percent);
+    void reach_battery_format_time_remaining(uint16_t *dst, size_t dst_count,
+                                             const reach_battery_model *model);
 
     reach_battery_pointer_action_kind reach_battery_hit_test(const reach_battery_state *state,
                                                              int32_t x, int32_t y);

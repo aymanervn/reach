@@ -20,6 +20,8 @@ struct reach_battery_metrics
 
     float toggle_width;
     float toggle_height;
+
+    float time_reveal_offset;
 };
 
 static constexpr reach_battery_metrics reach_battery_make_metrics()
@@ -41,6 +43,8 @@ static constexpr reach_battery_metrics reach_battery_make_metrics()
 
     metrics.toggle_width = 36.0f;
     metrics.toggle_height = 20.0f;
+
+    metrics.time_reveal_offset = 4.0f;
 
     return metrics;
 }
