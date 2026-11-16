@@ -22,6 +22,7 @@
 #include "reach/ports/render_backend.h"
 #include "reach/ports/search_provider.h"
 #include "reach/ports/settings_launcher.h"
+#include "reach/ports/bluetooth.h"
 #include "reach/ports/system_controls.h"
 #include "reach/ports/tray_provider.h"
 #include "reach/ports/user_account.h"
@@ -102,6 +103,7 @@ extern "C"
         reach_audio_volume_port audio_volume;
         reach_system_controls_port system_controls;
         reach_wifi_port wifi;
+        reach_bluetooth_port bluetooth;
         reach_user_account_port user_account;
         reach_media_controls_port media_controls;
         reach_clipboard_port clipboard;

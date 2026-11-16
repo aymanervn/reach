@@ -29,6 +29,7 @@
 #include "reach/services/clock.h"
 #include "reach/services/input_language.h"
 #include "reach/services/system_stats.h"
+#include "reach/services/bluetooth.h"
 #include "reach/services/profile.h"
 #include "reach/services/system_status.h"
 #include "reach/services/wifi.h"
@@ -168,6 +169,7 @@ typedef struct reach_feature_dependencies
     reach_app_control *app_control;
     reach_system_status *system_status;
     reach_wifi_service *wifi;
+    reach_bluetooth_service *bluetooth;
     reach_profile_service *profile;
     const reach_power_session_port *power_session;
     const reach_clipboard_port *clipboard;
@@ -691,6 +693,7 @@ struct reach_host
     std::atomic<uint32_t> audio_volume_changed;
     reach_system_status *system_status;
     reach_wifi_service *wifi_service;
+    reach_bluetooth_service *bluetooth_service;
     reach_profile_service *profile_service;
     reach_system_stats *system_stats;
     reach_popup_capture_port popup_capture;

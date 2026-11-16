@@ -183,6 +183,43 @@ reach_quick_settings_hit_test_wifi(const reach_quick_settings_layout *layout,
     return result;
 }
 
+static reach_quick_settings_hit_result
+reach_quick_settings_hit_test_bluetooth(const reach_quick_settings_layout *layout,
+                                        const reach_quick_settings_model *model, float x, float y)
+{
+    reach_quick_settings_hit_result result = {};
+    if (model->bluetooth.available &&
+        reach_quick_settings_point_in_rect(layout->bluetooth_switch, x, y))
+    {
+        result.type = REACH_QUICK_SETTINGS_HIT_BLUETOOTH_SWITCH;
+        return result;
+    }
+    for (size_t button = 0; button < 2; ++button)
+    {
+        if (reach_quick_settings_point_in_rect(layout->bluetooth_action_buttons[button], x, y))
+        {
+            result.type = REACH_QUICK_SETTINGS_HIT_BLUETOOTH_ACTION;
+            result.item_index = button;
+            return result;
+        }
+    }
+    for (size_t index = 0;
+         index < layout->bluetooth_row_count && index < model->bluetooth_row_count; ++index)
+    {
+        if (reach_quick_settings_point_in_rect(layout->bluetooth_rows[index].bounds, x, y))
+        {
+            const reach_bluetooth_device &device = model->bluetooth_rows[index];
+            if (!model->bluetooth_pin_active && (device.paired || device.can_pair))
+            {
+                result.type = REACH_QUICK_SETTINGS_HIT_BLUETOOTH_ROW;
+                result.item_index = index;
+            }
+            return result;
+        }
+    }
+    return result;
+}
+
 reach_quick_settings_hit_result
 reach_quick_settings_hit_test(const reach_quick_settings_layout *layout,
                               const reach_quick_settings_model *model, float x, float y)
@@ -209,6 +246,8 @@ reach_quick_settings_hit_test(const reach_quick_settings_layout *layout,
         return reach_quick_settings_hit_test_sound(layout, model, x, y);
     case REACH_QUICK_SETTINGS_PAGE_WIFI:
         return reach_quick_settings_hit_test_wifi(layout, model, x, y);
+    case REACH_QUICK_SETTINGS_PAGE_BLUETOOTH:
+        return reach_quick_settings_hit_test_bluetooth(layout, model, x, y);
     default:
         return result;
     }
@@ -278,6 +317,15 @@ reach_quick_settings_action reach_quick_settings_action_for_hit(reach_quick_sett
         break;
     case REACH_QUICK_SETTINGS_HIT_WIFI_KEY_CONNECT:
         action.type = REACH_QUICK_SETTINGS_ACTION_SUBMIT_WIFI_KEY;
+        break;
+    case REACH_QUICK_SETTINGS_HIT_BLUETOOTH_SWITCH:
+        action.type = REACH_QUICK_SETTINGS_ACTION_TOGGLE_BLUETOOTH;
+        break;
+    case REACH_QUICK_SETTINGS_HIT_BLUETOOTH_ROW:
+        action.type = REACH_QUICK_SETTINGS_ACTION_SELECT_BLUETOOTH;
+        break;
+    case REACH_QUICK_SETTINGS_HIT_BLUETOOTH_ACTION:
+        action.type = REACH_QUICK_SETTINGS_ACTION_BLUETOOTH_ACTION;
         break;
     case REACH_QUICK_SETTINGS_HIT_NONE:
     default:
@@ -364,6 +412,17 @@ uint64_t reach_quick_settings_pressable_target(reach_quick_settings_hit_result h
         break;
     case REACH_QUICK_SETTINGS_HIT_WIFI_KEY_CONNECT:
         kind = REACH_QUICK_SETTINGS_PRESS_TARGET_WIFI_KEY_CONNECT;
+        break;
+    case REACH_QUICK_SETTINGS_HIT_BLUETOOTH_SWITCH:
+        kind = REACH_QUICK_SETTINGS_PRESS_TARGET_BLUETOOTH_SWITCH;
+        break;
+    case REACH_QUICK_SETTINGS_HIT_BLUETOOTH_ROW:
+        kind = REACH_QUICK_SETTINGS_PRESS_TARGET_BLUETOOTH_ROW;
+        index = hit.item_index;
+        break;
+    case REACH_QUICK_SETTINGS_HIT_BLUETOOTH_ACTION:
+        kind = REACH_QUICK_SETTINGS_PRESS_TARGET_BLUETOOTH_ACTION;
+        index = hit.item_index;
         break;
     default:
         return REACH_PRESSABLE_TARGET_NONE;

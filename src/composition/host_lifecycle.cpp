@@ -132,6 +132,7 @@ static void reach_host_cleanup(reach_host *host)
     reach_idle_watch_stop(host->idle_watch);
     reach_system_status_stop(host->system_status);
     reach_wifi_service_stop(host->wifi_service);
+    reach_bluetooth_service_stop(host->bluetooth_service);
     reach_profile_service_stop(host->profile_service);
     reach_system_stats_stop(host->system_stats);
     reach_host_clear_interfeature_routes(host);
@@ -184,6 +185,8 @@ static void reach_host_cleanup(reach_host *host)
     host->system_status = nullptr;
     reach_wifi_service_destroy(host->wifi_service);
     host->wifi_service = nullptr;
+    reach_bluetooth_service_destroy(host->bluetooth_service);
+    host->bluetooth_service = nullptr;
     reach_system_stats_destroy(host->system_stats);
     host->system_stats = nullptr;
     reach_clock_destroy(host->clock);
@@ -418,6 +421,12 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
     {
         result = REACH_ERROR;
     }
+    host->bluetooth_service = nullptr;
+    if (reach_bluetooth_service_create(dependencies->bluetooth, reach_host_on_system_status_ready,
+                                       host, &host->bluetooth_service) != REACH_OK)
+    {
+        result = REACH_ERROR;
+    }
     host->profile_service = nullptr;
     if (reach_profile_service_create(dependencies->user_account, &host->image_loader,
                                      reach_host_on_system_status_ready, host,
@@ -469,6 +478,7 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
                                                        host->app_control,
                                                        host->system_status,
                                                        host->wifi_service,
+                                                       host->bluetooth_service,
                                                        host->profile_service,
                                                        &host->power_session,
                                                        &host->clipboard,

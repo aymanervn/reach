@@ -79,6 +79,7 @@ static void reach_feature_attach_quick_settings(void *capsule,
         static_cast<reach_quick_settings *>(capsule),
         dependencies != nullptr ? dependencies->system_status : nullptr,
         dependencies != nullptr ? dependencies->wifi : nullptr,
+        dependencies != nullptr ? dependencies->bluetooth : nullptr,
         dependencies != nullptr ? dependencies->profile : nullptr,
         dependencies != nullptr ? dependencies->power_session : nullptr);
 }

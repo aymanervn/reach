@@ -282,6 +282,10 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
     {
         dependencies.wifi = {};
     }
+    if (result == REACH_OK && reach_windows_create_bluetooth(&dependencies.bluetooth) != REACH_OK)
+    {
+        dependencies.bluetooth = {};
+    }
     if (result == REACH_OK &&
         reach_windows_create_user_account(&dependencies.user_account) != REACH_OK)
     {
@@ -310,6 +314,7 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
             dependencies.audio_volume = {};
             dependencies.system_controls = {};
             dependencies.wifi = {};
+            dependencies.bluetooth = {};
             dependencies.user_account = {};
             dependencies.media_controls = {};
             dependencies.quick_settings_window = {};
@@ -495,6 +500,10 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
         if (dependencies.wifi.destroy != nullptr)
         {
             dependencies.wifi.destroy(dependencies.wifi.userdata);
+        }
+        if (dependencies.bluetooth.destroy != nullptr)
+        {
+            dependencies.bluetooth.destroy(dependencies.bluetooth.userdata);
         }
         if (dependencies.user_account.ops.destroy != nullptr)
         {

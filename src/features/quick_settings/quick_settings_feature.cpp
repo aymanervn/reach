@@ -1,6 +1,7 @@
 #include "reach/features/common/ui_controls.h"
 #include "reach/features/quick_settings.h"
 #include "reach/features/common/popup.h"
+#include "reach/features/common/bluetooth_session.h"
 #include "reach/features/common/wifi_session.h"
 
 #include "quick_settings_common.h"
@@ -88,6 +89,14 @@ void reach_quick_settings_model_init(reach_quick_settings_model *model)
     model->wifi_status_ssid[0] = 0;
     model->wifi_key_row = -1;
     reach_text_edit_init(&model->wifi_key, REACH_WIFI_KEY_MAXIMUM_LENGTH);
+    model->bluetooth_row_count = 0;
+    model->bluetooth_paired_count = 0;
+    model->bluetooth_status = REACH_BLUETOOTH_SESSION_STATUS_IDLE;
+    model->bluetooth_status_device[0] = 0;
+    model->bluetooth_action_row = -1;
+    model->bluetooth_pin_active = 0;
+    model->bluetooth_pin[0] = 0;
+    model->bluetooth_scanning = 0;
     model->light_theme = 0;
     model->display_name[0] = 0;
     model->picture_image_id = 0;
@@ -285,6 +294,44 @@ static float reach_quick_settings_wifi_height(const reach_quick_settings_model *
            metrics->overview_row_gap + body;
 }
 
+static int32_t reach_quick_settings_bluetooth_message_shown(const reach_quick_settings_model *model)
+{
+    return !model->bluetooth.available || !model->bluetooth.enabled ||
+           model->bluetooth_row_count == 0;
+}
+
+static float reach_quick_settings_bluetooth_row_offset(const reach_quick_settings_model *model,
+                                                       size_t index,
+                                                       const reach_quick_settings_metrics *metrics)
+{
+    float label = metrics->section_label_height;
+    float row = metrics->output_device_row_height;
+    size_t paired = model->bluetooth_paired_count;
+    float y = paired > 0 ? label : 0.0f;
+    if (index < paired)
+        y += (float)index * row;
+    else
+        y += (float)paired * row + label + (float)(index - paired) * row;
+    if (model->bluetooth_action_row >= 0 && index > (size_t)model->bluetooth_action_row)
+        y += metrics->wifi_key_area_height;
+    return y;
+}
+
+static float reach_quick_settings_bluetooth_height(const reach_quick_settings_model *model,
+                                                   const reach_quick_settings_metrics *metrics)
+{
+    float body = metrics->section_label_height;
+    if (!reach_quick_settings_bluetooth_message_shown(model))
+    {
+        body =
+            reach_quick_settings_bluetooth_row_offset(model, model->bluetooth_row_count, metrics);
+        if (model->bluetooth_row_count == model->bluetooth_paired_count)
+            body -= metrics->section_label_height;
+    }
+    return metrics->content_padding * 2.0f + metrics->wifi_header_height +
+           metrics->overview_row_gap + body;
+}
+
 static float
 reach_quick_settings_content_height_for_spans_scaled(const reach_quick_settings_model *model,
                                                      float output_devices_span,
@@ -299,6 +346,10 @@ reach_quick_settings_content_height_for_spans_scaled(const reach_quick_settings_
     else if (model->page == REACH_QUICK_SETTINGS_PAGE_WIFI)
     {
         page_height = reach_quick_settings_wifi_height(model, &metrics);
+    }
+    else if (model->page == REACH_QUICK_SETTINGS_PAGE_BLUETOOTH)
+    {
+        page_height = reach_quick_settings_bluetooth_height(model, &metrics);
     }
     else
     {
@@ -568,6 +619,94 @@ void reach_quick_settings_wifi_key_rects(reach_rect_f32 row,
                                            metrics->overview_pill_height);
 }
 
+void reach_quick_settings_bluetooth_action_rects(reach_rect_f32 row, int32_t pin,
+                                                 const reach_quick_settings_metrics *metrics,
+                                                 reach_rect_f32 *out_label,
+                                                 reach_rect_f32 out_buttons[2])
+{
+    float top = row.y + row.height + metrics->wifi_key_gap;
+    float width = pin ? metrics->wifi_connect_width * 0.75f : metrics->wifi_connect_width;
+    float right = row.x + row.width;
+    out_buttons[0] =
+        reach_quick_settings_rect(right - width, top, width, metrics->overview_pill_height);
+    out_buttons[1] = {};
+    if (pin)
+    {
+        out_buttons[1] = out_buttons[0];
+        out_buttons[0].x -= width + metrics->toggle_gap;
+    }
+    float label_x = row.x + metrics->overview_pill_icon_inset;
+    *out_label =
+        reach_quick_settings_rect(label_x, top, out_buttons[0].x - metrics->toggle_gap - label_x,
+                                  metrics->overview_pill_height);
+}
+
+static void reach_quick_settings_place_header_switch(reach_rect_f32 page_bounds,
+                                                     const reach_quick_settings_metrics *metrics,
+                                                     reach_rect_f32 *out_title,
+                                                     reach_rect_f32 *out_switch)
+{
+    reach_rect_f32 header =
+        reach_quick_settings_content_line(page_bounds, page_bounds.y + metrics->content_padding,
+                                          metrics->wifi_header_height, metrics);
+    *out_switch = reach_quick_settings_rect(
+        header.x + header.width - metrics->overview_pill_icon_inset - metrics->wifi_switch_width,
+        header.y + (header.height - metrics->wifi_switch_height) * 0.5f, metrics->wifi_switch_width,
+        metrics->wifi_switch_height);
+    *out_title = reach_quick_settings_rect(
+        header.x + metrics->overview_pill_icon_inset, header.y,
+        out_switch->x - header.x - metrics->overview_pill_icon_inset * 2.0f, header.height);
+}
+
+static void reach_quick_settings_place_bluetooth(reach_quick_settings_layout *layout,
+                                                 reach_rect_f32 page_bounds,
+                                                 const reach_quick_settings_model *model,
+                                                 const reach_quick_settings_metrics *metrics,
+                                                 float dpi_scale)
+{
+    reach_quick_settings_place_header_switch(page_bounds, metrics, &layout->bluetooth_title,
+                                             &layout->bluetooth_switch);
+    float base =
+        layout->bluetooth_title.y + layout->bluetooth_title.height + metrics->overview_row_gap;
+    int32_t message = reach_quick_settings_bluetooth_message_shown(model);
+    layout->bluetooth_message =
+        message ? reach_quick_settings_content_line(page_bounds, base,
+                                                    metrics->section_label_height, metrics)
+                : reach_rect_f32{};
+    layout->bluetooth_mine_label =
+        !message && model->bluetooth_paired_count > 0
+            ? reach_quick_settings_content_line(page_bounds, base, metrics->section_label_height,
+                                                metrics)
+            : reach_rect_f32{};
+    size_t paired = model->bluetooth_paired_count;
+    layout->bluetooth_nearby_label =
+        !message && model->bluetooth_row_count > paired
+            ? reach_quick_settings_content_line(
+                  page_bounds,
+                  base + reach_quick_settings_bluetooth_row_offset(model, paired, metrics) -
+                      metrics->section_label_height,
+                  metrics->section_label_height, metrics)
+            : reach_rect_f32{};
+    layout->bluetooth_row_count = message ? 0 : model->bluetooth_row_count;
+    reach_rect_f32 panel = reach_quick_settings_content_line(page_bounds, base, 0.0f, metrics);
+    for (size_t index = 0; index < layout->bluetooth_row_count; ++index)
+    {
+        layout->bluetooth_rows[index] = reach_quick_settings_output_device_row_layout_at(
+            panel, base + reach_quick_settings_bluetooth_row_offset(model, index, metrics),
+            dpi_scale);
+    }
+    layout->bluetooth_action_label = {};
+    layout->bluetooth_action_buttons[0] = {};
+    layout->bluetooth_action_buttons[1] = {};
+    if (model->bluetooth_action_row >= 0 &&
+        (size_t)model->bluetooth_action_row < layout->bluetooth_row_count)
+    {
+        reach_quick_settings_bluetooth_action_rects(
+            layout->bluetooth_rows[model->bluetooth_action_row].bounds, model->bluetooth_pin_active,
+            metrics, &layout->bluetooth_action_label, layout->bluetooth_action_buttons);
+    }
+}
+
 static void reach_quick_settings_place_wifi(reach_quick_settings_layout *layout,
                                             reach_rect_f32 page_bounds,
                                             const reach_quick_settings_model *model,
@@ -643,6 +782,7 @@ reach_quick_settings_layout reach_quick_settings_layout_for_sections_scaled(
     if (model != nullptr)
     {
         reach_quick_settings_place_wifi(&layout, page_bounds, model, &metrics, dpi_scale);
+        reach_quick_settings_place_bluetooth(&layout, page_bounds, model, &metrics, dpi_scale);
     }
     return layout;
 }
@@ -684,6 +824,12 @@ struct reach_quick_settings
     reach_wifi_network wifi_row_items[REACH_QUICK_SETTINGS_WIFI_ROWS];
     uint16_t wifi_key_ssid[REACH_WIFI_SSID_CAPACITY];
     reach_blink wifi_caret;
+    reach_bluetooth_service *bluetooth_service;
+    reach_bluetooth_session bluetooth_session;
+    uint16_t bluetooth_selected_id[REACH_BLUETOOTH_DEVICE_ID_CAPACITY];
+    reach_motion bluetooth_switch;
+    reach_keyed_row bluetooth_row_motions[REACH_QUICK_SETTINGS_BLUETOOTH_ROWS];
+    reach_bluetooth_device bluetooth_row_items[REACH_QUICK_SETTINGS_BLUETOOTH_ROWS];
     reach_keyed_row output_device_rows[REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES];
     reach_quick_settings_output_device_row
         output_device_items[REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES];
@@ -1003,6 +1149,116 @@ static void reach_quick_settings_sync_wifi_rows(reach_quick_settings *quick_sett
         quick_settings->section_cleanup_pending = 1;
 }
 
+static int32_t reach_quick_settings_bluetooth_row_same(const void *context, size_t slot,
+                                                       size_t item_index)
+{
+    const reach_quick_settings *quick_settings = static_cast<const reach_quick_settings *>(context);
+    return reach_bluetooth_device_id_equal(
+        quick_settings->bluetooth_row_items[slot].id,
+        quick_settings->state.model.bluetooth_rows[item_index].id);
+}
+
+static void reach_quick_settings_sync_bluetooth_rows(reach_quick_settings *quick_settings,
+                                                     int32_t animate)
+{
+    reach_quick_settings_model &model = quick_settings->state.model;
+    reach_quick_settings_metrics metrics =
+        reach_quick_settings_metrics_for_scale(quick_settings->layout_dpi);
+    size_t count =
+        reach_quick_settings_bluetooth_message_shown(&model) ? 0 : model.bluetooth_row_count;
+    float targets[REACH_QUICK_SETTINGS_BLUETOOTH_ROWS] = {};
+    for (size_t index = 0; index < count; ++index)
+        targets[index] = reach_quick_settings_bluetooth_row_offset(&model, index, &metrics);
+    reach_keyed_rows_sync_input input = {};
+    input.count = count;
+    input.targets = targets;
+    input.same = reach_quick_settings_bluetooth_row_same;
+    input.context = quick_settings;
+    input.animate = animate;
+    input.theme = reach_quick_settings_motion_theme(quick_settings);
+    input.now_seconds = reach_motion_now_seconds();
+    reach_keyed_row_change
+        changes[REACH_KEYED_ROWS_MAX_CHANGES(REACH_QUICK_SETTINGS_BLUETOOTH_ROWS)];
+    (void)reach_keyed_rows_sync(quick_settings->bluetooth_row_motions,
+                                REACH_QUICK_SETTINGS_BLUETOOTH_ROWS, &input, changes,
+                                REACH_KEYED_ROWS_MAX_CHANGES(REACH_QUICK_SETTINGS_BLUETOOTH_ROWS));
+    for (size_t slot = 0; slot < REACH_QUICK_SETTINGS_BLUETOOTH_ROWS; ++slot)
+    {
+        const reach_keyed_row &row = quick_settings->bluetooth_row_motions[slot];
+        if (row.lifecycle == REACH_KEYED_ROW_LIVE && row.index < count)
+            quick_settings->bluetooth_row_items[slot] = model.bluetooth_rows[row.index];
+    }
+    if (reach_keyed_rows_active(quick_settings->bluetooth_row_motions,
+                                REACH_QUICK_SETTINGS_BLUETOOTH_ROWS))
+        quick_settings->section_cleanup_pending = 1;
+}
+
+static void reach_quick_settings_build_bluetooth_rows(reach_quick_settings *quick_settings)
+{
+    reach_quick_settings_model &model = quick_settings->state.model;
+    const reach_bluetooth_session &session = quick_settings->bluetooth_session;
+    model.bluetooth_row_count = 0;
+    for (int32_t pass = 0; pass < 3; ++pass)
+    {
+        for (size_t index = 0; index < session.devices.count &&
+                               model.bluetooth_row_count < REACH_QUICK_SETTINGS_BLUETOOTH_ROWS;
+             ++index)
+        {
+            const reach_bluetooth_device &device = session.devices.devices[index];
+            int32_t wanted = pass == 0   ? device.paired && device.connected
+                             : pass == 1 ? device.paired && !device.connected
+                                         : !device.paired && device.can_pair && device.name[0] != 0;
+            if (wanted)
+                model.bluetooth_rows[model.bluetooth_row_count++] = device;
+        }
+        if (pass == 1)
+            model.bluetooth_paired_count = model.bluetooth_row_count;
+    }
+    model.bluetooth_status = session.status;
+    reach_copy_utf16(model.bluetooth_status_device, REACH_BLUETOOTH_DEVICE_ID_CAPACITY,
+                     session.status_device);
+    model.bluetooth_scanning = session.scanning;
+    model.bluetooth_pin_active = 0;
+    model.bluetooth_pin[0] = 0;
+    model.bluetooth_action_row = -1;
+    for (size_t index = 0; index < model.bluetooth_row_count; ++index)
+    {
+        const reach_bluetooth_device &device = model.bluetooth_rows[index];
+        if (session.pairing.active &&
+            reach_bluetooth_device_id_equal(device.id, session.pairing.device_id))
+        {
+            model.bluetooth_action_row = (int32_t)index;
+            model.bluetooth_pin_active = 1;
+            reach_copy_utf16(model.bluetooth_pin, REACH_BLUETOOTH_PIN_CAPACITY,
+                             session.pairing.pin);
+            break;
+        }
+        if (device.paired && quick_settings->bluetooth_selected_id[0] != 0 &&
+            reach_bluetooth_device_id_equal(device.id, quick_settings->bluetooth_selected_id))
+            model.bluetooth_action_row = (int32_t)index;
+    }
+    if (model.bluetooth_action_row < 0)
+        quick_settings->bluetooth_selected_id[0] = 0;
+    reach_quick_settings_sync_bluetooth_rows(quick_settings,
+                                             reach_quick_settings_rows_animate(quick_settings));
+}
+
+static void reach_quick_settings_set_bluetooth_scan(reach_quick_settings *quick_settings,
+                                                    int32_t enabled)
+{
+    if (quick_settings->bluetooth_service == nullptr)
+        return;
+    reach_bluetooth_session &session = quick_settings->bluetooth_session;
+    if (enabled && (!session.radio.available || !session.radio.enabled))
+        return;
+    if ((session.scanning ? 1 : 0) == (enabled ? 1 : 0) &&
+        (enabled || session.status != REACH_BLUETOOTH_SESSION_STATUS_SCANNING))
+        return;
+    reach_bluetooth_service_set_scan_enabled(quick_settings->bluetooth_service, enabled);
+    session.scanning = enabled ? 1 : 0;
+    quick_settings->state.model.bluetooth_scanning = session.scanning;
+}
+
 static void reach_quick_settings_build_wifi_rows(reach_quick_settings *quick_settings)
 {
     reach_quick_settings_model &model = quick_settings->state.model;
@@ -1055,7 +1311,9 @@ static void reach_quick_settings_build_wifi_rows(reach_quick_settings *quick_set
 static int32_t reach_quick_settings_sections_active(const reach_quick_settings *quick_settings)
 {
     const reach_quick_settings_state &state = quick_settings->state;
-    return reach_keyed_rows_active(quick_settings->wifi_row_motions,
+    return reach_keyed_rows_active(quick_settings->bluetooth_row_motions,
+                                   REACH_QUICK_SETTINGS_BLUETOOTH_ROWS) ||
+           reach_keyed_rows_active(quick_settings->wifi_row_motions,
                                    REACH_QUICK_SETTINGS_WIFI_ROWS) ||
            reach_motion_active(&state.output_devices_span) ||
            reach_motion_active(&state.app_volumes_span) ||
@@ -1086,6 +1344,16 @@ static void reach_quick_settings_sync_tile_states(reach_quick_settings *quick_se
         model.bluetooth_pending ? model.bluetooth_pending_enabled : model.bluetooth.enabled;
     int32_t active[REACH_QUICK_SETTINGS_TOGGLE_COUNT] = {};
     active[REACH_QUICK_SETTINGS_TOGGLE_WIFI] = model.wifi_radio == REACH_WIFI_RADIO_ON ? 1 : 0;
+    float bluetooth_switch = active[REACH_QUICK_SETTINGS_TOGGLE_BLUETOOTH] ? 1.0f : 0.0f;
+    if (!animate)
+        reach_motion_set(&quick_settings->bluetooth_switch, bluetooth_switch);
+    else if (quick_settings->bluetooth_switch.generation == 0 ||
+             quick_settings->bluetooth_switch.to != bluetooth_switch)
+        reach_motion_animate_spec_to_at(
+            &quick_settings->bluetooth_switch, bluetooth_switch,
+            reach_theme_motion_preset(reach_quick_settings_motion_theme(quick_settings),
+                                      REACH_MOTION_PRESET_BOUNCY),
+            reach_motion_now_seconds());
     float wifi_switch = active[REACH_QUICK_SETTINGS_TOGGLE_WIFI] ? 1.0f : 0.0f;
     if (!animate)
         reach_motion_set(&quick_settings->wifi_switch, wifi_switch);
@@ -1154,6 +1422,8 @@ int32_t reach_quick_settings_select_page(reach_quick_settings *quick_settings,
     if (!reach_quick_settings_tiles_animate(quick_settings))
     {
         reach_quick_settings_snap_pages(quick_settings);
+        reach_quick_settings_set_bluetooth_scan(quick_settings,
+                                                page == REACH_QUICK_SETTINGS_PAGE_BLUETOOTH);
         return 1;
     }
     const reach_theme *theme = reach_quick_settings_motion_theme(quick_settings);
@@ -1176,6 +1446,8 @@ int32_t reach_quick_settings_select_page(reach_quick_settings *quick_settings,
     {
         reach_quick_settings_scan_wifi(quick_settings);
     }
+    reach_quick_settings_set_bluetooth_scan(quick_settings,
+                                            page == REACH_QUICK_SETTINGS_PAGE_BLUETOOTH);
     return 1;
 }
 
@@ -1266,6 +1538,21 @@ void reach_quick_settings_wifi_motions(const reach_quick_settings *quick_setting
     *out_caret = quick_settings->wifi_caret;
 }
 
+void reach_quick_settings_bluetooth_motions(
+    const reach_quick_settings *quick_settings,
+    reach_keyed_row out_rows[REACH_QUICK_SETTINGS_BLUETOOTH_ROWS],
+    reach_bluetooth_device out_items[REACH_QUICK_SETTINGS_BLUETOOTH_ROWS], reach_motion *out_switch)
+{
+    if (quick_settings == nullptr)
+        return;
+    for (size_t slot = 0; slot < REACH_QUICK_SETTINGS_BLUETOOTH_ROWS; ++slot)
+    {
+        out_rows[slot] = quick_settings->bluetooth_row_motions[slot];
+        out_items[slot] = quick_settings->bluetooth_row_items[slot];
+    }
+    *out_switch = quick_settings->bluetooth_switch;
+}
+
 const reach_ui_event_type *reach_quick_settings_routed_events(size_t *out_count)
 {
     static const reach_ui_event_type events[] = {REACH_UI_EVENT_ESCAPE, REACH_UI_EVENT_ENTER,
@@ -1350,6 +1637,9 @@ int32_t reach_quick_settings_set_open(reach_quick_settings *quick_settings, int3
     reach_wifi_session_clear_secrets(&quick_settings->wifi_session);
     state->model.wifi_key = quick_settings->wifi_session.key_edit;
     reach_blink_stop(&quick_settings->wifi_caret);
+    quick_settings->bluetooth_selected_id[0] = 0;
+    if (!next_open)
+        reach_quick_settings_set_bluetooth_scan(quick_settings, 0);
     state->drag.active = 0;
     state->drag.type = REACH_QUICK_SETTINGS_HIT_NONE;
     state->drag.level_valid = 0;
@@ -1363,6 +1653,7 @@ int32_t reach_quick_settings_set_open(reach_quick_settings *quick_settings, int3
         reach_quick_settings_refresh_system(quick_settings, 0);
         reach_quick_settings_refresh_audio(quick_settings);
         reach_wifi_service_refresh(quick_settings->wifi);
+        reach_bluetooth_service_refresh(quick_settings->bluetooth_service);
         (void)reach_quick_settings_refresh_uptime(quick_settings);
         reach_motion_set(&quick_settings->height, 0);
         quick_settings->layout_initialized = 0;
@@ -1522,6 +1813,16 @@ static void reach_quick_settings_capsule_tick(void *capsule, double delta_second
         changes.redraw = 1;
     }
     reach_keyed_row_change
+        bluetooth_changes[REACH_KEYED_ROWS_MAX_CHANGES(REACH_QUICK_SETTINGS_BLUETOOTH_ROWS)];
+    if (quick_settings != nullptr &&
+        reach_keyed_rows_release_settled(
+            quick_settings->bluetooth_row_motions, REACH_QUICK_SETTINGS_BLUETOOTH_ROWS,
+            bluetooth_changes,
+            REACH_KEYED_ROWS_MAX_CHANGES(REACH_QUICK_SETTINGS_BLUETOOTH_ROWS)) > 0)
+    {
+        changes.redraw = 1;
+    }
+    reach_keyed_row_change
         wifi_changes[REACH_KEYED_ROWS_MAX_CHANGES(REACH_QUICK_SETTINGS_WIFI_ROWS)];
     if (quick_settings != nullptr &&
         reach_keyed_rows_release_settled(
@@ -1629,8 +1930,10 @@ static void reach_quick_settings_capsule_surface_geometry(const void *capsule,
             out->deadline_seconds = fmax(out->deadline_seconds, reach_motion_deadline(motion));
         out->deadline_seconds =
             fmax(out->deadline_seconds,
-                 fmax(fmax(reach_keyed_rows_deadline(quick_settings->wifi_row_motions,
-                                                     REACH_QUICK_SETTINGS_WIFI_ROWS),
+                 fmax(fmax(fmax(reach_keyed_rows_deadline(quick_settings->wifi_row_motions,
+                                                          REACH_QUICK_SETTINGS_WIFI_ROWS),
+                                reach_keyed_rows_deadline(quick_settings->bluetooth_row_motions,
+                                                          REACH_QUICK_SETTINGS_BLUETOOTH_ROWS)),
                            reach_keyed_rows_deadline(quick_settings->output_device_rows,
                                                      REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES)),
                       reach_keyed_rows_deadline(quick_settings->app_volume_rows,
@@ -1722,6 +2025,67 @@ static void reach_quick_settings_toggle_bluetooth(reach_quick_settings *quick_se
         reach_quick_settings_set_bluetooth_pending(quick_settings, 0, 0);
         break;
     }
+}
+
+static int32_t reach_quick_settings_select_bluetooth(reach_quick_settings *quick_settings,
+                                                     size_t row)
+{
+    reach_quick_settings_model &model = quick_settings->state.model;
+    reach_bluetooth_session &session = quick_settings->bluetooth_session;
+    if (row >= model.bluetooth_row_count || session.pairing.active)
+    {
+        return 0;
+    }
+    const reach_bluetooth_device &device = model.bluetooth_rows[row];
+    if (device.paired)
+    {
+        if (reach_bluetooth_device_id_equal(quick_settings->bluetooth_selected_id, device.id))
+            quick_settings->bluetooth_selected_id[0] = 0;
+        else
+            reach_copy_utf16(quick_settings->bluetooth_selected_id,
+                             REACH_BLUETOOTH_DEVICE_ID_CAPACITY, device.id);
+    }
+    else if (quick_settings->bluetooth_service != nullptr &&
+             session.status != REACH_BLUETOOTH_SESSION_STATUS_PAIRING)
+    {
+        quick_settings->bluetooth_selected_id[0] = 0;
+        reach_bluetooth_session_set_status(&session, REACH_BLUETOOTH_SESSION_STATUS_PAIRING,
+                                           device.id);
+        reach_bluetooth_service_pair(quick_settings->bluetooth_service, device.id);
+    }
+    reach_quick_settings_build_bluetooth_rows(quick_settings);
+    quick_settings->relayout_animate_pending = 1;
+    return 1;
+}
+
+static int32_t reach_quick_settings_bluetooth_action(reach_quick_settings *quick_settings,
+                                                     size_t button)
+{
+    reach_quick_settings_model &model = quick_settings->state.model;
+    reach_bluetooth_session &session = quick_settings->bluetooth_session;
+    if (quick_settings->bluetooth_service == nullptr || model.bluetooth_action_row < 0)
+    {
+        return 0;
+    }
+    const reach_bluetooth_device &device = model.bluetooth_rows[model.bluetooth_action_row];
+    if (model.bluetooth_pin_active)
+    {
+        int32_t accept = button == 0;
+        reach_bluetooth_session_set_status(&session,
+                                           accept ? REACH_BLUETOOTH_SESSION_STATUS_PAIRING
+                                                  : REACH_BLUETOOTH_SESSION_STATUS_IDLE,
+                                           device.id);
+        reach_bluetooth_service_respond_pairing(quick_settings->bluetooth_service, accept);
+        session.pairing.active = 0;
+    }
+    else if (button == 0)
+    {
+        reach_bluetooth_service_unpair(quick_settings->bluetooth_service, device.id);
+        quick_settings->bluetooth_selected_id[0] = 0;
+    }
+    reach_quick_settings_build_bluetooth_rows(quick_settings);
+    quick_settings->relayout_animate_pending = 1;
+    return 1;
 }
 
 static void reach_quick_settings_mirror_wifi_key(reach_quick_settings *quick_settings)
@@ -1917,6 +2281,16 @@ static void reach_quick_settings_capsule_perform_action(reach_quick_settings *qu
         out->redraw = 1;
         break;
     }
+
+    case REACH_QUICK_SETTINGS_ACTION_SELECT_BLUETOOTH:
+        out->relayout |= reach_quick_settings_select_bluetooth(quick_settings, action->item_index);
+        out->redraw = 1;
+        break;
+
+    case REACH_QUICK_SETTINGS_ACTION_BLUETOOTH_ACTION:
+        out->relayout |= reach_quick_settings_bluetooth_action(quick_settings, action->item_index);
+        out->redraw = 1;
+        break;
 
     case REACH_QUICK_SETTINGS_ACTION_FOCUS_WIFI_KEY:
         reach_quick_settings_mirror_wifi_key(quick_settings);
@@ -2181,6 +2555,7 @@ reach_result reach_quick_settings_create(reach_quick_settings **out_quick_settin
     reach_pressable_init(&quick_settings->pressable);
     reach_quick_settings_model_init(&quick_settings->state.model);
     reach_wifi_session_init(&quick_settings->wifi_session);
+    reach_bluetooth_session_init(&quick_settings->bluetooth_session);
     reach_quick_settings_snap_pages(quick_settings);
     *out_quick_settings = quick_settings;
     return REACH_OK;
@@ -2193,6 +2568,7 @@ void reach_quick_settings_destroy(reach_quick_settings *quick_settings)
 
 void reach_quick_settings_attach_services(reach_quick_settings *quick_settings,
                                           reach_system_status *status, reach_wifi_service *wifi,
+                                          reach_bluetooth_service *bluetooth,
                                           reach_profile_service *profile,
                                           const reach_power_session_port *power_session)
 {
@@ -2200,6 +2576,7 @@ void reach_quick_settings_attach_services(reach_quick_settings *quick_settings,
     {
         quick_settings->status = status;
         quick_settings->wifi = wifi;
+        quick_settings->bluetooth_service = bluetooth;
         quick_settings->profile = profile;
         quick_settings->power_session = power_session;
     }
@@ -2372,6 +2749,30 @@ size_t reach_quick_settings_take_retired_render_icons(reach_quick_settings *quic
     return count;
 }
 
+int32_t reach_quick_settings_apply_bluetooth_snapshot(reach_quick_settings *quick_settings,
+                                                      const reach_bluetooth_snapshot *snapshot)
+{
+    if (quick_settings == nullptr || snapshot == nullptr)
+    {
+        return 0;
+    }
+    reach_quick_settings_model &model = quick_settings->state.model;
+    size_t previous_rows = model.bluetooth_row_count;
+    int32_t previous_action = model.bluetooth_action_row;
+    int32_t previous_pin = model.bluetooth_pin_active;
+    reach_bluetooth_session_apply_snapshot(&quick_settings->bluetooth_session, snapshot);
+    reach_quick_settings_build_bluetooth_rows(quick_settings);
+    if (quick_settings->state.open && model.page == REACH_QUICK_SETTINGS_PAGE_BLUETOOTH &&
+        (previous_rows != model.bluetooth_row_count ||
+         previous_action != model.bluetooth_action_row ||
+         previous_pin != model.bluetooth_pin_active))
+    {
+        quick_settings->relayout_animate_pending = 1;
+        return 1;
+    }
+    return 0;
+}
+
 int32_t reach_quick_settings_apply_wifi_snapshot(reach_quick_settings *quick_settings,
                                                  const reach_wifi_snapshot *snapshot)
 {
@@ -2437,6 +2838,16 @@ void reach_quick_settings_process_changes(reach_quick_settings *quick_settings,
                          profile.display_name);
         state->model.picture_image_id = profile.picture_image_id;
         state->model.wallpaper_image_id = profile.wallpaper_image_id;
+        out->redraw = 1;
+        out->request_update = 1;
+    }
+
+    reach_bluetooth_snapshot bluetooth_snapshot = {};
+    if (quick_settings->bluetooth_service != nullptr &&
+        reach_bluetooth_service_take(quick_settings->bluetooth_service, &bluetooth_snapshot))
+    {
+        out->relayout |=
+            reach_quick_settings_apply_bluetooth_snapshot(quick_settings, &bluetooth_snapshot);
         out->redraw = 1;
         out->request_update = 1;
     }
@@ -2932,7 +3343,16 @@ void reach_quick_settings_apply_system_states(reach_quick_settings *quick_settin
 
     reach_quick_settings_sync_tile_states(quick_settings,
                                           reach_quick_settings_tiles_animate(quick_settings));
-    int32_t layout_changed = previous_brightness.available != state->model.brightness.available;
+    reach_bluetooth_state previous_radio = quick_settings->bluetooth_session.radio;
+    reach_bluetooth_session_set_radio(&quick_settings->bluetooth_session, state->model.bluetooth);
+    reach_quick_settings_build_bluetooth_rows(quick_settings);
+    int32_t radio_changed = previous_radio.available != state->model.bluetooth.available ||
+                            previous_radio.enabled != state->model.bluetooth.enabled;
+    if (radio_changed && state->model.page == REACH_QUICK_SETTINGS_PAGE_BLUETOOTH)
+        reach_quick_settings_set_bluetooth_scan(quick_settings, state->open);
+    int32_t layout_changed =
+        previous_brightness.available != state->model.brightness.available ||
+        (radio_changed && state->model.page == REACH_QUICK_SETTINGS_PAGE_BLUETOOTH);
 
     out->relayout = layout_changed && state->open;
 }

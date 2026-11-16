@@ -6,6 +6,7 @@
 #include "reach/features/common/ui_controls.h"
 
 #include "reach/features/common/level_presentation.h"
+#include "reach/features/common/bluetooth_session.h"
 #include "reach/features/common/wifi_session.h"
 #include "quick_settings_metrics.h"
 
@@ -581,7 +582,7 @@ static reach_result reach_quick_settings_push_rail(const reach_quick_settings_re
 
     static const uint32_t icons[REACH_QUICK_SETTINGS_PAGE_COUNT] = {
         REACH_VECTOR_ICON_QUICK_SETTINGS, REACH_VECTOR_ICON_VOLUME_HIGH,
-        REACH_VECTOR_ICON_WIFI_HIGH};
+        REACH_VECTOR_ICON_WIFI_HIGH, REACH_VECTOR_ICON_BLUETOOTH_ON};
     reach_quick_settings_metrics metrics = reach_quick_settings_metrics_for_scale(input->dpi_scale);
     reach_render_group glyphs = {};
     glyphs.id = 32;
@@ -634,6 +635,7 @@ enum reach_quick_settings_feedback_slot
     REACH_QUICK_SETTINGS_FEEDBACK_APPS,
     REACH_QUICK_SETTINGS_FEEDBACK_INPUT,
     REACH_QUICK_SETTINGS_FEEDBACK_WIFI,
+    REACH_QUICK_SETTINGS_FEEDBACK_BLUETOOTH,
     REACH_QUICK_SETTINGS_FEEDBACK_TRAILING
 };
 
@@ -1109,6 +1111,188 @@ static reach_result reach_quick_settings_push_wifi(const reach_quick_settings_re
     return result;
 }
 
+static void reach_quick_settings_push_bluetooth_row(
+    reach_render_command_buffer *commands, const reach_bluetooth_device *device,
+    const reach_quick_settings_output_device_row_layout *row,
+    const reach_quick_settings_model *model, const reach_theme *theme,
+    const reach_quick_settings_metrics *metrics, const reach_text_measure_port *text_measure)
+{
+    if (device->connected)
+    {
+        reach_quick_settings_push_rounded_rect(commands, row->bounds, row->bounds.height * 0.5f,
+                                               theme->accent);
+    }
+    reach_quick_settings_push_pill_icon(
+        commands, row->icon, reach_bluetooth_session_device_icon(device->kind), 0, theme);
+    reach_quick_settings_push_fitted_text(commands, row->title, device->name,
+                                          metrics->output_row_title_text_size,
+                                          REACH_TEXT_WEIGHT_SEMIBOLD, REACH_TEXT_ALIGNMENT_LEADING,
+                                          theme->primary_text, text_measure);
+    static const uint16_t tap_to_pair[] = {'T', 'a', 'p', ' ', 't', 'o',
+                                           ' ', 'p', 'a', 'i', 'r', 0};
+    static const uint16_t not_connected[] = {'N', 'o', 't', ' ', 'c', 'o', 'n',
+                                             'n', 'e', 'c', 't', 'e', 'd', 0};
+    const uint16_t *detail = device->connected ? reach_bluetooth_session_device_detail(device)
+                             : device->paired  ? not_connected
+                                               : tap_to_pair;
+    if (model->bluetooth_status != REACH_BLUETOOTH_SESSION_STATUS_IDLE &&
+        model->bluetooth_status != REACH_BLUETOOTH_SESSION_STATUS_SCANNING &&
+        reach_bluetooth_device_id_equal(model->bluetooth_status_device, device->id))
+    {
+        detail = reach_bluetooth_session_status_message(
+            (reach_bluetooth_session_status)model->bluetooth_status);
+    }
+    reach_quick_settings_push_fitted_text(commands, row->detail, detail,
+                                          metrics->output_row_detail_text_size,
+                                          REACH_TEXT_WEIGHT_NORMAL, REACH_TEXT_ALIGNMENT_LEADING,
+                                          theme->quick_settings_secondary_text, text_measure);
+}
+
+static void reach_quick_settings_push_bluetooth_action(
+    const reach_quick_settings_render_input *input, reach_render_command_buffer *commands,
+    reach_rect_f32 row, const reach_quick_settings_metrics *metrics)
+{
+    const reach_theme &theme = input->theme;
+    int32_t pin = input->model.bluetooth_pin_active;
+    reach_rect_f32 label = {};
+    reach_rect_f32 buttons[2] = {};
+    reach_quick_settings_bluetooth_action_rects(row, pin, metrics, &label, buttons);
+    static const uint16_t remove_label[] = {'R', 'e', 'm', 'o', 'v', 'e', 0};
+    static const uint16_t remove_prompt[] = {'F', 'o', 'r', 'g', 'e', 't', ' ', 't', 'h', 'i',
+                                             's', ' ', 'd', 'e', 'v', 'i', 'c', 'e', '?', 0};
+    static const uint16_t yes[] = {'Y', 'e', 's', 0};
+    static const uint16_t no[] = {'N', 'o', 0};
+    uint16_t prompt[64] = {};
+    if (pin)
+    {
+        static const uint16_t pin_prefix[] = {'P', 'I', 'N', ' ', 0};
+        reach_copy_utf16(prompt, 64, pin_prefix);
+        size_t length = 4;
+        for (size_t at = 0; input->model.bluetooth_pin[at] != 0 && length + 1 < 64; ++at)
+            prompt[length++] = input->model.bluetooth_pin[at];
+        prompt[length] = 0;
+    }
+    else
+    {
+        reach_copy_utf16(prompt, 64, remove_prompt);
+    }
+    reach_quick_settings_push_fitted_text(
+        commands, label, prompt, metrics->pill_label_text_size,
+        pin ? REACH_TEXT_WEIGHT_SEMIBOLD : REACH_TEXT_WEIGHT_NORMAL, REACH_TEXT_ALIGNMENT_LEADING,
+        theme.primary_text, &input->text_measure);
+    const uint16_t *labels[2] = {pin ? yes : remove_label, no};
+    for (size_t index = 0; index < 2; ++index)
+    {
+        if (buttons[index].width <= 0.0f)
+            continue;
+        int32_t primary = index == 0 && pin;
+        reach_quick_settings_push_rounded_rect(
+            commands, buttons[index], buttons[index].height * 0.5f,
+            primary ? theme.accent : theme.quick_settings_button_background);
+        reach_quick_settings_push_text(commands, buttons[index], labels[index],
+                                       metrics->pill_label_text_size, REACH_TEXT_WEIGHT_SEMIBOLD,
+                                       REACH_TEXT_ALIGNMENT_CENTER, theme.primary_text);
+    }
+}
+
+static reach_result
+reach_quick_settings_push_bluetooth(const reach_quick_settings_render_input *input,
+                                    reach_render_command_buffer *commands,
+                                    const reach_quick_settings_metrics *metrics)
+{
+    const reach_quick_settings_layout &layout = input->layout;
+    const reach_theme &theme = input->theme;
+    const reach_quick_settings_model &model = input->model;
+    reach_result result =
+        reach_quick_settings_begin_page(input, commands, REACH_QUICK_SETTINGS_PAGE_BLUETOOTH, 23);
+    if (result == REACH_OK)
+    {
+        static const uint16_t title[] = {'B', 'l', 'u', 'e', 't', 'o', 'o', 't', 'h', 0};
+        reach_quick_settings_push_text(commands, layout.bluetooth_title, title,
+                                       metrics->wifi_title_text_size, REACH_TEXT_WEIGHT_SEMIBOLD,
+                                       REACH_TEXT_ALIGNMENT_LEADING, theme.primary_text);
+        static const uint16_t off[] = {'B', 'l', 'u', 'e', 't', 'o', 'o', 't', 'h',
+                                       ' ', 'i', 's', ' ', 'o', 'f', 'f', 0};
+        static const uint16_t unavailable[] = {'N', 'o', ' ', 'B', 'l', 'u', 'e',
+                                               't', 'o', 'o', 't', 'h', ' ', 'a',
+                                               'd', 'a', 'p', 't', 'e', 'r', 0};
+        static const uint16_t looking[] = {'L', 'o', 'o', 'k', 'i', 'n', 'g', ' ', 'f',    'o', 'r',
+                                           ' ', 'd', 'e', 'v', 'i', 'c', 'e', 's', 0x2026, 0};
+        static const uint16_t none[] = {'N', 'o', ' ', 'd', 'e', 'v', 'i', 'c', 'e', 's', 0};
+        static const uint16_t mine[] = {'M', 'y', ' ', 'd', 'e', 'v', 'i', 'c', 'e', 's', 0};
+        static const uint16_t nearby[] = {'N', 'e', 'a', 'r', 'b', 'y', 0};
+        if (layout.bluetooth_message.height > 0.0f)
+        {
+            const uint16_t *message = !model.bluetooth.available ? unavailable
+                                      : !model.bluetooth.enabled ? off
+                                      : model.bluetooth_scanning ? looking
+                                                                 : none;
+            reach_quick_settings_push_section_label(commands, layout.bluetooth_message, message,
+                                                    &theme, metrics);
+        }
+        if (layout.bluetooth_mine_label.height > 0.0f)
+            reach_quick_settings_push_section_label(commands, layout.bluetooth_mine_label, mine,
+                                                    &theme, metrics);
+        if (layout.bluetooth_nearby_label.height > 0.0f)
+            reach_quick_settings_push_section_label(commands, layout.bluetooth_nearby_label,
+                                                    model.bluetooth_scanning ? looking : nearby,
+                                                    &theme, metrics);
+        if (model.bluetooth.available)
+        {
+            reach_ui_toggle_style style = {};
+            style.track_off = theme.toggle_track_off;
+            style.track_on = theme.accent;
+            style.knob = theme.toggle_knob;
+            result = reach_ui_toggle_motion_render(commands, layout.bluetooth_switch, &style, 704,
+                                                   &input->bluetooth_switch);
+        }
+    }
+    reach_render_command_buffer_end_group(commands);
+    if (result != REACH_OK)
+        return result;
+
+    float base =
+        layout.bluetooth_title.y + layout.bluetooth_title.height + metrics->overview_row_gap;
+    reach_rect_f32 panel = layout.page_bounds;
+    panel.x += metrics->content_padding;
+    panel.width -= metrics->content_padding * 2.0f;
+    for (size_t slot = 0; result == REACH_OK && slot < REACH_QUICK_SETTINGS_BLUETOOTH_ROWS; ++slot)
+    {
+        const reach_keyed_row &row = input->bluetooth_row_motions[slot];
+        if (row.lifecycle == REACH_KEYED_ROW_EMPTY)
+            continue;
+        reach_quick_settings_output_device_row_layout row_layout =
+            reach_quick_settings_output_device_row_layout_at(panel, base + row.y.to,
+                                                             input->dpi_scale);
+        int32_t expanded = model.bluetooth_action_row >= 0 &&
+                           row.lifecycle == REACH_KEYED_ROW_LIVE &&
+                           row.index == (size_t)model.bluetooth_action_row;
+        reach_render_group group = {};
+        group.id = 740 + slot;
+        group.parent_id = 23;
+        group.bounds = row_layout.bounds;
+        if (expanded)
+            group.bounds.height += metrics->wifi_key_area_height;
+        group.opacity = row.opacity;
+        group.y = reach_motion_affine(&row.y, 1, -row.y.to);
+        result = reach_render_command_buffer_begin_group(commands, &group);
+        if (result == REACH_OK)
+        {
+            reach_quick_settings_push_bluetooth_row(commands, &input->bluetooth_row_items[slot],
+                                                    &row_layout, &model, &theme, metrics,
+                                                    &input->text_measure);
+            if (expanded)
+                reach_quick_settings_push_bluetooth_action(input, commands, row_layout.bounds,
+                                                           metrics);
+        }
+        reach_render_command_buffer_end_group(commands);
+    }
+    if (result == REACH_OK)
+        result = reach_quick_settings_push_press_feedback(input, commands,
+                                                          REACH_QUICK_SETTINGS_FEEDBACK_BLUETOOTH);
+    return result;
+}
+
 static int32_t reach_quick_settings_feedback_slot(uint64_t target)
 {
     size_t index = reach_quick_settings_pressable_target_index(target);
@@ -1126,6 +1310,10 @@ static int32_t reach_quick_settings_feedback_slot(uint64_t target)
     case REACH_QUICK_SETTINGS_PRESS_TARGET_WIFI_KEY_FIELD:
     case REACH_QUICK_SETTINGS_PRESS_TARGET_WIFI_KEY_CONNECT:
         return REACH_QUICK_SETTINGS_FEEDBACK_WIFI;
+    case REACH_QUICK_SETTINGS_PRESS_TARGET_BLUETOOTH_SWITCH:
+    case REACH_QUICK_SETTINGS_PRESS_TARGET_BLUETOOTH_ROW:
+    case REACH_QUICK_SETTINGS_PRESS_TARGET_BLUETOOTH_ACTION:
+        return REACH_QUICK_SETTINGS_FEEDBACK_BLUETOOTH;
     case REACH_QUICK_SETTINGS_PRESS_TARGET_MUTE:
         return index == REACH_QUICK_SETTINGS_MUTE_OVERVIEW ? REACH_QUICK_SETTINGS_FEEDBACK_OVERVIEW
                : index == REACH_QUICK_SETTINGS_MUTE_SOUND  ? REACH_QUICK_SETTINGS_FEEDBACK_SOUND_TOP
@@ -1165,6 +1353,13 @@ reach_quick_settings_press_feedback_bounds(const reach_quick_settings_render_inp
         return index < layout.wifi_row_count ? layout.wifi_rows[index].bounds : reach_rect_f32{};
     case REACH_QUICK_SETTINGS_PRESS_TARGET_WIFI_KEY_FIELD:
         return layout.wifi_key_field;
+    case REACH_QUICK_SETTINGS_PRESS_TARGET_BLUETOOTH_SWITCH:
+        return layout.bluetooth_switch;
+    case REACH_QUICK_SETTINGS_PRESS_TARGET_BLUETOOTH_ROW:
+        return index < layout.bluetooth_row_count ? layout.bluetooth_rows[index].bounds
+                                                  : reach_rect_f32{};
+    case REACH_QUICK_SETTINGS_PRESS_TARGET_BLUETOOTH_ACTION:
+        return index < 2 ? layout.bluetooth_action_buttons[index] : reach_rect_f32{};
     case REACH_QUICK_SETTINGS_PRESS_TARGET_WIFI_KEY_CONNECT:
         return layout.wifi_key_connect;
     case REACH_QUICK_SETTINGS_PRESS_TARGET_MUTE:
@@ -1200,7 +1395,7 @@ reach_quick_settings_push_press_feedback(const reach_quick_settings_render_input
     {
         return REACH_OK;
     }
-    static const uint64_t parents[] = {20, 21, 3, 4, 13, 22, 8};
+    static const uint64_t parents[] = {20, 21, 3, 4, 13, 22, 23, 8};
     reach_render_group placement = {};
     placement.bounds = bounds;
     placement.parent_id = parents[slot];
@@ -1312,6 +1507,9 @@ reach_quick_settings_build_render_commands(const reach_quick_settings_render_inp
     if (result == REACH_OK &&
         reach_quick_settings_page_visible(input, REACH_QUICK_SETTINGS_PAGE_WIFI))
         result = reach_quick_settings_push_wifi(input, commands, &metrics);
+    if (result == REACH_OK &&
+        reach_quick_settings_page_visible(input, REACH_QUICK_SETTINGS_PAGE_BLUETOOTH))
+        result = reach_quick_settings_push_bluetooth(input, commands, &metrics);
     if (result != REACH_OK)
         return result;
     return reach_quick_settings_push_press_feedback(input, commands,
@@ -1355,6 +1553,8 @@ reach_result reach_quick_settings_append_render_commands(
                                       input.page_shift, &input.rail_marker);
     reach_quick_settings_wifi_motions(quick_settings, input.wifi_row_motions, input.wifi_row_items,
                                       &input.wifi_switch, &input.wifi_caret);
+    reach_quick_settings_bluetooth_motions(quick_settings, input.bluetooth_row_motions,
+                                           input.bluetooth_row_items, &input.bluetooth_switch);
     input.press_feedback_target = reach_quick_settings_press_feedback_target(quick_settings);
     input.press_feedback = reach_quick_settings_press_feedback_motion(quick_settings);
 

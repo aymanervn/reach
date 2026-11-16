@@ -5,6 +5,7 @@
 #include "reach/core/theme.h"
 #include "reach/core/wifi.h"
 #include "reach/core/blink.h"
+#include "reach/core/bluetooth.h"
 #include "reach/features/common/keyed_rows.h"
 #include "reach/features/common/text_edit.h"
 #include "reach/features/feature_capsule.h"
@@ -12,6 +13,7 @@
 #include "reach/ports/power_session.h"
 #include "reach/ports/system_controls.h"
 #include "reach/ports/text_measure.h"
+#include "reach/services/bluetooth.h"
 #include "reach/services/profile.h"
 #include "reach/services/system_status.h"
 #include "reach/services/wifi.h"
@@ -29,6 +31,7 @@ extern "C"
         REACH_QUICK_SETTINGS_PAGE_OVERVIEW = 0,
         REACH_QUICK_SETTINGS_PAGE_SOUND,
         REACH_QUICK_SETTINGS_PAGE_WIFI,
+        REACH_QUICK_SETTINGS_PAGE_BLUETOOTH,
         REACH_QUICK_SETTINGS_PAGE_COUNT
     } reach_quick_settings_page;
 
@@ -42,6 +45,7 @@ extern "C"
     } reach_quick_settings_toggle;
 
 #define REACH_QUICK_SETTINGS_WIFI_ROWS 9
+#define REACH_QUICK_SETTINGS_BLUETOOTH_ROWS 10
 
     typedef struct reach_quick_settings_model
     {
@@ -65,6 +69,15 @@ extern "C"
         uint16_t wifi_status_ssid[REACH_WIFI_SSID_CAPACITY];
         int32_t wifi_key_row;
         reach_text_edit wifi_key;
+        reach_bluetooth_device bluetooth_rows[REACH_QUICK_SETTINGS_BLUETOOTH_ROWS];
+        size_t bluetooth_row_count;
+        size_t bluetooth_paired_count;
+        int32_t bluetooth_status;
+        uint16_t bluetooth_status_device[REACH_BLUETOOTH_DEVICE_ID_CAPACITY];
+        int32_t bluetooth_action_row;
+        int32_t bluetooth_pin_active;
+        uint16_t bluetooth_pin[REACH_BLUETOOTH_PIN_CAPACITY];
+        int32_t bluetooth_scanning;
         int32_t light_theme;
         uint16_t display_name[REACH_USER_ACCOUNT_NAME_CAPACITY];
         uint64_t picture_image_id;
@@ -144,6 +157,17 @@ extern "C"
         size_t wifi_row_count;
         reach_rect_f32 wifi_key_field;
         reach_rect_f32 wifi_key_connect;
+
+        reach_rect_f32 bluetooth_title;
+        reach_rect_f32 bluetooth_switch;
+        reach_rect_f32 bluetooth_message;
+        reach_rect_f32 bluetooth_mine_label;
+        reach_rect_f32 bluetooth_nearby_label;
+        reach_quick_settings_output_device_row_layout
+            bluetooth_rows[REACH_QUICK_SETTINGS_BLUETOOTH_ROWS];
+        size_t bluetooth_row_count;
+        reach_rect_f32 bluetooth_action_label;
+        reach_rect_f32 bluetooth_action_buttons[2];
     } reach_quick_settings_layout;
 
     typedef struct reach_quick_settings_output_device_row
@@ -173,6 +197,9 @@ extern "C"
         reach_wifi_network wifi_row_items[REACH_QUICK_SETTINGS_WIFI_ROWS];
         reach_motion wifi_switch;
         reach_blink wifi_caret;
+        reach_keyed_row bluetooth_row_motions[REACH_QUICK_SETTINGS_BLUETOOTH_ROWS];
+        reach_bluetooth_device bluetooth_row_items[REACH_QUICK_SETTINGS_BLUETOOTH_ROWS];
+        reach_motion bluetooth_switch;
         reach_motion toggle_states[REACH_QUICK_SETTINGS_TOGGLE_COUNT];
         reach_motion page_opacity[REACH_QUICK_SETTINGS_PAGE_COUNT];
         reach_motion page_shift[REACH_QUICK_SETTINGS_PAGE_COUNT];
@@ -274,6 +301,8 @@ extern "C"
                                           const reach_audio_volume_state *input);
     int32_t reach_quick_settings_apply_wifi_snapshot(reach_quick_settings *quick_settings,
                                                      const reach_wifi_snapshot *snapshot);
+    int32_t reach_quick_settings_apply_bluetooth_snapshot(reach_quick_settings *quick_settings,
+                                                          const reach_bluetooth_snapshot *snapshot);
     void reach_quick_settings_apply_sessions(reach_quick_settings *quick_settings,
                                              const reach_audio_volume_session_list *sessions);
     void reach_quick_settings_apply_output_devices(reach_quick_settings *quick_settings,
@@ -331,6 +360,7 @@ extern "C"
 
     void reach_quick_settings_attach_services(reach_quick_settings *quick_settings,
                                               reach_system_status *status, reach_wifi_service *wifi,
+                                              reach_bluetooth_service *bluetooth,
                                               reach_profile_service *profile,
                                               const reach_power_session_port *power_session);
     void reach_quick_settings_set_routes(reach_quick_settings *quick_settings,
