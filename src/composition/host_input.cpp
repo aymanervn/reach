@@ -267,6 +267,10 @@ static size_t reach_host_pointer_order(reach_host *host,
 
 static int32_t reach_host_surface_pointer_open(const reach_feature_runtime *desc)
 {
+    // TEMP: owner experiment letting Stage take clicks while it closes; remove or generalize after
+    // evaluation.
+    if (desc->definition->surface.role == REACH_SURFACE_STAGE)
+        return reach_host_surface_presented(desc);
     return desc->definition->capsule_ops->is_open == nullptr ||
            desc->definition->capsule_ops->is_open(desc->capsule);
 }

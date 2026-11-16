@@ -2,6 +2,7 @@
 
 #include "stage_common.h"
 
+#include <math.h>
 #include <new>
 
 reach_result reach_stage_create(reach_stage **out_stage)
@@ -130,7 +131,6 @@ reach_result reach_stage_open(reach_stage *stage, reach_rect_f32 monitor_bounds,
 
     state->open = 1;
     state->backdrop_opacity = 1.0f;
-    reach_motion_set(&stage->motions[REACH_STAGE_ANIMATION_BACKDROP], 1.0f);
     state->closing = 0;
     state->progress = 0.0f;
     state->desktop_progress = 0.0f;
@@ -230,7 +230,7 @@ void reach_stage_start_reflow(reach_stage *stage)
 
     state->reflow = 0.0f;
     reach_stage_track_start(stage, REACH_STAGE_ANIMATION_REFLOW, 0.0f, 1.0f,
-                            reach_stage_motion_preset(REACH_MOTION_PRESET_SMOOTH));
+                            reach_stage_presentation_spec(state->animation_seconds, 1.0f));
     state->departure_progress = has_departing ? 0.0f : 1.0f;
     if (has_departing)
     {
@@ -386,7 +386,6 @@ void reach_stage_force_close(reach_stage *stage)
     reach_motion_set(&stage->motions[REACH_STAGE_ANIMATION_REFLOW], 0.0f);
     reach_motion_set(&stage->motions[REACH_STAGE_ANIMATION_DEPARTURE], 0.0f);
     reach_motion_set(&stage->close_hover, 0.0f);
-    reach_motion_set(&stage->motions[REACH_STAGE_ANIMATION_BACKDROP], 0.0f);
     reach_motion_set(&stage->motions[REACH_STAGE_ANIMATION_RETARGET], 0.0f);
 }
 
@@ -661,9 +660,8 @@ static void reach_stage_capsule_reset(void *capsule)
 
 static void reach_stage_begin_reveal(reach_stage *stage)
 {
-    stage->state.close_phase = REACH_STAGE_CLOSE_REVEALING;
-    reach_stage_track_to(stage, REACH_STAGE_ANIMATION_BACKDROP, 0.0f,
-                         reach_stage_motion_preset(REACH_MOTION_PRESET_FADE_OUT));
+    stage->state.close_phase = REACH_STAGE_CLOSE_TRANSPARENT;
+    stage->state.backdrop_opacity = 0.0f;
 }
 
 static void reach_stage_capsule_presentation_committed(void *capsule, reach_result result,
@@ -671,7 +669,7 @@ static void reach_stage_capsule_presentation_committed(void *capsule, reach_resu
 {
     reach_stage *stage = static_cast<reach_stage *>(capsule);
     if (result != REACH_OK && stage->state.closing &&
-        stage->state.close_phase < REACH_STAGE_CLOSE_REVEALING)
+        stage->state.close_phase < REACH_STAGE_CLOSE_TRANSPARENT)
     {
         stage->state.close_failed = 1;
         reach_stage_begin_reveal(stage);
@@ -714,6 +712,60 @@ static void reach_stage_capsule_set_close_handoff_pending(void *capsule, int32_t
     }
 }
 
+static const size_t reach_stage_spring_tracks[] = {REACH_STAGE_ANIMATION_PROGRESS,
+                                                   REACH_STAGE_ANIMATION_DESKTOP_PROGRESS,
+                                                   REACH_STAGE_ANIMATION_REFLOW};
+
+static int32_t reach_stage_rect_near(reach_rect_f32 a, reach_rect_f32 b, float tolerance)
+{
+    return fabsf(a.x - b.x) < tolerance && fabsf(a.y - b.y) < tolerance &&
+           fabsf(a.width - b.width) < tolerance && fabsf(a.height - b.height) < tolerance;
+}
+
+static void reach_stage_sample_tracks(reach_stage *stage)
+{
+    reach_stage_state *state = &stage->state;
+    state->progress = reach_stage_track_value(stage, REACH_STAGE_ANIMATION_PROGRESS);
+    state->desktop_progress =
+        reach_stage_track_value(stage, REACH_STAGE_ANIMATION_DESKTOP_PROGRESS);
+    state->reflow = reach_stage_track_value(stage, REACH_STAGE_ANIMATION_REFLOW);
+    state->departure_progress = reach_stage_track_value(stage, REACH_STAGE_ANIMATION_DEPARTURE);
+    state->retarget_progress = reach_stage_track_value(stage, REACH_STAGE_ANIMATION_RETARGET);
+}
+
+static void reach_stage_finish_settled_springs(reach_stage *stage)
+{
+    int32_t any_active = 0;
+    for (size_t track : reach_stage_spring_tracks)
+        any_active |= reach_stage_track_active(stage, track);
+    if (!any_active)
+        return;
+
+    static reach_stage settled;
+    settled = *stage;
+    for (size_t track : reach_stage_spring_tracks)
+        reach_motion_set(&settled.motions[track], settled.motions[track].to);
+    reach_stage_sample_tracks(&settled);
+    reach_stage_apply_progress(&settled);
+
+    const float pixel_tolerance = 2.0f;
+    const float presence_tolerance = 1.0f / 512.0f;
+    for (size_t index = 0; index < stage->state.tile_count; ++index)
+    {
+        const reach_stage_tile *now = &stage->state.tiles[index];
+        const reach_stage_tile *end = &settled.state.tiles[index];
+        if (!reach_stage_rect_near(now->current_rect, end->current_rect, pixel_tolerance) ||
+            !reach_stage_rect_near(now->current_bar, end->current_bar, pixel_tolerance) ||
+            fabsf(now->presence - end->presence) >= presence_tolerance)
+            return;
+    }
+
+    for (size_t track : reach_stage_spring_tracks)
+        reach_motion_set(&stage->motions[track], stage->motions[track].to);
+    reach_stage_sample_tracks(stage);
+    reach_stage_apply_progress(stage);
+}
+
 static void reach_stage_capsule_tick(void *capsule, double delta_seconds,
                                      reach_feature_tick_result *out)
 {
@@ -741,15 +793,9 @@ static void reach_stage_capsule_tick(void *capsule, double delta_seconds,
     int32_t retarget_was_active = reach_stage_track_active(stage, REACH_STAGE_ANIMATION_RETARGET);
 
     stage->sampled_seconds = reach_motion_now_seconds();
-    state->progress = reach_stage_track_value(stage, REACH_STAGE_ANIMATION_PROGRESS);
-    state->desktop_progress =
-        reach_stage_track_value(stage, REACH_STAGE_ANIMATION_DESKTOP_PROGRESS);
-    state->backdrop_opacity = reach_stage_track_value(stage, REACH_STAGE_ANIMATION_BACKDROP);
-    state->reflow = reach_stage_track_value(stage, REACH_STAGE_ANIMATION_REFLOW);
-    state->departure_progress = reach_stage_track_value(stage, REACH_STAGE_ANIMATION_DEPARTURE);
-    state->retarget_progress = reach_stage_track_value(stage, REACH_STAGE_ANIMATION_RETARGET);
-
+    reach_stage_sample_tracks(stage);
     reach_stage_apply_progress(stage);
+    reach_stage_finish_settled_springs(stage);
 
     if (retarget_was_active && !reach_stage_track_active(stage, REACH_STAGE_ANIMATION_RETARGET))
     {
@@ -771,11 +817,6 @@ static void reach_stage_capsule_tick(void *capsule, double delta_seconds,
     {
         state->close_phase = REACH_STAGE_CLOSE_ALIGNED;
         state->close_aligned_committed = 0;
-    }
-    if (state->close_phase == REACH_STAGE_CLOSE_REVEALING &&
-        !reach_stage_track_active(stage, REACH_STAGE_ANIMATION_BACKDROP))
-    {
-        state->close_phase = REACH_STAGE_CLOSE_TRANSPARENT;
     }
 
     if (out != nullptr)

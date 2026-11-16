@@ -476,7 +476,7 @@ static void test_close_handoff_holds_only_the_reveal(void)
     expect_true(!ops->needs_frame(stage),
                 "an aligned Stage waits for the event without polling frames");
     ops->set_close_handoff_pending(stage, 0, &tick);
-    expect_true(reach_stage_state_ptr(stage)->close_phase == REACH_STAGE_CLOSE_REVEALING,
+    expect_true(reach_stage_state_ptr(stage)->close_phase == REACH_STAGE_CLOSE_TRANSPARENT,
                 "handoff completion releases the shared reveal");
     reach_stage_destroy(stage);
 
@@ -496,7 +496,7 @@ static void test_close_handoff_holds_only_the_reveal(void)
     {
         tick_stage(restoring, 0.016, &tick);
         revealed_while_held |=
-            reach_stage_state_ptr(restoring)->close_phase == REACH_STAGE_CLOSE_REVEALING;
+            reach_stage_state_ptr(restoring)->close_phase == REACH_STAGE_CLOSE_TRANSPARENT;
     }
     expect_true(!revealed_while_held &&
                     reach_stage_state_ptr(restoring)->close_phase == REACH_STAGE_CLOSE_ALIGNED,
@@ -512,7 +512,7 @@ static void test_close_handoff_holds_only_the_reveal(void)
     {
         tick_stage(restoring, 0.016, &tick);
         reach_stage_close_phase phase = reach_stage_state_ptr(restoring)->close_phase;
-        reveal_started |= phase == REACH_STAGE_CLOSE_REVEALING;
+        reveal_started |= phase == REACH_STAGE_CLOSE_TRANSPARENT;
         moved_after_reveal |= reveal_started && phase == REACH_STAGE_CLOSE_MOVING;
     }
     expect_true(reveal_started && !moved_after_reveal,
@@ -747,7 +747,7 @@ static void test_restored_thumbnail_is_committed_before_reveal(void)
     expect_true(reach_stage_state_ptr(stage)->close_phase == REACH_STAGE_CLOSE_ALIGNED,
                 "the restored thumbnail reaches its live frame before reveal");
     ops->presentation_committed(stage, REACH_OK, &tick);
-    expect_true(reach_stage_state_ptr(stage)->close_phase == REACH_STAGE_CLOSE_REVEALING,
+    expect_true(reach_stage_state_ptr(stage)->close_phase == REACH_STAGE_CLOSE_TRANSPARENT,
                 "the shared reveal starts after the restored thumbnail is committed");
     reach_stage_destroy(stage);
 }
