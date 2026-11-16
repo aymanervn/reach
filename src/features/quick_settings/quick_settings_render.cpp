@@ -701,7 +701,8 @@ static void reach_quick_settings_push_pill(reach_render_command_buffer *commands
     reach_quick_settings_push_rounded_rect(commands, pill, radius,
                                            theme->quick_settings_slider_track);
     reach_rect_f32 fill = pill;
-    fill.width = fmaxf(pill.height, pill.width * reach_quick_settings_clamp01(level));
+    float rest_width = (layout->icon.x - pill.x) * 2.0f + layout->icon.width;
+    fill.width = fmaxf(rest_width, pill.width * reach_quick_settings_clamp01(level));
     reach_quick_settings_push_rounded_rect(
         commands, fill, radius, muted ? theme->quick_settings_slider_muted_fill : theme->accent);
     reach_quick_settings_push_pill_icon(commands, layout->icon, vector_icon, image_icon, theme);
