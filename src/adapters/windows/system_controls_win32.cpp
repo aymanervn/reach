@@ -1460,21 +1460,6 @@ static reach_result reach_system_controls_open_project_menu(void *userdata)
     return sent == (sizeof(inputs) / sizeof(inputs[0])) ? REACH_OK : REACH_ERROR;
 }
 
-static reach_result reach_system_controls_open_system_quick_settings(void *userdata)
-{
-    (void)userdata;
-
-    INPUT inputs[] = {
-        reach_system_controls_key_input(VK_LWIN, 0),
-        reach_system_controls_key_input(0x41, 0),
-        reach_system_controls_key_input(0x41, KEYEVENTF_KEYUP),
-        reach_system_controls_key_input(VK_LWIN, KEYEVENTF_KEYUP),
-    };
-
-    UINT sent = SendInput((UINT)(sizeof(inputs) / sizeof(inputs[0])), inputs, sizeof(INPUT));
-    return sent == (sizeof(inputs) / sizeof(inputs[0])) ? REACH_OK : REACH_ERROR;
-}
-
 static reach_result
 reach_system_controls_start_watching(void *userdata, reach_system_controls_change_callback callback,
                                      void *callback_user)
@@ -1638,7 +1623,6 @@ extern "C" reach_result reach_windows_create_system_controls(reach_system_contro
     out_port->get_brightness_state = reach_system_controls_get_brightness_state;
     out_port->set_brightness_level = reach_system_controls_set_brightness_level;
     out_port->open_project_menu = reach_system_controls_open_project_menu;
-    out_port->open_system_quick_settings = reach_system_controls_open_system_quick_settings;
     out_port->set_theme_modes = reach_system_controls_set_theme_modes;
     out_port->start_watching = reach_system_controls_start_watching;
     out_port->stop_watching = reach_system_controls_stop_watching;

@@ -728,19 +728,6 @@ reach_result reach_system_status_set_battery_saver_enabled(reach_system_status *
     return result;
 }
 
-reach_result reach_system_status_open_system_quick_settings(reach_system_status *service)
-{
-    if (service == nullptr)
-    {
-        return REACH_INVALID_ARGUMENT;
-    }
-    if (service->system_controls.open_system_quick_settings == nullptr)
-    {
-        return REACH_NOT_IMPLEMENTED;
-    }
-    return service->system_controls.open_system_quick_settings(service->system_controls.userdata);
-}
-
 reach_result reach_system_status_open_project_menu(reach_system_status *service)
 {
     if (service == nullptr)

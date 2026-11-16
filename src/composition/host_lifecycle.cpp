@@ -131,6 +131,7 @@ static void reach_host_cleanup(reach_host *host)
     reach_host_release_registered_render_resources(host);
     reach_idle_watch_stop(host->idle_watch);
     reach_system_status_stop(host->system_status);
+    reach_wifi_service_stop(host->wifi_service);
     reach_system_stats_stop(host->system_stats);
     reach_host_clear_interfeature_routes(host);
     reach_host_attach_registered_features(host, nullptr);
@@ -178,6 +179,8 @@ static void reach_host_cleanup(reach_host *host)
     host->search_service = nullptr;
     reach_system_status_destroy(host->system_status);
     host->system_status = nullptr;
+    reach_wifi_service_destroy(host->wifi_service);
+    host->wifi_service = nullptr;
     reach_system_stats_destroy(host->system_stats);
     host->system_stats = nullptr;
     reach_clock_destroy(host->clock);
@@ -406,6 +409,12 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
     {
         result = REACH_ERROR;
     }
+    host->wifi_service = nullptr;
+    if (reach_wifi_service_create(dependencies->wifi, reach_host_on_system_status_ready, host,
+                                  &host->wifi_service) != REACH_OK)
+    {
+        result = REACH_ERROR;
+    }
     host->system_stats = nullptr;
     if (reach_system_stats_create(dependencies->system_stats, reach_host_on_system_stats_ready,
                                   host, &host->system_stats) != REACH_OK)
@@ -449,6 +458,7 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
                                                        host->tray_service,
                                                        host->app_control,
                                                        host->system_status,
+                                                       host->wifi_service,
                                                        &host->clipboard,
                                                        reach_host_on_feature_update_requested,
                                                        host,
