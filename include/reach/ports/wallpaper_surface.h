@@ -5,7 +5,6 @@
 #include <stdint.h>
 
 #include "reach/core/geometry.h"
-#include "reach/core/theme.h"
 #include "reach/core/window_id.h"
 #include "reach/support/util.h"
 
@@ -27,9 +26,6 @@ extern "C"
         reach_result (*clear_monitor_wallpaper)(reach_wallpaper_surface *surface,
                                                 size_t monitor_index);
         reach_result (*clear)(reach_wallpaper_surface *surface);
-        reach_result (*set_top_shade)(reach_wallpaper_surface *surface,
-                                      reach_rect_f32 monitor_bounds, float extent,
-                                      reach_color color);
         reach_window_id (*desktop_window)(const reach_wallpaper_surface *surface);
         void (*destroy)(reach_wallpaper_surface *surface);
     } reach_wallpaper_surface_ops;

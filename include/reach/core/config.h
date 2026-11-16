@@ -26,7 +26,7 @@ extern "C"
     {
         REACH_CONFIG_TOP_BAR_STYLE_SPLIT = 0,
         REACH_CONFIG_TOP_BAR_STYLE_UNIFIED = 1,
-        REACH_CONFIG_TOP_BAR_STYLE_SIMPLE = 2
+        REACH_CONFIG_TOP_BAR_STYLE_TRANSPARENT = 2
     } reach_config_top_bar_style;
 
     typedef enum reach_config_top_bar_mode
@@ -34,13 +34,6 @@ extern "C"
         REACH_CONFIG_TOP_BAR_MODE_DYNAMIC = 0,
         REACH_CONFIG_TOP_BAR_MODE_STATIC = 1
     } reach_config_top_bar_mode;
-
-    typedef enum reach_config_top_bar_scrim_length
-    {
-        REACH_CONFIG_TOP_BAR_SCRIM_STANDARD = 0,
-        REACH_CONFIG_TOP_BAR_SCRIM_SHORT = 1,
-        REACH_CONFIG_TOP_BAR_SCRIM_LONG = 2
-    } reach_config_top_bar_scrim_length;
 
     typedef struct reach_config_snapshot
     {
@@ -53,7 +46,6 @@ extern "C"
         int32_t dock_size;
         reach_config_top_bar_style top_bar_style;
         reach_config_top_bar_mode top_bar_mode;
-        reach_config_top_bar_scrim_length top_bar_scrim_length;
         int32_t top_bar_icon_only;
         int32_t power_screen_off_minutes;
         int32_t power_sleep_minutes;

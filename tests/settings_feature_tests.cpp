@@ -612,8 +612,8 @@ static void test_top_bar_preferences(void)
     reach_settings_model_init(model.get());
 
     expect_true(reach_settings_model_top_bar_style(model.get()) ==
-                    REACH_CONFIG_TOP_BAR_STYLE_SIMPLE,
-                "top bar defaults to simple style");
+                    REACH_CONFIG_TOP_BAR_STYLE_TRANSPARENT,
+                "top bar defaults to transparent style");
     expect_true(reach_settings_model_top_bar_mode(model.get()) == REACH_CONFIG_TOP_BAR_MODE_STATIC,
                 "top bar defaults to static mode");
     expect_true(reach_motion_value(&model->top_bar_mode_toggle) == 0.0f,
@@ -626,12 +626,12 @@ static void test_top_bar_preferences(void)
                     REACH_CONFIG_TOP_BAR_STYLE_UNIFIED,
                 "top bar style stores unified");
     expect_true(
-        reach_settings_model_select_top_bar_style(model.get(), REACH_CONFIG_TOP_BAR_STYLE_SIMPLE),
-        "top bar style can select simple");
+        reach_settings_model_select_top_bar_style(model.get(), REACH_CONFIG_TOP_BAR_STYLE_TRANSPARENT),
+        "top bar style can select transparent");
     expect_true(reach_settings_model_top_bar_style(model.get()) ==
-                    REACH_CONFIG_TOP_BAR_STYLE_SIMPLE,
-                "top bar style stores simple");
-    expect_true(model->top_bar_style_selection.to == 2.0f, "top bar style selector targets simple");
+                    REACH_CONFIG_TOP_BAR_STYLE_TRANSPARENT,
+                "top bar style stores transparent");
+    expect_true(model->top_bar_style_selection.to == 2.0f, "top bar style selector targets transparent");
     expect_true(
         !reach_settings_model_select_top_bar_style(model.get(), (reach_config_top_bar_style)99),
         "top bar style rejects invalid selections");

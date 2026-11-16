@@ -9,7 +9,7 @@ typedef enum reach_top_bar_background_style
 {
     REACH_TOP_BAR_BACKGROUND_SPLIT = 0,
     REACH_TOP_BAR_BACKGROUND_UNIFIED = 1,
-    REACH_TOP_BAR_BACKGROUND_SIMPLE = 2
+    REACH_TOP_BAR_BACKGROUND_TRANSPARENT = 2
 } reach_top_bar_background_style;
 
 struct reach_top_bar_style_profile
@@ -29,8 +29,8 @@ reach_top_bar_style_profile_for(reach_config_top_bar_style style)
     {
     case REACH_CONFIG_TOP_BAR_STYLE_UNIFIED:
         return {34.5f, 6.0f, 6.0f, 8.0f, REACH_TOP_BAR_BACKGROUND_UNIFIED, 1};
-    case REACH_CONFIG_TOP_BAR_STYLE_SIMPLE:
-        return {34.5f, 0.0f, 0.0f, 0.0f, REACH_TOP_BAR_BACKGROUND_SIMPLE, 0};
+    case REACH_CONFIG_TOP_BAR_STYLE_TRANSPARENT:
+        return {34.5f, 0.0f, 0.0f, 0.0f, REACH_TOP_BAR_BACKGROUND_TRANSPARENT, 0};
     case REACH_CONFIG_TOP_BAR_STYLE_SPLIT:
     default:
         return {34.5f, 6.0f, 6.0f, 8.0f, REACH_TOP_BAR_BACKGROUND_SPLIT, 1};
@@ -39,8 +39,6 @@ reach_top_bar_style_profile_for(reach_config_top_bar_style style)
 
 struct reach_top_bar_metrics
 {
-    float simple_scrim_height_ratio[3];
-
     float pill_gap;
     float pill_padding;
 
@@ -95,10 +93,6 @@ struct reach_top_bar_metrics
 static constexpr reach_top_bar_metrics reach_top_bar_make_metrics()
 {
     reach_top_bar_metrics metrics = {};
-
-    metrics.simple_scrim_height_ratio[REACH_CONFIG_TOP_BAR_SCRIM_STANDARD] = 1.2f;
-    metrics.simple_scrim_height_ratio[REACH_CONFIG_TOP_BAR_SCRIM_SHORT] = 0.9f;
-    metrics.simple_scrim_height_ratio[REACH_CONFIG_TOP_BAR_SCRIM_LONG] = 1.5f;
 
     metrics.pill_gap = 6.0f;
     metrics.pill_padding = 10.0f;

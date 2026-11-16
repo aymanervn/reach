@@ -124,8 +124,6 @@ extern "C"
         int32_t reserve_monitor_work_area;
         float work_area_clearance;
         int32_t shadowless;
-        float wallpaper_top_shade_extent;
-        reach_color wallpaper_top_shade_color;
         reach_feature_bar_reveal_policy bar_reveal_policy;
         int32_t force_topmost;
         float notch_anchor_x;

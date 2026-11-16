@@ -25,7 +25,7 @@ int32_t reach_top_bar_apply_config(reach_top_bar *top_bar, reach_config_top_bar_
                                    reach_config_top_bar_mode mode)
 {
     if (top_bar == nullptr || style < REACH_CONFIG_TOP_BAR_STYLE_SPLIT ||
-        style > REACH_CONFIG_TOP_BAR_STYLE_SIMPLE || mode < REACH_CONFIG_TOP_BAR_MODE_DYNAMIC ||
+        style > REACH_CONFIG_TOP_BAR_STYLE_TRANSPARENT || mode < REACH_CONFIG_TOP_BAR_MODE_DYNAMIC ||
         mode > REACH_CONFIG_TOP_BAR_MODE_STATIC)
     {
         return 0;
@@ -56,18 +56,6 @@ int32_t reach_top_bar_apply_icon_only(reach_top_bar *top_bar, int32_t icon_only)
         return 0;
     }
     top_bar->state.icon_only = icon_only;
-    return 1;
-}
-
-int32_t reach_top_bar_apply_scrim_length(reach_top_bar *top_bar,
-                                         reach_config_top_bar_scrim_length scrim)
-{
-    if (top_bar == nullptr || scrim < REACH_CONFIG_TOP_BAR_SCRIM_STANDARD ||
-        scrim > REACH_CONFIG_TOP_BAR_SCRIM_LONG || top_bar->state.scrim_length == scrim)
-    {
-        return 0;
-    }
-    top_bar->state.scrim_length = scrim;
     return 1;
 }
 
@@ -544,7 +532,6 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
         return;
     }
     reach_top_bar_load_motion_specs(top_bar, ctx->theme);
-    top_bar->scrim_color = ctx->theme->top_bar_scrim;
 
     const reach_top_bar_metrics &metrics = reach_top_bar_metrics_values;
     const reach_top_bar_style_profile profile =
@@ -1003,7 +990,7 @@ reach_rect_f32 reach_top_bar_background_bounds(const reach_top_bar *top_bar)
 
     const reach_top_bar_layout *layout = &top_bar->state.layout;
     if (reach_top_bar_style_profile_for(top_bar->state.style).background ==
-        REACH_TOP_BAR_BACKGROUND_SIMPLE)
+        REACH_TOP_BAR_BACKGROUND_TRANSPARENT)
     {
         return {0.0f, 0.0f, layout->bounds.width, layout->bounds.height};
     }
@@ -1451,15 +1438,7 @@ static void reach_top_bar_capsule_surface_geometry(const void *capsule,
         out->bar_reveal_policy =
             static_mode ? REACH_FEATURE_BAR_REVEAL_FULLSCREEN : REACH_FEATURE_BAR_REVEAL_ALWAYS;
         out->force_topmost = static_mode;
-        if (top_bar->state.style == REACH_CONFIG_TOP_BAR_STYLE_SIMPLE)
-        {
-            out->shadowless = 1;
-            const reach_top_bar_layout *layout = &top_bar->state.layout;
-            out->wallpaper_top_shade_extent =
-                layout->bounds.height *
-                reach_top_bar_metrics_values.simple_scrim_height_ratio[top_bar->state.scrim_length];
-            out->wallpaper_top_shade_color = top_bar->scrim_color;
-        }
+        out->shadowless = top_bar->state.style == REACH_CONFIG_TOP_BAR_STYLE_TRANSPARENT;
     }
 }
 

@@ -602,7 +602,7 @@ static void render_theme_page(const reach_settings_render_input *input,
         reach_settings_scale(input, REACH_TEXT_SIZE_XSMALL), REACH_TEXT_WEIGHT_SEMIBOLD,
         input->text_alignment_leading, input->theme->settings_secondary_text, 1);
     const uint16_t *top_bar_style_labels[REACH_SETTINGS_SELECTOR_ITEM_COUNT] = {
-        (const uint16_t *)u"Split", (const uint16_t *)u"Unified", (const uint16_t *)u"Simple"};
+        (const uint16_t *)u"Split", (const uint16_t *)u"Unified", (const uint16_t *)u"Transparent"};
     render_theme_selector_card(
         input, commands, layout->top_bar_style_card, {}, REACH_VECTOR_ICON_NONE,
         layout->top_bar_style_title, layout->top_bar_style_subtitle, layout->top_bar_style_selector,
@@ -610,15 +610,6 @@ static void render_theme_page(const reach_settings_render_input *input,
         (const uint16_t *)u"Choose how top bar items are grouped and framed", top_bar_style_labels,
         REACH_SETTINGS_SELECTOR_ITEM_COUNT, &model->top_bar_style_selection,
         REACH_SETTINGS_HIT_TOP_BAR_STYLE, accent);
-    const uint16_t *scrim_length_labels[REACH_SETTINGS_SELECTOR_ITEM_COUNT] = {
-        (const uint16_t *)u"Short", (const uint16_t *)u"Standard", (const uint16_t *)u"Long"};
-    render_theme_selector_card(
-        input, commands, layout->top_bar_scrim_length_card, {}, REACH_VECTOR_ICON_NONE,
-        layout->top_bar_scrim_length_title, layout->top_bar_scrim_length_subtitle,
-        layout->top_bar_scrim_length_selector, (const uint16_t *)u"Top bar shadow length",
-        (const uint16_t *)u"How far the simple top bar's shadow reaches", scrim_length_labels,
-        REACH_SETTINGS_SELECTOR_ITEM_COUNT, &model->top_bar_scrim_length_selection,
-        REACH_SETTINGS_HIT_TOP_BAR_SCRIM_LENGTH, accent);
     theme_toggle_card auto_hide = {layout->top_bar_auto_hide_card,
                                    {},
                                    layout->top_bar_auto_hide_title,

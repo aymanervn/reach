@@ -185,24 +185,17 @@ static reach_result reach_config_store_load(reach_config_store *store,
             ? REACH_CONFIG_DOCK_SIZE_MIN
             : (dock_size > REACH_CONFIG_DOCK_SIZE_MAX ? REACH_CONFIG_DOCK_SIZE_MAX : dock_size);
     int32_t top_bar_style = (int32_t)GetPrivateProfileIntW(L"top_bar", L"style",
-                                                           REACH_CONFIG_TOP_BAR_STYLE_SIMPLE, path);
+                                                           REACH_CONFIG_TOP_BAR_STYLE_TRANSPARENT, path);
     out_snapshot->top_bar_style = top_bar_style >= REACH_CONFIG_TOP_BAR_STYLE_SPLIT &&
-                                          top_bar_style <= REACH_CONFIG_TOP_BAR_STYLE_SIMPLE
+                                          top_bar_style <= REACH_CONFIG_TOP_BAR_STYLE_TRANSPARENT
                                       ? (reach_config_top_bar_style)top_bar_style
-                                      : REACH_CONFIG_TOP_BAR_STYLE_SIMPLE;
+                                      : REACH_CONFIG_TOP_BAR_STYLE_TRANSPARENT;
     int32_t top_bar_mode =
         (int32_t)GetPrivateProfileIntW(L"top_bar", L"mode", REACH_CONFIG_TOP_BAR_MODE_STATIC, path);
     out_snapshot->top_bar_mode = top_bar_mode >= REACH_CONFIG_TOP_BAR_MODE_DYNAMIC &&
                                          top_bar_mode <= REACH_CONFIG_TOP_BAR_MODE_STATIC
                                      ? (reach_config_top_bar_mode)top_bar_mode
                                      : REACH_CONFIG_TOP_BAR_MODE_STATIC;
-    int32_t top_bar_scrim_length = (int32_t)GetPrivateProfileIntW(
-        L"top_bar", L"scrim_length", REACH_CONFIG_TOP_BAR_SCRIM_STANDARD, path);
-    out_snapshot->top_bar_scrim_length =
-        top_bar_scrim_length >= REACH_CONFIG_TOP_BAR_SCRIM_STANDARD &&
-                top_bar_scrim_length <= REACH_CONFIG_TOP_BAR_SCRIM_LONG
-            ? (reach_config_top_bar_scrim_length)top_bar_scrim_length
-            : REACH_CONFIG_TOP_BAR_SCRIM_STANDARD;
     out_snapshot->top_bar_icon_only =
         (int32_t)GetPrivateProfileIntW(L"top_bar", L"icon_only", 1, path) != 0;
     out_snapshot->power_screen_off_minutes =
@@ -355,8 +348,6 @@ static reach_result reach_config_store_save(reach_config_store *store,
     text.append(std::to_wstring((int32_t)snapshot->top_bar_style));
     text.append(L"\r\nmode=");
     text.append(std::to_wstring((int32_t)snapshot->top_bar_mode));
-    text.append(L"\r\nscrim_length=");
-    text.append(std::to_wstring((int32_t)snapshot->top_bar_scrim_length));
     text.append(L"\r\nicon_only=");
     text.append(std::to_wstring(snapshot->top_bar_icon_only ? 1 : 0));
     text.append(L"\r\n\r\n[power]\r\nscreen_off_minutes=");

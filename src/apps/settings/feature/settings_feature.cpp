@@ -74,8 +74,7 @@ void reach_settings_model_init(reach_settings_model *model)
     model->account_focused_field = -1;
     model->hovered_button = REACH_SETTINGS_HIT_NONE;
     reach_motion_set(&model->theme_reach_selection, 0);
-    reach_settings_model_set_top_bar_style(model, REACH_CONFIG_TOP_BAR_STYLE_SIMPLE);
-    reach_settings_model_set_top_bar_scrim_length(model, REACH_CONFIG_TOP_BAR_SCRIM_STANDARD);
+    reach_settings_model_set_top_bar_style(model, REACH_CONFIG_TOP_BAR_STYLE_TRANSPARENT);
     reach_settings_model_set_top_bar_mode(model, REACH_CONFIG_TOP_BAR_MODE_STATIC);
     reach_settings_model_set_top_bar_icon_only(model, 1);
     model->dock_size = REACH_CONFIG_DOCK_SIZE_MAX;
@@ -810,14 +809,8 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
         reach_settings_toggle_card_rects auto_hide = {
             &layout.top_bar_auto_hide_card, nullptr, &layout.top_bar_auto_hide_title,
             &layout.top_bar_auto_hide_subtitle, &layout.top_bar_auto_hide_toggle};
-        float scrim_y = desktop_y + appearance_card_height + card_spacing;
-        reach_settings_layout_selector_card(
-            &layout.top_bar_scrim_length_card, &layout.top_bar_scrim_length_title,
-            &layout.top_bar_scrim_length_subtitle, &layout.top_bar_scrim_length_selector, nullptr,
-            area_x, scrim_y, area_width, appearance_card_height, REACH_SETTINGS_SELECTOR_WIDTH,
-            scale);
         reach_settings_layout_toggle_card(&auto_hide, area_x,
-                                          scrim_y + appearance_card_height + card_spacing,
+                                          desktop_y + appearance_card_height + card_spacing,
                                           area_width, card_height, scale);
         reach_settings_toggle_card_rects icon_only = {
             &layout.top_bar_icon_only_card, nullptr, &layout.top_bar_icon_only_title,
@@ -1176,16 +1169,6 @@ reach_settings_hit_result reach_settings_hit_test(const reach_settings_layout *l
     {
         result.type = REACH_SETTINGS_HIT_TOP_BAR_STYLE;
         result.top_bar_style = (reach_config_top_bar_style)option;
-        return result;
-    }
-    option = theme_pointer
-                 ? reach_ui_segmented_control_index_at(layout->top_bar_scrim_length_selector,
-                                                       REACH_SETTINGS_SELECTOR_ITEM_COUNT, x, y)
-                 : -1;
-    if (option >= 0)
-    {
-        result.type = REACH_SETTINGS_HIT_TOP_BAR_SCRIM_LENGTH;
-        result.top_bar_scrim_length = reach_settings_top_bar_scrim_length_at((size_t)option);
         return result;
     }
     option = theme_pointer

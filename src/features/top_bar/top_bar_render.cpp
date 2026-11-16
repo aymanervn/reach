@@ -110,6 +110,28 @@ static reach_result reach_top_bar_push_pill_background(const reach_theme *theme,
         dpi_scale);
 }
 
+static reach_result reach_top_bar_push_transparent_scrim(const reach_theme *theme,
+                                                    reach_render_command_buffer *commands,
+                                                    reach_rect_f32 bounds)
+{
+    reach_render_command scrim = {};
+    scrim.type = REACH_RENDER_COMMAND_RECT;
+    scrim.rect = reach_render_pixel_aligned_rect(bounds);
+    scrim.color = theme->top_bar_scrim;
+    scrim.fill_gradient = REACH_RENDER_FILL_EASED_FADE_DOWN;
+    if (scrim.color.a <= 0.0f || scrim.rect.width <= 0.0f || scrim.rect.height <= 0.0f)
+    {
+        return REACH_OK;
+    }
+    reach_render_group group = {};
+    group.id = UINT64_C(0x10000000000) + 9;
+    reach_result result = reach_render_command_buffer_begin_group(commands, &group);
+    if (result == REACH_OK)
+        result = reach_render_command_buffer_push(commands, &scrim);
+    reach_render_command_buffer_end_group(commands);
+    return result;
+}
+
 static reach_rect_f32 reach_top_bar_render_pill(const reach_top_bar_layout *layout, size_t index)
 {
     return index == REACH_TOP_BAR_PILL_QUICK_SETTINGS &&
@@ -520,7 +542,16 @@ reach_result reach_top_bar_append_render_commands(reach_top_bar *top_bar,
     const reach_top_bar_layout *layout = &state->layout;
     reach_top_bar_style_profile profile = reach_top_bar_style_profile_for(state->style);
 
-    if (profile.background == REACH_TOP_BAR_BACKGROUND_UNIFIED)
+    if (profile.background == REACH_TOP_BAR_BACKGROUND_TRANSPARENT)
+    {
+        result = reach_top_bar_push_transparent_scrim(ctx->theme, out_commands,
+                                                 reach_top_bar_background_bounds(top_bar));
+        if (result != REACH_OK)
+        {
+            return result;
+        }
+    }
+    else if (profile.background == REACH_TOP_BAR_BACKGROUND_UNIFIED)
     {
         result = reach_top_bar_push_pill_background(ctx->theme, out_commands,
                                                     reach_top_bar_background_bounds(top_bar),

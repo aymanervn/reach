@@ -98,6 +98,12 @@ extern "C"
         REACH_RENDER_CORNER_ALL = 15
     } reach_render_corner_mask;
 
+    typedef enum reach_render_fill_gradient
+    {
+        REACH_RENDER_FILL_SOLID = 0,
+        REACH_RENDER_FILL_EASED_FADE_DOWN = 1
+    } reach_render_fill_gradient;
+
     typedef enum reach_notch_side
     {
         REACH_NOTCH_SIDE_BOTTOM = 0,
@@ -204,6 +210,7 @@ extern "C"
         uint64_t icon_id;
         int32_t icon_crop_to_fill;
         int32_t corner_mask;
+        int32_t fill_gradient;
         int32_t text_weight;
         float text_size;
         float notch_center_x;

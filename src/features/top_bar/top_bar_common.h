@@ -39,7 +39,6 @@ struct reach_top_bar
     reach_motion power_hover;
     reach_motion_spec snappy_spec;
     reach_motion_spec fade_in_spec;
-    reach_color scrim_color;
     reach_motion_spec fade_out_spec;
     reach_top_bar_now_playing *now_playing_subfeature;
     reach_top_bar_window_push *window_push;
