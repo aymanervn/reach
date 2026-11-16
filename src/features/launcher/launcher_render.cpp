@@ -55,7 +55,10 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
     const reach_launcher_layout *layout = input->layout;
     reach_render_command_buffer_clear(out_commands);
     float launcher_radius = layout->search_box.height * 0.5f;
-    float row_selected_radius = reach_launcher_scale(input, theme->radius_small);
+    float border_thickness = reach_theme_border_thickness(theme, input->dpi_scale);
+    float highlight_inset = reach_launcher_scale(input, 6.0f);
+    float row_selected_radius =
+        reach_nested_radius(launcher_radius, border_thickness + highlight_inset);
     float row_icon_size = reach_launcher_scale(input, 32.0f);
     float row_icon_x = reach_launcher_scale(input, 16.0f);
     float row_icon_y = reach_launcher_scale(input, 12.0f);
@@ -75,7 +78,6 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
         rows_held |= input->rows[slot].lifecycle != REACH_KEYED_ROW_EMPTY;
     int32_t results_attached = model->result_count > 0 || error_row_visible || rows_held ? 1 : 0;
     auto bounds = reach_launcher_body_motion(layout, &input->body_height);
-    float border_thickness = reach_theme_border_thickness(theme, input->dpi_scale);
     reach_result result = reach_ui_motion_background_render(
         out_commands, &bounds, launcher_radius, border_thickness, theme->launcher_search_background,
         theme->launcher_border, &theme->popup_shadow, input->dpi_scale,
@@ -195,8 +197,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
                 return result;
         }
 
-        float highlight_x =
-            layout->search_result_items.x - layout->bounds.x + reach_launcher_scale(input, 6.0f);
+        float highlight_x = layout->search_result_items.x - layout->bounds.x + highlight_inset;
         float highlight_y =
             layout->search_result_items.y - layout->bounds.y + reach_launcher_scale(input, 5.0f);
         float highlight_width =
