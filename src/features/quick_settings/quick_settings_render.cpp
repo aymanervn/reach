@@ -732,6 +732,11 @@ static int32_t reach_quick_settings_page_visible(const reach_quick_settings_rend
 }
 
 static reach_result
+reach_quick_settings_push_press_feedback(const reach_quick_settings_render_input *input,
+                                         reach_render_command_buffer *commands,
+                                         int32_t overview_pass);
+
+static reach_result
 reach_quick_settings_push_overview(const reach_quick_settings_render_input *input,
                                    reach_render_command_buffer *commands,
                                    const reach_quick_settings_metrics *metrics)
@@ -774,7 +779,8 @@ reach_quick_settings_push_overview(const reach_quick_settings_render_input *inpu
             commands, &layout.toggles[index], &input->model, index, &input->toggle_states[index],
             &theme, metrics, &input->text_measure, 600 + index * 2, 20);
     }
-    return result;
+    return result == REACH_OK ? reach_quick_settings_push_press_feedback(input, commands, 1)
+                              : result;
 }
 
 static const reach_audio_output_device *
@@ -1039,7 +1045,8 @@ reach_quick_settings_press_feedback_bounds(const reach_quick_settings_render_inp
 
 static reach_result
 reach_quick_settings_push_press_feedback(const reach_quick_settings_render_input *input,
-                                         reach_render_command_buffer *commands)
+                                         reach_render_command_buffer *commands,
+                                         int32_t overview_pass)
 {
     if (input == nullptr || commands == nullptr)
     {
@@ -1052,6 +1059,16 @@ reach_quick_settings_push_press_feedback(const reach_quick_settings_render_input
     }
     reach_color overlay = {0.0f, 0.0f, 0.0f, 0.12f};
     auto kind = reach_quick_settings_pressable_target_kind(input->press_feedback_target);
+    int32_t overview_target = kind == REACH_QUICK_SETTINGS_PRESS_TARGET_SOUND_PAGE_BUTTON ||
+                              kind == REACH_QUICK_SETTINGS_PRESS_TARGET_TOGGLE;
+    if (overview_target != (overview_pass ? 1 : 0) ||
+        (kind != REACH_QUICK_SETTINGS_PRESS_TARGET_RAIL_ITEM &&
+         !reach_quick_settings_page_visible(input, overview_target
+                                                       ? REACH_QUICK_SETTINGS_PAGE_OVERVIEW
+                                                       : REACH_QUICK_SETTINGS_PAGE_SOUND)))
+    {
+        return REACH_OK;
+    }
     int32_t pill = kind == REACH_QUICK_SETTINGS_PRESS_TARGET_RAIL_ITEM ||
                    kind == REACH_QUICK_SETTINGS_PRESS_TARGET_SOUND_PAGE_BUTTON ||
                    kind == REACH_QUICK_SETTINGS_PRESS_TARGET_TOGGLE;
@@ -1135,7 +1152,7 @@ reach_quick_settings_build_render_commands(const reach_quick_settings_render_inp
     if (result != REACH_OK)
         return result;
     if (!reach_quick_settings_page_visible(input, REACH_QUICK_SETTINGS_PAGE_SOUND))
-        return reach_quick_settings_push_press_feedback(input, commands);
+        return reach_quick_settings_push_press_feedback(input, commands, 0);
     result = reach_quick_settings_begin_page(input, commands, REACH_QUICK_SETTINGS_PAGE_SOUND, 21);
     reach_render_command_buffer_end_group(commands);
     if (result != REACH_OK ||
@@ -1258,7 +1275,7 @@ reach_quick_settings_build_render_commands(const reach_quick_settings_render_inp
     auto feedback_kind = reach_quick_settings_pressable_target_kind(input->press_feedback_target);
     if (feedback_kind == REACH_QUICK_SETTINGS_PRESS_TARGET_OUTPUT_DEVICE_ROW)
     {
-        result = reach_quick_settings_push_press_feedback(input, commands);
+        result = reach_quick_settings_push_press_feedback(input, commands, 0);
         if (result != REACH_OK)
             return result;
     }
@@ -1335,7 +1352,7 @@ reach_quick_settings_build_render_commands(const reach_quick_settings_render_inp
 
     return feedback_kind == REACH_QUICK_SETTINGS_PRESS_TARGET_OUTPUT_DEVICE_ROW
                ? REACH_OK
-               : reach_quick_settings_push_press_feedback(input, commands);
+               : reach_quick_settings_push_press_feedback(input, commands, 0);
 }
 
 reach_result reach_quick_settings_append_render_commands(
