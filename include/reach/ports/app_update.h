@@ -17,7 +17,8 @@ extern "C"
         void *userdata;
         reach_result (*check)(void *userdata, const uint16_t *owner, const uint16_t *repo,
                               reach_app_update_info *out_info);
-        reach_result (*download)(void *userdata, const uint16_t *url, const uint16_t *dest_path,
+        reach_result (*download)(void *userdata, const uint16_t *url, const uint16_t *digest,
+                                 const uint16_t *dest_path,
                                  reach_app_update_download_progress progress, void *progress_user);
         void (*cancel)(void *userdata);
         void (*destroy)(void *userdata);

@@ -1,6 +1,28 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(reach VERSION 1.9.4  LANGUAGES C CXX)
+if(NOT REACH_VERSION)
+    execute_process(
+        COMMAND git describe --tags --abbrev=0 --match "v[0-9]*.[0-9]*.[0-9]*"
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        OUTPUT_VARIABLE REACH_GIT_TAG
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+        RESULT_VARIABLE REACH_GIT_RESULT
+    )
+    if(REACH_GIT_RESULT EQUAL 0 AND REACH_GIT_TAG MATCHES "^v([0-9]+\.[0-9]+\.[0-9]+)$")
+        set(REACH_VERSION "${CMAKE_MATCH_1}")
+    else()
+        set(REACH_VERSION "0.0.0")
+    endif()
+endif()
+foreach(REACH_TAG_SOURCE IN ITEMS "${CMAKE_CURRENT_SOURCE_DIR}/.git/refs/tags"
+                                  "${CMAKE_CURRENT_SOURCE_DIR}/.git/packed-refs")
+    if(EXISTS "${REACH_TAG_SOURCE}")
+        set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${REACH_TAG_SOURCE}")
+    endif()
+endforeach()
+
+project(reach VERSION ${REACH_VERSION} LANGUAGES C CXX)
 
 option(REACH_BUILD_TESTS "Build Reach test executables and register CTest tests" ON)
 option(REACH_RUN_ARCHITECTURE_CHECK "Run architecture boundary checks as part of the default build" ON)
@@ -291,6 +313,7 @@ add_library(reach_windows_adapters STATIC
     src/adapters/windows/user_account_win32.cpp
     src/adapters/windows/windows_update_wua.cpp
     src/adapters/windows/reach_update_winhttp.cpp
+    src/adapters/windows/reach_update_release.cpp
 )
 
 reach_configure_common(reach_windows_adapters)
@@ -334,6 +357,7 @@ target_link_libraries(reach_windows_adapters PRIVATE
     wbemuuid
     Wuguid
     winhttp
+    bcrypt
     wer
 )
 
@@ -1258,6 +1282,20 @@ add_executable(reach_system_controls_network_tests
     src/adapters/windows/system_controls_network.cpp
 )
 
+add_executable(reach_app_update_release_tests
+    tests/app_update_release_tests.cpp
+    src/adapters/windows/reach_update_release.cpp
+)
+
+reach_configure_common(reach_app_update_release_tests)
+reach_configure_windows(reach_app_update_release_tests)
+target_compile_features(reach_app_update_release_tests PRIVATE
+    cxx_std_17
+)
+target_link_libraries(reach_app_update_release_tests PRIVATE
+    bcrypt
+)
+
 reach_configure_common(reach_system_controls_network_tests)
 reach_configure_windows(reach_system_controls_network_tests)
 target_compile_features(reach_system_controls_network_tests PRIVATE
@@ -1302,6 +1340,7 @@ target_compile_features(reach_system_controls_network_tests PRIVATE
     add_test(NAME reach_text_edit_tests COMMAND reach_text_edit_tests)
     add_test(NAME reach_search_ranking_tests COMMAND reach_search_ranking_tests)
     add_test(NAME reach_system_controls_network_tests COMMAND reach_system_controls_network_tests)
+    add_test(NAME reach_app_update_release_tests COMMAND reach_app_update_release_tests)
     add_test(NAME reach_dock_model_tests COMMAND reach_dock_model_tests)
     add_test(NAME reach_pressable_tests COMMAND reach_pressable_tests)
     add_test(NAME reach_bar_visibility_tests COMMAND reach_bar_visibility_tests)

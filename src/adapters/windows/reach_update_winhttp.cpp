@@ -1,12 +1,13 @@
 #include "windows_adapters_internal.h"
 
+#include "reach_update_release.h"
+
 #include "reach/ports/app_update.h"
 
 #include <windows.h>
 #include <winhttp.h>
 
 #include <atomic>
-#include <cstring>
 #include <new>
 #include <string>
 
@@ -36,6 +37,16 @@ static void reach_app_update_store_utf16(uint16_t *dst, size_t capacity, const s
     reach_copy_utf16(dst, capacity, reinterpret_cast<const uint16_t *>(value.c_str()));
 }
 
+static int32_t reach_app_update_status_ok(HINTERNET request)
+{
+    DWORD status = 0;
+    DWORD size = sizeof(status);
+    return WinHttpQueryHeaders(request, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
+                               WINHTTP_HEADER_NAME_BY_INDEX, &status, &size,
+                               WINHTTP_NO_HEADER_INDEX) &&
+           status == HTTP_STATUS_OK;
+}
+
 static reach_result reach_app_update_https_get(const wchar_t *host, const wchar_t *path,
                                                const wchar_t *accept, std::string *out_body)
 {
@@ -58,7 +69,7 @@ static reach_result reach_app_update_https_get(const wchar_t *host, const wchar_
             DWORD headers_length = accept != nullptr ? (DWORD)-1L : 0;
             if (WinHttpSendRequest(request, headers, headers_length, WINHTTP_NO_REQUEST_DATA, 0, 0,
                                    0) &&
-                WinHttpReceiveResponse(request, nullptr))
+                WinHttpReceiveResponse(request, nullptr) && reach_app_update_status_ok(request))
             {
                 std::string body;
                 for (;;)
@@ -92,71 +103,6 @@ static reach_result reach_app_update_https_get(const wchar_t *host, const wchar_
     return result;
 }
 
-static std::string reach_app_update_clean_notes(const std::string &html)
-{
-    std::string out;
-    size_t index = 0;
-    int32_t in_tag = 0;
-    while (index < html.size() && out.size() < REACH_APP_UPDATE_NOTES_CAPACITY - 1)
-    {
-        char c = html[index];
-        if (c == '<')
-        {
-            in_tag = 1;
-            ++index;
-            continue;
-        }
-        if (c == '>')
-        {
-            in_tag = 0;
-            ++index;
-            continue;
-        }
-        if (in_tag)
-        {
-            ++index;
-            continue;
-        }
-        if (c == '&')
-        {
-            if (html.compare(index, 4, "&lt;") == 0)
-            {
-                out.push_back('<');
-                index += 4;
-            }
-            else if (html.compare(index, 4, "&gt;") == 0)
-            {
-                out.push_back('>');
-                index += 4;
-            }
-            else if (html.compare(index, 5, "&amp;") == 0)
-            {
-                out.push_back('&');
-                index += 5;
-            }
-            else if (html.compare(index, 6, "&quot;") == 0)
-            {
-                out.push_back('"');
-                index += 6;
-            }
-            else if (html.compare(index, 5, "&#39;") == 0)
-            {
-                out.push_back('\'');
-                index += 5;
-            }
-            else
-            {
-                out.push_back('&');
-                ++index;
-            }
-            continue;
-        }
-        out.push_back(c);
-        ++index;
-    }
-    return out;
-}
-
 static reach_result reach_app_update_check(void *userdata, const uint16_t *owner,
                                            const uint16_t *repo, reach_app_update_info *out_info)
 {
@@ -173,71 +119,65 @@ static reach_result reach_app_update_check(void *userdata, const uint16_t *owner
     const wchar_t *owner_w = reinterpret_cast<const wchar_t *>(owner);
     const wchar_t *repo_w = reinterpret_cast<const wchar_t *>(repo);
 
-    std::wstring path = std::wstring(L"/") + owner_w + L"/" + repo_w + L"/releases.atom";
+    std::wstring path = std::wstring(L"/repos/") + owner_w + L"/" + repo_w + L"/releases/latest";
     std::string body;
-    reach_result result = reach_app_update_https_get(L"github.com", path.c_str(),
-                                                     L"Accept: application/atom+xml\r\n", &body);
+    reach_result result = reach_app_update_https_get(
+        L"api.github.com", path.c_str(),
+        L"Accept: application/vnd.github+json\r\nX-GitHub-Api-Version: 2022-11-28\r\n", &body);
     if (result != REACH_OK || body.empty())
     {
         return REACH_ERROR;
     }
 
-    size_t entry = body.find("<entry>");
-    if (entry == std::string::npos)
+    reach_windows_app_update_release release = {};
+    if (!reach_windows_app_update_parse_release(body, &release))
     {
         return REACH_ERROR;
     }
-    const char *tag_marker = "/releases/tag/";
-    size_t tag_start = body.find(tag_marker, entry);
-    if (tag_start == std::string::npos)
-    {
-        return REACH_ERROR;
-    }
-    tag_start += strlen(tag_marker);
-    size_t tag_end = body.find('"', tag_start);
-    if (tag_end == std::string::npos || tag_end <= tag_start)
-    {
-        return REACH_ERROR;
-    }
-    std::string tag = body.substr(tag_start, tag_end - tag_start);
 
-    std::string notes;
-    size_t content = body.find("<content", entry);
-    if (content != std::string::npos)
-    {
-        size_t content_start = body.find('>', content);
-        size_t content_end = body.find("</content>", content);
-        if (content_start != std::string::npos && content_end != std::string::npos &&
-            content_end > content_start)
-        {
-            notes = reach_app_update_clean_notes(
-                body.substr(content_start + 1, content_end - content_start - 1));
-        }
-    }
-
-    std::wstring tag_w = reach_app_update_utf8_to_utf16(tag.c_str(), tag.size());
-    std::wstring asset_w = L"reach-" + tag_w + L"-Release.zip";
-    std::wstring url_w = std::wstring(L"https://github.com/") + owner_w + L"/" + repo_w +
-                         L"/releases/download/" + tag_w + L"/" + asset_w;
-
-    reach_app_update_store_utf16(out_info->version, REACH_APP_UPDATE_VERSION_CAPACITY, tag_w);
-    reach_app_update_store_utf16(out_info->asset_name, REACH_APP_UPDATE_NAME_CAPACITY, asset_w);
-    reach_app_update_store_utf16(out_info->download_url, REACH_APP_UPDATE_URL_CAPACITY, url_w);
-    reach_app_update_store_utf16(out_info->notes, REACH_APP_UPDATE_NOTES_CAPACITY,
-                                 reach_app_update_utf8_to_utf16(notes.c_str(), notes.size()));
-    out_info->has_release = !tag.empty();
+    reach_app_update_store_utf16(
+        out_info->version, REACH_APP_UPDATE_VERSION_CAPACITY,
+        reach_app_update_utf8_to_utf16(release.tag.c_str(), release.tag.size()));
+    reach_app_update_store_utf16(
+        out_info->asset_name, REACH_APP_UPDATE_NAME_CAPACITY,
+        reach_app_update_utf8_to_utf16(release.asset_name.c_str(), release.asset_name.size()));
+    reach_app_update_store_utf16(
+        out_info->download_url, REACH_APP_UPDATE_URL_CAPACITY,
+        reach_app_update_utf8_to_utf16(release.asset_url.c_str(), release.asset_url.size()));
+    reach_app_update_store_utf16(
+        out_info->digest, REACH_APP_UPDATE_DIGEST_CAPACITY,
+        reach_app_update_utf8_to_utf16(release.digest.c_str(), release.digest.size()));
+    out_info->asset_size = release.asset_size;
+    out_info->has_release = 1;
     return REACH_OK;
 }
 
+static int32_t reach_app_update_digest_matches(const uint16_t *path, const uint16_t *digest)
+{
+    char ascii[REACH_APP_UPDATE_DIGEST_CAPACITY] = {};
+    for (size_t index = 0; index + 1 < REACH_APP_UPDATE_DIGEST_CAPACITY && digest[index] != 0;
+         ++index)
+    {
+        if (digest[index] >= 128)
+        {
+            return 0;
+        }
+        ascii[index] = (char)digest[index];
+    }
+    return reach_windows_app_update_file_matches_digest(reinterpret_cast<const wchar_t *>(path),
+                                                        ascii);
+}
+
 static reach_result reach_app_update_download(void *userdata, const uint16_t *url,
-                                              const uint16_t *dest_path,
+                                              const uint16_t *digest, const uint16_t *dest_path,
                                               reach_app_update_download_progress progress,
                                               void *progress_user)
 {
     reach_app_update_state *state = static_cast<reach_app_update_state *>(userdata);
     REACH_ASSERT(url != nullptr);
+    REACH_ASSERT(digest != nullptr);
     REACH_ASSERT(dest_path != nullptr);
-    if (url == nullptr || dest_path == nullptr)
+    if (url == nullptr || digest == nullptr || dest_path == nullptr)
     {
         return REACH_INVALID_ARGUMENT;
     }
@@ -281,7 +221,7 @@ static reach_result reach_app_update_download(void *userdata, const uint16_t *ur
             WinHttpSetOption(request, WINHTTP_OPTION_REDIRECT_POLICY, &redirect, sizeof(redirect));
             if (WinHttpSendRequest(request, WINHTTP_NO_ADDITIONAL_HEADERS, 0,
                                    WINHTTP_NO_REQUEST_DATA, 0, 0, 0) &&
-                WinHttpReceiveResponse(request, nullptr))
+                WinHttpReceiveResponse(request, nullptr) && reach_app_update_status_ok(request))
             {
                 uint64_t total = 0;
                 DWORD content_length = 0;
@@ -334,7 +274,7 @@ static reach_result reach_app_update_download(void *userdata, const uint16_t *ur
                         }
                     }
                     CloseHandle(file);
-                    if (!failed)
+                    if (!failed && reach_app_update_digest_matches(dest_path, digest))
                     {
                         result = REACH_OK;
                     }
