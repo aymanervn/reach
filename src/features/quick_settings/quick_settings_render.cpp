@@ -6,6 +6,7 @@
 #include "reach/features/common/ui_controls.h"
 
 #include "reach/features/common/level_presentation.h"
+#include "reach/features/common/wifi_session.h"
 #include "quick_settings_metrics.h"
 
 #include <math.h>
@@ -579,7 +580,8 @@ static reach_result reach_quick_settings_push_rail(const reach_quick_settings_re
     }
 
     static const uint32_t icons[REACH_QUICK_SETTINGS_PAGE_COUNT] = {
-        REACH_VECTOR_ICON_QUICK_SETTINGS, REACH_VECTOR_ICON_VOLUME_HIGH};
+        REACH_VECTOR_ICON_QUICK_SETTINGS, REACH_VECTOR_ICON_VOLUME_HIGH,
+        REACH_VECTOR_ICON_WIFI_HIGH};
     reach_quick_settings_metrics metrics = reach_quick_settings_metrics_for_scale(input->dpi_scale);
     reach_render_group glyphs = {};
     glyphs.id = 32;
@@ -631,6 +633,7 @@ enum reach_quick_settings_feedback_slot
     REACH_QUICK_SETTINGS_FEEDBACK_OUTPUTS,
     REACH_QUICK_SETTINGS_FEEDBACK_APPS,
     REACH_QUICK_SETTINGS_FEEDBACK_INPUT,
+    REACH_QUICK_SETTINGS_FEEDBACK_WIFI,
     REACH_QUICK_SETTINGS_FEEDBACK_TRAILING
 };
 
@@ -913,6 +916,134 @@ static reach_result reach_quick_settings_push_sound(const reach_quick_settings_r
     return result;
 }
 
+static void reach_quick_settings_push_wifi_row(
+    reach_render_command_buffer *commands, const reach_wifi_network *network,
+    const reach_quick_settings_output_device_row_layout *row,
+    const reach_quick_settings_model *model, const reach_theme *theme,
+    const reach_quick_settings_metrics *metrics, const reach_text_measure_port *text_measure)
+{
+    if (network->connected)
+    {
+        reach_quick_settings_push_rounded_rect(commands, row->bounds, row->bounds.height * 0.5f,
+                                               theme->accent);
+    }
+    reach_quick_settings_push_pill_icon(commands, row->icon,
+                                        reach_wifi_signal_icon(network->signal_strength), 0, theme);
+    reach_quick_settings_push_fitted_text(commands, row->title, network->ssid,
+                                          metrics->output_row_title_text_size,
+                                          REACH_TEXT_WEIGHT_SEMIBOLD, REACH_TEXT_ALIGNMENT_LEADING,
+                                          theme->primary_text, text_measure);
+    const uint16_t *detail = reach_wifi_session_network_detail(network, 0);
+    if (model->wifi_status != REACH_WIFI_SESSION_STATUS_IDLE &&
+        model->wifi_status != REACH_WIFI_SESSION_STATUS_SCANNING &&
+        reach_utf16_equal(model->wifi_status_ssid, network->ssid))
+    {
+        detail = reach_wifi_session_status_message((reach_wifi_session_status)model->wifi_status);
+    }
+    reach_quick_settings_push_fitted_text(commands, row->detail, detail,
+                                          metrics->output_row_detail_text_size,
+                                          REACH_TEXT_WEIGHT_NORMAL, REACH_TEXT_ALIGNMENT_LEADING,
+                                          theme->quick_settings_secondary_text, text_measure);
+    if (network->connected || network->security != REACH_WIFI_SECURITY_OPEN)
+    {
+        reach_render_command trailing = {};
+        trailing.type = REACH_RENDER_COMMAND_VECTOR_ICON;
+        trailing.rect = row->checkmark;
+        trailing.icon_id = network->connected ? REACH_VECTOR_ICON_CHECK : REACH_VECTOR_ICON_LOCK;
+        trailing.color =
+            network->connected ? theme->primary_text : theme->quick_settings_secondary_text;
+        (void)reach_render_command_buffer_push(commands, &trailing);
+    }
+}
+
+static reach_result reach_quick_settings_push_wifi(const reach_quick_settings_render_input *input,
+                                                   reach_render_command_buffer *commands,
+                                                   const reach_quick_settings_metrics *metrics)
+{
+    const reach_quick_settings_layout &layout = input->layout;
+    const reach_theme &theme = input->theme;
+    const reach_quick_settings_model &model = input->model;
+    reach_result result =
+        reach_quick_settings_begin_page(input, commands, REACH_QUICK_SETTINGS_PAGE_WIFI, 22);
+    if (result == REACH_OK)
+    {
+        static const uint16_t title[] = {'W', 'i', '-', 'F', 'i', 0};
+        reach_quick_settings_push_text(commands, layout.wifi_title, title,
+                                       metrics->wifi_title_text_size, REACH_TEXT_WEIGHT_SEMIBOLD,
+                                       REACH_TEXT_ALIGNMENT_LEADING, theme.primary_text);
+        static const uint16_t off[] = {'W', 'i', '-', 'F', 'i', ' ', 'i',
+                                       's', ' ', 'o', 'f', 'f', 0};
+        static const uint16_t unavailable[] = {'N', 'o', ' ', 'W', 'i', '-', 'F', 'i', ' ',
+                                               'a', 'd', 'a', 'p', 't', 'e', 'r', 0};
+        static const uint16_t searching[] = {'L', 'o', 'o', 'k', 'i',    'n', 'g', ' ',
+                                             'f', 'o', 'r', ' ', 'n',    'e', 't', 'w',
+                                             'o', 'r', 'k', 's', 0x2026, 0};
+        static const uint16_t none[] = {'N', 'o', ' ', 'n', 'e', 't', 'w', 'o', 'r',
+                                        'k', 's', ' ', 'f', 'o', 'u', 'n', 'd', 0};
+        if (layout.wifi_message.height > 0.0f)
+        {
+            const uint16_t *message = model.wifi_radio == REACH_WIFI_RADIO_UNAVAILABLE ? unavailable
+                                      : model.wifi_radio != REACH_WIFI_RADIO_ON        ? off
+                                      : model.wifi_status == REACH_WIFI_SESSION_STATUS_SCANNING
+                                          ? searching
+                                          : none;
+            reach_quick_settings_push_section_label(commands, layout.wifi_message, message, &theme,
+                                                    metrics);
+        }
+        if (layout.wifi_nearby_label.height > 0.0f)
+        {
+            static const uint16_t nearby[] = {'N', 'e', 'a', 'r', 'b', 'y', 0};
+            reach_quick_settings_push_section_label(
+                commands, layout.wifi_nearby_label,
+                model.wifi_status == REACH_WIFI_SESSION_STATUS_SCANNING ? searching : nearby,
+                &theme, metrics);
+        }
+        if (model.wifi_radio != REACH_WIFI_RADIO_UNAVAILABLE)
+        {
+            reach_ui_toggle_style style = {};
+            style.track_off = theme.toggle_track_off;
+            style.track_on = theme.accent;
+            style.knob = theme.toggle_knob;
+            result = reach_ui_toggle_motion_render(commands, layout.wifi_switch, &style, 700,
+                                                   &input->wifi_switch);
+        }
+    }
+    reach_render_command_buffer_end_group(commands);
+    if (result != REACH_OK)
+        return result;
+
+    float base = layout.wifi_title.y + layout.wifi_title.height + metrics->overview_row_gap;
+    reach_rect_f32 panel = layout.page_bounds;
+    panel.x += metrics->content_padding;
+    panel.width -= metrics->content_padding * 2.0f;
+    for (size_t slot = 0; result == REACH_OK && slot < REACH_QUICK_SETTINGS_WIFI_ROWS; ++slot)
+    {
+        const reach_keyed_row &row = input->wifi_row_motions[slot];
+        if (row.lifecycle == REACH_KEYED_ROW_EMPTY)
+            continue;
+        reach_quick_settings_output_device_row_layout row_layout =
+            reach_quick_settings_output_device_row_layout_at(panel, base + row.y.to,
+                                                             input->dpi_scale);
+        reach_render_group group = {};
+        group.id = 720 + slot;
+        group.parent_id = 22;
+        group.bounds = row_layout.bounds;
+        group.opacity = row.opacity;
+        group.y = reach_motion_affine(&row.y, 1, -row.y.to);
+        result = reach_render_command_buffer_begin_group(commands, &group);
+        if (result == REACH_OK)
+        {
+            reach_quick_settings_push_wifi_row(commands, &input->wifi_row_items[slot], &row_layout,
+                                               &model, &theme, metrics, &input->text_measure);
+        }
+        reach_render_command_buffer_end_group(commands);
+    }
+    if (result == REACH_OK)
+        result = reach_quick_settings_push_press_feedback(input, commands,
+                                                          REACH_QUICK_SETTINGS_FEEDBACK_WIFI);
+    return result;
+}
+
 static int32_t reach_quick_settings_feedback_slot(uint64_t target)
 {
     size_t index = reach_quick_settings_pressable_target_index(target);
@@ -925,6 +1056,9 @@ static int32_t reach_quick_settings_feedback_slot(uint64_t target)
         return REACH_QUICK_SETTINGS_FEEDBACK_OVERVIEW;
     case REACH_QUICK_SETTINGS_PRESS_TARGET_OUTPUT_DEVICE_ROW:
         return REACH_QUICK_SETTINGS_FEEDBACK_OUTPUTS;
+    case REACH_QUICK_SETTINGS_PRESS_TARGET_WIFI_SWITCH:
+    case REACH_QUICK_SETTINGS_PRESS_TARGET_WIFI_ROW:
+        return REACH_QUICK_SETTINGS_FEEDBACK_WIFI;
     case REACH_QUICK_SETTINGS_PRESS_TARGET_MUTE:
         return index == REACH_QUICK_SETTINGS_MUTE_OVERVIEW ? REACH_QUICK_SETTINGS_FEEDBACK_OVERVIEW
                : index == REACH_QUICK_SETTINGS_MUTE_SOUND  ? REACH_QUICK_SETTINGS_FEEDBACK_SOUND_TOP
@@ -958,6 +1092,10 @@ reach_quick_settings_press_feedback_bounds(const reach_quick_settings_render_inp
     case REACH_QUICK_SETTINGS_PRESS_TARGET_OUTPUT_DEVICE_ROW:
         return index < layout.output_device_row_count ? layout.output_device_rows[index].bounds
                                                       : reach_rect_f32{};
+    case REACH_QUICK_SETTINGS_PRESS_TARGET_WIFI_SWITCH:
+        return layout.wifi_switch;
+    case REACH_QUICK_SETTINGS_PRESS_TARGET_WIFI_ROW:
+        return index < layout.wifi_row_count ? layout.wifi_rows[index].bounds : reach_rect_f32{};
     case REACH_QUICK_SETTINGS_PRESS_TARGET_MUTE:
         if (index == REACH_QUICK_SETTINGS_MUTE_OVERVIEW)
             return reach_quick_settings_mute_bounds(layout.overview_volume.bounds);
@@ -991,7 +1129,7 @@ reach_quick_settings_push_press_feedback(const reach_quick_settings_render_input
     {
         return REACH_OK;
     }
-    static const uint64_t parents[] = {20, 21, 3, 4, 13, 8};
+    static const uint64_t parents[] = {20, 21, 3, 4, 13, 22, 8};
     reach_render_group placement = {};
     placement.bounds = bounds;
     placement.parent_id = parents[slot];
@@ -1100,6 +1238,9 @@ reach_quick_settings_build_render_commands(const reach_quick_settings_render_inp
     if (result == REACH_OK &&
         reach_quick_settings_page_visible(input, REACH_QUICK_SETTINGS_PAGE_SOUND))
         result = reach_quick_settings_push_sound(input, commands, &metrics);
+    if (result == REACH_OK &&
+        reach_quick_settings_page_visible(input, REACH_QUICK_SETTINGS_PAGE_WIFI))
+        result = reach_quick_settings_push_wifi(input, commands, &metrics);
     if (result != REACH_OK)
         return result;
     return reach_quick_settings_push_press_feedback(input, commands,
@@ -1141,6 +1282,8 @@ reach_result reach_quick_settings_append_render_commands(
                                      input.app_volume_row_items);
     reach_quick_settings_page_motions(quick_settings, input.toggle_states, input.page_opacity,
                                       input.page_shift, &input.rail_marker);
+    reach_quick_settings_wifi_motions(quick_settings, input.wifi_row_motions, input.wifi_row_items,
+                                      &input.wifi_switch);
     input.press_feedback_target = reach_quick_settings_press_feedback_target(quick_settings);
     input.press_feedback = reach_quick_settings_press_feedback_motion(quick_settings);
 

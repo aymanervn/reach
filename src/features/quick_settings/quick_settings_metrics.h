@@ -52,6 +52,9 @@ struct reach_quick_settings_metrics
     float output_row_title_height;
     float output_row_detail_height;
     float app_volume_row_height;
+    float wifi_header_height;
+    float wifi_switch_width;
+    float wifi_switch_height;
 
     float toggle_title_text_size;
     float toggle_status_text_size;
@@ -62,6 +65,7 @@ struct reach_quick_settings_metrics
     float section_label_text_size;
     float output_row_title_text_size;
     float output_row_detail_text_size;
+    float wifi_title_text_size;
 };
 
 static constexpr reach_quick_settings_metrics reach_quick_settings_make_metrics()
@@ -114,6 +118,9 @@ static constexpr reach_quick_settings_metrics reach_quick_settings_make_metrics(
     metrics.output_row_title_height = 15.0f;
     metrics.output_row_detail_height = 14.0f;
     metrics.app_volume_row_height = 38.0f;
+    metrics.wifi_header_height = 32.0f;
+    metrics.wifi_switch_width = 36.0f;
+    metrics.wifi_switch_height = 20.0f;
 
     metrics.toggle_title_text_size = REACH_TEXT_SIZE_SMALL;
     metrics.toggle_status_text_size = REACH_TEXT_SIZE_XSMALL;
@@ -124,6 +131,7 @@ static constexpr reach_quick_settings_metrics reach_quick_settings_make_metrics(
     metrics.section_label_text_size = REACH_TEXT_SIZE_XSMALL;
     metrics.output_row_title_text_size = REACH_TEXT_SIZE_SMALL;
     metrics.output_row_detail_text_size = REACH_TEXT_SIZE_XSMALL;
+    metrics.wifi_title_text_size = REACH_TEXT_SIZE_MEDIUM;
 
     return metrics;
 }
@@ -216,6 +224,12 @@ static inline reach_quick_settings_metrics reach_quick_settings_metrics_for_scal
         reach_quick_settings_metric_scale_value(metrics.output_row_detail_height, dpi_scale);
     metrics.app_volume_row_height =
         reach_quick_settings_metric_scale_value(metrics.app_volume_row_height, dpi_scale);
+    metrics.wifi_header_height =
+        reach_quick_settings_metric_scale_value(metrics.wifi_header_height, dpi_scale);
+    metrics.wifi_switch_width =
+        reach_quick_settings_metric_scale_value(metrics.wifi_switch_width, dpi_scale);
+    metrics.wifi_switch_height =
+        reach_quick_settings_metric_scale_value(metrics.wifi_switch_height, dpi_scale);
     metrics.toggle_title_text_size =
         reach_quick_settings_metric_scale_value(metrics.toggle_title_text_size, dpi_scale);
     metrics.toggle_status_text_size =
@@ -234,6 +248,8 @@ static inline reach_quick_settings_metrics reach_quick_settings_metrics_for_scal
         reach_quick_settings_metric_scale_value(metrics.output_row_title_text_size, dpi_scale);
     metrics.output_row_detail_text_size =
         reach_quick_settings_metric_scale_value(metrics.output_row_detail_text_size, dpi_scale);
+    metrics.wifi_title_text_size =
+        reach_quick_settings_metric_scale_value(metrics.wifi_title_text_size, dpi_scale);
     return metrics;
 }
 
