@@ -83,6 +83,15 @@ static void reach_system_status_audio_thread_main(reach_system_status *service)
             snapshot.state_valid = 1;
         }
 
+        if (service->audio_volume.get_input_state != nullptr &&
+            service->audio_volume.get_input_state(service->audio_volume.userdata,
+                                                  &snapshot.input) == REACH_OK)
+        {
+            snapshot.input.level = reach_system_status_clamp01(snapshot.input.level);
+            snapshot.input.muted = snapshot.input.muted ? 1 : 0;
+            snapshot.input_valid = 1;
+        }
+
         if (service->audio_volume.list_sessions != nullptr &&
             service->audio_volume.list_sessions(service->audio_volume.userdata,
                                                 &snapshot.sessions) == REACH_OK)
@@ -570,6 +579,55 @@ reach_result reach_system_status_set_session_volume(reach_system_status *service
     }
     return service->audio_volume.set_session_level(
         service->audio_volume.userdata, session_instance_id, reach_system_status_clamp01(level));
+}
+
+reach_result reach_system_status_set_main_muted(reach_system_status *service, int32_t muted)
+{
+    if (service == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    return service->audio_volume.set_muted != nullptr
+               ? service->audio_volume.set_muted(service->audio_volume.userdata, muted ? 1 : 0)
+               : REACH_NOT_IMPLEMENTED;
+}
+
+reach_result reach_system_status_set_session_muted(reach_system_status *service,
+                                                   const uint16_t *session_instance_id,
+                                                   int32_t muted)
+{
+    if (service == nullptr || session_instance_id == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    return service->audio_volume.set_session_muted != nullptr
+               ? service->audio_volume.set_session_muted(service->audio_volume.userdata,
+                                                         session_instance_id, muted ? 1 : 0)
+               : REACH_NOT_IMPLEMENTED;
+}
+
+reach_result reach_system_status_set_input_volume(reach_system_status *service, float level)
+{
+    if (service == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    return service->audio_volume.set_input_level != nullptr
+               ? service->audio_volume.set_input_level(service->audio_volume.userdata,
+                                                       reach_system_status_clamp01(level))
+               : REACH_NOT_IMPLEMENTED;
+}
+
+reach_result reach_system_status_set_input_muted(reach_system_status *service, int32_t muted)
+{
+    if (service == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    return service->audio_volume.set_input_muted != nullptr
+               ? service->audio_volume.set_input_muted(service->audio_volume.userdata,
+                                                       muted ? 1 : 0)
+               : REACH_NOT_IMPLEMENTED;
 }
 
 reach_result reach_system_status_set_default_output_device(reach_system_status *service,

@@ -263,7 +263,11 @@ static void test_expansion_keeps_popup_anchor_position(void)
 
     (void)reach_quick_settings_select_page(quick_settings, REACH_QUICK_SETTINGS_PAGE_SOUND);
     reach_quick_settings_relayout(quick_settings, &ctx, 0);
-    (void)reach_quick_settings_toggle_expanded(quick_settings);
+    reach_audio_volume_session_list sessions = {};
+    sessions.count = 3;
+    for (size_t index = 0; index < sessions.count; ++index)
+        sessions.sessions[index].session_instance_id[0] = (uint16_t)('a' + index);
+    reach_quick_settings_apply_sessions(quick_settings, &sessions);
     reach_quick_settings_relayout(quick_settings, &ctx, 1);
     expect_true(reach_quick_settings_state_ptr(quick_settings)->target_bounds.height >
                     reach_quick_settings_state_ptr(quick_settings)->bounds.height,

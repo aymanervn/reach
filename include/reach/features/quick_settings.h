@@ -42,8 +42,8 @@ extern "C"
         reach_quick_settings_page page;
         float main_volume_level;
         int32_t main_muted;
-        int32_t expanded;
-        int32_t output_devices_expanded;
+        reach_audio_volume_state input;
+        int32_t input_available;
         reach_audio_volume_session_list sessions;
         reach_audio_output_device_list output_devices;
         reach_network_state network;
@@ -60,43 +60,21 @@ extern "C"
         reach_power_state power;
     } reach_quick_settings_model;
 
-    typedef struct reach_quick_settings_volume_pill_model
-    {
-        float volume_level;
-        int32_t muted;
-        uint32_t icon_id;
-        uint16_t label[REACH_AUDIO_VOLUME_SESSION_LABEL_CAPACITY];
-        uint16_t session_instance_id[REACH_AUDIO_VOLUME_SESSION_KEY_CAPACITY];
-    } reach_quick_settings_volume_pill_model;
-
-    typedef struct reach_quick_settings_volume_pill_layout
+    typedef struct reach_quick_settings_level_pill_layout
     {
         reach_rect_f32 bounds;
-        reach_rect_f32 header_icon;
-        reach_rect_f32 header_label;
-        reach_rect_f32 slider_track;
-        reach_rect_f32 slider_fill;
-    } reach_quick_settings_volume_pill_layout;
-
-    typedef struct reach_quick_settings_app_volume_row_layout
-    {
-        reach_rect_f32 bounds;
-        reach_rect_f32 app_icon;
-        reach_rect_f32 app_label;
-        reach_rect_f32 slider_full_range_line;
-        reach_rect_f32 slider_level_line;
-        reach_rect_f32 slider_thumb;
-        reach_rect_f32 app_volume_percent;
-        reach_rect_f32 separator;
-    } reach_quick_settings_app_volume_row_layout;
+        reach_rect_f32 icon;
+        reach_rect_f32 label;
+        reach_rect_f32 value;
+    } reach_quick_settings_level_pill_layout;
 
     typedef struct reach_quick_settings_output_device_row_layout
     {
         reach_rect_f32 bounds;
         reach_rect_f32 icon;
-        reach_rect_f32 label;
+        reach_rect_f32 title;
+        reach_rect_f32 detail;
         reach_rect_f32 checkmark;
-        reach_rect_f32 separator;
     } reach_quick_settings_output_device_row_layout;
 
     typedef struct reach_quick_settings_toggle_layout
@@ -122,48 +100,37 @@ extern "C"
         reach_rect_f32 rail;
         reach_rect_f32 rail_items[REACH_QUICK_SETTINGS_PAGE_COUNT];
 
-        reach_rect_f32 overview_volume;
-        reach_rect_f32 overview_volume_icon;
-        reach_rect_f32 overview_volume_value;
+        reach_quick_settings_level_pill_layout overview_volume;
         reach_rect_f32 sound_page_button;
-        reach_rect_f32 overview_brightness;
-        reach_rect_f32 overview_brightness_icon;
-        reach_rect_f32 overview_brightness_value;
+        reach_quick_settings_level_pill_layout overview_brightness;
         reach_quick_settings_toggle_layout toggles[REACH_QUICK_SETTINGS_TOGGLE_COUNT];
 
-        reach_quick_settings_volume_pill_layout main_volume_pill;
-        reach_rect_f32 main_slider_track;
-        reach_rect_f32 main_slider_fill;
+        reach_quick_settings_level_pill_layout sound_volume;
 
-        reach_rect_f32 output_device_button;
-        reach_rect_f32 output_device_button_icon;
-        reach_rect_f32 output_device_button_label;
-        reach_rect_f32 output_device_button_chevron;
+        reach_rect_f32 output_label;
         reach_rect_f32 output_devices_panel;
         reach_rect_f32 output_devices_clip;
         reach_quick_settings_output_device_row_layout
             output_device_rows[REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES];
         size_t output_device_row_count;
 
+        reach_rect_f32 app_label;
         reach_rect_f32 app_volumes_panel;
         reach_rect_f32 app_volumes_clip;
-        reach_quick_settings_app_volume_row_layout app_volume_rows[REACH_AUDIO_VOLUME_MAX_SESSIONS];
+        reach_quick_settings_level_pill_layout app_volume_rows[REACH_AUDIO_VOLUME_MAX_SESSIONS];
         size_t app_volume_row_count;
 
-        reach_rect_f32 expand_button;
-        reach_rect_f32 expand_button_label;
-        reach_rect_f32 expand_button_icon;
+        reach_rect_f32 input_label;
+        reach_quick_settings_level_pill_layout input_volume;
     } reach_quick_settings_layout;
 
     typedef struct reach_quick_settings_output_device_row
     {
-        int32_t separator;
         reach_audio_output_device device;
     } reach_quick_settings_output_device_row;
 
     typedef struct reach_quick_settings_app_volume_row
     {
-        int32_t separator;
         reach_audio_volume_session session;
     } reach_quick_settings_app_volume_row;
 
@@ -173,12 +140,8 @@ extern "C"
         reach_quick_settings_layout layout;
         reach_theme theme;
         float dpi_scale;
-        reach_motion output_devices_expansion;
-        reach_motion app_volumes_expansion;
         reach_motion output_devices_span;
         reach_motion app_volumes_span;
-        reach_motion output_devices_opacity;
-        reach_motion app_volumes_opacity;
         reach_keyed_row output_device_row_motions[REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES];
         reach_quick_settings_output_device_row
             output_device_row_items[REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES];
@@ -219,18 +182,6 @@ extern "C"
 
     uint32_t reach_quick_settings_volume_icon_id(float volume_level, int32_t muted);
 
-    void reach_quick_settings_volume_pill_model_init(reach_quick_settings_volume_pill_model *model,
-                                                     float volume_level, int32_t muted,
-                                                     const uint16_t *label);
-
-    reach_quick_settings_volume_pill_layout
-    reach_quick_settings_volume_pill_layout_for_bounds_scaled(reach_rect_f32 bounds,
-                                                              const reach_theme *theme,
-                                                              float dpi_scale);
-
-    float reach_quick_settings_volume_pill_level_for_x(
-        const reach_quick_settings_volume_pill_layout *layout, float x);
-
     reach_quick_settings_layout
     reach_quick_settings_layout_for_content_bounds(reach_rect_f32 content_bounds,
                                                    const reach_theme *theme,
@@ -270,12 +221,8 @@ extern "C"
         reach_rect_f32 bounds;
         reach_rect_f32 target_bounds;
         reach_rect_f32 content_bounds;
-        reach_motion output_devices_expansion;
-        reach_motion app_volumes_expansion;
         reach_motion output_devices_span;
         reach_motion app_volumes_span;
-        reach_motion output_devices_opacity;
-        reach_motion app_volumes_opacity;
         reach_rect_motion surface_motion;
         reach_motion scroll_motion;
         reach_rect_f32 render_bounds;
@@ -297,6 +244,8 @@ extern "C"
 
     void reach_quick_settings_apply_main_volume(reach_quick_settings *quick_settings, float level,
                                                 int32_t muted);
+    void reach_quick_settings_apply_input(reach_quick_settings *quick_settings,
+                                          const reach_audio_volume_state *input);
     void reach_quick_settings_apply_sessions(reach_quick_settings *quick_settings,
                                              const reach_audio_volume_session_list *sessions);
     void reach_quick_settings_apply_output_devices(reach_quick_settings *quick_settings,
@@ -327,10 +276,6 @@ extern "C"
     int32_t reach_quick_settings_bluetooth_enabled(reach_quick_settings *quick_settings);
     void reach_quick_settings_set_bluetooth_pending(reach_quick_settings *quick_settings,
                                                     int32_t pending, int32_t pending_enabled);
-
-    int32_t reach_quick_settings_toggle_expanded(reach_quick_settings *quick_settings);
-    int32_t reach_quick_settings_toggle_output_devices(reach_quick_settings *quick_settings);
-    void reach_quick_settings_collapse_output_devices(reach_quick_settings *quick_settings);
 
     const uint16_t *reach_quick_settings_set_session_level(reach_quick_settings *quick_settings,
                                                            size_t session_index, float level);

@@ -2880,6 +2880,30 @@ static void test_quick_settings_section_motion_renders_worst_case(void)
     const reach_feature_capsule_ops *ops = host->feature_runtimes[id].definition->capsule_ops;
     void *capsule = host->feature_runtimes[id].capsule;
     const char *label = "Quick Settings renders section motion within budget";
+    const reach_audio_volume_session_list empty_sessions = {};
+    const reach_audio_output_device_list empty_devices = {};
+    reach_audio_volume_state microphone = {};
+    microphone.level = 0.5f;
+    int32_t apps_full = 1;
+    int32_t outputs_full = 1;
+    auto toggle_apps = [&]
+    {
+        apps_full = !apps_full;
+        reach_quick_settings_apply_sessions(quick_settings,
+                                            apps_full ? &sessions : &empty_sessions);
+    };
+    auto toggle_outputs = [&]
+    {
+        outputs_full = !outputs_full;
+        reach_quick_settings_apply_output_devices(quick_settings,
+                                                  outputs_full ? &devices : &empty_devices);
+    };
+    auto fill_lists = [&]
+    {
+        apps_full = outputs_full = 1;
+        reach_quick_settings_apply_sessions(quick_settings, &sessions);
+        reach_quick_settings_apply_output_devices(quick_settings, &devices);
+    };
     for (float dpi : dpis)
     {
         for (reach_rect_f32 monitor : monitors)
@@ -2898,8 +2922,8 @@ static void test_quick_settings_section_motion_renders_worst_case(void)
                         quick_settings, retired, sizeof(retired) / sizeof(retired[0]));
                     render();
                 };
-                reach_quick_settings_apply_sessions(quick_settings, &sessions);
-                reach_quick_settings_apply_output_devices(quick_settings, &devices);
+                fill_lists();
+                reach_quick_settings_apply_input(quick_settings, &microphone);
                 set_system(0);
                 (void)reach_quick_settings_set_open(quick_settings, 1);
                 render();
@@ -2926,11 +2950,36 @@ static void test_quick_settings_section_motion_renders_worst_case(void)
                 (void)reach_quick_settings_select_page(quick_settings,
                                                        REACH_QUICK_SETTINGS_PAGE_SOUND);
                 step(0.6);
-                (void)reach_quick_settings_toggle_expanded(quick_settings);
+                {
+                    const reach_quick_settings_layout &sound =
+                        reach_quick_settings_state_ptr(quick_settings)->layout;
+                    const reach_rect_f32 controls[] = {
+                        sound.sound_volume.icon, sound.app_volume_rows[0].icon,
+                        sound.input_volume.icon, sound.output_device_rows[1].bounds};
+                    for (reach_rect_f32 control : controls)
+                    {
+                        float x = control.x + control.width * 0.5f;
+                        float y = control.y + control.height * 0.5f;
+                        send_pointer(ops, capsule,
+                                     make_pointer_event(REACH_POINTER_EVENT_DOWN,
+                                                        REACH_POINTER_COORDINATE_SURFACE_LOCAL, x,
+                                                        y));
+                        step(0.016);
+                        send_pointer(ops, capsule,
+                                     make_pointer_event(REACH_POINTER_EVENT_UP,
+                                                        REACH_POINTER_COORDINATE_SURFACE_LOCAL, x,
+                                                        y));
+                        for (size_t frame = 0; frame < 4; ++frame)
+                            step(0.016);
+                    }
+                    fill_lists();
+                    step(0.6);
+                }
+                toggle_apps();
                 set_system(1);
                 render();
                 step(0.06);
-                (void)reach_quick_settings_toggle_output_devices(quick_settings);
+                toggle_outputs();
                 render();
                 step(0.03);
                 reach_quick_settings_apply_sessions(quick_settings, &shifted_sessions);
@@ -2941,19 +2990,19 @@ static void test_quick_settings_section_motion_renders_worst_case(void)
                 reach_quick_settings_apply_output_devices(quick_settings, &devices);
                 render();
                 step(0.03);
-                (void)reach_quick_settings_toggle_output_devices(quick_settings);
+                toggle_outputs();
                 set_system(0);
                 render();
                 step(0.02);
-                (void)reach_quick_settings_toggle_expanded(quick_settings);
+                toggle_apps();
                 render();
                 for (size_t frame = 0; frame < 15; ++frame)
                     step(0.016);
                 step(0.6);
-                (void)reach_quick_settings_toggle_output_devices(quick_settings);
+                toggle_outputs();
                 for (size_t frame = 0; frame < 10; ++frame)
                     step(0.016);
-                (void)reach_quick_settings_toggle_expanded(quick_settings);
+                toggle_apps();
                 set_system(1);
                 for (size_t frame = 0; frame < 10; ++frame)
                     step(0.016);
@@ -2961,15 +3010,12 @@ static void test_quick_settings_section_motion_renders_worst_case(void)
                 render();
                 tick_presented_surface(host, id, 0.6);
                 tick_presented_surface(host, id, 0.6);
-                if (reach_quick_settings_state_ptr(quick_settings)->model.expanded)
-                    (void)reach_quick_settings_toggle_expanded(quick_settings);
-                if (reach_quick_settings_state_ptr(quick_settings)->model.output_devices_expanded)
-                    (void)reach_quick_settings_toggle_output_devices(quick_settings);
+                fill_lists();
 
                 (void)reach_quick_settings_set_open(quick_settings, 1);
                 (void)reach_quick_settings_select_page(quick_settings,
                                                        REACH_QUICK_SETTINGS_PAGE_SOUND);
-                (void)reach_quick_settings_toggle_expanded(quick_settings);
+                toggle_apps();
                 render();
                 step(0.6);
                 reach_feature_surface_geometry geometry = {};
@@ -2987,7 +3033,7 @@ static void test_quick_settings_section_motion_renders_worst_case(void)
                     replaced_sessions.sessions[index] = sessions.sessions[index + 1];
                 replaced_sessions.sessions[sessions.count - 1].session_instance_id[0] = 'Z';
                 reach_quick_settings_apply_sessions(quick_settings, &replaced_sessions);
-                (void)reach_quick_settings_toggle_output_devices(quick_settings);
+                toggle_outputs();
                 step(0.004);
                 reach_audio_volume_session_list no_sessions = {};
                 reach_quick_settings_apply_sessions(quick_settings, &no_sessions);
@@ -3018,20 +3064,17 @@ static void test_quick_settings_section_motion_renders_worst_case(void)
                 render();
                 tick_presented_surface(host, id, 0.6);
                 tick_presented_surface(host, id, 0.6);
-                if (reach_quick_settings_state_ptr(quick_settings)->model.expanded)
-                    (void)reach_quick_settings_toggle_expanded(quick_settings);
-                if (reach_quick_settings_state_ptr(quick_settings)->model.output_devices_expanded)
-                    (void)reach_quick_settings_toggle_output_devices(quick_settings);
+                fill_lists();
             }
         }
     }
     expect_true(presentation_render_failures == 0,
                 "every Quick Settings section-motion render stays valid");
-    expect_true(presentation_render_count == 4 * 3 * 2 * 119,
+    expect_true(presentation_render_count == 4 * 3 * 2 * 140,
                 "Quick Settings renders every section-motion step at every DPI and monitor");
     const size_t largest_rows = (size_t)REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES * 5 +
-                                (size_t)REACH_AUDIO_VOLUME_MAX_SESSIONS * 7;
-    expect_true(presentation_max_groups >= largest_rows + 25,
+                                (size_t)REACH_AUDIO_VOLUME_MAX_SESSIONS * 5;
+    expect_true(presentation_max_groups >= largest_rows + 16,
                 "Quick Settings rendered every row at its largest in both sections while pressed");
     reach_host_destroy_registered_features(host);
 }

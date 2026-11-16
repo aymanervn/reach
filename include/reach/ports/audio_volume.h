@@ -67,6 +67,12 @@ extern "C"
 
         reach_result (*set_muted)(void *userdata, int32_t muted);
 
+        reach_result (*get_input_state)(void *userdata, reach_audio_volume_state *out_state);
+
+        reach_result (*set_input_level)(void *userdata, float level);
+
+        reach_result (*set_input_muted)(void *userdata, int32_t muted);
+
         reach_result (*list_sessions)(void *userdata, reach_audio_volume_session_list *out_list);
 
         reach_result (*list_output_devices)(void *userdata,

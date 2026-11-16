@@ -133,7 +133,8 @@ static void reach_audio_volume_destroy_output_device_icons(reach_audio_volume_ad
 }
 
 static reach_result
-reach_audio_volume_create_default_endpoint_volume(IAudioEndpointVolume **out_endpoint)
+reach_audio_volume_create_default_endpoint_volume(EDataFlow flow,
+                                                  IAudioEndpointVolume **out_endpoint)
 {
     if (out_endpoint == nullptr)
     {
@@ -151,10 +152,10 @@ reach_audio_volume_create_default_endpoint_volume(IAudioEndpointVolume **out_end
 
     if (SUCCEEDED(hr))
     {
-        hr = enumerator->GetDefaultAudioEndpoint(eRender, eMultimedia, &device);
+        hr = enumerator->GetDefaultAudioEndpoint(flow, eMultimedia, &device);
         if (FAILED(hr))
         {
-            hr = enumerator->GetDefaultAudioEndpoint(eRender, eConsole, &device);
+            hr = enumerator->GetDefaultAudioEndpoint(flow, eConsole, &device);
         }
     }
 
@@ -522,8 +523,8 @@ static reach_result reach_audio_volume_read_session(IAudioSessionControl *contro
 
     return SUCCEEDED(hr) ? REACH_OK : REACH_ERROR;
 }
-static reach_result reach_audio_volume_get_state(void *userdata,
-                                                 reach_audio_volume_state *out_state)
+static reach_result reach_audio_volume_read_endpoint(void *userdata, EDataFlow flow,
+                                                     reach_audio_volume_state *out_state)
 {
     reach_audio_volume_adapter *adapter = static_cast<reach_audio_volume_adapter *>(userdata);
 
@@ -533,7 +534,7 @@ static reach_result reach_audio_volume_get_state(void *userdata,
     }
 
     IAudioEndpointVolume *endpoint = nullptr;
-    reach_result result = reach_audio_volume_create_default_endpoint_volume(&endpoint);
+    reach_result result = reach_audio_volume_create_default_endpoint_volume(flow, &endpoint);
     if (result != REACH_OK)
     {
         return result;
@@ -561,7 +562,7 @@ static reach_result reach_audio_volume_get_state(void *userdata,
     return REACH_OK;
 }
 
-static reach_result reach_audio_volume_set_level(void *userdata, float level)
+static reach_result reach_audio_volume_write_level(void *userdata, EDataFlow flow, float level)
 {
     reach_audio_volume_adapter *adapter = static_cast<reach_audio_volume_adapter *>(userdata);
 
@@ -571,7 +572,7 @@ static reach_result reach_audio_volume_set_level(void *userdata, float level)
     }
 
     IAudioEndpointVolume *endpoint = nullptr;
-    reach_result result = reach_audio_volume_create_default_endpoint_volume(&endpoint);
+    reach_result result = reach_audio_volume_create_default_endpoint_volume(flow, &endpoint);
     if (result != REACH_OK)
     {
         return result;
@@ -579,16 +580,10 @@ static reach_result reach_audio_volume_set_level(void *userdata, float level)
 
     HRESULT hr = endpoint->SetMasterVolumeLevelScalar(reach_audio_volume_clamp01(level), nullptr);
     endpoint->Release();
-
-    if (FAILED(hr))
-    {
-        return REACH_ERROR;
-    }
-
-    return REACH_OK;
+    return SUCCEEDED(hr) ? REACH_OK : REACH_ERROR;
 }
 
-static reach_result reach_audio_volume_set_muted(void *userdata, int32_t muted)
+static reach_result reach_audio_volume_write_muted(void *userdata, EDataFlow flow, int32_t muted)
 {
     reach_audio_volume_adapter *adapter = static_cast<reach_audio_volume_adapter *>(userdata);
 
@@ -598,7 +593,7 @@ static reach_result reach_audio_volume_set_muted(void *userdata, int32_t muted)
     }
 
     IAudioEndpointVolume *endpoint = nullptr;
-    reach_result result = reach_audio_volume_create_default_endpoint_volume(&endpoint);
+    reach_result result = reach_audio_volume_create_default_endpoint_volume(flow, &endpoint);
     if (result != REACH_OK)
     {
         return result;
@@ -606,13 +601,39 @@ static reach_result reach_audio_volume_set_muted(void *userdata, int32_t muted)
 
     HRESULT hr = endpoint->SetMute(muted ? TRUE : FALSE, nullptr);
     endpoint->Release();
+    return SUCCEEDED(hr) ? REACH_OK : REACH_ERROR;
+}
 
-    if (FAILED(hr))
-    {
-        return REACH_ERROR;
-    }
+static reach_result reach_audio_volume_get_state(void *userdata,
+                                                 reach_audio_volume_state *out_state)
+{
+    return reach_audio_volume_read_endpoint(userdata, eRender, out_state);
+}
 
-    return REACH_OK;
+static reach_result reach_audio_volume_set_level(void *userdata, float level)
+{
+    return reach_audio_volume_write_level(userdata, eRender, level);
+}
+
+static reach_result reach_audio_volume_set_muted(void *userdata, int32_t muted)
+{
+    return reach_audio_volume_write_muted(userdata, eRender, muted);
+}
+
+static reach_result reach_audio_volume_get_input_state(void *userdata,
+                                                       reach_audio_volume_state *out_state)
+{
+    return reach_audio_volume_read_endpoint(userdata, eCapture, out_state);
+}
+
+static reach_result reach_audio_volume_set_input_level(void *userdata, float level)
+{
+    return reach_audio_volume_write_level(userdata, eCapture, level);
+}
+
+static reach_result reach_audio_volume_set_input_muted(void *userdata, int32_t muted)
+{
+    return reach_audio_volume_write_muted(userdata, eCapture, muted);
 }
 
 static reach_result reach_audio_volume_list_sessions(void *userdata,
@@ -1099,7 +1120,7 @@ class reach_audio_volume_device_watcher : public IMMNotificationClient
     {
         (void)role;
         (void)device_id;
-        if (flow == eRender && rebind != nullptr)
+        if ((flow == eRender || flow == eCapture) && rebind != nullptr)
         {
             SetEvent(rebind);
         }
@@ -1150,11 +1171,11 @@ static void reach_audio_volume_unbind_endpoint(IAudioEndpointVolume **endpoint,
     }
 }
 
-static void reach_audio_volume_bind_endpoint(reach_audio_volume_adapter *adapter,
+static void reach_audio_volume_bind_endpoint(reach_audio_volume_adapter *adapter, EDataFlow flow,
                                              IAudioEndpointVolume **endpoint,
                                              reach_audio_volume_endpoint_watcher **watcher)
 {
-    if (reach_audio_volume_create_default_endpoint_volume(endpoint) != REACH_OK)
+    if (reach_audio_volume_create_default_endpoint_volume(flow, endpoint) != REACH_OK)
     {
         return;
     }
@@ -1194,7 +1215,10 @@ static DWORD WINAPI reach_audio_volume_watch_thread(LPVOID parameter)
 
     IAudioEndpointVolume *endpoint = nullptr;
     reach_audio_volume_endpoint_watcher *endpoint_watcher = nullptr;
-    reach_audio_volume_bind_endpoint(adapter, &endpoint, &endpoint_watcher);
+    reach_audio_volume_bind_endpoint(adapter, eRender, &endpoint, &endpoint_watcher);
+    IAudioEndpointVolume *input_endpoint = nullptr;
+    reach_audio_volume_endpoint_watcher *input_watcher = nullptr;
+    reach_audio_volume_bind_endpoint(adapter, eCapture, &input_endpoint, &input_watcher);
 
     HANDLE waits[2] = {adapter->watch_stop, adapter->watch_rebind};
     for (;;)
@@ -1206,10 +1230,13 @@ static DWORD WINAPI reach_audio_volume_watch_thread(LPVOID parameter)
         }
 
         reach_audio_volume_unbind_endpoint(&endpoint, &endpoint_watcher);
-        reach_audio_volume_bind_endpoint(adapter, &endpoint, &endpoint_watcher);
+        reach_audio_volume_bind_endpoint(adapter, eRender, &endpoint, &endpoint_watcher);
+        reach_audio_volume_unbind_endpoint(&input_endpoint, &input_watcher);
+        reach_audio_volume_bind_endpoint(adapter, eCapture, &input_endpoint, &input_watcher);
         reach_audio_volume_notify(adapter);
     }
 
+    reach_audio_volume_unbind_endpoint(&input_endpoint, &input_watcher);
     reach_audio_volume_unbind_endpoint(&endpoint, &endpoint_watcher);
     if (enumerator != nullptr)
     {
@@ -1356,6 +1383,9 @@ extern "C" reach_result reach_windows_create_audio_volume(reach_audio_volume_por
     out_port->get_state = reach_audio_volume_get_state;
     out_port->set_level = reach_audio_volume_set_level;
     out_port->set_muted = reach_audio_volume_set_muted;
+    out_port->get_input_state = reach_audio_volume_get_input_state;
+    out_port->set_input_level = reach_audio_volume_set_input_level;
+    out_port->set_input_muted = reach_audio_volume_set_input_muted;
     out_port->list_sessions = reach_audio_volume_list_sessions;
     out_port->list_output_devices = reach_audio_volume_list_output_devices;
     out_port->set_session_level = reach_audio_volume_set_session_level;
