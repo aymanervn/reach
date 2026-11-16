@@ -228,16 +228,26 @@ static void reach_quick_settings_section_spans(const reach_quick_settings_model 
                                        (float)sessions * metrics.app_volume_row_height
                                  : 0.0f;
 }
+static float reach_quick_settings_rail_full_width(const reach_quick_settings_metrics *metrics)
+{
+    return metrics->surface_padding + metrics->rail_width;
+}
+
+static float reach_quick_settings_rail_item_inset(const reach_quick_settings_metrics *metrics)
+{
+    return (reach_quick_settings_rail_full_width(metrics) - metrics->rail_item_size) * 0.5f;
+}
+
 static float reach_quick_settings_rail_height(const reach_quick_settings_metrics *metrics)
 {
-    return metrics->rail_padding * 2.0f +
+    return reach_quick_settings_rail_item_inset(metrics) * 2.0f - metrics->surface_padding * 2.0f +
            reach_quick_settings_stacked_rows_height(
                REACH_QUICK_SETTINGS_PAGE_COUNT, metrics->rail_item_size, metrics->rail_item_gap);
 }
 
 static float reach_quick_settings_header_height(const reach_quick_settings_metrics *metrics)
 {
-    return metrics->content_padding + metrics->banner_height + metrics->identity_height +
+    return metrics->banner_height - metrics->surface_padding + metrics->identity_height +
            metrics->identity_gap;
 }
 
@@ -360,8 +370,8 @@ reach_quick_settings_content_height_for_spans_scaled(const reach_quick_settings_
                       metrics.overview_row_gap + output_devices_span + app_volumes_span +
                       input_height;
     }
-    return reach_quick_settings_header_height(&metrics) +
-           fmaxf(page_height, reach_quick_settings_rail_height(&metrics) + metrics.content_padding);
+    return fmaxf(reach_quick_settings_header_height(&metrics) + page_height,
+                 reach_quick_settings_rail_height(&metrics));
 }
 
 float reach_quick_settings_content_height_for_model_scaled(const reach_quick_settings_model *model,
@@ -415,9 +425,10 @@ static void reach_quick_settings_place_header(reach_quick_settings_layout *layou
                                               reach_rect_f32 content_bounds,
                                               const reach_quick_settings_metrics *metrics)
 {
-    layout->banner = reach_quick_settings_content_line(content_bounds,
-                                                       content_bounds.y + metrics->content_padding,
-                                                       metrics->banner_height, metrics);
+    float banner_x = layout->rail.x + layout->rail.width;
+    layout->banner = reach_quick_settings_rect(
+        banner_x, layout->interior.y, layout->interior.x + layout->interior.width - banner_x,
+        metrics->banner_height);
     float ring = metrics->avatar_size + metrics->avatar_ring * 2.0f;
     layout->avatar_ring = reach_quick_settings_rect(
         layout->banner.x + metrics->avatar_inset - metrics->avatar_ring,
@@ -427,7 +438,7 @@ static void reach_quick_settings_place_header(reach_quick_settings_layout *layou
                                                layout->avatar_ring.y + metrics->avatar_ring,
                                                metrics->avatar_size, metrics->avatar_size);
     float text_x = layout->avatar_ring.x + ring + metrics->overview_row_gap;
-    float text_width = layout->banner.x + layout->banner.width - text_x;
+    float text_width = content_bounds.x + content_bounds.width - metrics->content_padding - text_x;
     float text_top = layout->banner.y + layout->banner.height +
                      (metrics->identity_height - metrics->identity_name_height -
                       metrics->identity_detail_height) *
@@ -440,20 +451,17 @@ static void reach_quick_settings_place_header(reach_quick_settings_layout *layou
 }
 
 static void reach_quick_settings_place_rail(reach_quick_settings_layout *layout,
-                                            reach_rect_f32 content_bounds,
                                             const reach_quick_settings_metrics *metrics)
 {
-    float top = content_bounds.y + metrics->content_padding +
-                (metrics->overview_pill_height - metrics->rail_item_size) * 0.5f -
-                metrics->rail_padding;
-    layout->rail = reach_quick_settings_rect(content_bounds.x, top, metrics->rail_width,
-                                             reach_quick_settings_rail_height(metrics));
-    float item_x = content_bounds.x + (metrics->rail_width - metrics->rail_item_size) * 0.5f;
+    layout->rail = reach_quick_settings_rect(layout->interior.x, layout->interior.y,
+                                             reach_quick_settings_rail_full_width(metrics),
+                                             layout->interior.height);
+    float inset = reach_quick_settings_rail_item_inset(metrics);
     for (size_t index = 0; index < REACH_QUICK_SETTINGS_PAGE_COUNT; ++index)
     {
         layout->rail_items[index] = reach_quick_settings_rect(
-            item_x,
-            top + metrics->rail_padding +
+            layout->rail.x + inset,
+            layout->rail.y + inset +
                 (float)index * (metrics->rail_item_size + metrics->rail_item_gap),
             metrics->rail_item_size, metrics->rail_item_size);
     }
@@ -490,8 +498,9 @@ static void reach_quick_settings_place_toggle(reach_quick_settings_toggle_layout
         reach_quick_settings_rect(bounds.x + metrics->toggle_leading_padding,
                                   bounds.y + (bounds.height - metrics->toggle_icon_size) * 0.5f,
                                   metrics->toggle_icon_size, metrics->toggle_icon_size);
-    float divider_x = toggle->icon.x + toggle->icon.width + metrics->toggle_divider_leading_gap;
-    float divider_width = fmaxf(1.0f, metrics->toggle_divider_height / 20.0f);
+    float divider_x =
+        roundf(toggle->icon.x + toggle->icon.width + metrics->toggle_divider_leading_gap);
+    float divider_width = 1.0f;
     toggle->divider = reach_quick_settings_rect(
         divider_x, bounds.y + (bounds.height - metrics->toggle_divider_height) * 0.5f,
         divider_width, metrics->toggle_divider_height);
@@ -785,13 +794,17 @@ reach_quick_settings_layout reach_quick_settings_layout_for_sections_scaled(
     layout.content_bounds = content_bounds;
 
     reach_quick_settings_metrics metrics = reach_quick_settings_metrics_for_scale(dpi_scale);
+    layout.interior = reach_quick_settings_rect(
+        content_bounds.x - metrics.surface_padding, content_bounds.y - metrics.surface_padding,
+        content_bounds.width + metrics.surface_padding * 2.0f,
+        content_bounds.height + metrics.surface_padding * 2.0f);
 
+    reach_quick_settings_place_rail(&layout, &metrics);
     reach_quick_settings_place_header(&layout, content_bounds, &metrics);
     reach_rect_f32 body_bounds = content_bounds;
     float header_height = reach_quick_settings_header_height(&metrics);
     body_bounds.y += header_height;
     body_bounds.height = reach_quick_settings_clamp_min0(body_bounds.height - header_height);
-    reach_quick_settings_place_rail(&layout, body_bounds, &metrics);
     reach_rect_f32 page_bounds = body_bounds;
     page_bounds.x += metrics.rail_width;
     page_bounds.width = reach_quick_settings_clamp_min0(page_bounds.width - metrics.rail_width);
@@ -2648,7 +2661,7 @@ static void reach_quick_settings_request_profile(reach_quick_settings *quick_set
     }
     reach_quick_settings_metrics metrics =
         reach_quick_settings_metrics_for_scale(quick_settings->layout_dpi);
-    float width = metrics.panel_width - metrics.content_padding * 2.0f;
+    float width = metrics.panel_width - reach_quick_settings_rail_full_width(&metrics);
     reach_profile_service_request(quick_settings->profile, quick_settings->wallpaper_path,
                                   (int32_t)ceilf(width), (int32_t)ceilf(metrics.banner_height));
 }
@@ -2956,8 +2969,6 @@ void reach_quick_settings_process_changes(reach_quick_settings *quick_settings,
     }
 }
 
-static const float reach_quick_settings_surface_padding = 4.0f;
-
 reach_rect_f32 reach_quick_settings_content_bounds_for(reach_rect_f32 surface_bounds,
                                                        const reach_theme *theme, float dpi_scale,
                                                        int32_t drop_direction)
@@ -2965,7 +2976,7 @@ reach_rect_f32 reach_quick_settings_content_bounds_for(reach_rect_f32 surface_bo
     reach_rect_f32 bounds = reach_theme_border_content_rect(theme, dpi_scale, surface_bounds);
 
     float scale = dpi_scale > 0.0f ? dpi_scale : 1.0f;
-    const float padding = reach_quick_settings_surface_padding * scale;
+    const float padding = reach_quick_settings_metrics_for_scale(scale).surface_padding;
     const float notch_height = reach_popup_notch_height_scaled(scale);
 
     bounds.x += padding;
@@ -2990,9 +3001,10 @@ static void reach_quick_settings_target_size(reach_quick_settings *quick_setting
                                              float *out_width, float *out_height)
 {
     float border_thickness = reach_theme_border_thickness(theme, scale);
-    const float surface_vertical_padding = border_thickness * 2.0f +
-                                           reach_quick_settings_surface_padding * scale * 2.0f +
-                                           reach_popup_notch_height_scaled(scale);
+    const float surface_vertical_padding =
+        border_thickness * 2.0f +
+        reach_quick_settings_metrics_for_scale(scale).surface_padding * 2.0f +
+        reach_popup_notch_height_scaled(scale);
     float content_height = reach_quick_settings_content_height_for_model_scaled(
         &reach_quick_settings_state_mut(quick_settings)->model, scale);
 

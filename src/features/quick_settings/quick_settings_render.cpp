@@ -490,8 +490,6 @@ static reach_result reach_quick_settings_push_header(const reach_quick_settings_
     reach_result result = reach_render_command_buffer_begin_group(commands, &group);
     if (result == REACH_OK)
     {
-        float radius = reach_nested_radius(reach_popup_radius_scaled(&theme, input->dpi_scale),
-                                           layout.banner.x - input->render_bounds.x);
         if (input->model.wallpaper_image_id != 0)
         {
             reach_render_command banner = {};
@@ -499,13 +497,12 @@ static reach_result reach_quick_settings_push_header(const reach_quick_settings_
             banner.rect = layout.banner;
             banner.icon_id = input->model.wallpaper_image_id;
             banner.icon_crop_to_fill = 1;
-            banner.radius = radius;
             banner.color.a = 1.0f;
             (void)reach_render_command_buffer_push(commands, &banner);
         }
         else
         {
-            reach_quick_settings_push_rounded_rect(commands, layout.banner, radius,
+            reach_quick_settings_push_rounded_rect(commands, layout.banner, 0.0f,
                                                    theme.quick_settings_button_background);
         }
 
@@ -548,33 +545,35 @@ static reach_result reach_quick_settings_push_header(const reach_quick_settings_
     return result;
 }
 
+static reach_result
+reach_quick_settings_push_rail_background(const reach_quick_settings_render_input *input,
+                                          reach_render_command_buffer *commands)
+{
+    reach_render_group rail = {};
+    rail.id = 30;
+    rail.parent_id = 1;
+    rail.bounds = input->layout.rail;
+    reach_result result = reach_render_command_buffer_begin_group(commands, &rail);
+    if (result == REACH_OK)
+    {
+        reach_quick_settings_push_rounded_rect(commands, input->layout.rail, 0.0f,
+                                               input->theme.quick_settings_button_background);
+    }
+    reach_render_command_buffer_end_group(commands);
+    return result;
+}
+
 static reach_result reach_quick_settings_push_rail(const reach_quick_settings_render_input *input,
                                                    reach_render_command_buffer *commands)
 {
     const reach_quick_settings_layout &layout = input->layout;
     const reach_theme &theme = input->theme;
-    reach_render_group rail = {};
-    rail.id = 30;
-    rail.parent_id = 8;
-    rail.bounds = layout.rail;
-    reach_result result = reach_render_command_buffer_begin_group(commands, &rail);
-    if (result == REACH_OK)
-    {
-        reach_quick_settings_push_rounded_rect(commands, layout.rail, layout.rail.width * 0.5f,
-                                               theme.quick_settings_button_background);
-    }
-    reach_render_command_buffer_end_group(commands);
-    if (result != REACH_OK)
-    {
-        return result;
-    }
-
     reach_render_group marker = {};
     marker.id = 31;
     marker.parent_id = 8;
     marker.bounds = layout.rail_items[0];
     marker.y = input->rail_marker;
-    result = reach_render_command_buffer_begin_group(commands, &marker);
+    reach_result result = reach_render_command_buffer_begin_group(commands, &marker);
     if (result == REACH_OK)
     {
         reach_quick_settings_push_rounded_rect(commands, layout.rail_items[0],
@@ -593,7 +592,9 @@ static reach_result reach_quick_settings_push_rail(const reach_quick_settings_re
     reach_render_group glyphs = {};
     glyphs.id = 32;
     glyphs.parent_id = 8;
-    glyphs.bounds = layout.rail;
+    const reach_rect_f32 &last = layout.rail_items[REACH_QUICK_SETTINGS_PAGE_COUNT - 1];
+    glyphs.bounds = layout.rail_items[0];
+    glyphs.bounds.height = last.y + last.height - glyphs.bounds.y;
     result = reach_render_command_buffer_begin_group(commands, &glyphs);
     for (size_t index = 0; result == REACH_OK && index < REACH_QUICK_SETTINGS_PAGE_COUNT; ++index)
     {
@@ -1512,8 +1513,13 @@ reach_quick_settings_build_render_commands(const reach_quick_settings_render_inp
         viewport_bottom =
             reach_motion_affine(&input->surface_motion.height, -1, body_bounds.height);
     reach_motion scrolling = reach_motion_affine(&input->scroll_motion, -1, 0);
-    if (reach_quick_settings_declare_group(commands, 1, 7, viewport, viewport, nullptr,
-                                           &viewport_bottom, nullptr) != REACH_OK ||
+    const reach_rect_f32 &interior = input->layout.interior;
+    float interior_radius = reach_nested_radius(
+        reach_popup_radius_scaled(&input->theme, input->dpi_scale), interior.x - body_bounds.x);
+    if (reach_quick_settings_declare_group(commands, 1, 7, interior, interior, nullptr,
+                                           &viewport_bottom, nullptr, true,
+                                           interior_radius) != REACH_OK ||
+        reach_quick_settings_push_rail_background(input, commands) != REACH_OK ||
         reach_quick_settings_declare_group(commands, 8, 1, viewport, viewport, &scrolling, nullptr,
                                            nullptr, false) != REACH_OK)
         return REACH_ERROR;

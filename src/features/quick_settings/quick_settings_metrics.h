@@ -6,6 +6,7 @@
 
 struct reach_quick_settings_metrics
 {
+    float surface_padding;
     float content_padding;
     float panel_width;
     float banner_height;
@@ -20,7 +21,6 @@ struct reach_quick_settings_metrics
     float rail_width;
     float rail_item_size;
     float rail_item_gap;
-    float rail_padding;
     float page_shift;
 
     float overview_pill_height;
@@ -77,6 +77,7 @@ static constexpr reach_quick_settings_metrics reach_quick_settings_make_metrics(
 {
     reach_quick_settings_metrics metrics = {};
 
+    metrics.surface_padding = 4.0f;
     metrics.content_padding = 8.0f;
     metrics.panel_width = 340.0f;
     metrics.banner_height = 84.0f;
@@ -91,7 +92,6 @@ static constexpr reach_quick_settings_metrics reach_quick_settings_make_metrics(
     metrics.rail_width = 38.0f;
     metrics.rail_item_size = 28.0f;
     metrics.rail_item_gap = 6.0f;
-    metrics.rail_padding = 5.0f;
     metrics.page_shift = 12.0f;
 
     metrics.overview_pill_height = 32.0f;
@@ -157,6 +157,8 @@ static inline float reach_quick_settings_metric_scale_value(float value, float d
 static inline reach_quick_settings_metrics reach_quick_settings_metrics_for_scale(float dpi_scale)
 {
     reach_quick_settings_metrics metrics = reach_quick_settings_metrics_values;
+    metrics.surface_padding =
+        reach_quick_settings_metric_scale_value(metrics.surface_padding, dpi_scale);
     metrics.content_padding =
         reach_quick_settings_metric_scale_value(metrics.content_padding, dpi_scale);
     metrics.panel_width = reach_quick_settings_metric_scale_value(metrics.panel_width, dpi_scale);
@@ -179,7 +181,6 @@ static inline reach_quick_settings_metrics reach_quick_settings_metrics_for_scal
         reach_quick_settings_metric_scale_value(metrics.rail_item_size, dpi_scale);
     metrics.rail_item_gap =
         reach_quick_settings_metric_scale_value(metrics.rail_item_gap, dpi_scale);
-    metrics.rail_padding = reach_quick_settings_metric_scale_value(metrics.rail_padding, dpi_scale);
     metrics.page_shift = reach_quick_settings_metric_scale_value(metrics.page_shift, dpi_scale);
     metrics.overview_pill_height =
         reach_quick_settings_metric_scale_value(metrics.overview_pill_height, dpi_scale);

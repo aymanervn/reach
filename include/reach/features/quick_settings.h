@@ -115,6 +115,7 @@ extern "C"
     typedef struct reach_quick_settings_layout
     {
         reach_rect_f32 content_bounds;
+        reach_rect_f32 interior;
         reach_rect_f32 page_bounds;
 
         reach_rect_f32 banner;
