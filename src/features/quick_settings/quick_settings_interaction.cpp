@@ -2,6 +2,8 @@
 
 #include "quick_settings_common.h"
 
+#include "reach/features/common/wifi_session.h"
+
 #include <math.h>
 
 static int reach_quick_settings_point_in_rect(reach_rect_f32 rect, float x, float y)
@@ -137,6 +139,38 @@ reach_quick_settings_hit_test_sound(const reach_quick_settings_layout *layout,
     return result;
 }
 
+static int32_t reach_quick_settings_wifi_row_connectable(const reach_wifi_network *network)
+{
+    return !network->connected && reach_wifi_security_is_supported(network->security) &&
+           (!reach_wifi_security_needs_key(network->security) || network->saved);
+}
+
+static reach_quick_settings_hit_result
+reach_quick_settings_hit_test_wifi(const reach_quick_settings_layout *layout,
+                                   const reach_quick_settings_model *model, float x, float y)
+{
+    reach_quick_settings_hit_result result = {};
+    if (model->wifi_radio != REACH_WIFI_RADIO_UNAVAILABLE &&
+        reach_quick_settings_point_in_rect(layout->wifi_switch, x, y))
+    {
+        result.type = REACH_QUICK_SETTINGS_HIT_WIFI_SWITCH;
+        return result;
+    }
+    for (size_t index = 0; index < layout->wifi_row_count && index < model->wifi_row_count; ++index)
+    {
+        if (reach_quick_settings_point_in_rect(layout->wifi_rows[index].bounds, x, y))
+        {
+            if (reach_quick_settings_wifi_row_connectable(&model->wifi_rows[index]))
+            {
+                result.type = REACH_QUICK_SETTINGS_HIT_WIFI_ROW;
+                result.item_index = index;
+            }
+            return result;
+        }
+    }
+    return result;
+}
+
 reach_quick_settings_hit_result
 reach_quick_settings_hit_test(const reach_quick_settings_layout *layout,
                               const reach_quick_settings_model *model, float x, float y)
@@ -155,9 +189,17 @@ reach_quick_settings_hit_test(const reach_quick_settings_layout *layout,
             return result;
         }
     }
-    return model->page == REACH_QUICK_SETTINGS_PAGE_OVERVIEW
-               ? reach_quick_settings_hit_test_overview(layout, model, x, y)
-               : reach_quick_settings_hit_test_sound(layout, model, x, y);
+    switch (model->page)
+    {
+    case REACH_QUICK_SETTINGS_PAGE_OVERVIEW:
+        return reach_quick_settings_hit_test_overview(layout, model, x, y);
+    case REACH_QUICK_SETTINGS_PAGE_SOUND:
+        return reach_quick_settings_hit_test_sound(layout, model, x, y);
+    case REACH_QUICK_SETTINGS_PAGE_WIFI:
+        return reach_quick_settings_hit_test_wifi(layout, model, x, y);
+    default:
+        return result;
+    }
 }
 
 reach_quick_settings_action reach_quick_settings_action_for_hit(reach_quick_settings_hit_result hit)
@@ -212,6 +254,12 @@ reach_quick_settings_action reach_quick_settings_action_for_hit(reach_quick_sett
         break;
     case REACH_QUICK_SETTINGS_HIT_MUTE:
         action.type = REACH_QUICK_SETTINGS_ACTION_TOGGLE_MUTE;
+        break;
+    case REACH_QUICK_SETTINGS_HIT_WIFI_SWITCH:
+        action.type = REACH_QUICK_SETTINGS_ACTION_TOGGLE_WIFI;
+        break;
+    case REACH_QUICK_SETTINGS_HIT_WIFI_ROW:
+        action.type = REACH_QUICK_SETTINGS_ACTION_CONNECT_WIFI;
         break;
     case REACH_QUICK_SETTINGS_HIT_NONE:
     default:
@@ -284,6 +332,13 @@ uint64_t reach_quick_settings_pressable_target(reach_quick_settings_hit_result h
         break;
     case REACH_QUICK_SETTINGS_HIT_MUTE:
         kind = REACH_QUICK_SETTINGS_PRESS_TARGET_MUTE;
+        index = hit.item_index;
+        break;
+    case REACH_QUICK_SETTINGS_HIT_WIFI_SWITCH:
+        kind = REACH_QUICK_SETTINGS_PRESS_TARGET_WIFI_SWITCH;
+        break;
+    case REACH_QUICK_SETTINGS_HIT_WIFI_ROW:
+        kind = REACH_QUICK_SETTINGS_PRESS_TARGET_WIFI_ROW;
         index = hit.item_index;
         break;
     default:

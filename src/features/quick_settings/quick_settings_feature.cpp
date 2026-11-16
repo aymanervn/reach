@@ -82,6 +82,10 @@ void reach_quick_settings_model_init(reach_quick_settings_model *model)
     model->bluetooth_pending_enabled = 0;
     model->brightness = {};
     model->wifi_radio = REACH_WIFI_RADIO_UNAVAILABLE;
+    model->wifi_row_count = 0;
+    model->wifi_connected_count = 0;
+    model->wifi_status = REACH_WIFI_SESSION_STATUS_IDLE;
+    model->wifi_status_ssid[0] = 0;
     model->light_theme = 0;
     model->display_name[0] = 0;
     model->picture_image_id = 0;
@@ -238,6 +242,44 @@ static float reach_quick_settings_overview_height(const reach_quick_settings_mod
                                                     metrics->toggle_height, metrics->toggle_gap);
 }
 
+static int32_t reach_quick_settings_wifi_message_shown(const reach_quick_settings_model *model)
+{
+    return model->wifi_radio != REACH_WIFI_RADIO_ON || model->wifi_row_count == 0;
+}
+
+static float reach_quick_settings_wifi_row_offset(const reach_quick_settings_model *model,
+                                                  size_t index,
+                                                  const reach_quick_settings_metrics *metrics)
+{
+    float connected = (float)model->wifi_connected_count * metrics->output_device_row_height;
+    if (index < model->wifi_connected_count)
+    {
+        return (float)index * metrics->output_device_row_height;
+    }
+    return connected + metrics->section_label_height +
+           (float)(index - model->wifi_connected_count) * metrics->output_device_row_height;
+}
+
+static float reach_quick_settings_wifi_height(const reach_quick_settings_model *model,
+                                              const reach_quick_settings_metrics *metrics)
+{
+    float body = 0.0f;
+    if (reach_quick_settings_wifi_message_shown(model))
+    {
+        body = metrics->section_label_height;
+    }
+    else
+    {
+        body = reach_quick_settings_wifi_row_offset(model, model->wifi_row_count, metrics);
+        if (model->wifi_row_count == model->wifi_connected_count)
+        {
+            body -= metrics->section_label_height;
+        }
+    }
+    return metrics->content_padding * 2.0f + metrics->wifi_header_height +
+           metrics->overview_row_gap + body;
+}
+
 static float
 reach_quick_settings_content_height_for_spans_scaled(const reach_quick_settings_model *model,
                                                      float output_devices_span,
@@ -248,6 +290,10 @@ reach_quick_settings_content_height_for_spans_scaled(const reach_quick_settings_
     if (model == nullptr || model->page == REACH_QUICK_SETTINGS_PAGE_OVERVIEW)
     {
         page_height = reach_quick_settings_overview_height(model, &metrics);
+    }
+    else if (model->page == REACH_QUICK_SETTINGS_PAGE_WIFI)
+    {
+        page_height = reach_quick_settings_wifi_height(model, &metrics);
     }
     else
     {
@@ -505,6 +551,45 @@ static void reach_quick_settings_place_sound(reach_quick_settings_layout *layout
     }
 }
 
+static void reach_quick_settings_place_wifi(reach_quick_settings_layout *layout,
+                                            reach_rect_f32 page_bounds,
+                                            const reach_quick_settings_model *model,
+                                            const reach_quick_settings_metrics *metrics,
+                                            float dpi_scale)
+{
+    reach_rect_f32 header =
+        reach_quick_settings_content_line(page_bounds, page_bounds.y + metrics->content_padding,
+                                          metrics->wifi_header_height, metrics);
+    layout->wifi_switch = reach_quick_settings_rect(
+        header.x + header.width - metrics->overview_pill_icon_inset - metrics->wifi_switch_width,
+        header.y + (header.height - metrics->wifi_switch_height) * 0.5f, metrics->wifi_switch_width,
+        metrics->wifi_switch_height);
+    layout->wifi_title = reach_quick_settings_rect(
+        header.x + metrics->overview_pill_icon_inset, header.y,
+        layout->wifi_switch.x - header.x - metrics->overview_pill_icon_inset * 2.0f, header.height);
+    float base = header.y + header.height + metrics->overview_row_gap;
+    layout->wifi_message = reach_quick_settings_wifi_message_shown(model)
+                               ? reach_quick_settings_content_line(
+                                     page_bounds, base, metrics->section_label_height, metrics)
+                               : reach_rect_f32{};
+    layout->wifi_nearby_label =
+        model->wifi_row_count > model->wifi_connected_count &&
+                !reach_quick_settings_wifi_message_shown(model)
+            ? reach_quick_settings_content_line(page_bounds,
+                                                base + (float)model->wifi_connected_count *
+                                                           metrics->output_device_row_height,
+                                                metrics->section_label_height, metrics)
+            : reach_rect_f32{};
+    layout->wifi_row_count =
+        reach_quick_settings_wifi_message_shown(model) ? 0 : model->wifi_row_count;
+    reach_rect_f32 panel = reach_quick_settings_content_line(page_bounds, base, 0.0f, metrics);
+    for (size_t index = 0; index < layout->wifi_row_count; ++index)
+    {
+        layout->wifi_rows[index] = reach_quick_settings_output_device_row_layout_at(
+            panel, base + reach_quick_settings_wifi_row_offset(model, index, metrics), dpi_scale);
+    }
+}
+
 reach_quick_settings_layout reach_quick_settings_layout_for_sections_scaled(
     reach_rect_f32 content_bounds, const reach_theme *theme,
     const reach_quick_settings_model *model, float output_devices_span, float app_volumes_span,
@@ -531,6 +616,10 @@ reach_quick_settings_layout reach_quick_settings_layout_for_sections_scaled(
 
     reach_quick_settings_place_sound(&layout, page_bounds, model, output_devices_span,
                                      app_volumes_span, &metrics, dpi_scale);
+    if (model != nullptr)
+    {
+        reach_quick_settings_place_wifi(&layout, page_bounds, model, &metrics, dpi_scale);
+    }
     return layout;
 }
 
@@ -566,6 +655,9 @@ struct reach_quick_settings
     reach_motion page_opacity[REACH_QUICK_SETTINGS_PAGE_COUNT];
     reach_motion page_shift[REACH_QUICK_SETTINGS_PAGE_COUNT];
     reach_motion rail_marker;
+    reach_motion wifi_switch;
+    reach_keyed_row wifi_row_motions[REACH_QUICK_SETTINGS_WIFI_ROWS];
+    reach_wifi_network wifi_row_items[REACH_QUICK_SETTINGS_WIFI_ROWS];
     reach_keyed_row output_device_rows[REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES];
     reach_quick_settings_output_device_row
         output_device_items[REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES];
@@ -845,10 +937,92 @@ static void reach_quick_settings_sync_app_rows(reach_quick_settings *quick_setti
         quick_settings->section_cleanup_pending = 1;
 }
 
+static int32_t reach_quick_settings_wifi_row_same(const void *context, size_t slot,
+                                                  size_t item_index)
+{
+    const reach_quick_settings *quick_settings = static_cast<const reach_quick_settings *>(context);
+    return reach_utf16_equal(quick_settings->wifi_row_items[slot].ssid,
+                             quick_settings->state.model.wifi_rows[item_index].ssid);
+}
+
+static void reach_quick_settings_sync_wifi_rows(reach_quick_settings *quick_settings,
+                                                int32_t animate)
+{
+    reach_quick_settings_model &model = quick_settings->state.model;
+    reach_quick_settings_metrics metrics =
+        reach_quick_settings_metrics_for_scale(quick_settings->layout_dpi);
+    size_t count = reach_quick_settings_wifi_message_shown(&model) ? 0 : model.wifi_row_count;
+    float targets[REACH_QUICK_SETTINGS_WIFI_ROWS] = {};
+    for (size_t index = 0; index < count; ++index)
+        targets[index] = reach_quick_settings_wifi_row_offset(&model, index, &metrics);
+    reach_keyed_rows_sync_input input = {};
+    input.count = count;
+    input.targets = targets;
+    input.same = reach_quick_settings_wifi_row_same;
+    input.context = quick_settings;
+    input.animate = animate;
+    input.theme = reach_quick_settings_motion_theme(quick_settings);
+    input.now_seconds = reach_motion_now_seconds();
+    reach_keyed_row_change changes[REACH_KEYED_ROWS_MAX_CHANGES(REACH_QUICK_SETTINGS_WIFI_ROWS)];
+    (void)reach_keyed_rows_sync(quick_settings->wifi_row_motions, REACH_QUICK_SETTINGS_WIFI_ROWS,
+                                &input, changes,
+                                REACH_KEYED_ROWS_MAX_CHANGES(REACH_QUICK_SETTINGS_WIFI_ROWS));
+    for (size_t slot = 0; slot < REACH_QUICK_SETTINGS_WIFI_ROWS; ++slot)
+    {
+        const reach_keyed_row &row = quick_settings->wifi_row_motions[slot];
+        if (row.lifecycle == REACH_KEYED_ROW_LIVE && row.index < count)
+            quick_settings->wifi_row_items[slot] = model.wifi_rows[row.index];
+    }
+    if (reach_keyed_rows_active(quick_settings->wifi_row_motions, REACH_QUICK_SETTINGS_WIFI_ROWS))
+        quick_settings->section_cleanup_pending = 1;
+}
+
+static void reach_quick_settings_build_wifi_rows(reach_quick_settings *quick_settings)
+{
+    reach_quick_settings_model &model = quick_settings->state.model;
+    const reach_wifi_session &session = quick_settings->wifi_session;
+    model.wifi_row_count = 0;
+    model.wifi_connected_count = 0;
+    for (size_t index = 0; index < session.networks.count; ++index)
+    {
+        const reach_wifi_network &network = session.networks.networks[index];
+        if (network.connected && network.in_range && model.wifi_connected_count == 0)
+        {
+            model.wifi_rows[model.wifi_row_count++] = network;
+            model.wifi_connected_count = 1;
+        }
+    }
+    int32_t taken[REACH_WIFI_MAX_NETWORKS] = {};
+    while (model.wifi_row_count < REACH_QUICK_SETTINGS_WIFI_ROWS)
+    {
+        size_t best = session.networks.count;
+        for (size_t index = 0; index < session.networks.count; ++index)
+        {
+            const reach_wifi_network &network = session.networks.networks[index];
+            if (taken[index] || network.connected || !network.in_range || network.ssid[0] == 0)
+                continue;
+            if (best == session.networks.count ||
+                network.signal_strength > session.networks.networks[best].signal_strength)
+                best = index;
+        }
+        if (best == session.networks.count)
+            break;
+        taken[best] = 1;
+        model.wifi_rows[model.wifi_row_count++] = session.networks.networks[best];
+    }
+    model.wifi_radio = session.radio;
+    model.wifi_status = session.status;
+    reach_copy_utf16(model.wifi_status_ssid, REACH_WIFI_SSID_CAPACITY, session.status_ssid);
+    reach_quick_settings_sync_wifi_rows(quick_settings,
+                                        reach_quick_settings_rows_animate(quick_settings));
+}
+
 static int32_t reach_quick_settings_sections_active(const reach_quick_settings *quick_settings)
 {
     const reach_quick_settings_state &state = quick_settings->state;
-    return reach_motion_active(&state.output_devices_span) ||
+    return reach_keyed_rows_active(quick_settings->wifi_row_motions,
+                                   REACH_QUICK_SETTINGS_WIFI_ROWS) ||
+           reach_motion_active(&state.output_devices_span) ||
            reach_motion_active(&state.app_volumes_span) ||
            reach_keyed_rows_active(quick_settings->output_device_rows,
                                    REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES) ||
@@ -877,6 +1051,16 @@ static void reach_quick_settings_sync_tile_states(reach_quick_settings *quick_se
         model.bluetooth_pending ? model.bluetooth_pending_enabled : model.bluetooth.enabled;
     int32_t active[REACH_QUICK_SETTINGS_TOGGLE_COUNT] = {};
     active[REACH_QUICK_SETTINGS_TOGGLE_WIFI] = model.wifi_radio == REACH_WIFI_RADIO_ON ? 1 : 0;
+    float wifi_switch = active[REACH_QUICK_SETTINGS_TOGGLE_WIFI] ? 1.0f : 0.0f;
+    if (!animate)
+        reach_motion_set(&quick_settings->wifi_switch, wifi_switch);
+    else if (quick_settings->wifi_switch.generation == 0 ||
+             quick_settings->wifi_switch.to != wifi_switch)
+        reach_motion_animate_spec_to_at(
+            &quick_settings->wifi_switch, wifi_switch,
+            reach_theme_motion_preset(reach_quick_settings_motion_theme(quick_settings),
+                                      REACH_MOTION_PRESET_BOUNCY),
+            reach_motion_now_seconds());
     active[REACH_QUICK_SETTINGS_TOGGLE_BLUETOOTH] = bluetooth ? 1 : 0;
     active[REACH_QUICK_SETTINGS_TOGGLE_DARK_MODE] = model.light_theme ? 0 : 1;
     double now_seconds = reach_motion_now_seconds();
@@ -906,6 +1090,20 @@ static void reach_quick_settings_snap_pages(reach_quick_settings *quick_settings
     }
     reach_motion_set(&quick_settings->rail_marker,
                      reach_quick_settings_rail_marker_offset(page, quick_settings->layout_dpi));
+}
+
+static void reach_quick_settings_scan_wifi(reach_quick_settings *quick_settings)
+{
+    if (quick_settings->wifi == nullptr ||
+        quick_settings->wifi_session.radio != REACH_WIFI_RADIO_ON ||
+        reach_wifi_session_busy(&quick_settings->wifi_session))
+    {
+        return;
+    }
+    reach_wifi_session_set_status(&quick_settings->wifi_session, REACH_WIFI_SESSION_STATUS_SCANNING,
+                                  nullptr);
+    quick_settings->state.model.wifi_status = REACH_WIFI_SESSION_STATUS_SCANNING;
+    reach_wifi_service_scan(quick_settings->wifi);
 }
 
 int32_t reach_quick_settings_select_page(reach_quick_settings *quick_settings,
@@ -939,6 +1137,10 @@ int32_t reach_quick_settings_select_page(reach_quick_settings *quick_settings,
         reach_quick_settings_rail_marker_offset(page, quick_settings->layout_dpi),
         reach_theme_motion_preset(theme, REACH_MOTION_PRESET_BOUNCY), now);
     quick_settings->relayout_animate_pending = 1;
+    if (page == REACH_QUICK_SETTINGS_PAGE_WIFI)
+    {
+        reach_quick_settings_scan_wifi(quick_settings);
+    }
     return 1;
 }
 
@@ -1007,6 +1209,21 @@ void reach_quick_settings_page_motions(
         out_page_shift[index] = quick_settings->page_shift[index];
     }
     *out_rail_marker = quick_settings->rail_marker;
+}
+
+void reach_quick_settings_wifi_motions(const reach_quick_settings *quick_settings,
+                                       reach_keyed_row out_rows[REACH_QUICK_SETTINGS_WIFI_ROWS],
+                                       reach_wifi_network out_items[REACH_QUICK_SETTINGS_WIFI_ROWS],
+                                       reach_motion *out_switch)
+{
+    if (quick_settings == nullptr)
+        return;
+    for (size_t slot = 0; slot < REACH_QUICK_SETTINGS_WIFI_ROWS; ++slot)
+    {
+        out_rows[slot] = quick_settings->wifi_row_motions[slot];
+        out_items[slot] = quick_settings->wifi_row_items[slot];
+    }
+    *out_switch = quick_settings->wifi_switch;
 }
 
 int32_t reach_quick_settings_is_open(const reach_quick_settings *quick_settings)
@@ -1200,6 +1417,15 @@ static void reach_quick_settings_capsule_tick(void *capsule, double delta_second
                                               reach_quick_settings_rows_animate(quick_settings));
         changes.redraw = 1;
     }
+    reach_keyed_row_change
+        wifi_changes[REACH_KEYED_ROWS_MAX_CHANGES(REACH_QUICK_SETTINGS_WIFI_ROWS)];
+    if (quick_settings != nullptr &&
+        reach_keyed_rows_release_settled(
+            quick_settings->wifi_row_motions, REACH_QUICK_SETTINGS_WIFI_ROWS, wifi_changes,
+            REACH_KEYED_ROWS_MAX_CHANGES(REACH_QUICK_SETTINGS_WIFI_ROWS)) > 0)
+    {
+        changes.redraw = 1;
+    }
     if (quick_settings != nullptr &&
         reach_quick_settings_release_settled_rows(quick_settings, quick_settings->app_volume_rows,
                                                   quick_settings->app_volume_items))
@@ -1299,8 +1525,10 @@ static void reach_quick_settings_capsule_surface_geometry(const void *capsule,
             out->deadline_seconds = fmax(out->deadline_seconds, reach_motion_deadline(motion));
         out->deadline_seconds =
             fmax(out->deadline_seconds,
-                 fmax(reach_keyed_rows_deadline(quick_settings->output_device_rows,
-                                                REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES),
+                 fmax(fmax(reach_keyed_rows_deadline(quick_settings->wifi_row_motions,
+                                                     REACH_QUICK_SETTINGS_WIFI_ROWS),
+                           reach_keyed_rows_deadline(quick_settings->output_device_rows,
+                                                     REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES)),
                       reach_keyed_rows_deadline(quick_settings->app_volume_rows,
                                                 REACH_AUDIO_VOLUME_MAX_SESSIONS)));
     }
@@ -1392,6 +1620,28 @@ static void reach_quick_settings_toggle_bluetooth(reach_quick_settings *quick_se
     }
 }
 
+static void reach_quick_settings_connect_wifi(reach_quick_settings *quick_settings, size_t row)
+{
+    reach_quick_settings_model &model = quick_settings->state.model;
+    reach_wifi_session &session = quick_settings->wifi_session;
+    if (quick_settings->wifi == nullptr || row >= model.wifi_row_count ||
+        reach_wifi_session_busy(&session))
+    {
+        return;
+    }
+    size_t index = reach_wifi_network_list_find(&session.networks, model.wifi_rows[row].ssid);
+    reach_wifi_connect_request request = {};
+    if (index >= session.networks.count ||
+        !reach_wifi_session_build_connect(&session, index, &request))
+    {
+        return;
+    }
+    reach_wifi_session_set_status(&session, REACH_WIFI_SESSION_STATUS_CONNECTING, request.ssid);
+    model.wifi_status = session.status;
+    reach_copy_utf16(model.wifi_status_ssid, REACH_WIFI_SSID_CAPACITY, session.status_ssid);
+    reach_wifi_service_connect(quick_settings->wifi, &request);
+}
+
 static void reach_quick_settings_toggle_mute(reach_quick_settings *quick_settings, size_t target)
 {
     reach_quick_settings_model &model = quick_settings->state.model;
@@ -1473,6 +1723,11 @@ static void reach_quick_settings_capsule_perform_action(reach_quick_settings *qu
             reach_quick_settings_sync_tile_states(quick_settings, 1);
             out->redraw = 1;
         }
+        break;
+
+    case REACH_QUICK_SETTINGS_ACTION_CONNECT_WIFI:
+        reach_quick_settings_connect_wifi(quick_settings, action->item_index);
+        out->redraw = 1;
         break;
 
     case REACH_QUICK_SETTINGS_ACTION_TOGGLE_DARK_MODE:
@@ -1915,6 +2170,35 @@ size_t reach_quick_settings_take_retired_render_icons(reach_quick_settings *quic
     return count;
 }
 
+int32_t reach_quick_settings_apply_wifi_snapshot(reach_quick_settings *quick_settings,
+                                                 const reach_wifi_snapshot *snapshot)
+{
+    if (quick_settings == nullptr || snapshot == nullptr)
+    {
+        return 0;
+    }
+    reach_quick_settings_state *state = &quick_settings->state;
+    reach_wifi_radio_state previous_radio = state->model.wifi_radio;
+    size_t previous_rows = state->model.wifi_row_count;
+    (void)reach_wifi_session_apply_snapshot(&quick_settings->wifi_session, snapshot);
+    reach_quick_settings_build_wifi_rows(quick_settings);
+    if (state->model.wifi_radio != previous_radio)
+    {
+        reach_quick_settings_sync_tile_states(quick_settings,
+                                              reach_quick_settings_tiles_animate(quick_settings));
+        if (state->model.wifi_radio == REACH_WIFI_RADIO_ON &&
+            state->model.page == REACH_QUICK_SETTINGS_PAGE_WIFI)
+            reach_quick_settings_scan_wifi(quick_settings);
+    }
+    if (state->open && state->model.page == REACH_QUICK_SETTINGS_PAGE_WIFI &&
+        (previous_rows != state->model.wifi_row_count || previous_radio != state->model.wifi_radio))
+    {
+        quick_settings->relayout_animate_pending = 1;
+        return 1;
+    }
+    return 0;
+}
+
 void reach_quick_settings_process_changes(reach_quick_settings *quick_settings,
                                           reach_feature_tick_result *out)
 {
@@ -1943,15 +2227,9 @@ void reach_quick_settings_process_changes(reach_quick_settings *quick_settings,
     if (quick_settings->wifi != nullptr &&
         reach_wifi_service_take(quick_settings->wifi, &wifi_snapshot))
     {
-        (void)reach_wifi_session_apply_snapshot(&quick_settings->wifi_session, &wifi_snapshot);
-        if (state->model.wifi_radio != quick_settings->wifi_session.radio)
-        {
-            state->model.wifi_radio = quick_settings->wifi_session.radio;
-            reach_quick_settings_sync_tile_states(
-                quick_settings, reach_quick_settings_tiles_animate(quick_settings));
-            out->redraw = 1;
-            out->request_update = 1;
-        }
+        out->relayout |= reach_quick_settings_apply_wifi_snapshot(quick_settings, &wifi_snapshot);
+        out->redraw = 1;
+        out->request_update = 1;
     }
 
     if (quick_settings->status == nullptr)

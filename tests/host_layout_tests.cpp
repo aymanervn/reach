@@ -2975,6 +2975,65 @@ static void test_quick_settings_section_motion_renders_worst_case(void)
                     fill_lists();
                     step(0.6);
                 }
+                {
+                    auto click = [&](reach_rect_f32 control)
+                    {
+                        float x = control.x + control.width * 0.5f;
+                        float y = control.y + control.height * 0.5f;
+                        send_pointer(ops, capsule,
+                                     make_pointer_event(REACH_POINTER_EVENT_DOWN,
+                                                        REACH_POINTER_COORDINATE_SURFACE_LOCAL, x,
+                                                        y));
+                        step(0.016);
+                        send_pointer(ops, capsule,
+                                     make_pointer_event(REACH_POINTER_EVENT_UP,
+                                                        REACH_POINTER_COORDINATE_SURFACE_LOCAL, x,
+                                                        y));
+                        for (size_t frame = 0; frame < 4; ++frame)
+                            step(0.016);
+                    };
+                    auto wifi = std::make_unique<reach_wifi_snapshot>();
+                    wifi->radio = REACH_WIFI_RADIO_ON;
+                    wifi->networks.count = REACH_WIFI_MAX_NETWORKS;
+                    for (size_t index = 0; index < REACH_WIFI_MAX_NETWORKS; ++index)
+                    {
+                        reach_wifi_network &network = wifi->networks.networks[index];
+                        for (size_t at = 0; at + 1 < REACH_WIFI_SSID_CAPACITY; ++at)
+                            network.ssid[at] = (uint16_t)('a' + (index + at) % 26);
+                        network.ssid[0] = (uint16_t)('A' + index % 26);
+                        network.ssid[1] = (uint16_t)('0' + index / 26);
+                        network.in_range = 1;
+                        network.connected = index == 3;
+                        network.saved = index % 3 == 0;
+                        network.signal_strength = (int32_t)((index * 37) % 100);
+                        network.security = index % 2 == 0 ? REACH_WIFI_SECURITY_OPEN
+                                                          : REACH_WIFI_SECURITY_WPA2_PERSONAL;
+                    }
+                    (void)reach_quick_settings_apply_wifi_snapshot(quick_settings, wifi.get());
+                    click(reach_quick_settings_state_ptr(quick_settings)
+                              ->layout.rail_items[REACH_QUICK_SETTINGS_PAGE_WIFI]);
+                    for (size_t frame = 0; frame < 30; ++frame)
+                        step(0.016);
+                    const reach_quick_settings_layout &page =
+                        reach_quick_settings_state_ptr(quick_settings)->layout;
+                    click(page.wifi_rows[2].bounds);
+                    click(page.wifi_switch);
+                    for (size_t index = 0; index < REACH_WIFI_MAX_NETWORKS; ++index)
+                        wifi->networks.networks[index].signal_strength =
+                            (int32_t)((index * 53 + 11) % 100);
+                    (void)reach_quick_settings_apply_wifi_snapshot(quick_settings, wifi.get());
+                    for (size_t frame = 0; frame < 10; ++frame)
+                        step(0.016);
+                    wifi->radio = REACH_WIFI_RADIO_OFF;
+                    (void)reach_quick_settings_apply_wifi_snapshot(quick_settings, wifi.get());
+                    for (size_t frame = 0; frame < 10; ++frame)
+                        step(0.016);
+                    wifi->radio = REACH_WIFI_RADIO_ON;
+                    (void)reach_quick_settings_apply_wifi_snapshot(quick_settings, wifi.get());
+                    (void)reach_quick_settings_select_page(quick_settings,
+                                                           REACH_QUICK_SETTINGS_PAGE_SOUND);
+                    step(0.6);
+                }
                 toggle_apps();
                 set_system(1);
                 render();
@@ -3070,7 +3129,7 @@ static void test_quick_settings_section_motion_renders_worst_case(void)
     }
     expect_true(presentation_render_failures == 0,
                 "every Quick Settings section-motion render stays valid");
-    expect_true(presentation_render_count == 4 * 3 * 2 * 140,
+    expect_true(presentation_render_count == 4 * 3 * 2 * 206,
                 "Quick Settings renders every section-motion step at every DPI and monitor");
     const size_t largest_rows = (size_t)REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES * 5 +
                                 (size_t)REACH_AUDIO_VOLUME_MAX_SESSIONS * 5;

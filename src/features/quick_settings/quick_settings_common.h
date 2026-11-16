@@ -22,7 +22,9 @@ typedef enum reach_quick_settings_hit_type
     REACH_QUICK_SETTINGS_HIT_TOGGLE,
     REACH_QUICK_SETTINGS_HIT_OUTPUT_DEVICE_ROW,
     REACH_QUICK_SETTINGS_HIT_MUTE,
-    REACH_QUICK_SETTINGS_HIT_INPUT_SLIDER
+    REACH_QUICK_SETTINGS_HIT_INPUT_SLIDER,
+    REACH_QUICK_SETTINGS_HIT_WIFI_SWITCH,
+    REACH_QUICK_SETTINGS_HIT_WIFI_ROW
 } reach_quick_settings_hit_type;
 
 enum
@@ -40,7 +42,9 @@ typedef enum reach_quick_settings_press_target_kind
     REACH_QUICK_SETTINGS_PRESS_TARGET_SOUND_PAGE_BUTTON,
     REACH_QUICK_SETTINGS_PRESS_TARGET_TOGGLE,
     REACH_QUICK_SETTINGS_PRESS_TARGET_OUTPUT_DEVICE_ROW,
-    REACH_QUICK_SETTINGS_PRESS_TARGET_MUTE
+    REACH_QUICK_SETTINGS_PRESS_TARGET_MUTE,
+    REACH_QUICK_SETTINGS_PRESS_TARGET_WIFI_SWITCH,
+    REACH_QUICK_SETTINGS_PRESS_TARGET_WIFI_ROW
 } reach_quick_settings_press_target_kind;
 #ifdef __cplusplus
 extern "C"
@@ -68,6 +72,11 @@ extern "C"
             out_output_devices[REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES],
         reach_keyed_row out_app_motions[REACH_AUDIO_VOLUME_MAX_SESSIONS],
         reach_quick_settings_app_volume_row out_app_volumes[REACH_AUDIO_VOLUME_MAX_SESSIONS]);
+    void
+    reach_quick_settings_wifi_motions(const reach_quick_settings *quick_settings,
+                                      reach_keyed_row out_rows[REACH_QUICK_SETTINGS_WIFI_ROWS],
+                                      reach_wifi_network out_items[REACH_QUICK_SETTINGS_WIFI_ROWS],
+                                      reach_motion *out_switch);
     reach_quick_settings_layout reach_quick_settings_layout_for_sections_scaled(
         reach_rect_f32 content_bounds, const reach_theme *theme,
         const reach_quick_settings_model *model, float output_devices_span, float app_volumes_span,
@@ -94,7 +103,8 @@ typedef enum reach_quick_settings_action_type
     REACH_QUICK_SETTINGS_ACTION_OPEN_PROJECT,
     REACH_QUICK_SETTINGS_ACTION_SET_OUTPUT_DEVICE,
     REACH_QUICK_SETTINGS_ACTION_TOGGLE_MUTE,
-    REACH_QUICK_SETTINGS_ACTION_SET_INPUT_VOLUME
+    REACH_QUICK_SETTINGS_ACTION_SET_INPUT_VOLUME,
+    REACH_QUICK_SETTINGS_ACTION_CONNECT_WIFI
 } reach_quick_settings_action_type;
 
 typedef struct reach_quick_settings_hit_result

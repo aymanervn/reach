@@ -3,6 +3,7 @@
 
 #include "reach/core/render_commands.h"
 #include "reach/core/theme.h"
+#include "reach/core/wifi.h"
 #include "reach/features/common/keyed_rows.h"
 #include "reach/features/feature_capsule.h"
 #include "reach/ports/audio_volume.h"
@@ -25,6 +26,7 @@ extern "C"
     {
         REACH_QUICK_SETTINGS_PAGE_OVERVIEW = 0,
         REACH_QUICK_SETTINGS_PAGE_SOUND,
+        REACH_QUICK_SETTINGS_PAGE_WIFI,
         REACH_QUICK_SETTINGS_PAGE_COUNT
     } reach_quick_settings_page;
 
@@ -36,6 +38,8 @@ extern "C"
         REACH_QUICK_SETTINGS_TOGGLE_PROJECT,
         REACH_QUICK_SETTINGS_TOGGLE_COUNT
     } reach_quick_settings_toggle;
+
+#define REACH_QUICK_SETTINGS_WIFI_ROWS 9
 
     typedef struct reach_quick_settings_model
     {
@@ -52,6 +56,11 @@ extern "C"
         int32_t bluetooth_pending_enabled;
         reach_brightness_state brightness;
         reach_wifi_radio_state wifi_radio;
+        reach_wifi_network wifi_rows[REACH_QUICK_SETTINGS_WIFI_ROWS];
+        size_t wifi_row_count;
+        size_t wifi_connected_count;
+        int32_t wifi_status;
+        uint16_t wifi_status_ssid[REACH_WIFI_SSID_CAPACITY];
         int32_t light_theme;
         uint16_t display_name[REACH_USER_ACCOUNT_NAME_CAPACITY];
         uint64_t picture_image_id;
@@ -122,6 +131,13 @@ extern "C"
 
         reach_rect_f32 input_label;
         reach_quick_settings_level_pill_layout input_volume;
+
+        reach_rect_f32 wifi_title;
+        reach_rect_f32 wifi_switch;
+        reach_rect_f32 wifi_message;
+        reach_rect_f32 wifi_nearby_label;
+        reach_quick_settings_output_device_row_layout wifi_rows[REACH_QUICK_SETTINGS_WIFI_ROWS];
+        size_t wifi_row_count;
     } reach_quick_settings_layout;
 
     typedef struct reach_quick_settings_output_device_row
@@ -147,6 +163,9 @@ extern "C"
             output_device_row_items[REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES];
         reach_keyed_row app_volume_row_motions[REACH_AUDIO_VOLUME_MAX_SESSIONS];
         reach_quick_settings_app_volume_row app_volume_row_items[REACH_AUDIO_VOLUME_MAX_SESSIONS];
+        reach_keyed_row wifi_row_motions[REACH_QUICK_SETTINGS_WIFI_ROWS];
+        reach_wifi_network wifi_row_items[REACH_QUICK_SETTINGS_WIFI_ROWS];
+        reach_motion wifi_switch;
         reach_motion toggle_states[REACH_QUICK_SETTINGS_TOGGLE_COUNT];
         reach_motion page_opacity[REACH_QUICK_SETTINGS_PAGE_COUNT];
         reach_motion page_shift[REACH_QUICK_SETTINGS_PAGE_COUNT];
@@ -246,6 +265,8 @@ extern "C"
                                                 int32_t muted);
     void reach_quick_settings_apply_input(reach_quick_settings *quick_settings,
                                           const reach_audio_volume_state *input);
+    int32_t reach_quick_settings_apply_wifi_snapshot(reach_quick_settings *quick_settings,
+                                                     const reach_wifi_snapshot *snapshot);
     void reach_quick_settings_apply_sessions(reach_quick_settings *quick_settings,
                                              const reach_audio_volume_session_list *sessions);
     void reach_quick_settings_apply_output_devices(reach_quick_settings *quick_settings,
