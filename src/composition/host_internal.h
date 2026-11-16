@@ -29,6 +29,7 @@
 #include "reach/services/clock.h"
 #include "reach/services/input_language.h"
 #include "reach/services/system_stats.h"
+#include "reach/services/profile.h"
 #include "reach/services/system_status.h"
 #include "reach/services/wifi.h"
 #include "reach/services/window_tracking.h"
@@ -167,6 +168,8 @@ typedef struct reach_feature_dependencies
     reach_app_control *app_control;
     reach_system_status *system_status;
     reach_wifi_service *wifi;
+    reach_profile_service *profile;
+    const reach_power_session_port *power_session;
     const reach_clipboard_port *clipboard;
     void (*request_update)(void *user);
     void *request_update_user;
@@ -687,6 +690,7 @@ struct reach_host
     std::atomic<uint32_t> audio_volume_changed;
     reach_system_status *system_status;
     reach_wifi_service *wifi_service;
+    reach_profile_service *profile_service;
     reach_system_stats *system_stats;
     reach_popup_capture_port popup_capture;
 };
@@ -857,6 +861,7 @@ void reach_host_drain_icon_evictions(reach_host *host);
 void reach_host_drain_registered_render_resources(reach_host *host);
 void reach_host_release_registered_render_resources(reach_host *host);
 void reach_host_drain_now_playing_retired_covers(reach_host *host);
+void reach_host_drain_profile_retired_images(reach_host *host);
 reach_result reach_host_refresh_open_windows(reach_host *host, int32_t *out_changed);
 void reach_host_note_foreground_window(reach_host *host, uintptr_t foreground_window);
 void reach_host_apply_foreground_change(reach_host *host);

@@ -88,6 +88,12 @@ void reach_quick_settings_model_init(reach_quick_settings_model *model)
     model->brightness = {};
     model->wifi_radio = REACH_WIFI_RADIO_UNAVAILABLE;
     model->light_theme = 0;
+    model->display_name[0] = 0;
+    model->picture_image_id = 0;
+    model->wallpaper_image_id = 0;
+    model->uptime_minutes = -1;
+    model->power = {};
+    model->power.battery_seconds_remaining = -1;
 }
 
 void reach_quick_settings_model_set_main_volume(reach_quick_settings_model *model,
@@ -281,6 +287,12 @@ static float reach_quick_settings_rail_height(const reach_quick_settings_metrics
                REACH_QUICK_SETTINGS_PAGE_COUNT, metrics->rail_item_size, metrics->rail_item_gap);
 }
 
+static float reach_quick_settings_header_height(const reach_quick_settings_metrics *metrics)
+{
+    return metrics->content_padding + metrics->banner_height + metrics->identity_height +
+           metrics->identity_gap;
+}
+
 static float reach_quick_settings_overview_height(const reach_quick_settings_model *model,
                                                   const reach_quick_settings_metrics *metrics)
 {
@@ -315,7 +327,8 @@ reach_quick_settings_content_height_for_spans_scaled(const reach_quick_settings_
         page_height = metrics.content_padding * 2.0f + volume_component_height +
                       output_component_height + app_volume_component_height;
     }
-    return fmaxf(page_height, reach_quick_settings_rail_height(&metrics) + metrics.content_padding);
+    return reach_quick_settings_header_height(&metrics) +
+           fmaxf(page_height, reach_quick_settings_rail_height(&metrics) + metrics.content_padding);
 }
 
 float reach_quick_settings_content_height_for_model_scaled(const reach_quick_settings_model *model,
@@ -463,6 +476,34 @@ reach_quick_settings_app_volume_row_layout_at(reach_rect_f32 panel, float top, f
     return row;
 }
 
+static void reach_quick_settings_place_header(reach_quick_settings_layout *layout,
+                                              reach_rect_f32 content_bounds,
+                                              const reach_quick_settings_metrics *metrics)
+{
+    layout->banner = reach_quick_settings_content_line(content_bounds,
+                                                       content_bounds.y + metrics->content_padding,
+                                                       metrics->banner_height, metrics);
+    float ring = metrics->avatar_size + metrics->avatar_ring * 2.0f;
+    layout->avatar_ring = reach_quick_settings_rect(
+        layout->banner.x + metrics->avatar_inset - metrics->avatar_ring,
+        layout->banner.y + layout->banner.height - metrics->avatar_overlap - metrics->avatar_ring,
+        ring, ring);
+    layout->avatar = reach_quick_settings_rect(layout->avatar_ring.x + metrics->avatar_ring,
+                                               layout->avatar_ring.y + metrics->avatar_ring,
+                                               metrics->avatar_size, metrics->avatar_size);
+    float text_x = layout->avatar_ring.x + ring + metrics->overview_row_gap;
+    float text_width = layout->banner.x + layout->banner.width - text_x;
+    float text_top = layout->banner.y + layout->banner.height +
+                     (metrics->identity_height - metrics->identity_name_height -
+                      metrics->identity_detail_height) *
+                         0.5f;
+    layout->identity_name =
+        reach_quick_settings_rect(text_x, text_top, text_width, metrics->identity_name_height);
+    layout->identity_detail =
+        reach_quick_settings_rect(text_x, text_top + metrics->identity_name_height, text_width,
+                                  metrics->identity_detail_height);
+}
+
 static void reach_quick_settings_place_rail(reach_quick_settings_layout *layout,
                                             reach_rect_f32 content_bounds,
                                             const reach_quick_settings_metrics *metrics)
@@ -575,8 +616,13 @@ reach_quick_settings_layout reach_quick_settings_layout_for_sections_scaled(
 
     reach_quick_settings_metrics metrics = reach_quick_settings_metrics_for_scale(dpi_scale);
 
-    reach_quick_settings_place_rail(&layout, content_bounds, &metrics);
-    reach_rect_f32 page_bounds = content_bounds;
+    reach_quick_settings_place_header(&layout, content_bounds, &metrics);
+    reach_rect_f32 body_bounds = content_bounds;
+    float header_height = reach_quick_settings_header_height(&metrics);
+    body_bounds.y += header_height;
+    body_bounds.height = reach_quick_settings_clamp_min0(body_bounds.height - header_height);
+    reach_quick_settings_place_rail(&layout, body_bounds, &metrics);
+    reach_rect_f32 page_bounds = body_bounds;
     page_bounds.x += metrics.rail_width;
     page_bounds.width = reach_quick_settings_clamp_min0(page_bounds.width - metrics.rail_width);
     layout.page_bounds = page_bounds;
@@ -743,6 +789,10 @@ struct reach_quick_settings
     reach_system_status *status;
     reach_wifi_service *wifi;
     reach_wifi_session wifi_session;
+    reach_profile_service *profile;
+    const reach_power_session_port *power_session;
+    uint16_t wallpaper_path[REACH_PROFILE_PATH_CAPACITY];
+    double uptime_deadline;
     reach_quick_settings_routes routes;
 
     int32_t relayout_animate_pending;
@@ -1069,6 +1119,7 @@ static void reach_quick_settings_retarget_sections(reach_quick_settings *quick_s
 }
 
 static int32_t reach_quick_settings_tiles_animate(const reach_quick_settings *quick_settings);
+static int32_t reach_quick_settings_refresh_uptime(reach_quick_settings *quick_settings);
 
 static void reach_quick_settings_sync_tile_states(reach_quick_settings *quick_settings,
                                                   int32_t animate)
@@ -1165,7 +1216,7 @@ static void reach_quick_settings_sample_input_layout(reach_quick_settings *quick
     REACH_ASSERT(isfinite(output) && isfinite(apps));
     float height = reach_quick_settings_content_height_for_spans_scaled(&state.model, output, apps,
                                                                         quick_settings->layout_dpi);
-    reach_rect_f32 resting = state.content_bounds;
+
     state.scroll_max = fmaxf(0.0f, height - state.content_bounds.height);
     state.scroll_offset = fminf(state.scroll_offset, state.scroll_max);
     reach_rect_f32 bounds = state.content_bounds;
@@ -1174,9 +1225,6 @@ static void reach_quick_settings_sample_input_layout(reach_quick_settings *quick
     state.layout = reach_quick_settings_layout_for_sections_scaled(
         bounds, &quick_settings->layout_theme, &state.model, output, apps,
         quick_settings->layout_dpi);
-    reach_quick_settings_metrics metrics =
-        reach_quick_settings_metrics_for_scale(quick_settings->layout_dpi);
-    reach_quick_settings_place_rail(&state.layout, resting, &metrics);
     if (reach_motion_value_at(&state.output_devices_opacity, now_seconds) <= 0)
         state.layout.output_devices_clip.height = 0;
     if (reach_motion_value_at(&state.app_volumes_opacity, now_seconds) <= 0)
@@ -1250,6 +1298,7 @@ int32_t reach_quick_settings_set_open(reach_quick_settings *quick_settings, int3
         reach_quick_settings_refresh_system(quick_settings, 0);
         reach_quick_settings_refresh_audio(quick_settings);
         reach_wifi_service_refresh(quick_settings->wifi);
+        (void)reach_quick_settings_refresh_uptime(quick_settings);
         reach_motion_set(&quick_settings->height, 0);
         quick_settings->layout_initialized = 0;
         state->model.page = REACH_QUICK_SETTINGS_PAGE_OVERVIEW;
@@ -1379,6 +1428,13 @@ static void reach_quick_settings_capsule_tick(void *capsule, double delta_second
     }
     reach_feature_tick_result changes = {};
     reach_quick_settings_process_changes(quick_settings, &changes);
+    if (quick_settings != nullptr && quick_settings->state.open &&
+        quick_settings->uptime_deadline > 0 &&
+        reach_motion_now_seconds() >= quick_settings->uptime_deadline &&
+        reach_quick_settings_refresh_uptime(quick_settings))
+    {
+        changes.redraw = 1;
+    }
     if (quick_settings != nullptr && reach_quick_settings_release_settled_rows(
                                          quick_settings, quick_settings->output_device_rows,
                                          quick_settings->output_device_items))
@@ -1472,6 +1528,11 @@ static void reach_quick_settings_capsule_surface_geometry(const void *capsule,
     out->notch_anchor_x = quick_settings->state.notch_anchor_x;
     out->notch_side = reach_popup_notch_side(quick_settings->state.drop_direction);
     reach_feature_transition_presentation(&quick_settings->popup_transition, out);
+    if (quick_settings->state.open && quick_settings->uptime_deadline > 0 &&
+        (out->deadline_seconds <= 0 || quick_settings->uptime_deadline < out->deadline_seconds))
+    {
+        out->deadline_seconds = quick_settings->uptime_deadline;
+    }
     if (quick_settings->section_cleanup_pending)
     {
         const reach_quick_settings_state &state = quick_settings->state;
@@ -1906,13 +1967,50 @@ void reach_quick_settings_destroy(reach_quick_settings *quick_settings)
 }
 
 void reach_quick_settings_attach_services(reach_quick_settings *quick_settings,
-                                          reach_system_status *status, reach_wifi_service *wifi)
+                                          reach_system_status *status, reach_wifi_service *wifi,
+                                          reach_profile_service *profile,
+                                          const reach_power_session_port *power_session)
 {
     if (quick_settings != nullptr)
     {
         quick_settings->status = status;
         quick_settings->wifi = wifi;
+        quick_settings->profile = profile;
+        quick_settings->power_session = power_session;
     }
+}
+
+static int32_t reach_quick_settings_refresh_uptime(reach_quick_settings *quick_settings)
+{
+    const reach_power_session_port *session = quick_settings->power_session;
+    if (session == nullptr || session->ops.now_milliseconds == nullptr)
+    {
+        quick_settings->uptime_deadline = 0;
+        return 0;
+    }
+    uint64_t uptime = session->ops.now_milliseconds(session->session);
+    int64_t minutes = (int64_t)(uptime / 60000u);
+    quick_settings->uptime_deadline =
+        reach_motion_now_seconds() + (double)(60000u - uptime % 60000u) / 1000.0;
+    if (quick_settings->state.model.uptime_minutes == minutes)
+    {
+        return 0;
+    }
+    quick_settings->state.model.uptime_minutes = minutes;
+    return 1;
+}
+
+static void reach_quick_settings_request_profile(reach_quick_settings *quick_settings)
+{
+    if (quick_settings->profile == nullptr || !quick_settings->layout_initialized)
+    {
+        return;
+    }
+    reach_quick_settings_metrics metrics =
+        reach_quick_settings_metrics_for_scale(quick_settings->layout_dpi);
+    float width = metrics.panel_width - metrics.content_padding * 2.0f;
+    reach_profile_service_request(quick_settings->profile, quick_settings->wallpaper_path,
+                                  (int32_t)ceilf(width), (int32_t)ceilf(metrics.banner_height));
 }
 
 void reach_quick_settings_set_routes(reach_quick_settings *quick_settings,
@@ -1924,22 +2022,33 @@ void reach_quick_settings_set_routes(reach_quick_settings *quick_settings,
     }
 }
 
-int32_t reach_quick_settings_apply_light_theme(reach_quick_settings *quick_settings,
-                                               int32_t light_theme)
+int32_t reach_quick_settings_apply_config(reach_quick_settings *quick_settings, int32_t light_theme,
+                                          const uint16_t *wallpaper_path)
 {
     if (quick_settings == nullptr)
     {
         return 0;
     }
-    int32_t next = light_theme ? 1 : 0;
-    if (quick_settings->state.model.light_theme == next)
+    int32_t changed = 0;
+    if (wallpaper_path != nullptr &&
+        !reach_utf16_equal(quick_settings->wallpaper_path, wallpaper_path))
     {
-        return 0;
+        reach_copy_utf16(quick_settings->wallpaper_path, REACH_PROFILE_PATH_CAPACITY,
+                         wallpaper_path);
+        if (quick_settings->state.open)
+        {
+            reach_quick_settings_request_profile(quick_settings);
+        }
     }
-    quick_settings->state.model.light_theme = next;
-    reach_quick_settings_sync_tile_states(quick_settings,
-                                          reach_quick_settings_tiles_animate(quick_settings));
-    return 1;
+    int32_t next = light_theme ? 1 : 0;
+    if (quick_settings->state.model.light_theme != next)
+    {
+        quick_settings->state.model.light_theme = next;
+        reach_quick_settings_sync_tile_states(quick_settings,
+                                              reach_quick_settings_tiles_animate(quick_settings));
+        changed = 1;
+    }
+    return changed;
 }
 
 void reach_quick_settings_refresh_audio(reach_quick_settings *quick_settings)
@@ -2051,6 +2160,17 @@ void reach_quick_settings_process_changes(reach_quick_settings *quick_settings,
     }
     reach_quick_settings_state *state = reach_quick_settings_state_mut(quick_settings);
 
+    reach_profile_snapshot profile = {};
+    if (reach_profile_service_take(quick_settings->profile, &profile))
+    {
+        reach_copy_utf16(state->model.display_name, REACH_USER_ACCOUNT_NAME_CAPACITY,
+                         profile.display_name);
+        state->model.picture_image_id = profile.picture_image_id;
+        state->model.wallpaper_image_id = profile.wallpaper_image_id;
+        out->redraw = 1;
+        out->request_update = 1;
+    }
+
     reach_wifi_snapshot wifi_snapshot = {};
     if (quick_settings->wifi != nullptr &&
         reach_wifi_service_take(quick_settings->wifi, &wifi_snapshot))
@@ -2074,6 +2194,10 @@ void reach_quick_settings_process_changes(reach_quick_settings *quick_settings,
     reach_system_status_system_snapshot system_snapshot = {};
     if (reach_system_status_take_system(quick_settings->status, &system_snapshot))
     {
+        if (system_snapshot.power_valid)
+        {
+            state->model.power = system_snapshot.power;
+        }
         reach_quick_settings_system_apply_result apply_result = {};
         reach_quick_settings_apply_system_states(
             quick_settings, &system_snapshot.network, &system_snapshot.bluetooth,
@@ -2451,6 +2575,10 @@ void reach_quick_settings_refresh_layout(reach_quick_settings *quick_settings,
     quick_settings->layout_dpi = ctx->dpi_scale;
     quick_settings->layout_context = *ctx;
     quick_settings->layout_initialized = 1;
+    if (state.open)
+    {
+        reach_quick_settings_request_profile(quick_settings);
+    }
     reach_quick_settings_sample_input_layout(quick_settings, now);
 }
 
