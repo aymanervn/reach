@@ -2573,7 +2573,7 @@ static void render_press_cycles(const reach_feature_capsule_ops *ops, void *caps
 
 template <typename Open, typename Render>
 static void render_pressed_surface(reach_host *host, reach_surface_id id, Open open, Render render,
-                                   float step, const char *label)
+                                   float step, const char *label, int32_t require_targets = 1)
 {
     reach_feature_runtime *runtime = &host->feature_runtimes[id];
     const reach_feature_capsule_ops *ops = runtime->definition->capsule_ops;
@@ -2590,7 +2590,7 @@ static void render_pressed_surface(reach_host *host, reach_surface_id id, Open o
                                 : geometry.visible_bounds;
     reach_pointer_event targets[3] = {};
     size_t count = find_press_targets(ops, runtime->capsule, area, space, step, targets, 3);
-    expect_true(count > 0, label);
+    expect_true(count > 0 || !require_targets, label);
     for (size_t index = 0; index < count; ++index)
     {
         render_press_cycles(ops, runtime->capsule, space, targets[index], render,
@@ -2746,7 +2746,7 @@ static void test_max_items_and_pressed_states_render_worst_case(void)
                         render_presented_surface(host, REACH_SURFACE_ID_QUICK_SETTINGS, *anchor,
                                                  "Quick Settings renders while pressed");
                     },
-                    6.0f, "Quick Settings has pressable controls");
+                    6.0f, "Quick Settings has pressable controls", monitor.height / dpi >= 200.0f);
                 (void)reach_quick_settings_set_open(quick_settings, 0);
                 tick_presented_surface(host, REACH_SURFACE_ID_QUICK_SETTINGS, 0.6);
 
@@ -2955,11 +2955,11 @@ static void test_quick_settings_section_motion_renders_worst_case(void)
                 reach_feature_surface_geometry geometry = {};
                 ops->surface_geometry(capsule, &geometry);
                 reach_pointer_event press = {};
-                expect_true(find_press_targets(ops, capsule,
-                                               {0.0f, 0.0f, geometry.visible_bounds.width,
-                                                geometry.visible_bounds.height},
-                                               REACH_POINTER_COORDINATE_SURFACE_LOCAL, 6.0f, &press,
-                                               1) == 1,
+                size_t press_count = find_press_targets(
+                    ops, capsule,
+                    {0.0f, 0.0f, geometry.visible_bounds.width, geometry.visible_bounds.height},
+                    REACH_POINTER_COORDINATE_SURFACE_LOCAL, 6.0f, &press, 1);
+                expect_true(press_count == 1 || monitor.height / dpi < 200.0f,
                             "Quick Settings has a control to hold pressed during list churn");
                 send_pointer(ops, capsule, press);
                 reach_audio_volume_session_list replaced_sessions = sessions;

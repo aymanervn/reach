@@ -75,10 +75,12 @@ static void reach_feature_attach_switcher(void *capsule,
 static void reach_feature_attach_quick_settings(void *capsule,
                                                 const reach_feature_dependencies *dependencies)
 {
-    reach_quick_settings_attach_services(static_cast<reach_quick_settings *>(capsule),
-                                         dependencies != nullptr ? dependencies->system_status
-                                                                 : nullptr,
-                                         dependencies != nullptr ? dependencies->wifi : nullptr);
+    reach_quick_settings_attach_services(
+        static_cast<reach_quick_settings *>(capsule),
+        dependencies != nullptr ? dependencies->system_status : nullptr,
+        dependencies != nullptr ? dependencies->wifi : nullptr,
+        dependencies != nullptr ? dependencies->profile : nullptr,
+        dependencies != nullptr ? dependencies->power_session : nullptr);
 }
 
 static void reach_feature_attach_battery(void *capsule,
@@ -499,8 +501,8 @@ static void reach_feature_notify_quick_settings(void *capsule,
     if (notification->kind == REACH_FEATURE_NOTIFICATION_CONFIG_CHANGED &&
         notification->config != nullptr)
     {
-        if (reach_quick_settings_apply_light_theme(quick_settings,
-                                                   notification->config->light_theme))
+        if (reach_quick_settings_apply_config(quick_settings, notification->config->light_theme,
+                                              notification->config->wallpaper_path))
         {
             out->redraw = 1;
         }

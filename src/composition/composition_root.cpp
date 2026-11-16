@@ -282,6 +282,11 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
     {
         dependencies.wifi = {};
     }
+    if (result == REACH_OK &&
+        reach_windows_create_user_account(&dependencies.user_account) != REACH_OK)
+    {
+        dependencies.user_account = {};
+    }
     if (result == REACH_OK)
     {
         result = reach_windows_create_media_controls(&dependencies.media_controls);
@@ -305,6 +310,7 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
             dependencies.audio_volume = {};
             dependencies.system_controls = {};
             dependencies.wifi = {};
+            dependencies.user_account = {};
             dependencies.media_controls = {};
             dependencies.quick_settings_window = {};
             dependencies.quick_settings_renderer = {};
@@ -489,6 +495,10 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
         if (dependencies.wifi.destroy != nullptr)
         {
             dependencies.wifi.destroy(dependencies.wifi.userdata);
+        }
+        if (dependencies.user_account.ops.destroy != nullptr)
+        {
+            dependencies.user_account.ops.destroy(dependencies.user_account.account);
         }
         if (dependencies.media_controls.destroy != nullptr)
         {

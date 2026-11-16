@@ -94,6 +94,7 @@ add_library(reach_services STATIC
     src/services/idle_watch.cpp
     src/services/now_playing.cpp
     src/services/pin_config.cpp
+    src/services/profile.cpp
     src/services/search.cpp
     src/services/clock.cpp
     src/services/input_language.cpp

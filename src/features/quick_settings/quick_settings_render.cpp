@@ -498,6 +498,155 @@ static void reach_quick_settings_push_level_pill(reach_render_command_buffer *co
                                    REACH_TEXT_ALIGNMENT_TRAILING, theme->primary_text);
 }
 
+static size_t reach_quick_settings_append_text(uint16_t *dst, size_t capacity, size_t length,
+                                               const char *text)
+{
+    while (text != nullptr && *text != 0 && length + 1 < capacity)
+    {
+        dst[length++] = (uint16_t)(unsigned char)*text++;
+    }
+    dst[length] = 0;
+    return length;
+}
+
+static size_t reach_quick_settings_append_unit(uint16_t *dst, size_t capacity, size_t length,
+                                               int64_t value, const char *unit)
+{
+    char digits[24] = {};
+    size_t count = 0;
+    do
+    {
+        digits[count++] = (char)('0' + value % 10);
+        value /= 10;
+    } while (value > 0 && count < sizeof(digits) - 1);
+    char ordered[24] = {};
+    for (size_t index = 0; index < count; ++index)
+    {
+        ordered[index] = digits[count - 1 - index];
+    }
+    length = reach_quick_settings_append_text(dst, capacity, length, ordered);
+    return reach_quick_settings_append_text(dst, capacity, length, unit);
+}
+
+static size_t reach_quick_settings_append_duration(uint16_t *dst, size_t capacity, size_t length,
+                                                   int64_t minutes)
+{
+    int64_t days = minutes / (60 * 24);
+    int64_t hours = minutes / 60 % 24;
+    int64_t remainder = minutes % 60;
+    if (days > 0)
+    {
+        length = reach_quick_settings_append_unit(dst, capacity, length, days, "d ");
+        return reach_quick_settings_append_unit(dst, capacity, length, hours, "h");
+    }
+    if (hours > 0)
+    {
+        length = reach_quick_settings_append_unit(dst, capacity, length, hours, "h ");
+    }
+    return reach_quick_settings_append_unit(dst, capacity, length, remainder, "m");
+}
+
+static void reach_quick_settings_identity_detail(const reach_quick_settings_model *model,
+                                                 uint16_t *dst, size_t capacity)
+{
+    size_t length = 0;
+    dst[0] = 0;
+    if (model->uptime_minutes >= 0)
+    {
+        length = reach_quick_settings_append_text(dst, capacity, length, "up ");
+        length = reach_quick_settings_append_duration(dst, capacity, length, model->uptime_minutes);
+    }
+    if (model->power.has_battery && model->power.battery_percent >= 0)
+    {
+        if (length > 0)
+        {
+            length = reach_quick_settings_append_text(dst, capacity, length, " \xB7 ");
+        }
+        length = reach_quick_settings_append_unit(dst, capacity, length,
+                                                  model->power.battery_percent, "%");
+        if (!model->power.battery_charging && model->power.battery_seconds_remaining >= 0)
+        {
+            length = reach_quick_settings_append_text(dst, capacity, length, " \xB7 ");
+            int64_t minutes = (model->power.battery_seconds_remaining + 30) / 60;
+            length = reach_quick_settings_append_duration(dst, capacity, length,
+                                                          minutes > 0 ? minutes : 1);
+            (void)reach_quick_settings_append_text(dst, capacity, length, " left");
+        }
+    }
+}
+
+static reach_result reach_quick_settings_push_header(const reach_quick_settings_render_input *input,
+                                                     reach_render_command_buffer *commands,
+                                                     const reach_quick_settings_metrics *metrics)
+{
+    const reach_quick_settings_layout &layout = input->layout;
+    const reach_theme &theme = input->theme;
+    reach_render_group group = {};
+    group.id = 40;
+    group.parent_id = 8;
+    group.bounds = layout.banner;
+    group.bounds.height =
+        layout.identity_detail.y + layout.identity_detail.height - layout.banner.y;
+    reach_result result = reach_render_command_buffer_begin_group(commands, &group);
+    if (result == REACH_OK)
+    {
+        float radius = theme.radius_large * input->dpi_scale;
+        if (input->model.wallpaper_image_id != 0)
+        {
+            reach_render_command banner = {};
+            banner.type = REACH_RENDER_COMMAND_ICON;
+            banner.rect = layout.banner;
+            banner.icon_id = input->model.wallpaper_image_id;
+            banner.icon_crop_to_fill = 1;
+            banner.radius = radius;
+            banner.color.a = 1.0f;
+            (void)reach_render_command_buffer_push(commands, &banner);
+        }
+        else
+        {
+            reach_quick_settings_push_rounded_rect(commands, layout.banner, radius,
+                                                   theme.quick_settings_button_background);
+        }
+
+        reach_quick_settings_push_rounded_rect(commands, layout.avatar_ring,
+                                               layout.avatar_ring.width * 0.5f,
+                                               theme.top_bar_dropdown_background);
+        if (input->model.picture_image_id != 0)
+        {
+            reach_render_command avatar = {};
+            avatar.type = REACH_RENDER_COMMAND_ICON;
+            avatar.rect = layout.avatar;
+            avatar.icon_id = input->model.picture_image_id;
+            avatar.icon_crop_to_fill = 1;
+            avatar.radius = layout.avatar.width * 0.5f;
+            avatar.color.a = 1.0f;
+            (void)reach_render_command_buffer_push(commands, &avatar);
+        }
+        else
+        {
+            reach_quick_settings_push_rounded_rect(commands, layout.avatar,
+                                                   layout.avatar.width * 0.5f, theme.accent);
+            uint16_t initial[2] = {input->model.display_name[0], 0};
+            reach_quick_settings_push_text(
+                commands, layout.avatar, initial, metrics->identity_name_text_size,
+                REACH_TEXT_WEIGHT_SEMIBOLD, REACH_TEXT_ALIGNMENT_CENTER, theme.primary_text);
+        }
+
+        reach_quick_settings_push_fitted_text(
+            commands, layout.identity_name, input->model.display_name,
+            metrics->identity_name_text_size, REACH_TEXT_WEIGHT_SEMIBOLD,
+            REACH_TEXT_ALIGNMENT_LEADING, theme.primary_text, &input->text_measure);
+        uint16_t detail[64] = {};
+        reach_quick_settings_identity_detail(&input->model, detail, 64);
+        reach_quick_settings_push_fitted_text(
+            commands, layout.identity_detail, detail, metrics->identity_detail_text_size,
+            REACH_TEXT_WEIGHT_NORMAL, REACH_TEXT_ALIGNMENT_LEADING,
+            theme.quick_settings_secondary_text, &input->text_measure);
+    }
+    reach_render_command_buffer_end_group(commands);
+    return result;
+}
+
 static reach_result reach_quick_settings_push_rail(const reach_quick_settings_render_input *input,
                                                    reach_render_command_buffer *commands)
 {
@@ -505,7 +654,7 @@ static reach_result reach_quick_settings_push_rail(const reach_quick_settings_re
     const reach_theme &theme = input->theme;
     reach_render_group rail = {};
     rail.id = 30;
-    rail.parent_id = 1;
+    rail.parent_id = 8;
     rail.bounds = layout.rail;
     reach_result result = reach_render_command_buffer_begin_group(commands, &rail);
     if (result == REACH_OK)
@@ -521,7 +670,7 @@ static reach_result reach_quick_settings_push_rail(const reach_quick_settings_re
 
     reach_render_group marker = {};
     marker.id = 31;
-    marker.parent_id = 1;
+    marker.parent_id = 8;
     marker.bounds = layout.rail_items[0];
     marker.y = input->rail_marker;
     result = reach_render_command_buffer_begin_group(commands, &marker);
@@ -541,7 +690,7 @@ static reach_result reach_quick_settings_push_rail(const reach_quick_settings_re
     reach_quick_settings_metrics metrics = reach_quick_settings_metrics_for_scale(input->dpi_scale);
     reach_render_group glyphs = {};
     glyphs.id = 32;
-    glyphs.parent_id = 1;
+    glyphs.parent_id = 8;
     glyphs.bounds = layout.rail;
     result = reach_render_command_buffer_begin_group(commands, &glyphs);
     for (size_t index = 0; result == REACH_OK && index < REACH_QUICK_SETTINGS_PAGE_COUNT; ++index)
@@ -913,7 +1062,7 @@ reach_quick_settings_push_press_feedback(const reach_quick_settings_render_input
     placement.bounds = bounds;
     placement.parent_id = kind == REACH_QUICK_SETTINGS_PRESS_TARGET_OUTPUT_DEVICE_ROW ? 6
                           : kind == REACH_QUICK_SETTINGS_PRESS_TARGET_EXPAND_BUTTON   ? 2
-                          : kind == REACH_QUICK_SETTINGS_PRESS_TARGET_RAIL_ITEM       ? 1
+                          : kind == REACH_QUICK_SETTINGS_PRESS_TARGET_RAIL_ITEM       ? 8
                           : pill                                                      ? 20
                                                                                       : 21;
     return reach_ui_feedback_render(commands, 900, bounds, radius, overlay, &input->press_feedback,
@@ -977,7 +1126,9 @@ reach_quick_settings_build_render_commands(const reach_quick_settings_render_inp
         reach_quick_settings_declare_group(commands, 8, 1, viewport, viewport, &scrolling, nullptr,
                                            nullptr, false) != REACH_OK)
         return REACH_ERROR;
-    reach_result result = reach_quick_settings_push_rail(input, commands);
+    reach_result result = reach_quick_settings_push_header(input, commands, &metrics);
+    if (result == REACH_OK)
+        result = reach_quick_settings_push_rail(input, commands);
     if (result == REACH_OK &&
         reach_quick_settings_page_visible(input, REACH_QUICK_SETTINGS_PAGE_OVERVIEW))
         result = reach_quick_settings_push_overview(input, commands, &metrics);

@@ -10,6 +10,15 @@ struct reach_quick_settings_metrics
     float text_padding;
 
     float panel_width;
+    float banner_height;
+    float avatar_size;
+    float avatar_ring;
+    float avatar_overlap;
+    float avatar_inset;
+    float identity_height;
+    float identity_gap;
+    float identity_name_height;
+    float identity_detail_height;
     float rail_width;
     float rail_item_size;
     float rail_item_gap;
@@ -70,6 +79,8 @@ struct reach_quick_settings_metrics
 
     float toggle_title_text_size;
     float toggle_status_text_size;
+    float identity_name_text_size;
+    float identity_detail_text_size;
     float overview_pill_value_text_size;
     float default_pill_label_text_size;
     float master_pill_label_text_size;
@@ -102,6 +113,15 @@ static constexpr reach_quick_settings_metrics reach_quick_settings_make_metrics(
     metrics.text_padding = 12.0f;
 
     metrics.panel_width = 340.0f;
+    metrics.banner_height = 84.0f;
+    metrics.avatar_size = 40.0f;
+    metrics.avatar_ring = 2.0f;
+    metrics.avatar_overlap = 16.0f;
+    metrics.avatar_inset = 10.0f;
+    metrics.identity_height = 34.0f;
+    metrics.identity_gap = 8.0f;
+    metrics.identity_name_height = 17.0f;
+    metrics.identity_detail_height = 14.0f;
     metrics.rail_width = 38.0f;
     metrics.rail_item_size = 28.0f;
     metrics.rail_item_gap = 6.0f;
@@ -162,6 +182,8 @@ static constexpr reach_quick_settings_metrics reach_quick_settings_make_metrics(
 
     metrics.toggle_title_text_size = REACH_TEXT_SIZE_SMALL;
     metrics.toggle_status_text_size = REACH_TEXT_SIZE_XSMALL;
+    metrics.identity_name_text_size = REACH_TEXT_SIZE_MEDIUM;
+    metrics.identity_detail_text_size = REACH_TEXT_SIZE_XSMALL;
     metrics.overview_pill_value_text_size = REACH_TEXT_SIZE_XSMALL;
     metrics.default_pill_label_text_size = REACH_TEXT_SIZE_MEDIUM;
     metrics.master_pill_label_text_size = REACH_TEXT_SIZE_MEDIUM;
@@ -342,6 +364,25 @@ static inline reach_quick_settings_metrics reach_quick_settings_metrics_for_scal
         reach_quick_settings_metric_scale_value(metrics.toggle_status_text_size, dpi_scale);
     metrics.overview_pill_value_text_size =
         reach_quick_settings_metric_scale_value(metrics.overview_pill_value_text_size, dpi_scale);
+
+    metrics.banner_height =
+        reach_quick_settings_metric_scale_value(metrics.banner_height, dpi_scale);
+    metrics.avatar_size = reach_quick_settings_metric_scale_value(metrics.avatar_size, dpi_scale);
+    metrics.avatar_ring = reach_quick_settings_metric_scale_value(metrics.avatar_ring, dpi_scale);
+    metrics.avatar_overlap =
+        reach_quick_settings_metric_scale_value(metrics.avatar_overlap, dpi_scale);
+    metrics.avatar_inset = reach_quick_settings_metric_scale_value(metrics.avatar_inset, dpi_scale);
+    metrics.identity_height =
+        reach_quick_settings_metric_scale_value(metrics.identity_height, dpi_scale);
+    metrics.identity_gap = reach_quick_settings_metric_scale_value(metrics.identity_gap, dpi_scale);
+    metrics.identity_name_height =
+        reach_quick_settings_metric_scale_value(metrics.identity_name_height, dpi_scale);
+    metrics.identity_detail_height =
+        reach_quick_settings_metric_scale_value(metrics.identity_detail_height, dpi_scale);
+    metrics.identity_name_text_size =
+        reach_quick_settings_metric_scale_value(metrics.identity_name_text_size, dpi_scale);
+    metrics.identity_detail_text_size =
+        reach_quick_settings_metric_scale_value(metrics.identity_detail_text_size, dpi_scale);
 
     return metrics;
 }

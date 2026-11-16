@@ -6,8 +6,10 @@
 #include "reach/features/common/keyed_rows.h"
 #include "reach/features/feature_capsule.h"
 #include "reach/ports/audio_volume.h"
+#include "reach/ports/power_session.h"
 #include "reach/ports/system_controls.h"
 #include "reach/ports/text_measure.h"
+#include "reach/services/profile.h"
 #include "reach/services/system_status.h"
 #include "reach/services/wifi.h"
 #include "reach/support/util.h"
@@ -51,6 +53,11 @@ extern "C"
         reach_brightness_state brightness;
         reach_wifi_radio_state wifi_radio;
         int32_t light_theme;
+        uint16_t display_name[REACH_USER_ACCOUNT_NAME_CAPACITY];
+        uint64_t picture_image_id;
+        uint64_t wallpaper_image_id;
+        int64_t uptime_minutes;
+        reach_power_state power;
     } reach_quick_settings_model;
 
     typedef struct reach_quick_settings_volume_pill_model
@@ -105,6 +112,12 @@ extern "C"
     {
         reach_rect_f32 content_bounds;
         reach_rect_f32 page_bounds;
+
+        reach_rect_f32 banner;
+        reach_rect_f32 avatar_ring;
+        reach_rect_f32 avatar;
+        reach_rect_f32 identity_name;
+        reach_rect_f32 identity_detail;
 
         reach_rect_f32 rail;
         reach_rect_f32 rail_items[REACH_QUICK_SETTINGS_PAGE_COUNT];
@@ -344,12 +357,13 @@ extern "C"
     } reach_quick_settings_routes;
 
     void reach_quick_settings_attach_services(reach_quick_settings *quick_settings,
-                                              reach_system_status *status,
-                                              reach_wifi_service *wifi);
+                                              reach_system_status *status, reach_wifi_service *wifi,
+                                              reach_profile_service *profile,
+                                              const reach_power_session_port *power_session);
     void reach_quick_settings_set_routes(reach_quick_settings *quick_settings,
                                          const reach_quick_settings_routes *routes);
-    int32_t reach_quick_settings_apply_light_theme(reach_quick_settings *quick_settings,
-                                                   int32_t light_theme);
+    int32_t reach_quick_settings_apply_config(reach_quick_settings *quick_settings,
+                                              int32_t light_theme, const uint16_t *wallpaper_path);
     int32_t reach_quick_settings_select_page(reach_quick_settings *quick_settings,
                                              reach_quick_settings_page page);
 

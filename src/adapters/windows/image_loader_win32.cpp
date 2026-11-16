@@ -10,7 +10,6 @@
 
 struct reach_image_loader
 {
-    IWICImagingFactory *factory;
 };
 
 static void reach_image_loader_scaled_size(UINT source_width, UINT source_height,
@@ -38,22 +37,15 @@ static void reach_image_loader_scaled_size(UINT source_width, UINT source_height
     *out_height = height > 0 ? height : 1;
 }
 
-static reach_result reach_image_loader_load(reach_image_loader *loader, const uint16_t *path,
-                                            int32_t target_width, int32_t target_height,
-                                            uint64_t *out_image_id)
+static reach_result reach_image_loader_decode(IWICImagingFactory *factory, const uint16_t *path,
+                                              int32_t target_width, int32_t target_height,
+                                              uint64_t *out_image_id)
 {
-    if (loader == nullptr || loader->factory == nullptr || path == nullptr || path[0] == 0 ||
-        out_image_id == nullptr)
-    {
-        return REACH_INVALID_ARGUMENT;
-    }
-
-    *out_image_id = 0;
 
     IWICBitmapDecoder *decoder = nullptr;
-    if (FAILED(loader->factory->CreateDecoderFromFilename(
-            reinterpret_cast<LPCWSTR>(path), nullptr, GENERIC_READ, WICDecodeMetadataCacheOnLoad,
-            &decoder)) ||
+    if (FAILED(factory->CreateDecoderFromFilename(reinterpret_cast<LPCWSTR>(path), nullptr,
+                                                  GENERIC_READ, WICDecodeMetadataCacheOnLoad,
+                                                  &decoder)) ||
         decoder == nullptr)
     {
         return REACH_ERROR;
@@ -85,7 +77,7 @@ static reach_result reach_image_loader_load(reach_image_loader *loader, const ui
     IWICBitmapScaler *scaler = nullptr;
     if (width != source_width || height != source_height)
     {
-        if (SUCCEEDED(loader->factory->CreateBitmapScaler(&scaler)) && scaler != nullptr &&
+        if (SUCCEEDED(factory->CreateBitmapScaler(&scaler)) && scaler != nullptr &&
             SUCCEEDED(scaler->Initialize(frame, width, height, WICBitmapInterpolationModeFant)))
         {
             source = scaler;
@@ -99,7 +91,7 @@ static reach_result reach_image_loader_load(reach_image_loader *loader, const ui
     }
 
     IWICFormatConverter *converter = nullptr;
-    if (FAILED(loader->factory->CreateFormatConverter(&converter)) || converter == nullptr ||
+    if (FAILED(factory->CreateFormatConverter(&converter)) || converter == nullptr ||
         FAILED(converter->Initialize(source, GUID_WICPixelFormat32bppPBGRA, WICBitmapDitherTypeNone,
                                      nullptr, 0.0, WICBitmapPaletteTypeMedianCut)))
     {
@@ -154,6 +146,34 @@ static reach_result reach_image_loader_load(reach_image_loader *loader, const ui
     return result;
 }
 
+static reach_result reach_image_loader_load(reach_image_loader *loader, const uint16_t *path,
+                                            int32_t target_width, int32_t target_height,
+                                            uint64_t *out_image_id)
+{
+    if (loader == nullptr || path == nullptr || path[0] == 0 || out_image_id == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    *out_image_id = 0;
+
+    HRESULT com = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+    IWICImagingFactory *factory = nullptr;
+    reach_result result = REACH_ERROR;
+    if (SUCCEEDED(CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER,
+                                   IID_PPV_ARGS(&factory))) &&
+        factory != nullptr)
+    {
+        result =
+            reach_image_loader_decode(factory, path, target_width, target_height, out_image_id);
+        factory->Release();
+    }
+    if (SUCCEEDED(com))
+    {
+        CoUninitialize();
+    }
+    return result;
+}
+
 static void reach_image_loader_release(reach_image_loader *loader, uint64_t image_id)
 {
     (void)loader;
@@ -168,11 +188,6 @@ static void reach_image_loader_destroy(reach_image_loader *loader)
     if (loader == nullptr)
     {
         return;
-    }
-    if (loader->factory != nullptr)
-    {
-        loader->factory->Release();
-        loader->factory = nullptr;
     }
     delete loader;
 }
@@ -189,14 +204,6 @@ reach_result reach_windows_create_image_loader(reach_image_loader_port *out_port
     reach_image_loader *loader = new (std::nothrow) reach_image_loader();
     if (loader == nullptr)
     {
-        return REACH_ERROR;
-    }
-
-    if (FAILED(CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER,
-                                IID_PPV_ARGS(&loader->factory))) ||
-        loader->factory == nullptr)
-    {
-        delete loader;
         return REACH_ERROR;
     }
 
