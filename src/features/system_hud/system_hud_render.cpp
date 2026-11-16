@@ -6,6 +6,7 @@
 #include "reach/features/common/progress_bar_render.h"
 
 static const float REACH_SYSTEM_HUD_ARTWORK_BLUR = 0.8f;
+static const float REACH_SYSTEM_HUD_MEDIA_BUTTON_FILL = 0.78f;
 
 static void reach_system_hud_push_text(reach_render_command_buffer *commands, reach_rect_f32 rect,
                                        const uint16_t *text, float size, int32_t weight,
@@ -60,7 +61,10 @@ static void reach_system_hud_push_media_button(const reach_system_hud_state *sta
     int32_t active = state->media_action == action;
     if (active)
     {
-        reach_system_hud_push_circle(commands, rect, theme->system_hud_track);
+        reach_system_hud_push_circle(
+            commands,
+            reach_system_hud_centered_glyph(rect, rect.height * REACH_SYSTEM_HUD_MEDIA_BUTTON_FILL),
+            theme->bar_button_background);
     }
     reach_system_hud_push_vector_icon(
         commands, reach_system_hud_centered_glyph(rect, rect.height * 0.5f), icon,
@@ -106,11 +110,11 @@ static reach_result reach_system_hud_render_media(const reach_system_hud_state *
     static const uint16_t fallback_title[] = {'M', 'e', 'd', 'i', 'a', 0};
     const uint16_t *title = state->media.title[0] != 0 ? state->media.title : fallback_title;
     reach_system_hud_push_text(commands, state->layout.title, title,
-                               REACH_TEXT_SIZE_MEDIUM * ctx->dpi_scale, REACH_TEXT_WEIGHT_DEMIBOLD,
+                               REACH_TEXT_SIZE_MEDIUM * ctx->dpi_scale, REACH_TEXT_WEIGHT_BOLD,
                                REACH_TEXT_ALIGNMENT_LEADING, theme->system_hud_primary_text);
     reach_system_hud_push_text(commands, state->layout.subtitle, state->media.artist,
                                REACH_TEXT_SIZE_SMALL * ctx->dpi_scale, REACH_TEXT_WEIGHT_NORMAL,
-                               REACH_TEXT_ALIGNMENT_LEADING, theme->system_hud_secondary_text);
+                               REACH_TEXT_ALIGNMENT_LEADING, theme->system_hud_primary_text);
 
     reach_system_hud_push_media_button(state, theme, commands, state->layout.media_previous,
                                        REACH_VECTOR_ICON_PREVIOUS,
