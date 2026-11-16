@@ -311,6 +311,11 @@ static void reach_quick_settings_toggle_text(const reach_quick_settings_model *m
             model->bluetooth_pending ? model->bluetooth_pending_enabled : model->bluetooth.enabled;
         title = bluetooth;
         status = !model->bluetooth.available ? unavailable : enabled ? on : off;
+        if (enabled && model->bluetooth.available && model->bluetooth_paired_count > 0 &&
+            model->bluetooth_rows[0].connected && model->bluetooth_rows[0].name[0] != 0)
+        {
+            status = model->bluetooth_rows[0].name;
+        }
         *out_icon = enabled ? REACH_VECTOR_ICON_BLUETOOTH_ON : REACH_VECTOR_ICON_BLUETOOTH_OFF;
         break;
     }
