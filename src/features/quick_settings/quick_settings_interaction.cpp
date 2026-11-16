@@ -10,119 +10,88 @@ static int reach_quick_settings_point_in_rect(reach_rect_f32 rect, float x, floa
            y >= rect.y && y <= rect.y + rect.height;
 }
 
-static float reach_quick_settings_level_for_slider_line(reach_rect_f32 slider_line, float x)
+static float reach_quick_settings_level_for_track(reach_rect_f32 track, float x)
 {
-    if (slider_line.width <= 0.0f)
+    if (track.width <= 0.0f)
     {
         return 0.0f;
     }
-    return reach_quick_settings_clamp01((x - slider_line.x) / slider_line.width);
+    return reach_quick_settings_clamp01((x - track.x) / track.width);
 }
 
-static int
-reach_quick_settings_point_in_app_slider(const reach_quick_settings_app_volume_row_layout *row,
-                                         float x, float y)
+static int32_t reach_quick_settings_hit_pill(const reach_quick_settings_level_pill_layout *pill,
+                                             float x, float y, reach_quick_settings_hit_type slider,
+                                             size_t mute_target, int32_t mutable_pill,
+                                             reach_quick_settings_hit_result *out)
 {
-    if (row == nullptr)
+    if (!reach_quick_settings_point_in_rect(pill->bounds, x, y))
     {
         return 0;
     }
-
-    reach_rect_f32 slider_hit = row->slider_full_range_line;
-    slider_hit.y = row->bounds.y;
-    slider_hit.height = row->bounds.height;
-    if (reach_quick_settings_point_in_rect(slider_hit, x, y))
+    if (mutable_pill && x <= pill->bounds.x + pill->bounds.height)
     {
+        out->type = REACH_QUICK_SETTINGS_HIT_MUTE;
+        out->item_index = mute_target;
         return 1;
     }
-
-    return reach_quick_settings_point_in_rect(row->slider_thumb, x, y);
+    out->type = slider;
+    out->volume_level = reach_quick_settings_level_for_track(pill->bounds, x);
+    return 1;
 }
 
-reach_quick_settings_hit_result
-reach_quick_settings_hit_test(const reach_quick_settings_layout *layout,
-                              const reach_quick_settings_model *model, float x, float y)
+static reach_quick_settings_hit_result
+reach_quick_settings_hit_test_overview(const reach_quick_settings_layout *layout,
+                                       const reach_quick_settings_model *model, float x, float y)
 {
     reach_quick_settings_hit_result result = {};
-    result.type = REACH_QUICK_SETTINGS_HIT_NONE;
-    result.volume_level = 0.0f;
-
-    if (layout == nullptr)
+    if (reach_quick_settings_hit_pill(&layout->overview_volume, x, y,
+                                      REACH_QUICK_SETTINGS_HIT_OVERVIEW_VOLUME_SLIDER,
+                                      REACH_QUICK_SETTINGS_MUTE_OVERVIEW, 1, &result))
     {
         return result;
     }
-
-    for (size_t index = 0; index < REACH_QUICK_SETTINGS_PAGE_COUNT; ++index)
+    if (reach_quick_settings_point_in_rect(layout->sound_page_button, x, y))
     {
-        if (reach_quick_settings_point_in_rect(layout->rail_items[index], x, y))
+        result.type = REACH_QUICK_SETTINGS_HIT_SOUND_PAGE_BUTTON;
+        return result;
+    }
+    if (model->brightness.available &&
+        reach_quick_settings_hit_pill(&layout->overview_brightness, x, y,
+                                      REACH_QUICK_SETTINGS_HIT_BRIGHTNESS_SLIDER, 0, 0, &result))
+    {
+        return result;
+    }
+    for (size_t index = 0; index < REACH_QUICK_SETTINGS_TOGGLE_COUNT; ++index)
+    {
+        if (!reach_quick_settings_point_in_rect(layout->toggles[index].bounds, x, y))
         {
-            result.type = REACH_QUICK_SETTINGS_HIT_RAIL_ITEM;
+            continue;
+        }
+        int32_t blocked =
+            (index == REACH_QUICK_SETTINGS_TOGGLE_BLUETOOTH && model->bluetooth_pending) ||
+            (index == REACH_QUICK_SETTINGS_TOGGLE_WIFI &&
+             model->wifi_radio == REACH_WIFI_RADIO_UNAVAILABLE);
+        if (!blocked)
+        {
+            result.type = REACH_QUICK_SETTINGS_HIT_TOGGLE;
             result.item_index = index;
-            return result;
-        }
-    }
-
-    if (model != nullptr && model->page == REACH_QUICK_SETTINGS_PAGE_OVERVIEW)
-    {
-        if (reach_quick_settings_point_in_rect(layout->overview_volume, x, y))
-        {
-            result.type = REACH_QUICK_SETTINGS_HIT_OVERVIEW_VOLUME_SLIDER;
-            result.volume_level =
-                reach_quick_settings_level_for_slider_line(layout->overview_volume, x);
-            return result;
-        }
-        if (reach_quick_settings_point_in_rect(layout->sound_page_button, x, y))
-        {
-            result.type = REACH_QUICK_SETTINGS_HIT_SOUND_PAGE_BUTTON;
-            return result;
-        }
-        if (model->brightness.available &&
-            reach_quick_settings_point_in_rect(layout->overview_brightness, x, y))
-        {
-            result.type = REACH_QUICK_SETTINGS_HIT_BRIGHTNESS_SLIDER;
-            result.volume_level =
-                reach_quick_settings_level_for_slider_line(layout->overview_brightness, x);
-            return result;
-        }
-        for (size_t index = 0; index < REACH_QUICK_SETTINGS_TOGGLE_COUNT; ++index)
-        {
-            if (!reach_quick_settings_point_in_rect(layout->toggles[index].bounds, x, y))
-            {
-                continue;
-            }
-            int32_t blocked =
-                (index == REACH_QUICK_SETTINGS_TOGGLE_BLUETOOTH && model->bluetooth_pending) ||
-                (index == REACH_QUICK_SETTINGS_TOGGLE_WIFI &&
-                 model->wifi_radio == REACH_WIFI_RADIO_UNAVAILABLE);
-            if (!blocked)
-            {
-                result.type = REACH_QUICK_SETTINGS_HIT_TOGGLE;
-                result.item_index = index;
-            }
-            return result;
         }
         return result;
     }
+    return result;
+}
 
-    if (model != nullptr && model->page != REACH_QUICK_SETTINGS_PAGE_SOUND)
+static reach_quick_settings_hit_result
+reach_quick_settings_hit_test_sound(const reach_quick_settings_layout *layout,
+                                    const reach_quick_settings_model *model, float x, float y)
+{
+    reach_quick_settings_hit_result result = {};
+    if (reach_quick_settings_hit_pill(&layout->sound_volume, x, y,
+                                      REACH_QUICK_SETTINGS_HIT_MAIN_SLIDER,
+                                      REACH_QUICK_SETTINGS_MUTE_SOUND, 1, &result))
     {
         return result;
     }
-
-    if (reach_quick_settings_point_in_rect(layout->main_slider_track, x, y))
-    {
-        result.type = REACH_QUICK_SETTINGS_HIT_MAIN_SLIDER;
-        result.volume_level =
-            reach_quick_settings_volume_pill_level_for_x(&layout->main_volume_pill, x);
-        return result;
-    }
-
-    if (reach_quick_settings_point_in_rect(layout->output_device_button, x, y))
-    {
-        result.type = REACH_QUICK_SETTINGS_HIT_OUTPUT_DEVICE_BUTTON;
-        return result;
-    }
-
     if (reach_quick_settings_point_in_rect(layout->output_devices_clip, x, y))
     {
         for (size_t index = 0; index < layout->output_device_row_count; ++index)
@@ -131,7 +100,7 @@ reach_quick_settings_hit_test(const reach_quick_settings_layout *layout,
             {
                 result.type = REACH_QUICK_SETTINGS_HIT_OUTPUT_DEVICE_ROW;
                 result.output_device_index = index;
-                if (model != nullptr && index < model->output_devices.count)
+                if (index < model->output_devices.count)
                 {
                     reach_copy_utf16(result.output_device_id, REACH_AUDIO_VOLUME_DEVICE_ID_CAPACITY,
                                      model->output_devices.devices[index].device_id);
@@ -140,18 +109,16 @@ reach_quick_settings_hit_test(const reach_quick_settings_layout *layout,
             }
         }
     }
-
     if (reach_quick_settings_point_in_rect(layout->app_volumes_clip, x, y))
     {
         for (size_t index = 0; index < layout->app_volume_row_count; ++index)
         {
-            if (reach_quick_settings_point_in_app_slider(&layout->app_volume_rows[index], x, y))
+            if (reach_quick_settings_hit_pill(
+                    &layout->app_volume_rows[index], x, y, REACH_QUICK_SETTINGS_HIT_SESSION_SLIDER,
+                    REACH_QUICK_SETTINGS_MUTE_FIRST_SESSION + index, 1, &result))
             {
-                result.type = REACH_QUICK_SETTINGS_HIT_SESSION_SLIDER;
                 result.session_index = index;
-                result.volume_level = reach_quick_settings_level_for_slider_line(
-                    layout->app_volume_rows[index].slider_full_range_line, x);
-                if (model != nullptr && index < model->sessions.count)
+                if (index < model->sessions.count)
                 {
                     reach_copy_utf16(result.session_instance_id,
                                      REACH_AUDIO_VOLUME_SESSION_KEY_CAPACITY,
@@ -161,62 +128,69 @@ reach_quick_settings_hit_test(const reach_quick_settings_layout *layout,
             }
         }
     }
-
-    if (reach_quick_settings_point_in_rect(layout->expand_button, x, y))
+    if (model->input_available)
     {
-        result.type = REACH_QUICK_SETTINGS_HIT_EXPAND_BUTTON;
+        (void)reach_quick_settings_hit_pill(&layout->input_volume, x, y,
+                                            REACH_QUICK_SETTINGS_HIT_INPUT_SLIDER,
+                                            REACH_QUICK_SETTINGS_MUTE_INPUT, 1, &result);
+    }
+    return result;
+}
+
+reach_quick_settings_hit_result
+reach_quick_settings_hit_test(const reach_quick_settings_layout *layout,
+                              const reach_quick_settings_model *model, float x, float y)
+{
+    reach_quick_settings_hit_result result = {};
+    if (layout == nullptr || model == nullptr)
+    {
         return result;
     }
-
-    return result;
+    for (size_t index = 0; index < REACH_QUICK_SETTINGS_PAGE_COUNT; ++index)
+    {
+        if (reach_quick_settings_point_in_rect(layout->rail_items[index], x, y))
+        {
+            result.type = REACH_QUICK_SETTINGS_HIT_RAIL_ITEM;
+            result.item_index = index;
+            return result;
+        }
+    }
+    return model->page == REACH_QUICK_SETTINGS_PAGE_OVERVIEW
+               ? reach_quick_settings_hit_test_overview(layout, model, x, y)
+               : reach_quick_settings_hit_test_sound(layout, model, x, y);
 }
 
 reach_quick_settings_action reach_quick_settings_action_for_hit(reach_quick_settings_hit_result hit)
 {
     reach_quick_settings_action action = {};
-    action.type = REACH_QUICK_SETTINGS_ACTION_NONE;
-    action.volume_level = 0.0f;
-
-    if (hit.type == REACH_QUICK_SETTINGS_HIT_MAIN_SLIDER ||
-        hit.type == REACH_QUICK_SETTINGS_HIT_OVERVIEW_VOLUME_SLIDER)
+    action.item_index = hit.item_index;
+    action.volume_level = reach_quick_settings_clamp01(hit.volume_level);
+    switch (hit.type)
     {
+    case REACH_QUICK_SETTINGS_HIT_MAIN_SLIDER:
+    case REACH_QUICK_SETTINGS_HIT_OVERVIEW_VOLUME_SLIDER:
         action.type = REACH_QUICK_SETTINGS_ACTION_SET_MAIN_VOLUME;
-        action.volume_level = reach_quick_settings_clamp01(hit.volume_level);
-        return action;
-    }
-
-    if (hit.type == REACH_QUICK_SETTINGS_HIT_SESSION_SLIDER)
-    {
+        break;
+    case REACH_QUICK_SETTINGS_HIT_SESSION_SLIDER:
         action.type = REACH_QUICK_SETTINGS_ACTION_SET_SESSION_VOLUME;
-        action.volume_level = reach_quick_settings_clamp01(hit.volume_level);
         action.session_index = hit.session_index;
         reach_copy_utf16(action.session_instance_id, REACH_AUDIO_VOLUME_SESSION_KEY_CAPACITY,
                          hit.session_instance_id);
-        return action;
-    }
-
-    if (hit.type == REACH_QUICK_SETTINGS_HIT_BRIGHTNESS_SLIDER)
-    {
+        break;
+    case REACH_QUICK_SETTINGS_HIT_BRIGHTNESS_SLIDER:
         action.type = REACH_QUICK_SETTINGS_ACTION_SET_BRIGHTNESS;
-        action.volume_level = reach_quick_settings_clamp01(hit.volume_level);
-        return action;
-    }
-
-    if (hit.type == REACH_QUICK_SETTINGS_HIT_RAIL_ITEM)
-    {
+        break;
+    case REACH_QUICK_SETTINGS_HIT_INPUT_SLIDER:
+        action.type = REACH_QUICK_SETTINGS_ACTION_SET_INPUT_VOLUME;
+        break;
+    case REACH_QUICK_SETTINGS_HIT_RAIL_ITEM:
         action.type = REACH_QUICK_SETTINGS_ACTION_SELECT_PAGE;
-        action.item_index = hit.item_index;
-        return action;
-    }
-
-    if (hit.type == REACH_QUICK_SETTINGS_HIT_SOUND_PAGE_BUTTON)
-    {
+        break;
+    case REACH_QUICK_SETTINGS_HIT_SOUND_PAGE_BUTTON:
         action.type = REACH_QUICK_SETTINGS_ACTION_SELECT_PAGE;
         action.item_index = REACH_QUICK_SETTINGS_PAGE_SOUND;
-        return action;
-    }
-
-    if (hit.type == REACH_QUICK_SETTINGS_HIT_TOGGLE)
+        break;
+    case REACH_QUICK_SETTINGS_HIT_TOGGLE:
     {
         static const reach_quick_settings_action_type toggle_actions[] = {
             REACH_QUICK_SETTINGS_ACTION_TOGGLE_WIFI, REACH_QUICK_SETTINGS_ACTION_TOGGLE_BLUETOOTH,
@@ -227,33 +201,33 @@ reach_quick_settings_action reach_quick_settings_action_for_hit(reach_quick_sett
         if (hit.item_index < REACH_QUICK_SETTINGS_TOGGLE_COUNT)
         {
             action.type = toggle_actions[hit.item_index];
-            action.item_index = hit.item_index;
         }
-        return action;
+        break;
     }
-
-    if (hit.type == REACH_QUICK_SETTINGS_HIT_OUTPUT_DEVICE_BUTTON)
-    {
-        action.type = REACH_QUICK_SETTINGS_ACTION_TOGGLE_OUTPUT_DEVICES;
-        return action;
-    }
-
-    if (hit.type == REACH_QUICK_SETTINGS_HIT_OUTPUT_DEVICE_ROW)
-    {
+    case REACH_QUICK_SETTINGS_HIT_OUTPUT_DEVICE_ROW:
         action.type = REACH_QUICK_SETTINGS_ACTION_SET_OUTPUT_DEVICE;
         action.output_device_index = hit.output_device_index;
         reach_copy_utf16(action.output_device_id, REACH_AUDIO_VOLUME_DEVICE_ID_CAPACITY,
                          hit.output_device_id);
-        return action;
+        break;
+    case REACH_QUICK_SETTINGS_HIT_MUTE:
+        action.type = REACH_QUICK_SETTINGS_ACTION_TOGGLE_MUTE;
+        break;
+    case REACH_QUICK_SETTINGS_HIT_NONE:
+    default:
+        action.type = REACH_QUICK_SETTINGS_ACTION_NONE;
+        break;
     }
-
-    if (hit.type == REACH_QUICK_SETTINGS_HIT_EXPAND_BUTTON)
-    {
-        action.type = REACH_QUICK_SETTINGS_ACTION_EXPAND;
-        return action;
-    }
-
     return action;
+}
+
+static int32_t reach_quick_settings_hit_is_slider(reach_quick_settings_hit_type type)
+{
+    return type == REACH_QUICK_SETTINGS_HIT_MAIN_SLIDER ||
+           type == REACH_QUICK_SETTINGS_HIT_OVERVIEW_VOLUME_SLIDER ||
+           type == REACH_QUICK_SETTINGS_HIT_SESSION_SLIDER ||
+           type == REACH_QUICK_SETTINGS_HIT_BRIGHTNESS_SLIDER ||
+           type == REACH_QUICK_SETTINGS_HIT_INPUT_SLIDER;
 }
 
 reach_quick_settings_action
@@ -266,25 +240,21 @@ reach_quick_settings_begin_slider_gesture_if_hit(reach_quick_settings *quick_set
         return action;
     }
     reach_quick_settings_state *state = reach_quick_settings_state_mut(quick_settings);
-
-    if (!reach_quick_settings_point_in_rect(
-            reach_quick_settings_state_ptr(quick_settings)->content_bounds, (float)x, (float)y))
-        return action;
-    reach_quick_settings_hit_result hit =
-        reach_quick_settings_hit_test(&state->layout, &state->model, (float)x, (float)y);
-    action = reach_quick_settings_action_for_hit(hit);
-    if (action.type != REACH_QUICK_SETTINGS_ACTION_SET_MAIN_VOLUME &&
-        action.type != REACH_QUICK_SETTINGS_ACTION_SET_SESSION_VOLUME &&
-        action.type != REACH_QUICK_SETTINGS_ACTION_SET_BRIGHTNESS)
+    if (!reach_quick_settings_point_in_rect(state->content_bounds, (float)x, (float)y))
     {
-        action = {};
         return action;
     }
-
+    reach_quick_settings_hit_result hit =
+        reach_quick_settings_hit_test(&state->layout, &state->model, (float)x, (float)y);
+    if (!reach_quick_settings_hit_is_slider(hit.type))
+    {
+        return action;
+    }
+    action = reach_quick_settings_action_for_hit(hit);
     state->drag.active = 1;
     state->drag.type = hit.type;
     state->drag.last_level = action.volume_level;
-    state->drag.level_valid = state->drag.active;
+    state->drag.level_valid = 1;
     state->drag.session_index = hit.session_index;
     reach_copy_utf16(state->drag.session_instance_id, REACH_AUDIO_VOLUME_SESSION_KEY_CAPACITY,
                      hit.session_instance_id);
@@ -308,21 +278,14 @@ uint64_t reach_quick_settings_pressable_target(reach_quick_settings_hit_result h
         kind = REACH_QUICK_SETTINGS_PRESS_TARGET_TOGGLE;
         index = hit.item_index;
         break;
-    case REACH_QUICK_SETTINGS_HIT_OUTPUT_DEVICE_BUTTON:
-        kind = REACH_QUICK_SETTINGS_PRESS_TARGET_OUTPUT_DEVICE_BUTTON;
-        break;
     case REACH_QUICK_SETTINGS_HIT_OUTPUT_DEVICE_ROW:
         kind = REACH_QUICK_SETTINGS_PRESS_TARGET_OUTPUT_DEVICE_ROW;
         index = hit.output_device_index;
         break;
-    case REACH_QUICK_SETTINGS_HIT_EXPAND_BUTTON:
-        kind = REACH_QUICK_SETTINGS_PRESS_TARGET_EXPAND_BUTTON;
+    case REACH_QUICK_SETTINGS_HIT_MUTE:
+        kind = REACH_QUICK_SETTINGS_PRESS_TARGET_MUTE;
+        index = hit.item_index;
         break;
-    case REACH_QUICK_SETTINGS_HIT_NONE:
-    case REACH_QUICK_SETTINGS_HIT_MAIN_SLIDER:
-    case REACH_QUICK_SETTINGS_HIT_SESSION_SLIDER:
-    case REACH_QUICK_SETTINGS_HIT_BRIGHTNESS_SLIDER:
-    case REACH_QUICK_SETTINGS_HIT_OVERVIEW_VOLUME_SLIDER:
     default:
         return REACH_PRESSABLE_TARGET_NONE;
     }
@@ -351,52 +314,51 @@ reach_quick_settings_action reach_quick_settings_drag_move(reach_quick_settings 
         return action;
     }
     reach_quick_settings_state *state = reach_quick_settings_state_mut(quick_settings);
+    const reach_quick_settings_layout &layout = state->layout;
 
-    reach_rect_f32 track = state->layout.main_slider_track;
-    if (state->drag.type == REACH_QUICK_SETTINGS_HIT_SESSION_SLIDER &&
-        state->drag.session_index < state->layout.app_volume_row_count)
+    reach_rect_f32 track = {};
+    switch (state->drag.type)
     {
-        track = state->layout.app_volume_rows[state->drag.session_index].slider_full_range_line;
-    }
-    else if (state->drag.type == REACH_QUICK_SETTINGS_HIT_BRIGHTNESS_SLIDER)
-    {
-        track = state->layout.overview_brightness;
-    }
-    else if (state->drag.type == REACH_QUICK_SETTINGS_HIT_OVERVIEW_VOLUME_SLIDER)
-    {
-        track = state->layout.overview_volume;
+    case REACH_QUICK_SETTINGS_HIT_SESSION_SLIDER:
+        if (state->drag.session_index < layout.app_volume_row_count)
+        {
+            track = layout.app_volume_rows[state->drag.session_index].bounds;
+        }
+        action.type = REACH_QUICK_SETTINGS_ACTION_SET_SESSION_VOLUME;
+        break;
+    case REACH_QUICK_SETTINGS_HIT_BRIGHTNESS_SLIDER:
+        track = layout.overview_brightness.bounds;
+        action.type = REACH_QUICK_SETTINGS_ACTION_SET_BRIGHTNESS;
+        break;
+    case REACH_QUICK_SETTINGS_HIT_OVERVIEW_VOLUME_SLIDER:
+        track = layout.overview_volume.bounds;
+        action.type = REACH_QUICK_SETTINGS_ACTION_SET_MAIN_VOLUME;
+        break;
+    case REACH_QUICK_SETTINGS_HIT_INPUT_SLIDER:
+        track = layout.input_volume.bounds;
+        action.type = REACH_QUICK_SETTINGS_ACTION_SET_INPUT_VOLUME;
+        break;
+    default:
+        track = layout.sound_volume.bounds;
+        action.type = REACH_QUICK_SETTINGS_ACTION_SET_MAIN_VOLUME;
+        break;
     }
 
     if (track.width <= 0.0f)
     {
-        return action;
+        return reach_quick_settings_action{};
     }
 
-    float next_level = reach_quick_settings_clamp01(((float)x - track.x) / track.width);
-
+    float next_level = reach_quick_settings_level_for_track(track, (float)x);
     if (state->drag.level_valid && (next_level == state->drag.last_level ||
                                     (fabsf(next_level - state->drag.last_level) < 0.005f &&
                                      next_level > 0.0f && next_level < 1.0f)))
     {
-        return action;
+        return reach_quick_settings_action{};
     }
 
     state->drag.last_level = next_level;
     state->drag.level_valid = 1;
-
-    if (state->drag.type == REACH_QUICK_SETTINGS_HIT_SESSION_SLIDER)
-    {
-        action.type = REACH_QUICK_SETTINGS_ACTION_SET_SESSION_VOLUME;
-    }
-    else if (state->drag.type == REACH_QUICK_SETTINGS_HIT_BRIGHTNESS_SLIDER)
-    {
-        action.type = REACH_QUICK_SETTINGS_ACTION_SET_BRIGHTNESS;
-    }
-    else
-    {
-        action.type = REACH_QUICK_SETTINGS_ACTION_SET_MAIN_VOLUME;
-    }
-
     action.volume_level = next_level;
     action.session_index = state->drag.session_index;
     reach_copy_utf16(action.session_instance_id, REACH_AUDIO_VOLUME_SESSION_KEY_CAPACITY,

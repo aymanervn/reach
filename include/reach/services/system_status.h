@@ -16,9 +16,11 @@ extern "C"
     typedef struct reach_system_status_audio_snapshot
     {
         reach_audio_volume_state state;
+        reach_audio_volume_state input;
         reach_audio_volume_session_list sessions;
         reach_audio_output_device_list output_devices;
         int32_t state_valid;
+        int32_t input_valid;
         int32_t sessions_valid;
         int32_t output_devices_valid;
     } reach_system_status_audio_snapshot;
@@ -85,6 +87,12 @@ extern "C"
     reach_result reach_system_status_set_session_volume(reach_system_status *service,
                                                         const uint16_t *session_instance_id,
                                                         float level);
+    reach_result reach_system_status_set_main_muted(reach_system_status *service, int32_t muted);
+    reach_result reach_system_status_set_session_muted(reach_system_status *service,
+                                                       const uint16_t *session_instance_id,
+                                                       int32_t muted);
+    reach_result reach_system_status_set_input_volume(reach_system_status *service, float level);
+    reach_result reach_system_status_set_input_muted(reach_system_status *service, int32_t muted);
     reach_result reach_system_status_set_default_output_device(reach_system_status *service,
                                                                const uint16_t *device_id);
     reach_result reach_system_status_set_brightness(reach_system_status *service, float level);

@@ -39,11 +39,6 @@ static float reach_quick_settings_stacked_rows_height(size_t row_count, float ro
     return (float)row_count * row_height + (float)(row_count - 1) * row_gap;
 }
 
-static float reach_quick_settings_expandable_panel_span(float panel_height, float panel_gap)
-{
-    return panel_height > 0.0f ? panel_gap + panel_height : 0.0f;
-}
-
 static size_t reach_quick_settings_visible_session_count(const reach_quick_settings_model *model)
 {
     if (model == nullptr)
@@ -77,8 +72,8 @@ void reach_quick_settings_model_init(reach_quick_settings_model *model)
     model->page = REACH_QUICK_SETTINGS_PAGE_OVERVIEW;
     model->main_volume_level = 0.0f;
     model->main_muted = 0;
-    model->expanded = 0;
-    model->output_devices_expanded = 0;
+    model->input = {};
+    model->input_available = 0;
     model->sessions = {};
     model->output_devices = {};
     model->network = {};
@@ -204,82 +199,20 @@ static void reach_quick_settings_model_set_bluetooth_pending(reach_quick_setting
     model->bluetooth_pending_enabled = pending_enabled ? 1 : 0;
 }
 
-void reach_quick_settings_volume_pill_model_init(reach_quick_settings_volume_pill_model *model,
-                                                 float volume_level, int32_t muted,
-                                                 const uint16_t *label)
-{
-    if (model == nullptr)
-    {
-        return;
-    }
-
-    model->volume_level = reach_quick_settings_clamp01(volume_level);
-    model->muted = muted ? 1 : 0;
-    model->icon_id = reach_quick_settings_volume_icon_id(model->volume_level, model->muted);
-    model->session_instance_id[0] = 0;
-    reach_copy_utf16(model->label, REACH_AUDIO_VOLUME_SESSION_LABEL_CAPACITY, label);
-}
-
-reach_quick_settings_volume_pill_layout
-reach_quick_settings_volume_pill_layout_for_bounds_scaled(reach_rect_f32 bounds,
-                                                          const reach_theme *theme, float dpi_scale)
-{
-    (void)theme;
-
-    reach_quick_settings_volume_pill_layout layout = {};
-    layout.bounds = bounds;
-
-    reach_quick_settings_metrics metrics = reach_quick_settings_metrics_for_scale(dpi_scale);
-
-    layout.header_icon.x = bounds.x;
-    layout.header_icon.y = bounds.y - metrics.pill_header_gap - metrics.pill_header_height +
-                           (metrics.pill_header_height - metrics.pill_header_icon_size) * 0.5f;
-    layout.header_icon.width = metrics.pill_header_icon_size;
-    layout.header_icon.height = metrics.pill_header_icon_size;
-
-    layout.header_label = reach_quick_settings_rect(
-        layout.header_icon.x + metrics.pill_header_icon_size + metrics.pill_header_label_gap,
-        bounds.y - metrics.pill_header_gap - metrics.pill_header_height,
-        bounds.width - metrics.pill_header_icon_size - metrics.pill_header_label_gap,
-        metrics.pill_header_height);
-
-    layout.slider_track = bounds;
-
-    layout.slider_fill = layout.slider_track;
-
-    return layout;
-}
-
-float reach_quick_settings_content_height_for_model(const reach_quick_settings_model *model)
-{
-    return reach_quick_settings_content_height_for_model_scaled(model, 1.0f);
-}
-
 static void reach_quick_settings_section_spans(const reach_quick_settings_model *model,
                                                float dpi_scale, float *out_output_span,
                                                float *out_app_span)
 {
     reach_quick_settings_metrics metrics = reach_quick_settings_metrics_for_scale(dpi_scale);
-    *out_output_span = reach_quick_settings_expandable_panel_span(
-        (float)reach_quick_settings_visible_output_device_count(model) *
-            metrics.output_device_row_height,
-        metrics.output_panel_gap);
-    *out_app_span = reach_quick_settings_expandable_panel_span(
-        (float)reach_quick_settings_visible_session_count(model) * metrics.app_volume_row_height,
-        metrics.app_panel_gap);
+    size_t outputs = reach_quick_settings_visible_output_device_count(model);
+    size_t sessions = reach_quick_settings_visible_session_count(model);
+    *out_output_span = outputs > 0 ? metrics.section_label_height +
+                                         (float)outputs * metrics.output_device_row_height
+                                   : 0.0f;
+    *out_app_span = sessions > 0 ? metrics.section_label_height +
+                                       (float)sessions * metrics.app_volume_row_height
+                                 : 0.0f;
 }
-
-static void reach_quick_settings_target_spans(const reach_quick_settings_model *model,
-                                              float dpi_scale, float *out_output_span,
-                                              float *out_app_span)
-{
-    reach_quick_settings_section_spans(model, dpi_scale, out_output_span, out_app_span);
-    if (model == nullptr || !model->output_devices_expanded)
-        *out_output_span = 0.0f;
-    if (model == nullptr || !model->expanded)
-        *out_app_span = 0.0f;
-}
-
 static float reach_quick_settings_rail_height(const reach_quick_settings_metrics *metrics)
 {
     return metrics->rail_padding * 2.0f +
@@ -318,14 +251,12 @@ reach_quick_settings_content_height_for_spans_scaled(const reach_quick_settings_
     }
     else
     {
-        float volume_component_height =
-            metrics.pill_header_height + metrics.section_header_gap + metrics.pill_height;
-        float output_component_height =
-            metrics.output_button_gap + metrics.output_button_height + output_devices_span;
-        float app_volume_component_height =
-            metrics.expand_button_gap + metrics.expand_button_height + app_volumes_span;
-        page_height = metrics.content_padding * 2.0f + volume_component_height +
-                      output_component_height + app_volume_component_height;
+        float input_height = model->input_available
+                                 ? metrics.section_label_height + metrics.overview_pill_height
+                                 : 0.0f;
+        page_height = metrics.content_padding * 2.0f + metrics.overview_pill_height +
+                      metrics.overview_row_gap + output_devices_span + app_volumes_span +
+                      input_height;
     }
     return reach_quick_settings_header_height(&metrics) +
            fmaxf(page_height, reach_quick_settings_rail_height(&metrics) + metrics.content_padding);
@@ -335,147 +266,49 @@ float reach_quick_settings_content_height_for_model_scaled(const reach_quick_set
                                                            float dpi_scale)
 {
     float output_span = 0, app_span = 0;
-    reach_quick_settings_target_spans(model, dpi_scale, &output_span, &app_span);
+    reach_quick_settings_section_spans(model, dpi_scale, &output_span, &app_span);
     return reach_quick_settings_content_height_for_spans_scaled(model, output_span, app_span,
                                                                 dpi_scale);
 }
-
-float reach_quick_settings_volume_pill_level_for_x(
-    const reach_quick_settings_volume_pill_layout *layout, float x)
-{
-    if (layout == nullptr || layout->slider_track.width <= 0.0f)
-    {
-        return 0.0f;
-    }
-
-    return reach_quick_settings_clamp01((x - layout->slider_track.x) / layout->slider_track.width);
-}
-
-reach_quick_settings_layout
-reach_quick_settings_layout_for_content_bounds(reach_rect_f32 content_bounds,
-                                               const reach_theme *theme,
-                                               const reach_quick_settings_model *model)
-{
-    return reach_quick_settings_layout_for_content_bounds_scaled(content_bounds, theme, model,
-                                                                 1.0f);
-}
+static reach_quick_settings_level_pill_layout
+reach_quick_settings_level_pill_at(reach_rect_f32 pill, int32_t labelled,
+                                   const reach_quick_settings_metrics *metrics);
 
 reach_quick_settings_output_device_row_layout
 reach_quick_settings_output_device_row_layout_at(reach_rect_f32 panel, float top, float dpi_scale)
 {
     reach_quick_settings_metrics metrics = reach_quick_settings_metrics_for_scale(dpi_scale);
     reach_quick_settings_output_device_row_layout row = {};
-    row.bounds.x = panel.x;
-    row.bounds.y = top;
-    row.bounds.width = panel.width;
-    row.bounds.height = metrics.output_device_row_height;
-
-    row.icon.width = metrics.output_icon_size;
-    row.icon.height = metrics.output_icon_size;
-    row.icon.x = row.bounds.x + metrics.output_row_horizontal_padding;
-    row.icon.y = row.bounds.y + (row.bounds.height - metrics.output_icon_size) * 0.5f;
-
-    row.checkmark.width = metrics.output_check_size;
-    row.checkmark.height = metrics.output_check_size;
-    row.checkmark.x = row.bounds.x + row.bounds.width - metrics.output_row_horizontal_padding -
-                      metrics.output_check_size;
-    row.checkmark.y = row.bounds.y + (row.bounds.height - metrics.output_check_size) * 0.5f;
-
-    row.label.x = row.icon.x + metrics.output_icon_size + metrics.output_row_label_gap;
-    row.label.y = row.bounds.y;
-    row.label.width = row.checkmark.x - metrics.output_row_label_gap - row.label.x;
-    row.label.height = row.bounds.height;
-    if (row.label.width < 0.0f)
-    {
-        row.label.width = 0.0f;
-    }
-
-    float separator_thickness = reach_ui_horizontal_separator_bounds(0, 0, 0, dpi_scale).height;
-    row.separator = reach_ui_horizontal_separator_bounds(
-        row.bounds.x + metrics.separator_inset,
-        row.bounds.y + row.bounds.height - separator_thickness,
-        row.bounds.width - metrics.separator_inset * 2.0f, dpi_scale);
-    if (row.separator.width < 0.0f)
-    {
-        row.separator.width = 0.0f;
-    }
+    row.bounds = reach_quick_settings_rect(panel.x, top, panel.width,
+                                           metrics.output_device_row_height - 2.0f * dpi_scale);
+    row.icon = reach_quick_settings_rect(row.bounds.x + metrics.output_row_horizontal_padding,
+                                         row.bounds.y +
+                                             (row.bounds.height - metrics.output_icon_size) * 0.5f,
+                                         metrics.output_icon_size, metrics.output_icon_size);
+    row.checkmark = reach_quick_settings_rect(
+        row.bounds.x + row.bounds.width - metrics.output_row_horizontal_padding -
+            metrics.output_check_size,
+        row.bounds.y + (row.bounds.height - metrics.output_check_size) * 0.5f,
+        metrics.output_check_size, metrics.output_check_size);
+    float text_x = row.icon.x + row.icon.width + metrics.output_row_label_gap;
+    float text_width = row.checkmark.x - metrics.output_row_label_gap - text_x;
+    float text_top = row.bounds.y + (row.bounds.height - metrics.output_row_title_height -
+                                     metrics.output_row_detail_height) *
+                                        0.5f;
+    row.title =
+        reach_quick_settings_rect(text_x, text_top, text_width, metrics.output_row_title_height);
+    row.detail = reach_quick_settings_rect(text_x, text_top + metrics.output_row_title_height,
+                                           text_width, metrics.output_row_detail_height);
     return row;
 }
-
-reach_quick_settings_app_volume_row_layout
-reach_quick_settings_app_volume_row_layout_at(reach_rect_f32 panel, float top, float level,
-                                              float dpi_scale)
+reach_quick_settings_level_pill_layout
+reach_quick_settings_app_volume_row_layout_at(reach_rect_f32 panel, float top, float dpi_scale)
 {
     reach_quick_settings_metrics metrics = reach_quick_settings_metrics_for_scale(dpi_scale);
-    reach_quick_settings_app_volume_row_layout row = {};
-    row.bounds.x = panel.x;
-    row.bounds.y = top;
-    row.bounds.width = panel.width;
-    row.bounds.height = metrics.app_volume_row_height;
-
-    row.app_icon.width = metrics.app_icon_size;
-    row.app_icon.height = metrics.app_icon_size;
-    row.app_icon.x = row.bounds.x + metrics.app_row_horizontal_padding;
-    row.app_icon.y = row.bounds.y + (row.bounds.height - metrics.app_icon_size) * 0.5f;
-
-    row.app_volume_percent.x = row.bounds.x + row.bounds.width -
-                               metrics.app_row_horizontal_padding - metrics.app_row_percent_width;
-    row.app_volume_percent.y = row.bounds.y;
-    row.app_volume_percent.width = metrics.app_row_percent_width;
-    row.app_volume_percent.height = row.bounds.height;
-
-    row.slider_full_range_line.width = metrics.app_row_slider_width;
-    row.slider_full_range_line.height = metrics.app_row_slider_line_height;
-    row.slider_full_range_line.x =
-        row.app_volume_percent.x - metrics.app_row_percent_gap - metrics.app_row_slider_width;
-    row.slider_full_range_line.y =
-        row.bounds.y + (row.bounds.height - metrics.app_row_slider_line_height) * 0.5f;
-    if (row.slider_full_range_line.x <
-        row.app_icon.x + metrics.app_icon_size + metrics.app_row_label_gap)
-    {
-        row.slider_full_range_line.x =
-            row.app_icon.x + metrics.app_icon_size + metrics.app_row_label_gap;
-        row.slider_full_range_line.width = row.bounds.x + row.bounds.width -
-                                           metrics.app_row_horizontal_padding -
-                                           row.slider_full_range_line.x;
-        if (row.slider_full_range_line.width < 0.0f)
-        {
-            row.slider_full_range_line.width = 0.0f;
-        }
-    }
-
-    row.app_label.x = row.app_icon.x + metrics.app_icon_size + metrics.app_row_label_gap;
-    row.app_label.y = row.bounds.y;
-    row.app_label.width =
-        row.slider_full_range_line.x - metrics.app_row_slider_gap - row.app_label.x;
-    row.app_label.height = row.bounds.height;
-    if (row.app_label.width < 0.0f)
-    {
-        row.app_label.width = 0.0f;
-    }
-
-    float session_level = reach_quick_settings_clamp01(level);
-    row.slider_level_line = row.slider_full_range_line;
-    row.slider_level_line.width = row.slider_full_range_line.width * session_level;
-    row.slider_thumb.width = metrics.app_row_thumb_size;
-    row.slider_thumb.height = metrics.app_row_thumb_size;
-    row.slider_thumb.x = row.slider_full_range_line.x +
-                         row.slider_full_range_line.width * session_level -
-                         metrics.app_row_thumb_size * 0.5f;
-    row.slider_thumb.y = row.bounds.y + (row.bounds.height - metrics.app_row_thumb_size) * 0.5f;
-
-    float separator_thickness = reach_ui_horizontal_separator_bounds(0, 0, 0, dpi_scale).height;
-    row.separator = reach_ui_horizontal_separator_bounds(
-        row.bounds.x + metrics.separator_inset,
-        row.bounds.y + row.bounds.height - separator_thickness,
-        row.bounds.width - metrics.separator_inset * 2.0f, dpi_scale);
-    if (row.separator.width < 0.0f)
-    {
-        row.separator.width = 0.0f;
-    }
-    return row;
+    return reach_quick_settings_level_pill_at(
+        reach_quick_settings_rect(panel.x, top, panel.width, metrics.overview_pill_height), 1,
+        &metrics);
 }
-
 static void reach_quick_settings_place_header(reach_quick_settings_layout *layout,
                                               reach_rect_f32 content_bounds,
                                               const reach_quick_settings_metrics *metrics)
@@ -524,20 +357,28 @@ static void reach_quick_settings_place_rail(reach_quick_settings_layout *layout,
     }
 }
 
-static void reach_quick_settings_place_pill_parts(reach_rect_f32 pill, reach_rect_f32 *out_icon,
-                                                  reach_rect_f32 *out_value,
-                                                  const reach_quick_settings_metrics *metrics)
+static reach_quick_settings_level_pill_layout
+reach_quick_settings_level_pill_at(reach_rect_f32 pill, int32_t labelled,
+                                   const reach_quick_settings_metrics *metrics)
 {
-    *out_icon = reach_quick_settings_rect(
+    reach_quick_settings_level_pill_layout layout = {};
+    layout.bounds = pill;
+    layout.icon = reach_quick_settings_rect(
         pill.x + metrics->overview_pill_icon_inset,
         pill.y + (pill.height - metrics->overview_pill_icon_size) * 0.5f,
         metrics->overview_pill_icon_size, metrics->overview_pill_icon_size);
-    *out_value =
+    layout.value =
         reach_quick_settings_rect(pill.x + pill.width - metrics->overview_pill_value_inset -
                                       metrics->overview_pill_value_width,
                                   pill.y, metrics->overview_pill_value_width, pill.height);
+    if (labelled)
+    {
+        float label_x = layout.icon.x + layout.icon.width + metrics->pill_label_gap;
+        layout.label = reach_quick_settings_rect(
+            label_x, pill.y, layout.value.x - metrics->pill_label_gap - label_x, pill.height);
+    }
+    return layout;
 }
-
 static void reach_quick_settings_place_toggle(reach_quick_settings_toggle_layout *toggle,
                                               reach_rect_f32 bounds,
                                               const reach_quick_settings_metrics *metrics)
@@ -573,19 +414,17 @@ static void reach_quick_settings_place_overview(reach_quick_settings_layout *lay
         page_bounds, page_bounds.y + metrics->content_padding, pill, metrics);
     layout->sound_page_button =
         reach_quick_settings_rect(row.x + row.width - pill, row.y, pill, pill);
-    layout->overview_volume =
-        reach_quick_settings_rect(row.x, row.y, row.width - pill - metrics->toggle_gap, pill);
-    reach_quick_settings_place_pill_parts(layout->overview_volume, &layout->overview_volume_icon,
-                                          &layout->overview_volume_value, metrics);
+    layout->overview_volume = reach_quick_settings_level_pill_at(
+        reach_quick_settings_rect(row.x, row.y, row.width - pill - metrics->toggle_gap, pill), 0,
+        metrics);
     float next_y = row.y + pill;
     if (model != nullptr && model->brightness.available)
     {
-        layout->overview_brightness = reach_quick_settings_content_line(
-            page_bounds, next_y + metrics->overview_row_gap, pill, metrics);
-        reach_quick_settings_place_pill_parts(layout->overview_brightness,
-                                              &layout->overview_brightness_icon,
-                                              &layout->overview_brightness_value, metrics);
-        next_y = layout->overview_brightness.y + pill;
+        layout->overview_brightness = reach_quick_settings_level_pill_at(
+            reach_quick_settings_content_line(page_bounds, next_y + metrics->overview_row_gap, pill,
+                                              metrics),
+            0, metrics);
+        next_y = layout->overview_brightness.bounds.y + pill;
     }
     reach_rect_f32 grid = reach_quick_settings_content_line(
         page_bounds, next_y + metrics->toggle_grid_gap, metrics->toggle_height, metrics);
@@ -601,6 +440,68 @@ static void reach_quick_settings_place_overview(reach_quick_settings_layout *lay
                                           line * (metrics->toggle_height + metrics->toggle_gap),
                                       toggle_width, metrics->toggle_height),
             metrics);
+    }
+}
+
+static void reach_quick_settings_place_sound(reach_quick_settings_layout *layout,
+                                             reach_rect_f32 page_bounds,
+                                             const reach_quick_settings_model *model,
+                                             float output_span, float app_span,
+                                             const reach_quick_settings_metrics *metrics,
+                                             float dpi_scale)
+{
+    float pill = metrics->overview_pill_height;
+    layout->sound_volume = reach_quick_settings_level_pill_at(
+        reach_quick_settings_content_line(page_bounds, page_bounds.y + metrics->content_padding,
+                                          pill, metrics),
+        0, metrics);
+    float section = layout->sound_volume.bounds.y + pill + metrics->overview_row_gap;
+
+    size_t outputs = reach_quick_settings_visible_output_device_count(model);
+    layout->output_label = reach_quick_settings_content_line(
+        page_bounds, section, metrics->section_label_height, metrics);
+    layout->output_devices_panel = reach_quick_settings_content_line(
+        page_bounds, section + metrics->section_label_height,
+        (float)outputs * metrics->output_device_row_height, metrics);
+    layout->output_devices_clip = layout->output_devices_panel;
+    layout->output_devices_clip.height =
+        reach_quick_settings_clamp_min0(output_span - metrics->section_label_height);
+    layout->output_device_row_count = outputs;
+    for (size_t index = 0; index < outputs; ++index)
+    {
+        layout->output_device_rows[index] = reach_quick_settings_output_device_row_layout_at(
+            layout->output_devices_panel,
+            layout->output_devices_panel.y + (float)index * metrics->output_device_row_height,
+            dpi_scale);
+    }
+
+    section += output_span;
+    size_t sessions = reach_quick_settings_visible_session_count(model);
+    layout->app_label = reach_quick_settings_content_line(page_bounds, section,
+                                                          metrics->section_label_height, metrics);
+    layout->app_volumes_panel = reach_quick_settings_content_line(
+        page_bounds, section + metrics->section_label_height,
+        (float)sessions * metrics->app_volume_row_height, metrics);
+    layout->app_volumes_clip = layout->app_volumes_panel;
+    layout->app_volumes_clip.height =
+        reach_quick_settings_clamp_min0(app_span - metrics->section_label_height);
+    layout->app_volume_row_count = sessions;
+    for (size_t index = 0; index < sessions; ++index)
+    {
+        layout->app_volume_rows[index] = reach_quick_settings_app_volume_row_layout_at(
+            layout->app_volumes_panel,
+            layout->app_volumes_panel.y + (float)index * metrics->app_volume_row_height, dpi_scale);
+    }
+
+    section += app_span;
+    if (model != nullptr && model->input_available)
+    {
+        layout->input_label = reach_quick_settings_content_line(
+            page_bounds, section, metrics->section_label_height, metrics);
+        layout->input_volume = reach_quick_settings_level_pill_at(
+            reach_quick_settings_content_line(page_bounds, section + metrics->section_label_height,
+                                              pill, metrics),
+            0, metrics);
     }
 }
 
@@ -628,120 +529,8 @@ reach_quick_settings_layout reach_quick_settings_layout_for_sections_scaled(
     layout.page_bounds = page_bounds;
     reach_quick_settings_place_overview(&layout, page_bounds, model, &metrics);
 
-    float next_y = page_bounds.y + metrics.content_padding;
-
-    reach_rect_f32 pill_bounds = reach_quick_settings_content_line(
-        page_bounds, next_y + metrics.pill_header_height + metrics.section_header_gap,
-        metrics.pill_height, &metrics);
-
-    layout.main_volume_pill =
-        reach_quick_settings_volume_pill_layout_for_bounds_scaled(pill_bounds, theme, dpi_scale);
-    layout.main_slider_track = layout.main_volume_pill.slider_track;
-    layout.main_slider_fill = layout.main_volume_pill.slider_fill;
-
-    next_y = pill_bounds.y + pill_bounds.height;
-
-    layout.output_device_row_count = 0;
-    size_t visible_output_devices = reach_quick_settings_visible_output_device_count(model);
-    layout.output_device_button = reach_quick_settings_content_line(
-        page_bounds, next_y + metrics.output_button_gap, metrics.output_button_height, &metrics);
-
-    layout.output_device_button_icon.width = metrics.output_icon_size;
-    layout.output_device_button_icon.height = metrics.output_icon_size;
-    layout.output_device_button_icon.x =
-        layout.output_device_button.x + metrics.output_row_horizontal_padding;
-    layout.output_device_button_icon.y =
-        layout.output_device_button.y +
-        (layout.output_device_button.height - metrics.output_icon_size) * 0.5f;
-
-    layout.output_device_button_chevron.width = metrics.chevron_icon_size;
-    layout.output_device_button_chevron.height = metrics.chevron_icon_size;
-    layout.output_device_button_chevron.x =
-        layout.output_device_button.x + layout.output_device_button.width -
-        2.0f * metrics.content_padding - metrics.chevron_icon_size;
-    layout.output_device_button_chevron.y =
-        layout.output_device_button.y +
-        (layout.output_device_button.height - metrics.chevron_icon_size) * 0.5f;
-
-    layout.output_device_button_label.x = layout.output_device_button_icon.x +
-                                          metrics.output_icon_size + metrics.output_row_label_gap;
-    layout.output_device_button_label.y = layout.output_device_button.y;
-    layout.output_device_button_label.width = layout.output_device_button_chevron.x -
-                                              layout.output_device_button_label.x -
-                                              metrics.content_padding;
-    layout.output_device_button_label.height = layout.output_device_button.height;
-    if (layout.output_device_button_label.width < 0.0f)
-    {
-        layout.output_device_button_label.width = 0.0f;
-    }
-
-    layout.output_devices_panel.x = layout.output_device_button.x;
-    layout.output_devices_panel.y = layout.output_device_button.y +
-                                    layout.output_device_button.height + metrics.output_panel_gap;
-    layout.output_devices_panel.width = layout.output_device_button.width;
-    layout.output_devices_panel.height =
-        (float)visible_output_devices * metrics.output_device_row_height;
-    layout.output_devices_clip = layout.output_devices_panel;
-    layout.output_devices_clip.height = output_devices_span - metrics.output_panel_gap;
-
-    for (size_t index = 0; index < visible_output_devices; ++index)
-    {
-        layout.output_device_rows[index] = reach_quick_settings_output_device_row_layout_at(
-            layout.output_devices_panel,
-            layout.output_devices_panel.y + (float)index * metrics.output_device_row_height,
-            dpi_scale);
-        layout.output_device_row_count++;
-    }
-
-    next_y =
-        layout.output_device_button.y + layout.output_device_button.height + output_devices_span;
-
-    layout.app_volume_row_count = 0;
-    size_t visible_sessions = reach_quick_settings_visible_session_count(model);
-    layout.expand_button = reach_quick_settings_content_line(
-        page_bounds, next_y + metrics.expand_button_gap, metrics.expand_button_height, &metrics);
-
-    layout.app_volumes_panel.x = layout.expand_button.x;
-    layout.app_volumes_panel.y =
-        layout.expand_button.y + layout.expand_button.height + metrics.app_panel_gap;
-    layout.app_volumes_panel.width = layout.expand_button.width;
-    layout.app_volumes_panel.height = (float)visible_sessions * metrics.app_volume_row_height;
-    layout.app_volumes_clip = layout.app_volumes_panel;
-    layout.app_volumes_clip.height = app_volumes_span - metrics.app_panel_gap;
-
-    for (size_t index = 0; index < visible_sessions; ++index)
-    {
-        layout.app_volume_rows[index] = reach_quick_settings_app_volume_row_layout_at(
-            layout.app_volumes_panel,
-            layout.app_volumes_panel.y + (float)index * metrics.app_volume_row_height,
-            index < model->sessions.count ? model->sessions.sessions[index].level : 0.0f,
-            dpi_scale);
-        layout.app_volume_row_count++;
-    }
-
-    if (layout.expand_button.width < 0.0f)
-    {
-        layout.expand_button.width = 0.0f;
-    }
-
-    layout.expand_button_icon.width = metrics.chevron_icon_size;
-    layout.expand_button_icon.height = metrics.chevron_icon_size;
-    layout.expand_button_icon.x = layout.expand_button.x + layout.expand_button.width -
-                                  2.0f * metrics.content_padding - metrics.chevron_icon_size;
-    layout.expand_button_icon.y =
-        layout.expand_button.y + (layout.expand_button.height - metrics.chevron_icon_size) * 0.5f;
-
-    layout.expand_button_label.x = layout.expand_button.x + metrics.text_padding;
-    layout.expand_button_label.y = layout.expand_button.y;
-    layout.expand_button_label.width =
-        layout.expand_button_icon.x - layout.expand_button_label.x - metrics.content_padding;
-    layout.expand_button_label.height = layout.expand_button.height;
-
-    if (layout.expand_button_label.width < 0.0f)
-    {
-        layout.expand_button_label.width = 0.0f;
-    }
-
+    reach_quick_settings_place_sound(&layout, page_bounds, model, output_devices_span,
+                                     app_volumes_span, &metrics, dpi_scale);
     return layout;
 }
 
@@ -750,11 +539,10 @@ reach_quick_settings_layout reach_quick_settings_layout_for_content_bounds_scale
     const reach_quick_settings_model *model, float dpi_scale)
 {
     float output_span = 0, app_span = 0;
-    reach_quick_settings_target_spans(model, dpi_scale, &output_span, &app_span);
+    reach_quick_settings_section_spans(model, dpi_scale, &output_span, &app_span);
     return reach_quick_settings_layout_for_sections_scaled(content_bounds, theme, model,
                                                            output_span, app_span, dpi_scale);
 }
-
 static const float REACH_QUICK_SETTINGS_POPUP_MARGIN = 8.0f;
 
 #define REACH_QUICK_SETTINGS_MAX_RETIRED_RENDER_ICONS                                              \
@@ -981,7 +769,6 @@ static void reach_quick_settings_sync_rows(reach_quick_settings *quick_settings,
         if (rows[slot].lifecycle != REACH_KEYED_ROW_LIVE)
             continue;
         size_t index = rows[slot].index;
-        payloads[slot].separator = index + 1 < count;
         reach_quick_settings_row_item(payloads[slot]) = items[index];
     }
 }
@@ -1026,20 +813,6 @@ void reach_quick_settings_row_motions(
                                      model.sessions.count, out_app_motions, out_app_volumes);
 }
 
-static int32_t reach_quick_settings_output_shown(const reach_quick_settings *quick_settings)
-{
-    const reach_quick_settings_state &state = quick_settings->state;
-    return state.model.output_devices_expanded || reach_motion_active(&state.output_devices_span) ||
-           reach_motion_active(&state.output_devices_opacity);
-}
-
-static int32_t reach_quick_settings_apps_shown(const reach_quick_settings *quick_settings)
-{
-    const reach_quick_settings_state &state = quick_settings->state;
-    return state.model.expanded || reach_motion_active(&state.app_volumes_span) ||
-           reach_motion_active(&state.app_volumes_opacity);
-}
-
 static int32_t reach_quick_settings_rows_animate(const reach_quick_settings *quick_settings)
 {
     return quick_settings->state.open && quick_settings->layout_initialized;
@@ -1052,8 +825,8 @@ static void reach_quick_settings_sync_output_rows(reach_quick_settings *quick_se
     reach_quick_settings_sync_rows(
         quick_settings, quick_settings->output_device_rows, quick_settings->output_device_items,
         model.output_devices.devices, model.output_devices.count,
-        reach_quick_settings_metrics_for_scale(dpi_scale).output_device_row_height,
-        animate && reach_quick_settings_output_shown(quick_settings), reach_motion_now_seconds());
+        reach_quick_settings_metrics_for_scale(dpi_scale).output_device_row_height, animate,
+        reach_motion_now_seconds());
     if (reach_keyed_rows_active(quick_settings->output_device_rows,
                                 REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES))
         quick_settings->section_cleanup_pending = 1;
@@ -1066,8 +839,8 @@ static void reach_quick_settings_sync_app_rows(reach_quick_settings *quick_setti
     reach_quick_settings_sync_rows(
         quick_settings, quick_settings->app_volume_rows, quick_settings->app_volume_items,
         model.sessions.sessions, model.sessions.count,
-        reach_quick_settings_metrics_for_scale(dpi_scale).app_volume_row_height,
-        animate && reach_quick_settings_apps_shown(quick_settings), reach_motion_now_seconds());
+        reach_quick_settings_metrics_for_scale(dpi_scale).app_volume_row_height, animate,
+        reach_motion_now_seconds());
     if (reach_keyed_rows_active(quick_settings->app_volume_rows, REACH_AUDIO_VOLUME_MAX_SESSIONS))
         quick_settings->section_cleanup_pending = 1;
 }
@@ -1075,49 +848,24 @@ static void reach_quick_settings_sync_app_rows(reach_quick_settings *quick_setti
 static int32_t reach_quick_settings_sections_active(const reach_quick_settings *quick_settings)
 {
     const reach_quick_settings_state &state = quick_settings->state;
-    return reach_motion_active(&state.output_devices_expansion) ||
-           reach_motion_active(&state.app_volumes_expansion) ||
-           reach_motion_active(&state.output_devices_span) ||
+    return reach_motion_active(&state.output_devices_span) ||
            reach_motion_active(&state.app_volumes_span) ||
-           reach_motion_active(&state.output_devices_opacity) ||
-           reach_motion_active(&state.app_volumes_opacity) ||
            reach_keyed_rows_active(quick_settings->output_device_rows,
                                    REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES) ||
            reach_keyed_rows_active(quick_settings->app_volume_rows,
                                    REACH_AUDIO_VOLUME_MAX_SESSIONS);
 }
-
 static void reach_quick_settings_snap_sections(reach_quick_settings *quick_settings,
                                                float dpi_scale)
 {
     reach_quick_settings_state *state = &quick_settings->state;
-    float output = state->model.output_devices_expanded ? 1.0f : 0.0f;
-    float apps = state->model.expanded ? 1.0f : 0.0f;
     float output_span = 0, app_span = 0;
-    reach_quick_settings_target_spans(&state->model, dpi_scale, &output_span, &app_span);
-    reach_motion_set(&state->output_devices_expansion, output);
-    reach_motion_set(&state->app_volumes_expansion, apps);
+    reach_quick_settings_section_spans(&state->model, dpi_scale, &output_span, &app_span);
     reach_motion_set(&state->output_devices_span, output_span);
     reach_motion_set(&state->app_volumes_span, app_span);
-    reach_motion_set(&state->output_devices_opacity, output);
-    reach_motion_set(&state->app_volumes_opacity, apps);
     reach_quick_settings_sync_output_rows(quick_settings, dpi_scale, 0);
     reach_quick_settings_sync_app_rows(quick_settings, dpi_scale, 0);
 }
-
-static void reach_quick_settings_retarget_sections(reach_quick_settings *quick_settings,
-                                                   double now_seconds)
-{
-    reach_quick_settings_state &state = quick_settings->state;
-    reach_quick_settings_fade_to(quick_settings, &state.output_devices_opacity,
-                                 state.model.output_devices_expanded, now_seconds);
-    reach_quick_settings_fade_to(quick_settings, &state.app_volumes_opacity, state.model.expanded,
-                                 now_seconds);
-    quick_settings->section_cleanup_pending = 1;
-    quick_settings->pending_motion_seconds = now_seconds;
-    quick_settings->relayout_animate_pending = 1;
-}
-
 static int32_t reach_quick_settings_tiles_animate(const reach_quick_settings *quick_settings);
 static int32_t reach_quick_settings_refresh_uptime(reach_quick_settings *quick_settings);
 
@@ -1225,10 +973,6 @@ static void reach_quick_settings_sample_input_layout(reach_quick_settings *quick
     state.layout = reach_quick_settings_layout_for_sections_scaled(
         bounds, &quick_settings->layout_theme, &state.model, output, apps,
         quick_settings->layout_dpi);
-    if (reach_motion_value_at(&state.output_devices_opacity, now_seconds) <= 0)
-        state.layout.output_devices_clip.height = 0;
-    if (reach_motion_value_at(&state.app_volumes_opacity, now_seconds) <= 0)
-        state.layout.app_volumes_clip.height = 0;
 }
 
 uint64_t reach_quick_settings_press_feedback_target(const reach_quick_settings *quick_settings)
@@ -1374,6 +1118,19 @@ void reach_quick_settings_apply_main_volume(reach_quick_settings *quick_settings
         reach_quick_settings_model_set_main_volume(
             &reach_quick_settings_state_mut(quick_settings)->model, level, muted);
     }
+}
+
+void reach_quick_settings_apply_input(reach_quick_settings *quick_settings,
+                                      const reach_audio_volume_state *input)
+{
+    if (quick_settings == nullptr)
+    {
+        return;
+    }
+    reach_quick_settings_model &model = quick_settings->state.model;
+    model.input_available = input != nullptr ? 1 : 0;
+    model.input = input != nullptr ? *input : reach_audio_volume_state{};
+    model.input.level = reach_quick_settings_clamp01(model.input.level);
 }
 
 void reach_quick_settings_apply_sessions(reach_quick_settings *quick_settings,
@@ -1536,11 +1293,8 @@ static void reach_quick_settings_capsule_surface_geometry(const void *capsule,
     if (quick_settings->section_cleanup_pending)
     {
         const reach_quick_settings_state &state = quick_settings->state;
-        const reach_motion *motions[] = {
-            &quick_settings->layout_progress, &state.output_devices_expansion,
-            &state.app_volumes_expansion,     &state.output_devices_span,
-            &state.app_volumes_span,          &state.output_devices_opacity,
-            &state.app_volumes_opacity};
+        const reach_motion *motions[] = {&quick_settings->layout_progress,
+                                         &state.output_devices_span, &state.app_volumes_span};
         for (const reach_motion *motion : motions)
             out->deadline_seconds = fmax(out->deadline_seconds, reach_motion_deadline(motion));
         out->deadline_seconds =
@@ -1638,6 +1392,31 @@ static void reach_quick_settings_toggle_bluetooth(reach_quick_settings *quick_se
     }
 }
 
+static void reach_quick_settings_toggle_mute(reach_quick_settings *quick_settings, size_t target)
+{
+    reach_quick_settings_model &model = quick_settings->state.model;
+    if (target == REACH_QUICK_SETTINGS_MUTE_INPUT)
+    {
+        model.input.muted = model.input.muted ? 0 : 1;
+        (void)reach_system_status_set_input_muted(quick_settings->status, model.input.muted);
+        return;
+    }
+    if (target >= REACH_QUICK_SETTINGS_MUTE_FIRST_SESSION)
+    {
+        size_t index = target - REACH_QUICK_SETTINGS_MUTE_FIRST_SESSION;
+        if (index < model.sessions.count)
+        {
+            reach_audio_volume_session &session = model.sessions.sessions[index];
+            session.muted = session.muted ? 0 : 1;
+            (void)reach_system_status_set_session_muted(quick_settings->status,
+                                                        session.session_instance_id, session.muted);
+        }
+        return;
+    }
+    model.main_muted = model.main_muted ? 0 : 1;
+    (void)reach_system_status_set_main_muted(quick_settings->status, model.main_muted);
+}
+
 static void reach_quick_settings_capsule_perform_action(reach_quick_settings *quick_settings,
                                                         const reach_quick_settings_action *action,
                                                         reach_capsule_pointer_result *out)
@@ -1716,15 +1495,6 @@ static void reach_quick_settings_capsule_perform_action(reach_quick_settings *qu
         out->action.kind = REACH_FEATURE_ACTION_CLOSE_SELF;
         break;
 
-    case REACH_QUICK_SETTINGS_ACTION_TOGGLE_OUTPUT_DEVICES:
-        (void)reach_quick_settings_toggle_output_devices(quick_settings);
-        reach_quick_settings_refresh_system(quick_settings, 0);
-        reach_quick_settings_refresh_audio(quick_settings);
-        quick_settings->relayout_animate_pending = 1;
-        out->redraw = 1;
-        out->relayout = 1;
-        break;
-
     case REACH_QUICK_SETTINGS_ACTION_SET_OUTPUT_DEVICE:
     {
         const uint16_t *output_device_id =
@@ -1732,27 +1502,25 @@ static void reach_quick_settings_capsule_perform_action(reach_quick_settings *qu
         int32_t changed = output_device_id != nullptr &&
                           reach_system_status_set_default_output_device(
                               quick_settings->status, output_device_id) == REACH_OK;
-        if (changed)
-        {
-            reach_quick_settings_collapse_output_devices(quick_settings);
-        }
-        reach_quick_settings_refresh_system(quick_settings, 0);
+        (void)changed;
         reach_quick_settings_refresh_audio(quick_settings);
-        if (changed)
-        {
-            quick_settings->relayout_animate_pending = 1;
-            out->relayout = 1;
-        }
         out->redraw = 1;
         break;
     }
-    case REACH_QUICK_SETTINGS_ACTION_EXPAND:
-        (void)reach_quick_settings_toggle_expanded(quick_settings);
-        reach_quick_settings_refresh_system(quick_settings, 0);
-        reach_quick_settings_refresh_audio(quick_settings);
-        quick_settings->relayout_animate_pending = 1;
+    case REACH_QUICK_SETTINGS_ACTION_SET_INPUT_VOLUME:
+        (void)reach_system_status_set_input_volume(quick_settings->status, action->volume_level);
+        if (quick_settings->state.model.input.muted)
+        {
+            (void)reach_system_status_set_input_muted(quick_settings->status, 0);
+            quick_settings->state.model.input.muted = 0;
+        }
+        quick_settings->state.model.input.level = action->volume_level;
         out->redraw = 1;
-        out->relayout = 1;
+        break;
+
+    case REACH_QUICK_SETTINGS_ACTION_TOGGLE_MUTE:
+        reach_quick_settings_toggle_mute(quick_settings, action->item_index);
+        out->redraw = 1;
         break;
 
     case REACH_QUICK_SETTINGS_ACTION_NONE:
@@ -2224,6 +1992,8 @@ void reach_quick_settings_process_changes(reach_quick_settings *quick_settings,
             reach_quick_settings_apply_main_volume(quick_settings, audio_snapshot.state.level,
                                                    audio_snapshot.state.muted);
         }
+        reach_quick_settings_apply_input(
+            quick_settings, audio_snapshot.input_valid ? &audio_snapshot.input : nullptr);
         reach_quick_settings_apply_sessions(
             quick_settings, audio_snapshot.sessions_valid ? &audio_snapshot.sessions : nullptr);
         reach_quick_settings_apply_output_devices(
@@ -2477,21 +2247,14 @@ void reach_quick_settings_refresh_layout(reach_quick_settings *quick_settings,
                                 : now;
         current_height = reach_motion_value_at(&quick_settings->height, event_time);
         current_scroll = reach_motion_value_at(&state.scroll_motion, event_time);
-        float output_from = reach_motion_value_at(&state.output_devices_expansion, event_time);
-        float app_from = reach_motion_value_at(&state.app_volumes_expansion, event_time);
-        float output_to = state.model.output_devices_expanded ? 1.0f : 0.0f;
-        float app_to = state.model.expanded ? 1.0f : 0.0f;
-        float output_velocity =
-            reach_motion_velocity_at(&state.output_devices_expansion, event_time);
-        float app_velocity = reach_motion_velocity_at(&state.app_volumes_expansion, event_time);
         float output_span_from = reach_motion_value_at(&state.output_devices_span, event_time);
         float app_span_from = reach_motion_value_at(&state.app_volumes_span, event_time);
         float output_span_velocity =
             reach_motion_velocity_at(&state.output_devices_span, event_time);
         float app_span_velocity = reach_motion_velocity_at(&state.app_volumes_span, event_time);
         float output_span_to = 0, app_span_to = 0;
-        reach_quick_settings_target_spans(&state.model, ctx->dpi_scale, &output_span_to,
-                                          &app_span_to);
+        reach_quick_settings_section_spans(&state.model, ctx->dpi_scale, &output_span_to,
+                                           &app_span_to);
         float height_velocity = reach_motion_velocity_at(&quick_settings->height, event_time);
         float height_limit =
             fmaxf(reach_quick_settings_placement(quick_settings, ctx, INFINITY).bounds.height,
@@ -2501,13 +2264,11 @@ void reach_quick_settings_refresh_layout(reach_quick_settings *quick_settings,
              fmaxf(output_span_from, output_span), 1},
             {app_span_from, app_span_to, app_span_velocity, fminf(0, app_span_from),
              fmaxf(app_span_from, app_span), 1},
-            {current_height, target.bounds.height, height_velocity, 0, height_limit, 1},
-            {output_from, output_to, output_velocity, 0, 1, 0},
-            {app_from, app_to, app_velocity, 0, 1, 0}};
+            {current_height, target.bounds.height, height_velocity, 0, height_limit, 1}};
         reach_motion square = reach_quick_settings_start_layout_progress(
             &quick_settings->layout_progress,
             reach_theme_motion_preset(ctx->theme, REACH_MOTION_PRESET_SMOOTH), event_time, channels,
-            5);
+            3);
         const reach_motion *progress = &quick_settings->layout_progress;
         state.output_devices_span =
             reach_quick_settings_channel_motion(progress, &square, &channels[0]);
@@ -2515,10 +2276,6 @@ void reach_quick_settings_refresh_layout(reach_quick_settings *quick_settings,
             reach_quick_settings_channel_motion(progress, &square, &channels[1]);
         quick_settings->height =
             reach_quick_settings_channel_motion(progress, &square, &channels[2]);
-        state.output_devices_expansion =
-            reach_quick_settings_channel_motion(progress, &square, &channels[3]);
-        state.app_volumes_expansion =
-            reach_quick_settings_channel_motion(progress, &square, &channels[4]);
         float content_from = reach_quick_settings_content_height_for_spans_scaled(
             &state.model, output_span_from, app_span_from, ctx->dpi_scale);
         const reach_quick_settings_layout_channel scroll = {
@@ -2616,43 +2373,6 @@ void reach_quick_settings_set_bluetooth_pending(reach_quick_settings *quick_sett
             &reach_quick_settings_state_mut(quick_settings)->model, pending, pending_enabled);
         reach_quick_settings_sync_tile_states(quick_settings,
                                               reach_quick_settings_tiles_animate(quick_settings));
-    }
-}
-
-int32_t reach_quick_settings_toggle_expanded(reach_quick_settings *quick_settings)
-{
-    if (quick_settings == nullptr)
-    {
-        return 0;
-    }
-    reach_quick_settings_state *state = reach_quick_settings_state_mut(quick_settings);
-    state->model.expanded = state->model.expanded ? 0 : 1;
-    if (state->model.expanded)
-        state->model.output_devices_expanded = 0;
-    reach_quick_settings_retarget_sections(quick_settings, reach_motion_now_seconds());
-    return state->model.expanded;
-}
-
-int32_t reach_quick_settings_toggle_output_devices(reach_quick_settings *quick_settings)
-{
-    if (quick_settings == nullptr)
-    {
-        return 0;
-    }
-    reach_quick_settings_state *state = reach_quick_settings_state_mut(quick_settings);
-    state->model.output_devices_expanded = state->model.output_devices_expanded ? 0 : 1;
-    if (state->model.output_devices_expanded)
-        state->model.expanded = 0;
-    reach_quick_settings_retarget_sections(quick_settings, reach_motion_now_seconds());
-    return state->model.output_devices_expanded;
-}
-
-void reach_quick_settings_collapse_output_devices(reach_quick_settings *quick_settings)
-{
-    if (quick_settings != nullptr)
-    {
-        reach_quick_settings_state_mut(quick_settings)->model.output_devices_expanded = 0;
-        reach_quick_settings_retarget_sections(quick_settings, reach_motion_now_seconds());
     }
 }
 

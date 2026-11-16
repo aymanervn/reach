@@ -20,10 +20,18 @@ typedef enum reach_quick_settings_hit_type
     REACH_QUICK_SETTINGS_HIT_RAIL_ITEM,
     REACH_QUICK_SETTINGS_HIT_SOUND_PAGE_BUTTON,
     REACH_QUICK_SETTINGS_HIT_TOGGLE,
-    REACH_QUICK_SETTINGS_HIT_OUTPUT_DEVICE_BUTTON,
     REACH_QUICK_SETTINGS_HIT_OUTPUT_DEVICE_ROW,
-    REACH_QUICK_SETTINGS_HIT_EXPAND_BUTTON
+    REACH_QUICK_SETTINGS_HIT_MUTE,
+    REACH_QUICK_SETTINGS_HIT_INPUT_SLIDER
 } reach_quick_settings_hit_type;
+
+enum
+{
+    REACH_QUICK_SETTINGS_MUTE_OVERVIEW = 0,
+    REACH_QUICK_SETTINGS_MUTE_SOUND,
+    REACH_QUICK_SETTINGS_MUTE_INPUT,
+    REACH_QUICK_SETTINGS_MUTE_FIRST_SESSION
+};
 
 typedef enum reach_quick_settings_press_target_kind
 {
@@ -31,9 +39,8 @@ typedef enum reach_quick_settings_press_target_kind
     REACH_QUICK_SETTINGS_PRESS_TARGET_RAIL_ITEM,
     REACH_QUICK_SETTINGS_PRESS_TARGET_SOUND_PAGE_BUTTON,
     REACH_QUICK_SETTINGS_PRESS_TARGET_TOGGLE,
-    REACH_QUICK_SETTINGS_PRESS_TARGET_OUTPUT_DEVICE_BUTTON,
     REACH_QUICK_SETTINGS_PRESS_TARGET_OUTPUT_DEVICE_ROW,
-    REACH_QUICK_SETTINGS_PRESS_TARGET_EXPAND_BUTTON
+    REACH_QUICK_SETTINGS_PRESS_TARGET_MUTE
 } reach_quick_settings_press_target_kind;
 #ifdef __cplusplus
 extern "C"
@@ -68,9 +75,8 @@ extern "C"
     reach_quick_settings_output_device_row_layout
     reach_quick_settings_output_device_row_layout_at(reach_rect_f32 panel, float top,
                                                      float dpi_scale);
-    reach_quick_settings_app_volume_row_layout
-    reach_quick_settings_app_volume_row_layout_at(reach_rect_f32 panel, float top, float level,
-                                                  float dpi_scale);
+    reach_quick_settings_level_pill_layout
+    reach_quick_settings_app_volume_row_layout_at(reach_rect_f32 panel, float top, float dpi_scale);
 #ifdef __cplusplus
 }
 #endif
@@ -86,9 +92,9 @@ typedef enum reach_quick_settings_action_type
     REACH_QUICK_SETTINGS_ACTION_TOGGLE_BLUETOOTH,
     REACH_QUICK_SETTINGS_ACTION_TOGGLE_DARK_MODE,
     REACH_QUICK_SETTINGS_ACTION_OPEN_PROJECT,
-    REACH_QUICK_SETTINGS_ACTION_TOGGLE_OUTPUT_DEVICES,
     REACH_QUICK_SETTINGS_ACTION_SET_OUTPUT_DEVICE,
-    REACH_QUICK_SETTINGS_ACTION_EXPAND
+    REACH_QUICK_SETTINGS_ACTION_TOGGLE_MUTE,
+    REACH_QUICK_SETTINGS_ACTION_SET_INPUT_VOLUME
 } reach_quick_settings_action_type;
 
 typedef struct reach_quick_settings_hit_result
