@@ -619,6 +619,25 @@ void reach_quick_settings_wifi_key_rects(reach_rect_f32 row,
                                            metrics->overview_pill_height);
 }
 
+reach_rect_f32
+reach_quick_settings_wifi_place_forget(reach_quick_settings_output_device_row_layout *row,
+                                       const reach_wifi_network *network,
+                                       const reach_quick_settings_metrics *metrics)
+{
+    if (!network->saved && !network->connected)
+        return {};
+    float inset = metrics->wifi_forget_inset;
+    float height = fmaxf(0.0f, row->bounds.height - inset * 2.0f);
+    reach_rect_f32 button = reach_quick_settings_rect(
+        row->bounds.x + row->bounds.width - inset - metrics->wifi_forget_width,
+        row->bounds.y + inset, metrics->wifi_forget_width, height);
+    row->checkmark.x = button.x - metrics->output_row_label_gap - row->checkmark.width;
+    float text_width = fmaxf(0.0f, row->checkmark.x - metrics->output_row_label_gap - row->title.x);
+    row->title.width = text_width;
+    row->detail.width = text_width;
+    return button;
+}
+
 void reach_quick_settings_bluetooth_action_rects(reach_rect_f32 row, int32_t pin,
                                                  const reach_quick_settings_metrics *metrics,
                                                  reach_rect_f32 *out_label,
@@ -743,6 +762,8 @@ static void reach_quick_settings_place_wifi(reach_quick_settings_layout *layout,
     {
         layout->wifi_rows[index] = reach_quick_settings_output_device_row_layout_at(
             panel, base + reach_quick_settings_wifi_row_offset(model, index, metrics), dpi_scale);
+        layout->wifi_forget_buttons[index] = reach_quick_settings_wifi_place_forget(
+            &layout->wifi_rows[index], &model->wifi_rows[index], metrics);
     }
     layout->wifi_key_field = {};
     layout->wifi_key_connect = {};
@@ -2180,6 +2201,18 @@ static void reach_quick_settings_connect_wifi(reach_quick_settings *quick_settin
     reach_wifi_service_connect(quick_settings->wifi, &request);
 }
 
+static void reach_quick_settings_forget_wifi(reach_quick_settings *quick_settings, size_t row)
+{
+    const reach_quick_settings_model &model = quick_settings->state.model;
+    if (quick_settings->wifi == nullptr || row >= model.wifi_row_count ||
+        reach_wifi_session_busy(&quick_settings->wifi_session) ||
+        (!model.wifi_rows[row].saved && !model.wifi_rows[row].connected))
+    {
+        return;
+    }
+    reach_wifi_service_forget(quick_settings->wifi, model.wifi_rows[row].ssid);
+}
+
 static void reach_quick_settings_toggle_mute(reach_quick_settings *quick_settings, size_t target)
 {
     reach_quick_settings_model &model = quick_settings->state.model;
@@ -2300,6 +2333,11 @@ static void reach_quick_settings_capsule_perform_action(reach_quick_settings *qu
 
     case REACH_QUICK_SETTINGS_ACTION_SUBMIT_WIFI_KEY:
         reach_quick_settings_submit_wifi_key(quick_settings);
+        out->redraw = 1;
+        break;
+
+    case REACH_QUICK_SETTINGS_ACTION_FORGET_WIFI:
+        reach_quick_settings_forget_wifi(quick_settings, action->item_index);
         out->redraw = 1;
         break;
 

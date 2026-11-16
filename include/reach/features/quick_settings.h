@@ -154,6 +154,7 @@ extern "C"
         reach_rect_f32 wifi_message;
         reach_rect_f32 wifi_nearby_label;
         reach_quick_settings_output_device_row_layout wifi_rows[REACH_QUICK_SETTINGS_WIFI_ROWS];
+        reach_rect_f32 wifi_forget_buttons[REACH_QUICK_SETTINGS_WIFI_ROWS];
         size_t wifi_row_count;
         reach_rect_f32 wifi_key_field;
         reach_rect_f32 wifi_key_connect;
