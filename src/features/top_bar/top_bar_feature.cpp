@@ -553,6 +553,11 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
     const float pill_gap = metrics.pill_gap * scale;
     const float padding = metrics.pill_padding * scale;
     const float power_button_size = height * metrics.bar_button_scale;
+    const float power_button_width =
+        reach_top_bar_text_advance(&ctx->text_measure, (const uint16_t *)L"Reach",
+                                   metrics.reach_label_text_size * scale,
+                                   metrics.reach_label_text_weight) +
+        metrics.reach_label_padding * scale * 2.0f;
     const float clock_gap = metrics.clock_gap * scale;
     const float time_size = metrics.clock_time_text_size * scale;
     const float date_size = metrics.clock_date_text_size * scale;
@@ -575,7 +580,7 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
         reach_top_bar_now_playing_desired_width(top_bar->now_playing_subfeature, ctx->theme,
                                                 scale));
 
-    float power_clock_width = border_thickness * 2.0f + padding + power_button_size + clock_gap +
+    float power_clock_width = border_thickness * 2.0f + padding + power_button_width + clock_gap +
                               clock_width + dot_gap + dot_size + dot_gap + now_playing_width;
     // Now playing sits flush against the pill's inner border, so the pill's right edge has to be on
     // the same pixel the chip's is. The renderer rounds pill rects but not the chip, and
@@ -587,9 +592,9 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
         reach_top_bar_rect(left, 0.0f, power_clock_width, height);
     layout->power_button =
         reach_top_bar_rect(left + border_thickness + padding, (height - power_button_size) * 0.5f,
-                           power_button_size, power_button_size);
+                           power_button_width, power_button_size);
 
-    float clock_x = layout->power_button.x + power_button_size + clock_gap;
+    float clock_x = layout->power_button.x + power_button_width + clock_gap;
     layout->clock_time = reach_top_bar_text_run(clock_x, height, time_advance);
     layout->clock_date =
         reach_top_bar_text_run(clock_x + time_advance + clock_gap, height, date_advance);
