@@ -33,10 +33,6 @@ reach_top_bar_pointer_region reach_top_bar_hit_test(const reach_top_bar_layout *
     {
         return REACH_TOP_BAR_POINTER_REGION_QUICK_SETTINGS_BUTTON;
     }
-    if (reach_top_bar_rect_contains(layout->settings_button, local_x, local_y))
-    {
-        return REACH_TOP_BAR_POINTER_REGION_SETTINGS_BUTTON;
-    }
     if (reach_top_bar_rect_contains(layout->language_button, local_x, local_y))
     {
         return REACH_TOP_BAR_POINTER_REGION_LANGUAGE_BUTTON;
@@ -359,8 +355,6 @@ static size_t reach_top_bar_pressable_feedback_index(reach_top_bar *top_bar, uin
         return REACH_TOP_BAR_FEEDBACK_TRAY_OVERFLOW;
     case REACH_TOP_BAR_POINTER_REGION_QUICK_SETTINGS_BUTTON:
         return REACH_TOP_BAR_FEEDBACK_QUICK_SETTINGS_BUTTON;
-    case REACH_TOP_BAR_POINTER_REGION_SETTINGS_BUTTON:
-        return REACH_TOP_BAR_FEEDBACK_SETTINGS_BUTTON;
     case REACH_TOP_BAR_POINTER_REGION_LANGUAGE_BUTTON:
         return REACH_TOP_BAR_FEEDBACK_LANGUAGE_BUTTON;
     case REACH_TOP_BAR_POINTER_REGION_BATTERY_BUTTON:
@@ -437,7 +431,6 @@ void reach_top_bar_pointer_down(reach_top_bar *top_bar, int32_t local_x, int32_t
         return;
     case REACH_TOP_BAR_POINTER_REGION_NOW_PLAYING:
     case REACH_TOP_BAR_POINTER_REGION_TRAY_ICON:
-    case REACH_TOP_BAR_POINTER_REGION_SETTINGS_BUTTON:
     case REACH_TOP_BAR_POINTER_REGION_LANGUAGE_BUTTON:
     default:
         return;
@@ -518,9 +511,6 @@ void reach_top_bar_pointer_up(reach_top_bar *top_bar, int32_t local_x, int32_t l
         {
             top_bar->routes.quick_settings_activated(top_bar->routes.user);
         }
-        return;
-    case REACH_TOP_BAR_POINTER_REGION_SETTINGS_BUTTON:
-        out->action.kind = REACH_FEATURE_ACTION_OPEN_SETTINGS_APP;
         return;
     case REACH_TOP_BAR_POINTER_REGION_LANGUAGE_BUTTON:
         out->action.kind = REACH_FEATURE_ACTION_CYCLE_INPUT_LANGUAGE;

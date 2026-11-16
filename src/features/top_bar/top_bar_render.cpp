@@ -447,26 +447,6 @@ static void reach_top_bar_push_battery(const reach_top_bar_render_input *input,
                                        REACH_TOP_BAR_FEEDBACK_BATTERY_BUTTON);
 }
 
-static void reach_top_bar_push_glyph_button(const reach_top_bar_render_input *input,
-                                            reach_render_command_buffer *commands,
-                                            reach_rect_f32 button, uint32_t icon_id,
-                                            size_t feedback_slot)
-{
-    const reach_top_bar_metrics &metrics = reach_top_bar_metrics_values;
-    if (button.width <= 0.0f)
-    {
-        return;
-    }
-
-    reach_top_bar_push_rect(commands, button, input->theme->bar_button_background,
-                            button.height * 0.5f);
-    reach_top_bar_push_vector_icon(
-        commands,
-        reach_top_bar_center_square(button, button.height * metrics.bar_button_glyph_scale),
-        icon_id, input->theme->system_glyph);
-    reach_top_bar_push_button_feedback(input, commands, button, feedback_slot);
-}
-
 static reach_color reach_top_bar_status_glyph_color(const reach_top_bar_render_input *input,
                                                     int32_t active)
 {
@@ -669,9 +649,6 @@ reach_result reach_top_bar_append_render_commands(reach_top_bar *top_bar,
         reach_top_bar_push_quick_settings(&input, out_commands);
         reach_render_command_buffer_end_group(out_commands);
     }
-    reach_top_bar_push_glyph_button(&input, out_commands, layout->settings_button,
-                                    REACH_VECTOR_ICON_SETTINGS,
-                                    REACH_TOP_BAR_FEEDBACK_SETTINGS_BUTTON);
 
     reach_top_bar_now_playing_render_context now_playing = {};
     now_playing.theme = ctx->theme;

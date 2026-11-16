@@ -76,7 +76,6 @@ extern "C"
         reach_rect_f32 network_label;
         reach_rect_f32 bluetooth_icon;
         reach_rect_f32 volume_label;
-        reach_rect_f32 settings_button;
         reach_rect_f32 language_button;
         reach_rect_f32 battery_button;
         reach_rect_f32 battery_shell;
@@ -93,7 +92,6 @@ extern "C"
         REACH_TOP_BAR_FEEDBACK_TRAY_OVERFLOW = REACH_TOP_BAR_FEEDBACK_TRAY_BASE +
             REACH_TOP_BAR_MAX_TRAY_ICONS,
         REACH_TOP_BAR_FEEDBACK_QUICK_SETTINGS_BUTTON,
-        REACH_TOP_BAR_FEEDBACK_SETTINGS_BUTTON,
         REACH_TOP_BAR_FEEDBACK_LANGUAGE_BUTTON,
         REACH_TOP_BAR_FEEDBACK_BATTERY_BUTTON
     };
@@ -107,8 +105,7 @@ extern "C"
         REACH_TOP_BAR_POINTER_REGION_TRAY_OVERFLOW = 4,
         REACH_TOP_BAR_POINTER_REGION_QUICK_SETTINGS_BUTTON = 5,
         REACH_TOP_BAR_POINTER_REGION_LANGUAGE_BUTTON = 6,
-        REACH_TOP_BAR_POINTER_REGION_SETTINGS_BUTTON = 7,
-        REACH_TOP_BAR_POINTER_REGION_BATTERY_BUTTON = 8
+        REACH_TOP_BAR_POINTER_REGION_BATTERY_BUTTON = 7
     } reach_top_bar_pointer_region;
 
     typedef enum reach_top_bar_control_slot

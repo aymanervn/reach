@@ -18,6 +18,8 @@ struct reach_quick_settings_metrics
     float rail_width;
     float rail_item_size;
     float rail_item_gap;
+    float header_button_size;
+    float header_button_icon_size;
     float page_shift;
 
     float overview_pill_height;
@@ -86,6 +88,8 @@ static constexpr reach_quick_settings_metrics reach_quick_settings_make_metrics(
     metrics.rail_width = 38.0f;
     metrics.rail_item_size = 28.0f;
     metrics.rail_item_gap = 6.0f;
+    metrics.header_button_size = 24.0f;
+    metrics.header_button_icon_size = 14.0f;
     metrics.page_shift = 12.0f;
 
     metrics.overview_pill_height = 32.0f;
@@ -169,6 +173,10 @@ static inline reach_quick_settings_metrics reach_quick_settings_metrics_for_scal
         reach_quick_settings_metric_scale_value(metrics.rail_item_size, dpi_scale);
     metrics.rail_item_gap =
         reach_quick_settings_metric_scale_value(metrics.rail_item_gap, dpi_scale);
+    metrics.header_button_size =
+        reach_quick_settings_metric_scale_value(metrics.header_button_size, dpi_scale);
+    metrics.header_button_icon_size =
+        reach_quick_settings_metric_scale_value(metrics.header_button_icon_size, dpi_scale);
     metrics.page_shift = reach_quick_settings_metric_scale_value(metrics.page_shift, dpi_scale);
     metrics.overview_pill_height =
         reach_quick_settings_metric_scale_value(metrics.overview_pill_height, dpi_scale);
