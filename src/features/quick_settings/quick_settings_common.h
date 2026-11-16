@@ -27,6 +27,7 @@ typedef enum reach_quick_settings_hit_type
     REACH_QUICK_SETTINGS_HIT_WIFI_ROW,
     REACH_QUICK_SETTINGS_HIT_WIFI_KEY_FIELD,
     REACH_QUICK_SETTINGS_HIT_WIFI_KEY_CONNECT,
+    REACH_QUICK_SETTINGS_HIT_WIFI_FORGET,
     REACH_QUICK_SETTINGS_HIT_BLUETOOTH_SWITCH,
     REACH_QUICK_SETTINGS_HIT_BLUETOOTH_ROW,
     REACH_QUICK_SETTINGS_HIT_BLUETOOTH_ACTION
@@ -52,6 +53,7 @@ typedef enum reach_quick_settings_press_target_kind
     REACH_QUICK_SETTINGS_PRESS_TARGET_WIFI_ROW,
     REACH_QUICK_SETTINGS_PRESS_TARGET_WIFI_KEY_FIELD,
     REACH_QUICK_SETTINGS_PRESS_TARGET_WIFI_KEY_CONNECT,
+    REACH_QUICK_SETTINGS_PRESS_TARGET_WIFI_FORGET,
     REACH_QUICK_SETTINGS_PRESS_TARGET_BLUETOOTH_SWITCH,
     REACH_QUICK_SETTINGS_PRESS_TARGET_BLUETOOTH_ROW,
     REACH_QUICK_SETTINGS_PRESS_TARGET_BLUETOOTH_ACTION
@@ -95,6 +97,10 @@ extern "C"
     void reach_quick_settings_bluetooth_action_rects(
         reach_rect_f32 row, int32_t pin, const struct reach_quick_settings_metrics *metrics,
         reach_rect_f32 *out_label, reach_rect_f32 out_buttons[2]);
+    reach_rect_f32
+    reach_quick_settings_wifi_place_forget(reach_quick_settings_output_device_row_layout *row,
+                                           const reach_wifi_network *network,
+                                           const struct reach_quick_settings_metrics *metrics);
     void reach_quick_settings_wifi_key_rects(reach_rect_f32 row,
                                              const struct reach_quick_settings_metrics *metrics,
                                              reach_rect_f32 *out_field,
@@ -129,6 +135,7 @@ typedef enum reach_quick_settings_action_type
     REACH_QUICK_SETTINGS_ACTION_CONNECT_WIFI,
     REACH_QUICK_SETTINGS_ACTION_FOCUS_WIFI_KEY,
     REACH_QUICK_SETTINGS_ACTION_SUBMIT_WIFI_KEY,
+    REACH_QUICK_SETTINGS_ACTION_FORGET_WIFI,
     REACH_QUICK_SETTINGS_ACTION_SELECT_BLUETOOTH,
     REACH_QUICK_SETTINGS_ACTION_BLUETOOTH_ACTION
 } reach_quick_settings_action_type;

@@ -170,6 +170,12 @@ reach_quick_settings_hit_test_wifi(const reach_quick_settings_layout *layout,
     }
     for (size_t index = 0; index < layout->wifi_row_count && index < model->wifi_row_count; ++index)
     {
+        if (reach_quick_settings_point_in_rect(layout->wifi_forget_buttons[index], x, y))
+        {
+            result.type = REACH_QUICK_SETTINGS_HIT_WIFI_FORGET;
+            result.item_index = index;
+            return result;
+        }
         if (reach_quick_settings_point_in_rect(layout->wifi_rows[index].bounds, x, y))
         {
             if (reach_quick_settings_wifi_row_connectable(&model->wifi_rows[index]))
@@ -318,6 +324,9 @@ reach_quick_settings_action reach_quick_settings_action_for_hit(reach_quick_sett
     case REACH_QUICK_SETTINGS_HIT_WIFI_KEY_CONNECT:
         action.type = REACH_QUICK_SETTINGS_ACTION_SUBMIT_WIFI_KEY;
         break;
+    case REACH_QUICK_SETTINGS_HIT_WIFI_FORGET:
+        action.type = REACH_QUICK_SETTINGS_ACTION_FORGET_WIFI;
+        break;
     case REACH_QUICK_SETTINGS_HIT_BLUETOOTH_SWITCH:
         action.type = REACH_QUICK_SETTINGS_ACTION_TOGGLE_BLUETOOTH;
         break;
@@ -412,6 +421,10 @@ uint64_t reach_quick_settings_pressable_target(reach_quick_settings_hit_result h
         break;
     case REACH_QUICK_SETTINGS_HIT_WIFI_KEY_CONNECT:
         kind = REACH_QUICK_SETTINGS_PRESS_TARGET_WIFI_KEY_CONNECT;
+        break;
+    case REACH_QUICK_SETTINGS_HIT_WIFI_FORGET:
+        kind = REACH_QUICK_SETTINGS_PRESS_TARGET_WIFI_FORGET;
+        index = hit.item_index;
         break;
     case REACH_QUICK_SETTINGS_HIT_BLUETOOTH_SWITCH:
         kind = REACH_QUICK_SETTINGS_PRESS_TARGET_BLUETOOTH_SWITCH;

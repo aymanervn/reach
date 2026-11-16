@@ -927,7 +927,7 @@ static reach_result reach_quick_settings_push_sound(const reach_quick_settings_r
 
 static void reach_quick_settings_push_wifi_row(
     reach_render_command_buffer *commands, const reach_wifi_network *network,
-    const reach_quick_settings_output_device_row_layout *row,
+    const reach_quick_settings_output_device_row_layout *row, reach_rect_f32 forget,
     const reach_quick_settings_model *model, const reach_theme *theme,
     const reach_quick_settings_metrics *metrics, const reach_text_measure_port *text_measure)
 {
@@ -962,6 +962,15 @@ static void reach_quick_settings_push_wifi_row(
         trailing.color =
             network->connected ? theme->primary_text : theme->quick_settings_secondary_text;
         (void)reach_render_command_buffer_push(commands, &trailing);
+    }
+    if (forget.width > 0.0f)
+    {
+        reach_quick_settings_push_rounded_rect(commands, forget, forget.height * 0.5f,
+                                               theme->quick_settings_button_background);
+        static const uint16_t forget_label[] = {'F', 'o', 'r', 'g', 'e', 't', 0};
+        reach_quick_settings_push_text(commands, forget, forget_label,
+                                       metrics->pill_label_text_size, REACH_TEXT_WEIGHT_SEMIBOLD,
+                                       REACH_TEXT_ALIGNMENT_CENTER, theme->primary_text);
     }
 }
 
@@ -1091,6 +1100,8 @@ static reach_result reach_quick_settings_push_wifi(const reach_quick_settings_re
         reach_quick_settings_output_device_row_layout row_layout =
             reach_quick_settings_output_device_row_layout_at(panel, base + row.y.to,
                                                              input->dpi_scale);
+        reach_rect_f32 forget = reach_quick_settings_wifi_place_forget(
+            &row_layout, &input->wifi_row_items[slot], metrics);
         int32_t expanded = model.wifi_key_row >= 0 && row.lifecycle == REACH_KEYED_ROW_LIVE &&
                            row.index == (size_t)model.wifi_key_row;
         reach_render_group group = {};
@@ -1105,7 +1116,8 @@ static reach_result reach_quick_settings_push_wifi(const reach_quick_settings_re
         if (result == REACH_OK)
         {
             reach_quick_settings_push_wifi_row(commands, &input->wifi_row_items[slot], &row_layout,
-                                               &model, &theme, metrics, &input->text_measure);
+                                               forget, &model, &theme, metrics,
+                                               &input->text_measure);
             if (expanded)
                 reach_quick_settings_push_wifi_key(input, commands, &input->wifi_row_items[slot],
                                                    row_layout.bounds, metrics);
@@ -1316,6 +1328,7 @@ static int32_t reach_quick_settings_feedback_slot(uint64_t target)
     case REACH_QUICK_SETTINGS_PRESS_TARGET_WIFI_ROW:
     case REACH_QUICK_SETTINGS_PRESS_TARGET_WIFI_KEY_FIELD:
     case REACH_QUICK_SETTINGS_PRESS_TARGET_WIFI_KEY_CONNECT:
+    case REACH_QUICK_SETTINGS_PRESS_TARGET_WIFI_FORGET:
         return REACH_QUICK_SETTINGS_FEEDBACK_WIFI;
     case REACH_QUICK_SETTINGS_PRESS_TARGET_BLUETOOTH_SWITCH:
     case REACH_QUICK_SETTINGS_PRESS_TARGET_BLUETOOTH_ROW:
@@ -1360,6 +1373,8 @@ reach_quick_settings_press_feedback_bounds(const reach_quick_settings_render_inp
         return index < layout.wifi_row_count ? layout.wifi_rows[index].bounds : reach_rect_f32{};
     case REACH_QUICK_SETTINGS_PRESS_TARGET_WIFI_KEY_FIELD:
         return layout.wifi_key_field;
+    case REACH_QUICK_SETTINGS_PRESS_TARGET_WIFI_FORGET:
+        return index < layout.wifi_row_count ? layout.wifi_forget_buttons[index] : reach_rect_f32{};
     case REACH_QUICK_SETTINGS_PRESS_TARGET_BLUETOOTH_SWITCH:
         return layout.bluetooth_switch;
     case REACH_QUICK_SETTINGS_PRESS_TARGET_BLUETOOTH_ROW:

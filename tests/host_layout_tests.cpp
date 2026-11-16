@@ -3004,7 +3004,7 @@ static void test_quick_settings_section_motion_renders_worst_case(void)
                         network.ssid[1] = (uint16_t)('0' + index / 26);
                         network.in_range = 1;
                         network.connected = index == 3;
-                        network.saved = index % 3 == 0;
+                        network.saved = index != 27;
                         network.signal_strength = (int32_t)((index * 37) % 100);
                         network.security = index % 2 == 0 ? REACH_WIFI_SECURITY_OPEN
                                                           : REACH_WIFI_SECURITY_WPA2_PERSONAL;

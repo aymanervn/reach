@@ -58,6 +58,8 @@ struct reach_quick_settings_metrics
     float wifi_key_area_height;
     float wifi_key_gap;
     float wifi_connect_width;
+    float wifi_forget_inset;
+    float wifi_forget_width;
 
     float toggle_title_text_size;
     float toggle_status_text_size;
@@ -127,6 +129,8 @@ static constexpr reach_quick_settings_metrics reach_quick_settings_make_metrics(
     metrics.wifi_key_area_height = 42.0f;
     metrics.wifi_key_gap = 4.0f;
     metrics.wifi_connect_width = 80.0f;
+    metrics.wifi_forget_inset = 4.0f;
+    metrics.wifi_forget_width = 64.0f;
 
     metrics.toggle_title_text_size = REACH_TEXT_SIZE_SMALL;
     metrics.toggle_status_text_size = REACH_TEXT_SIZE_XSMALL;
@@ -241,6 +245,10 @@ static inline reach_quick_settings_metrics reach_quick_settings_metrics_for_scal
     metrics.wifi_key_gap = reach_quick_settings_metric_scale_value(metrics.wifi_key_gap, dpi_scale);
     metrics.wifi_connect_width =
         reach_quick_settings_metric_scale_value(metrics.wifi_connect_width, dpi_scale);
+    metrics.wifi_forget_inset =
+        reach_quick_settings_metric_scale_value(metrics.wifi_forget_inset, dpi_scale);
+    metrics.wifi_forget_width =
+        reach_quick_settings_metric_scale_value(metrics.wifi_forget_width, dpi_scale);
     metrics.toggle_title_text_size =
         reach_quick_settings_metric_scale_value(metrics.toggle_title_text_size, dpi_scale);
     metrics.toggle_status_text_size =
