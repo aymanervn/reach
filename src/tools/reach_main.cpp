@@ -203,7 +203,10 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
             QueryPerformanceCounter(&current_counter);
 
             int32_t needs_frame_after_messages = !device_lost && reach_app_needs_frame(app);
-            if (needs_frame_after_messages)
+            double current_seconds = (double)current_counter.QuadPart / (double)frequency.QuadPart;
+            int32_t frame_due = !needed_frame_before_wait || wait_result == WAIT_TIMEOUT ||
+                                current_seconds >= frame_clock.next_frame_seconds;
+            if (needs_frame_after_messages && frame_due)
             {
                 double delta_seconds =
                     needed_frame_before_wait && frequency.QuadPart > 0
@@ -214,8 +217,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
                 previous_counter = current_counter;
 
                 reach_result update_result = reach_app_update(app, delta_seconds);
-                reach_frame_clock_presented(&frame_clock, (double)current_counter.QuadPart /
-                                                              (double)frequency.QuadPart);
+                reach_frame_clock_presented(&frame_clock, current_seconds);
                 if (update_result != REACH_OK && update_result != REACH_DEVICE_LOST)
                 {
                     running = 0;
@@ -223,7 +225,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
                     break;
                 }
             }
-            else
+            else if (!needs_frame_after_messages)
             {
                 previous_counter = current_counter;
             }
