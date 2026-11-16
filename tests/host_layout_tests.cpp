@@ -2902,9 +2902,29 @@ static void test_quick_settings_section_motion_renders_worst_case(void)
                 reach_quick_settings_apply_output_devices(quick_settings, &devices);
                 set_system(0);
                 (void)reach_quick_settings_set_open(quick_settings, 1);
+                render();
+                step(0.6);
+                reach_rect_f32 arrow =
+                    reach_quick_settings_state_ptr(quick_settings)->layout.sound_page_button;
+                float arrow_x = arrow.x + arrow.width * 0.5f;
+                float arrow_y = arrow.y + arrow.height * 0.5f;
+                send_pointer(ops, capsule,
+                             make_pointer_event(REACH_POINTER_EVENT_DOWN,
+                                                REACH_POINTER_COORDINATE_SURFACE_LOCAL, arrow_x,
+                                                arrow_y));
+                step(0.016);
+                send_pointer(ops, capsule,
+                             make_pointer_event(REACH_POINTER_EVENT_UP,
+                                                REACH_POINTER_COORDINATE_SURFACE_LOCAL, arrow_x,
+                                                arrow_y));
+                for (size_t frame = 0; frame < 40; ++frame)
+                    step(0.016);
+                expect_true(reach_quick_settings_state_ptr(quick_settings)->model.page ==
+                                    REACH_QUICK_SETTINGS_PAGE_SOUND ||
+                                monitor.height / dpi < 200.0f,
+                            "the Sound arrow opens the Sound page");
                 (void)reach_quick_settings_select_page(quick_settings,
                                                        REACH_QUICK_SETTINGS_PAGE_SOUND);
-                render();
                 step(0.6);
                 (void)reach_quick_settings_toggle_expanded(quick_settings);
                 set_system(1);
@@ -3007,7 +3027,7 @@ static void test_quick_settings_section_motion_renders_worst_case(void)
     }
     expect_true(presentation_render_failures == 0,
                 "every Quick Settings section-motion render stays valid");
-    expect_true(presentation_render_count == 4 * 3 * 2 * 77,
+    expect_true(presentation_render_count == 4 * 3 * 2 * 119,
                 "Quick Settings renders every section-motion step at every DPI and monitor");
     const size_t largest_rows = (size_t)REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES * 5 +
                                 (size_t)REACH_AUDIO_VOLUME_MAX_SESSIONS * 7;
