@@ -19,11 +19,11 @@ static reach_rect_f32 reach_settings_wifi_rect(float x, float y, float width, fl
 
 int32_t reach_settings_wifi_row_needs_key_form(const reach_settings_model *model, size_t index)
 {
-    if (model == nullptr || index >= model->wifi_networks.count)
+    if (model == nullptr || index >= model->wifi.networks.count)
     {
         return 0;
     }
-    const reach_wifi_network *network = &model->wifi_networks.networks[index];
+    const reach_wifi_network *network = &model->wifi.networks.networks[index];
     if (network->connected || model->wifi_view == REACH_SETTINGS_WIFI_VIEW_KNOWN)
     {
         return 0;
@@ -39,7 +39,7 @@ static void reach_settings_wifi_layout_row_actions(reach_settings_layout *layout
                                                    const reach_settings_model *model,
                                                    reach_rect_f32 row, size_t index, float scale)
 {
-    const reach_wifi_network *network = &model->wifi_networks.networks[index];
+    const reach_wifi_network *network = &model->wifi.networks.networks[index];
     float inset = 14.0f * scale;
     float button_height = 28.0f * scale;
     float gap = 8.0f * scale;
@@ -191,7 +191,7 @@ void reach_settings_layout_wifi(reach_settings_layout *layout, reach_settings_mo
         viewport_y = button_y + button_height + 12.0f * scale;
     }
 
-    if (model->wifi_status == REACH_SETTINGS_WIFI_STATUS_SCANNING)
+    if (model->wifi.status == REACH_WIFI_SESSION_STATUS_SCANNING)
     {
         layout->wifi_loader_bar =
             reach_settings_wifi_rect(area_x, viewport_y, area_width, 3.0f * scale);
@@ -239,7 +239,7 @@ void reach_settings_layout_wifi(reach_settings_layout *layout, reach_settings_mo
     }
 
     for (size_t index = 0;
-         index < model->wifi_networks.count && layout->wifi_row_count < REACH_WIFI_MAX_NETWORKS;
+         index < model->wifi.networks.count && layout->wifi_row_count < REACH_WIFI_MAX_NETWORKS;
          ++index)
     {
         if (!reach_settings_model_wifi_row_visible(model, index))
@@ -262,8 +262,7 @@ void reach_settings_layout_wifi(reach_settings_layout *layout, reach_settings_mo
                 reach_scroll_view_value_at(&model->wifi_scroll, layout->scroll_time),
             layout->wifi_viewport.width, height);
 
-        if (model->wifi_expanded_row >= 0 && (size_t)model->wifi_expanded_row == index &&
-            progress > 0.99f)
+        if (model->wifi.selected >= 0 && (size_t)model->wifi.selected == index && progress > 0.99f)
         {
             reach_settings_wifi_layout_row_actions(layout, model, layout->wifi_rows[row_index],
                                                    index, scale);

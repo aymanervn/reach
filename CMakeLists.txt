@@ -145,6 +145,7 @@ target_link_libraries(reach_services PUBLIC
 
 add_library(reach_features STATIC
     src/features/common/bar_visibility/bar_visibility.cpp
+    src/features/common/bluetooth_session/bluetooth_session.cpp
     src/features/common/draggable/draggable.cpp
     src/features/common/icon_feedback/icon_feedback.cpp
     src/features/common/keyed_rows/keyed_rows.cpp
@@ -159,6 +160,7 @@ add_library(reach_features STATIC
     src/features/common/scroll_view/scroll_view.cpp
     src/features/common/text_edit/text_edit.cpp
     src/features/common/ui_controls/ui_controls.cpp
+    src/features/common/wifi_session/wifi_session.cpp
     src/features/battery/battery_feature.cpp
     src/features/battery/battery_interaction.cpp
     src/features/battery/battery_render.cpp

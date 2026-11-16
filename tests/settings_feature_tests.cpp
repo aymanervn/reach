@@ -625,13 +625,14 @@ static void test_top_bar_preferences(void)
     expect_true(reach_settings_model_top_bar_style(model.get()) ==
                     REACH_CONFIG_TOP_BAR_STYLE_UNIFIED,
                 "top bar style stores unified");
-    expect_true(
-        reach_settings_model_select_top_bar_style(model.get(), REACH_CONFIG_TOP_BAR_STYLE_TRANSPARENT),
-        "top bar style can select transparent");
+    expect_true(reach_settings_model_select_top_bar_style(model.get(),
+                                                          REACH_CONFIG_TOP_BAR_STYLE_TRANSPARENT),
+                "top bar style can select transparent");
     expect_true(reach_settings_model_top_bar_style(model.get()) ==
                     REACH_CONFIG_TOP_BAR_STYLE_TRANSPARENT,
                 "top bar style stores transparent");
-    expect_true(model->top_bar_style_selection.to == 2.0f, "top bar style selector targets transparent");
+    expect_true(model->top_bar_style_selection.to == 2.0f,
+                "top bar style selector targets transparent");
     expect_true(
         !reach_settings_model_select_top_bar_style(model.get(), (reach_config_top_bar_style)99),
         "top bar style rejects invalid selections");
@@ -678,15 +679,15 @@ static void test_bluetooth_radio_stops_scan(void)
 {
     std::unique_ptr<reach_settings_model> model(new reach_settings_model());
     reach_settings_model_init(model.get());
-    model->bluetooth_scanning = 1;
-    reach_settings_model_set_bluetooth_status(model.get(), REACH_SETTINGS_BLUETOOTH_STATUS_SCANNING,
+    model->bluetooth.scanning = 1;
+    reach_settings_model_set_bluetooth_status(model.get(), REACH_BLUETOOTH_SESSION_STATUS_SCANNING,
                                               nullptr);
 
     reach_bluetooth_state state = {};
     state.available = 1;
     reach_settings_model_set_bluetooth_radio(model.get(), state);
-    expect_true(!model->bluetooth_scanning, "turning Bluetooth off stops scanning");
-    expect_true(model->bluetooth_status == REACH_SETTINGS_BLUETOOTH_STATUS_IDLE,
+    expect_true(!model->bluetooth.scanning, "turning Bluetooth off stops scanning");
+    expect_true(model->bluetooth.status == REACH_BLUETOOTH_SESSION_STATUS_IDLE,
                 "turning Bluetooth off clears the scan loader");
 }
 
@@ -710,7 +711,9 @@ static void test_radio_toggle_animations(void)
     std::unique_ptr<reach_settings_model> model(new reach_settings_model());
     reach_settings_model_init(model.get());
 
-    reach_settings_model_set_wifi_radio(model.get(), REACH_WIFI_RADIO_ON);
+    reach_wifi_snapshot wifi_snapshot = {};
+    wifi_snapshot.radio = REACH_WIFI_RADIO_ON;
+    reach_settings_model_apply_wifi_snapshot(model.get(), &wifi_snapshot);
     expect_true(reach_settings_model_toggle_wifi_radio(model.get()), "Wi-Fi radio can toggle");
     float wifi_position = reach_motion_value_at(&model->wifi_radio_toggle,
                                                 model->wifi_radio_toggle.started_seconds + 0.09);

@@ -36,7 +36,7 @@ static void reach_settings_bluetooth_layout_row_actions(reach_settings_layout *l
         return;
     }
 
-    const reach_bluetooth_device *device = &model->bluetooth_devices.devices[index];
+    const reach_bluetooth_device *device = &model->bluetooth.devices.devices[index];
     if (!device->paired && !device->can_pair)
     {
         return;
@@ -87,7 +87,7 @@ void reach_settings_layout_bluetooth(reach_settings_layout *layout, reach_settin
         reach_settings_bluetooth_rect(area_x, button_y, scan_width, button_height);
 
     float viewport_y = button_y + button_height + 12.0f * scale;
-    if (model->bluetooth_status == REACH_SETTINGS_BLUETOOTH_STATUS_SCANNING)
+    if (model->bluetooth.status == REACH_BLUETOOTH_SESSION_STATUS_SCANNING)
     {
         layout->bluetooth_loader_bar =
             reach_settings_bluetooth_rect(area_x, viewport_y, area_width, 3.0f * scale);
@@ -109,9 +109,9 @@ void reach_settings_layout_bluetooth(reach_settings_layout *layout, reach_settin
     {
         const int32_t want_paired = section == 0 ? 1 : 0;
         size_t section_count = 0;
-        for (size_t index = 0; index < model->bluetooth_devices.count; ++index)
+        for (size_t index = 0; index < model->bluetooth.devices.count; ++index)
         {
-            if (model->bluetooth_devices.devices[index].paired == want_paired)
+            if (model->bluetooth.devices.devices[index].paired == want_paired)
             {
                 ++section_count;
             }
@@ -134,11 +134,11 @@ void reach_settings_layout_bluetooth(reach_settings_layout *layout, reach_settin
             layout->bluetooth_viewport.width, section_title_height);
         content_y += section_title_height + 5.0f * scale;
 
-        for (size_t index = 0; index < model->bluetooth_devices.count &&
+        for (size_t index = 0; index < model->bluetooth.devices.count &&
                                layout->bluetooth_row_count < REACH_BLUETOOTH_MAX_DEVICES;
              ++index)
         {
-            if (model->bluetooth_devices.devices[index].paired != want_paired)
+            if (model->bluetooth.devices.devices[index].paired != want_paired)
             {
                 continue;
             }
@@ -158,8 +158,8 @@ void reach_settings_layout_bluetooth(reach_settings_layout *layout, reach_settin
                     reach_scroll_view_value_at(&model->bluetooth_scroll, layout->scroll_time),
                 layout->bluetooth_viewport.width, height);
 
-            if (model->bluetooth_expanded_row >= 0 &&
-                (size_t)model->bluetooth_expanded_row == index && progress > 0.99f)
+            if (model->bluetooth.selected >= 0 && (size_t)model->bluetooth.selected == index &&
+                progress > 0.99f)
             {
                 reach_settings_bluetooth_layout_row_actions(
                     layout, model, layout->bluetooth_rows[row_index], index, scale);

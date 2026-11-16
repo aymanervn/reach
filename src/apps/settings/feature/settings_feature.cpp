@@ -60,12 +60,10 @@ void reach_settings_model_init(reach_settings_model *model)
         reach_motion_set(&motion, 0.0f);
     for (reach_motion &motion : model->bluetooth_row_motions)
         reach_motion_set(&motion, 0.0f);
-    model->wifi_expanded_row = REACH_SETTINGS_WIFI_ROW_NONE;
+    reach_wifi_session_init(&model->wifi);
+    reach_bluetooth_session_init(&model->bluetooth);
     model->wifi_focused_field = REACH_SETTINGS_WIFI_FIELD_NONE;
     model->wifi_add_security = REACH_WIFI_SECURITY_WPA2_PERSONAL;
-    model->wifi_connect_automatically = 1;
-    model->bluetooth_expanded_row = REACH_SETTINGS_BLUETOOTH_ROW_NONE;
-    reach_text_edit_init(&model->wifi_key_edit, REACH_WIFI_KEY_MAXIMUM_LENGTH);
     reach_text_edit_init(&model->wifi_add_key_edit, REACH_WIFI_KEY_MAXIMUM_LENGTH);
     reach_text_edit_init(&model->wifi_add_name_edit, REACH_WIFI_SSID_CAPACITY - 1);
     for (auto &selection : model->power_selection)
