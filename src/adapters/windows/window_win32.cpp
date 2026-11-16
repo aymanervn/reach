@@ -450,7 +450,8 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
             }
 
             else if (window->role == REACH_SURFACE_LAUNCHER ||
-                     window->role == REACH_SURFACE_SETTINGS)
+                     window->role == REACH_SURFACE_SETTINGS ||
+                     window->role == REACH_SURFACE_QUICK_SETTINGS)
             {
                 reach_ui_edit_key edit_key = REACH_UI_EDIT_KEY_NONE;
                 switch (wparam)
@@ -497,7 +498,8 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
         return DefWindowProcW(hwnd, message, wparam, lparam);
     case WM_CHAR:
         if (window != nullptr &&
-            (window->role == REACH_SURFACE_LAUNCHER || window->role == REACH_SURFACE_SETTINGS))
+            (window->role == REACH_SURFACE_LAUNCHER || window->role == REACH_SURFACE_SETTINGS ||
+             window->role == REACH_SURFACE_QUICK_SETTINGS))
         {
 
             if (wparam >= 0x20 && wparam != 0x7F)
@@ -1111,6 +1113,16 @@ static int32_t reach_platform_window_queue_event(reach_platform_window *window,
     return 1;
 }
 
+static reach_result reach_platform_window_take_keyboard_focus(reach_platform_window *window)
+{
+    if (window == nullptr || window->hwnd == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    reach_platform_window_focus(window->hwnd);
+    return GetForegroundWindow() == window->hwnd ? REACH_OK : REACH_ERROR;
+}
+
 static reach_result reach_platform_window_raise(reach_platform_window *window)
 {
     if (window == nullptr || window->hwnd == nullptr)
@@ -1342,6 +1354,7 @@ reach_result reach_windows_create_platform_window(reach_surface_role role,
     out_port->ops.set_input_passthrough = reach_platform_window_set_input_passthrough;
     out_port->ops.set_input_regions = reach_platform_window_set_input_regions;
     out_port->ops.set_input_presentation = reach_platform_window_set_input_presentation;
+    out_port->ops.take_keyboard_focus = reach_platform_window_take_keyboard_focus;
     out_port->ops.destroy = reach_platform_window_destroy;
     return REACH_OK;
 }

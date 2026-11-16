@@ -141,8 +141,7 @@ reach_quick_settings_hit_test_sound(const reach_quick_settings_layout *layout,
 
 static int32_t reach_quick_settings_wifi_row_connectable(const reach_wifi_network *network)
 {
-    return !network->connected && reach_wifi_security_is_supported(network->security) &&
-           (!reach_wifi_security_needs_key(network->security) || network->saved);
+    return !network->connected && reach_wifi_security_is_supported(network->security);
 }
 
 static reach_quick_settings_hit_result
@@ -155,6 +154,19 @@ reach_quick_settings_hit_test_wifi(const reach_quick_settings_layout *layout,
     {
         result.type = REACH_QUICK_SETTINGS_HIT_WIFI_SWITCH;
         return result;
+    }
+    if (model->wifi_key_row >= 0)
+    {
+        if (reach_quick_settings_point_in_rect(layout->wifi_key_field, x, y))
+        {
+            result.type = REACH_QUICK_SETTINGS_HIT_WIFI_KEY_FIELD;
+            return result;
+        }
+        if (reach_quick_settings_point_in_rect(layout->wifi_key_connect, x, y))
+        {
+            result.type = REACH_QUICK_SETTINGS_HIT_WIFI_KEY_CONNECT;
+            return result;
+        }
     }
     for (size_t index = 0; index < layout->wifi_row_count && index < model->wifi_row_count; ++index)
     {
@@ -261,6 +273,12 @@ reach_quick_settings_action reach_quick_settings_action_for_hit(reach_quick_sett
     case REACH_QUICK_SETTINGS_HIT_WIFI_ROW:
         action.type = REACH_QUICK_SETTINGS_ACTION_CONNECT_WIFI;
         break;
+    case REACH_QUICK_SETTINGS_HIT_WIFI_KEY_FIELD:
+        action.type = REACH_QUICK_SETTINGS_ACTION_FOCUS_WIFI_KEY;
+        break;
+    case REACH_QUICK_SETTINGS_HIT_WIFI_KEY_CONNECT:
+        action.type = REACH_QUICK_SETTINGS_ACTION_SUBMIT_WIFI_KEY;
+        break;
     case REACH_QUICK_SETTINGS_HIT_NONE:
     default:
         action.type = REACH_QUICK_SETTINGS_ACTION_NONE;
@@ -340,6 +358,12 @@ uint64_t reach_quick_settings_pressable_target(reach_quick_settings_hit_result h
     case REACH_QUICK_SETTINGS_HIT_WIFI_ROW:
         kind = REACH_QUICK_SETTINGS_PRESS_TARGET_WIFI_ROW;
         index = hit.item_index;
+        break;
+    case REACH_QUICK_SETTINGS_HIT_WIFI_KEY_FIELD:
+        kind = REACH_QUICK_SETTINGS_PRESS_TARGET_WIFI_KEY_FIELD;
+        break;
+    case REACH_QUICK_SETTINGS_HIT_WIFI_KEY_CONNECT:
+        kind = REACH_QUICK_SETTINGS_PRESS_TARGET_WIFI_KEY_CONNECT;
         break;
     default:
         return REACH_PRESSABLE_TARGET_NONE;

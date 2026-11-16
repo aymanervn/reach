@@ -1059,45 +1059,7 @@ void reach_launcher_handle_text_event(reach_launcher *launcher, const reach_ui_e
 
     reach_text_edit *edit = &launcher->state.launcher_text_edit;
     reach_text_edit_event te = REACH_TEXT_EDIT_EVENT_NONE;
-
-    if (event->type == REACH_UI_EVENT_TEXT_CHAR)
-    {
-        te = reach_text_edit_insert_char(edit, (uint16_t)event->id);
-    }
-    else if (event->type == REACH_UI_EVENT_TEXT_EDIT)
-    {
-        reach_text_edit_modifiers mods = {};
-        mods.shift = (event->modifiers & REACH_UI_EVENT_MODIFIER_SHIFT) ? 1 : 0;
-        mods.ctrl = (event->modifiers & REACH_UI_EVENT_MODIFIER_CTRL) ? 1 : 0;
-        switch ((reach_ui_edit_key)event->id)
-        {
-        case REACH_UI_EDIT_KEY_BACKSPACE:
-            te = reach_text_edit_handle_key(edit, REACH_TEXT_EDIT_KEY_BACKSPACE, mods);
-            break;
-        case REACH_UI_EDIT_KEY_DELETE:
-            te = reach_text_edit_handle_key(edit, REACH_TEXT_EDIT_KEY_DELETE, mods);
-            break;
-        case REACH_UI_EDIT_KEY_LEFT:
-            te = reach_text_edit_handle_key(edit, REACH_TEXT_EDIT_KEY_LEFT, mods);
-            break;
-        case REACH_UI_EDIT_KEY_RIGHT:
-            te = reach_text_edit_handle_key(edit, REACH_TEXT_EDIT_KEY_RIGHT, mods);
-            break;
-        case REACH_UI_EDIT_KEY_HOME:
-            te = reach_text_edit_handle_key(edit, REACH_TEXT_EDIT_KEY_HOME, mods);
-            break;
-        case REACH_UI_EDIT_KEY_END:
-            te = reach_text_edit_handle_key(edit, REACH_TEXT_EDIT_KEY_END, mods);
-            break;
-        case REACH_UI_EDIT_KEY_SELECT_ALL:
-            reach_text_edit_select_all(edit);
-            break;
-        case REACH_UI_EDIT_KEY_NONE:
-        default:
-            return;
-        }
-    }
-    else
+    if (!reach_text_edit_apply_ui_event(edit, event, &te))
     {
         return;
     }

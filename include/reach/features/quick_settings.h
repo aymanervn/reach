@@ -4,7 +4,9 @@
 #include "reach/core/render_commands.h"
 #include "reach/core/theme.h"
 #include "reach/core/wifi.h"
+#include "reach/core/blink.h"
 #include "reach/features/common/keyed_rows.h"
+#include "reach/features/common/text_edit.h"
 #include "reach/features/feature_capsule.h"
 #include "reach/ports/audio_volume.h"
 #include "reach/ports/power_session.h"
@@ -61,6 +63,8 @@ extern "C"
         size_t wifi_connected_count;
         int32_t wifi_status;
         uint16_t wifi_status_ssid[REACH_WIFI_SSID_CAPACITY];
+        int32_t wifi_key_row;
+        reach_text_edit wifi_key;
         int32_t light_theme;
         uint16_t display_name[REACH_USER_ACCOUNT_NAME_CAPACITY];
         uint64_t picture_image_id;
@@ -138,6 +142,8 @@ extern "C"
         reach_rect_f32 wifi_nearby_label;
         reach_quick_settings_output_device_row_layout wifi_rows[REACH_QUICK_SETTINGS_WIFI_ROWS];
         size_t wifi_row_count;
+        reach_rect_f32 wifi_key_field;
+        reach_rect_f32 wifi_key_connect;
     } reach_quick_settings_layout;
 
     typedef struct reach_quick_settings_output_device_row
@@ -166,6 +172,7 @@ extern "C"
         reach_keyed_row wifi_row_motions[REACH_QUICK_SETTINGS_WIFI_ROWS];
         reach_wifi_network wifi_row_items[REACH_QUICK_SETTINGS_WIFI_ROWS];
         reach_motion wifi_switch;
+        reach_blink wifi_caret;
         reach_motion toggle_states[REACH_QUICK_SETTINGS_TOGGLE_COUNT];
         reach_motion page_opacity[REACH_QUICK_SETTINGS_PAGE_COUNT];
         reach_motion page_shift[REACH_QUICK_SETTINGS_PAGE_COUNT];
@@ -332,6 +339,7 @@ extern "C"
                                               int32_t light_theme, const uint16_t *wallpaper_path);
     int32_t reach_quick_settings_select_page(reach_quick_settings *quick_settings,
                                              reach_quick_settings_page page);
+    const reach_ui_event_type *reach_quick_settings_routed_events(size_t *out_count);
 
     void reach_quick_settings_refresh_audio(reach_quick_settings *quick_settings);
     void reach_quick_settings_refresh_system(reach_quick_settings *quick_settings,

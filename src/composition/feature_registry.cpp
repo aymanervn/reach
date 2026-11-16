@@ -1045,6 +1045,8 @@ static void reach_host_init_feature_definitions(reach_host *host)
         &definitions[REACH_SURFACE_ID_LAUNCHER].toggle_event_count);
     definitions[REACH_SURFACE_ID_LAUNCHER].routed_events =
         reach_launcher_routed_events(&definitions[REACH_SURFACE_ID_LAUNCHER].routed_event_count);
+    definitions[REACH_SURFACE_ID_QUICK_SETTINGS].routed_events = reach_quick_settings_routed_events(
+        &definitions[REACH_SURFACE_ID_QUICK_SETTINGS].routed_event_count);
     definitions[REACH_SURFACE_ID_CLIPBOARD].toggle_events = reach_clipboard_activation_events(
         &definitions[REACH_SURFACE_ID_CLIPBOARD].toggle_event_count);
     definitions[REACH_SURFACE_ID_SWITCHER].routed_events =

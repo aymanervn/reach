@@ -51,6 +51,10 @@ reach_result reach_host_apply_feature_action(reach_host *host, reach_feature_run
         reach_host_close_surface(host, desc);
         return REACH_OK;
 
+    case REACH_FEATURE_ACTION_TAKE_KEYBOARD_FOCUS:
+        reach_host_take_keyboard_focus(host, desc);
+        return REACH_OK;
+
     case REACH_FEATURE_ACTION_MOVE_PIN:
         return reach_host_move_pin(host, (uint32_t)action->id, action->index);
 
