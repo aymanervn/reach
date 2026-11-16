@@ -439,7 +439,7 @@ static void reach_quick_settings_place_header(reach_quick_settings_layout *layou
     layout->avatar = reach_quick_settings_rect(layout->avatar_ring.x + metrics->avatar_ring,
                                                layout->avatar_ring.y + metrics->avatar_ring,
                                                metrics->avatar_size, metrics->avatar_size);
-    float button = metrics->rail_item_size;
+    float button = metrics->header_button_size;
     float header_right = layout->header.x + layout->header.width - metrics->avatar_inset;
     layout->settings_button = reach_quick_settings_rect(
         header_right - button, layout->avatar_ring.y + (ring - button) * 0.5f, button, button);

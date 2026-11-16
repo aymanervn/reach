@@ -498,11 +498,11 @@ static reach_result reach_quick_settings_push_header(const reach_quick_settings_
         reach_quick_settings_push_rounded_rect(commands, layout.settings_button,
                                                layout.settings_button.height * 0.5f,
                                                theme.quick_settings_button_background);
-        float inset = (layout.settings_button.width - metrics->toggle_icon_size) * 0.5f;
+        float inset = (layout.settings_button.width - metrics->header_button_icon_size) * 0.5f;
         reach_render_command settings = {};
         settings.type = REACH_RENDER_COMMAND_VECTOR_ICON;
         settings.rect = {layout.settings_button.x + inset, layout.settings_button.y + inset,
-                         metrics->toggle_icon_size, metrics->toggle_icon_size};
+                         metrics->header_button_icon_size, metrics->header_button_icon_size};
         settings.icon_id = REACH_VECTOR_ICON_SETTINGS;
         settings.color = theme.system_glyph;
         (void)reach_render_command_buffer_push(commands, &settings);

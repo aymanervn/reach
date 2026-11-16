@@ -675,7 +675,7 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
     float responsive_budget =
         layout->bounds.width - edge_inset * 2.0f - button_size - pill_gap * 3.0f;
     if (power_clock_width + quick_settings_button_width + stats_width + language_width +
-            language_gap + battery_width + battery_gap + padding + button_size >
+            language_gap + battery_width + battery_gap + padding >
         responsive_budget)
     {
         show_stats = 0;
@@ -686,7 +686,7 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
         upload_advance = 0.0f;
     }
     if (power_clock_width + quick_settings_button_width + language_width + language_gap +
-            battery_width + battery_gap + padding + button_size >
+            battery_width + battery_gap + padding >
         responsive_budget)
     {
         network_name_advance = 0.0f;
@@ -705,14 +705,13 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
                          quick_settings_button_width);
     }
     if (power_clock_width + quick_settings_button_width + language_width + language_gap +
-            battery_width + battery_gap + padding + button_size >
+            battery_width + battery_gap + padding >
         responsive_budget)
     {
         language_width = 0.0f;
         language_gap = 0.0f;
     }
-    if (power_clock_width + quick_settings_button_width + battery_width + battery_gap + padding +
-            button_size >
+    if (power_clock_width + quick_settings_button_width + battery_width + battery_gap + padding >
         responsive_budget)
     {
         volume_advance = 0.0f;
@@ -726,8 +725,7 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
         reach_motion_set(&top_bar->motions[REACH_TOP_BAR_ANIM_QUICK_SETTINGS_WIDTH],
                          quick_settings_button_width);
     }
-    if (power_clock_width + quick_settings_button_width + battery_width + battery_gap + padding +
-                button_size >
+    if (power_clock_width + quick_settings_button_width + battery_width + battery_gap + padding >
             responsive_budget &&
         now_playing_width > 0.0f)
     {
@@ -739,15 +737,13 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
         layout->now_playing = {};
         layout->now_playing_separator = {};
     }
-    if (power_clock_width + quick_settings_button_width + battery_width + battery_gap + padding +
-            button_size >
+    if (power_clock_width + quick_settings_button_width + battery_width + battery_gap + padding >
         responsive_budget)
     {
         battery_width = 0.0f;
         battery_gap = 0.0f;
     }
-    if (power_clock_width + quick_settings_button_width + padding + button_size >
-            responsive_budget &&
+    if (power_clock_width + quick_settings_button_width + padding > responsive_budget &&
         date_advance > 0.0f)
     {
         power_clock_width -= date_advance + clock_gap;
@@ -758,7 +754,7 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
 
     float quick_settings_width = border_thickness + dot_size * 0.5f + dot_gap + stats_width +
                                  language_width + language_gap + battery_width + battery_gap +
-                                 quick_settings_button_width + pill_gap + button_size + padding;
+                                 quick_settings_button_width + padding;
     layout->pills[REACH_TOP_BAR_PILL_QUICK_SETTINGS] =
         reach_top_bar_rect(right - quick_settings_width, 0.0f, quick_settings_width, height);
     layout->tray_separator =
@@ -816,9 +812,6 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
         layout->volume_label = reach_top_bar_text_run(content_x, height, volume_advance);
     }
 
-    cluster_x += quick_settings_button_width + pill_gap;
-    layout->settings_button =
-        reach_top_bar_rect(cluster_x, (height - button_size) * 0.5f, button_size, button_size);
     right = layout->pills[REACH_TOP_BAR_PILL_QUICK_SETTINGS].x;
 
     reach_top_bar_sync_tray_items(top_bar);
