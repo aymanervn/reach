@@ -383,12 +383,12 @@ static reach_result reach_quick_settings_push_toggle(
         icon.icon_id = icon_id;
         icon.color = theme->primary_text;
         (void)reach_render_command_buffer_push(commands, &icon);
-        reach_quick_settings_push_rounded_rect(commands, layout->divider, 0.0f,
-                                               theme->primary_text);
+        reach_quick_settings_push_rounded_rect(
+            commands, layout->divider, 0.0f,
+            reach_theme_color_alpha(theme->quick_settings_secondary_text, 0.5f));
         reach_quick_settings_push_fitted_text(
-            commands, layout->title, title, metrics->toggle_title_text_size,
-            REACH_TEXT_WEIGHT_SEMIBOLD, REACH_TEXT_ALIGNMENT_CENTER, theme->primary_text,
-            text_measure);
+            commands, layout->title, title, metrics->toggle_title_text_size, REACH_TEXT_WEIGHT_BOLD,
+            REACH_TEXT_ALIGNMENT_CENTER, theme->primary_text, text_measure);
         reach_quick_settings_push_fitted_text(commands, layout->status, status,
                                               metrics->toggle_status_text_size,
                                               REACH_TEXT_WEIGHT_NORMAL, REACH_TEXT_ALIGNMENT_CENTER,
