@@ -283,8 +283,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
             DispatchMessageW(&message);
         }
 
-        int32_t dispatched_event = reach_settings_app_has_pending_events(app);
-        if (dispatched_event)
+        if (reach_settings_app_has_pending_events(app))
         {
             (void)reach_settings_app_dispatch_events(app);
         }
@@ -302,10 +301,9 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
         {
             LARGE_INTEGER current_counter = {};
             QueryPerformanceCounter(&current_counter);
-            if (wait_result == WAIT_OBJECT_0 + 2 && !dispatched_event && needed_frame_before_wait &&
-                reach_frame_clock_wait_ms(
-                    &frame_clock, (double)current_counter.QuadPart / (double)frequency.QuadPart,
-                    reach_settings_app_frame_rate_hz(app), 1) > 0)
+            double current_seconds = (double)current_counter.QuadPart / (double)frequency.QuadPart;
+            if (needed_frame_before_wait && wait_result != WAIT_TIMEOUT &&
+                current_seconds < frame_clock.next_frame_seconds)
                 continue;
             double delta_seconds =
                 needed_frame_before_wait && frequency.QuadPart > 0
@@ -319,8 +317,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
                 exit_code = 1;
                 break;
             }
-            reach_frame_clock_presented(&frame_clock, (double)current_counter.QuadPart /
-                                                          (double)frequency.QuadPart);
+            reach_frame_clock_presented(&frame_clock, current_seconds);
         }
     }
 
