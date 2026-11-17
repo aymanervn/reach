@@ -1829,7 +1829,7 @@ an app — apps are leaves, like `tools`.
 
 ## Desktop widgets
 
-One persistent capsule owns the clock, calendar, GPU monitor, Now Playing, stopwatch, and
+One persistent capsule owns the clock, calendar, system monitor, Now Playing, stopwatch, and
 Pomodoro cards. Its surface uses the shared DirectComposition render device and reports
 card hit regions to the window adapter. The native surface sits above Reach's desktop
 and below application windows. Surface ports can be provided by the host caller or created
@@ -1837,7 +1837,9 @@ from the registered role by the composition root's platform factory.
 
 Settings toggles and position resets use typed config mutations. Card placements are stored
 in DP, and the INI adapter keeps the retained widgets' original disk slots so older installs
-can carry forward their selections and placements. Packing starts on the right and resolves
-overlap when a drag ends. Stopwatch and Pomodoro use monotonic deadlines. The GPU monitor
-opts into GPU engine counters and available NVIDIA thermals on the existing system-stats
-worker. Now Playing uses the shared playback service and artwork render commands.
+can carry forward their selections and placements. Automatic packing starts on the right.
+During a drag the capsule previews the closest free drop position and saves it in whole DP
+on release. Cards can pass over siblings during the gesture while the siblings keep their
+positions. Stopwatch and Pomodoro use monotonic deadlines. The system monitor reads CPU and
+RAM usage and opts into GPU engine counters and available NVIDIA thermals on the existing
+system-stats worker. Now Playing uses the shared playback service and artwork render commands.

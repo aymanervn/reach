@@ -26,7 +26,7 @@ static inline bool reach_widgets_overlap(reach_rect_f32 a, reach_rect_f32 b, flo
 
 static inline bool reach_widgets_find_space(reach_rect_f32 area, reach_rect_f32 wanted,
                                             const std::vector<reach_rect_f32> &occupied, float gap,
-                                            reach_rect_f32 *out)
+                                            reach_rect_f32 *out, float grid = 0.0f)
 {
     *out = {};
     if (wanted.width <= 0 || wanted.height <= 0 || wanted.width > area.width ||
@@ -42,6 +42,21 @@ static inline bool reach_widgets_find_space(reach_rect_f32 area, reach_rect_f32 
         xs.push_back(rect.x + rect.width + gap);
         ys.push_back(rect.y - gap - wanted.height);
         ys.push_back(rect.y + rect.height + gap);
+    }
+    if (grid > 0.0f)
+    {
+        const auto align = [grid](std::vector<float> &points)
+        {
+            const size_t count = points.size();
+            for (size_t index = 0; index < count; ++index)
+            {
+                const float units = points[index] / grid;
+                points[index] = std::floor(units) * grid;
+                points.push_back(std::ceil(units) * grid);
+            }
+        };
+        align(xs);
+        align(ys);
     }
     double best = std::numeric_limits<double>::infinity();
     for (float x : xs)
@@ -68,6 +83,49 @@ static inline bool reach_widgets_find_space(reach_rect_f32 area, reach_rect_f32 
         }
     }
     return std::isfinite(best);
+}
+
+static inline bool reach_widgets_find_drop(reach_rect_f32 desktop, reach_rect_f32 wanted,
+                                           const reach_rect_f32 *cards, size_t count,
+                                           size_t moving, bool resizing, float gap, float grid,
+                                           reach_rect_f32 *out)
+{
+    *out = {};
+    wanted.width = std::round(wanted.width / grid) * grid;
+    wanted.height = std::round(wanted.height / grid) * grid;
+    if (wanted.width <= 0.0f || wanted.height <= 0.0f)
+    {
+        return false;
+    }
+    std::vector<reach_rect_f32> occupied;
+    for (size_t index = 0; index < count; ++index)
+    {
+        if (index != moving && cards[index].width > 0.0f && cards[index].height > 0.0f)
+        {
+            occupied.push_back(cards[index]);
+        }
+    }
+    if (!resizing)
+    {
+        return reach_widgets_find_space(desktop, wanted, occupied, gap, out, grid);
+    }
+    wanted.x = std::round(wanted.x / grid) * grid;
+    wanted.y = std::round(wanted.y / grid) * grid;
+    if (wanted.x < desktop.x || wanted.y < desktop.y ||
+        wanted.x + wanted.width > desktop.x + desktop.width ||
+        wanted.y + wanted.height > desktop.y + desktop.height)
+    {
+        return false;
+    }
+    for (const auto &card : occupied)
+    {
+        if (reach_widgets_overlap(wanted, card, gap))
+        {
+            return false;
+        }
+    }
+    *out = wanted;
+    return true;
 }
 
 static inline bool reach_widgets_pack(reach_rect_f32 desktop, reach_rect_f32 automatic_area,
