@@ -12,6 +12,7 @@
 #include "reach/features/switcher.h"
 #include "reach/features/system_hud.h"
 #include "reach/features/top_bar.h"
+#include "reach/features/widgets.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -3490,6 +3491,113 @@ static void test_clipboard_card_motion_renders_worst_case(void)
     reach_host_destroy_registered_features(host);
 }
 
+static reach_result fake_widgets_clock_sample(reach_clock_source *source,
+                                              reach_clock_sample *out_sample)
+{
+    (void)source;
+    *out_sample = {};
+    out_sample->year = 2026;
+    out_sample->month = 8;
+    out_sample->day = 31;
+    out_sample->weekday = 1;
+    out_sample->hour = 23;
+    out_sample->minute = 59;
+    return REACH_OK;
+}
+
+static reach_host widgets_render_host;
+
+static void test_desktop_widgets_render_worst_case(void)
+{
+    reach_host *host = &widgets_render_host;
+    reach_host_init_feature_registry(host);
+    expect_true(reach_host_create_registered_features(host) == REACH_OK,
+                "registered features are available for desktop widgets");
+    reach_host_init_layout(host);
+
+    reach_clock_port clock_port = {};
+    clock_port.source = reinterpret_cast<reach_clock_source *>(1);
+    clock_port.ops.sample_local = fake_widgets_clock_sample;
+    reach_clock *clock = nullptr;
+    expect_true(reach_clock_create(clock_port, &clock) == REACH_OK,
+                "a fixed clock is available for desktop widgets");
+    (void)reach_clock_tick(clock);
+
+    const reach_surface_id id = REACH_SURFACE_ID_WIDGET_DESKTOP;
+    reach_feature_runtime *runtime = &host->feature_runtimes[id];
+    const reach_feature_definition *definition = runtime->definition;
+    reach_widgets *widgets = reach_host_feature_capsule<reach_widgets>(host, id);
+    reach_widgets_attach_services(widgets, clock, nullptr, nullptr);
+
+    const int32_t columns[] = {0, 460, 920};
+    const int32_t rows[] = {0, 420};
+    for (size_t index = 0; index < REACH_MAX_DESKTOP_WIDGETS; ++index)
+    {
+        const reach_config_widget_limits limits = reach_widget_definition_at(index)->limits;
+        (void)reach_widgets_set_placement(
+            widgets, index,
+            {columns[index % 3], rows[index / 3], limits.max_width, limits.max_height});
+    }
+    (void)reach_widgets_set_enabled(widgets, REACH_DESKTOP_WIDGET_MASK);
+    reach_feature_tick_result tick = {};
+    definition->capsule_ops->tick(runtime->capsule, 0.0, &tick);
+
+    const char *label = "desktop widgets render within budget";
+    auto storage = std::make_unique<reach_render_command_buffer>();
+    reach_render_command_buffer *commands = storage.get();
+    size_t max_commands = 0;
+    auto render = [&](const reach_feature_surface_context &ctx)
+    {
+        reach_render_command_buffer_clear(commands);
+        reach_result result =
+            definition->surface_ops->append_render_commands(runtime->capsule, &ctx, commands);
+        expect_true(result == REACH_OK && commands->count < REACH_MAX_RENDER_COMMANDS &&
+                        commands->group_count <= REACH_MAX_RENDER_GROUPS &&
+                        reach_render_command_buffer_validate_groups(commands) == REACH_OK,
+                    label);
+        if (commands->count > max_commands)
+            max_commands = commands->count;
+    };
+
+    const float dpis[] = {1.0f, 1.25f, 1.5f, 2.0f};
+    const reach_rect_f32 monitors[] = {{0.0f, 0.0f, 3840.0f, 2160.0f},
+                                       {-1920.0f, 0.0f, 1920.0f, 1080.0f},
+                                       {0.0f, 0.0f, 360.0f, 280.0f}};
+    for (float dpi : dpis)
+    {
+        for (reach_rect_f32 monitor : monitors)
+        {
+            host->layout_dpi_scale = dpi;
+            presentation_contexts contexts = make_presentation_contexts(dpi, monitor);
+            (void)definition->surface_ops->arrange(runtime->capsule, &contexts.base);
+            render(contexts.base);
+
+            reach_rect_f32 regions[REACH_MAX_DESKTOP_WIDGETS] = {};
+            if (definition->capsule_ops->input_regions(runtime->capsule, regions,
+                                                       REACH_MAX_DESKTOP_WIDGETS) == 0)
+                continue;
+            const reach_rect_f32 card = regions[0];
+            float x = monitor.x + card.x + card.width * 0.5f;
+            float y = monitor.y + card.y + card.height * 0.5f;
+            const reach_feature_capsule_ops *ops = definition->capsule_ops;
+            send_pointer(ops, runtime->capsule,
+                         make_pointer_event(REACH_POINTER_EVENT_DOWN,
+                                            REACH_POINTER_COORDINATE_SCREEN, x, y));
+            send_pointer(ops, runtime->capsule,
+                         make_pointer_event(REACH_POINTER_EVENT_MOVE,
+                                            REACH_POINTER_COORDINATE_SCREEN, x + 220.0f * dpi,
+                                            y + 140.0f * dpi));
+            render(contexts.base);
+            send_pointer(ops, runtime->capsule,
+                         make_pointer_event(REACH_POINTER_EVENT_CANCEL,
+                                            REACH_POINTER_COORDINATE_SCREEN, x, y));
+        }
+    }
+    expect_true(max_commands > 0, "desktop widgets rendered their cards");
+    reach_host_destroy_registered_features(host);
+    reach_clock_destroy(clock);
+}
+
 int main(void)
 {
     test_close_handoff_readiness_waits_for_observed_restore();
@@ -3530,6 +3638,7 @@ int main(void)
     test_quick_settings_section_motion_renders_worst_case();
     test_launcher_result_motion_renders_worst_case();
     test_clipboard_card_motion_renders_worst_case();
+    test_desktop_widgets_render_worst_case();
 
     if (failures != 0)
     {
