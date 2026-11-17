@@ -82,8 +82,8 @@ extern "C"
     reach_result reach_config_service_set_widget_placement(reach_config_service *service,
                                                            size_t index,
                                                            reach_config_widget_placement placement);
-    reach_result reach_config_service_toggle_desktop_widget(reach_config_service *service,
-                                                            size_t index);
+    reach_result reach_config_service_set_desktop_widget(reach_config_service *service,
+                                                         size_t index, int32_t enabled);
 
     reach_result reach_config_service_set_dock_size(reach_config_service *service, int32_t size);
     reach_result reach_config_service_set_wallpapers(reach_config_service *service,

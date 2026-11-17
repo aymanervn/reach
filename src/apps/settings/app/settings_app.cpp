@@ -2284,7 +2284,9 @@ static void reach_settings_handle_pointer_up(reach_settings_app *app, const reac
     {
         if (hit.type == REACH_SETTINGS_HIT_WIDGET_TOGGLE)
         {
-            (void)reach_config_service_toggle_desktop_widget(app->config_service, hit.widget_index);
+            const int32_t enabled = (app->model.desktop_widgets & (1u << hit.widget_index)) == 0;
+            (void)reach_config_service_set_desktop_widget(app->config_service, hit.widget_index,
+                                                          enabled);
             reach_settings_load_widget_config(app);
             app->dirty = 1;
         }
