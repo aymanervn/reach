@@ -19,6 +19,7 @@ Open items only.
 - Trails behind a shadow-casting background whose y and height both move. Worked around in Clipboard and Switcher; deferred.
 - Shadow padding swallows clicks for other apps' windows (`window_win32.cpp:293` `HTTRANSPARENT`). The Dock and Unified/Split bars still overlap a thin strip; needs OS-level passthrough.
 - Canceled item drags keep their reordered position.
+- A hidden Dock parks its window below the primary monitor; with a monitor stacked below, that window covers a strip at its top and swallows clicks there. The retained reveal makes the strip taller by the slide distance.
 - A failed Applications refresh clears its loading state without reporting the failure.
 - Graphics-device loss is fatal for Reach surfaces; device-loss and fence recovery is unimplemented.
 - Display settings has no overflow policy at short window heights.
@@ -60,7 +61,7 @@ Open items only.
 ## GPU migration (remaining)
 
 - Repeatable baseline measurements, and final comparable performance acceptance. Windows profiling policy blocks system trace collection.
-- Dock to GPU: size, reveal, slot insertion/removal/reorder and fitting (`dock_feature.cpp:900`, `:1041`, `:1482`).
+- Dock to GPU: size fit and slot insertion/removal (`dock_feature.cpp`, `size_scale` and `slot_motions`). Reveal and reorder are done.
 - Top Bar pill widths to GPU: Now Playing, current app, tray (`top_bar_feature.cpp:505`). The reveal slide stays on the CPU.
 - Remaining consumers: Launcher results and resize, Settings expandable rows, Stage movement, backdrop and feedback.
 - Separate bar visuals from HWND movement and window push on one physical timeline.

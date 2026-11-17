@@ -1071,7 +1071,7 @@ static reach_result reach_dock_surface_render(void *capsule,
 {
     reach_dock_surface_render_context render = {};
     render.theme = ctx->theme;
-    render.bounds = ctx->render_bounds;
+    render.bounds = ctx->visible_bounds;
     render.icon_size_px = ctx->icon_size_px;
     render.dpi_scale = ctx->dpi_scale;
     return reach_dock_append_surface_render_commands(static_cast<reach_dock *>(capsule), &render,
