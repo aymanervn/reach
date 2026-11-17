@@ -137,8 +137,7 @@ static reach_result reach_monitor_refresh(reach_monitor_list *list)
     reach_monitor_list snapshot = {};
     if (!EnumDisplayMonitors(nullptr, nullptr, reach_monitor_enum_proc,
                              reinterpret_cast<LPARAM>(&snapshot)) ||
-        snapshot.enumeration_failed ||
-        snapshot.monitors.empty())
+        snapshot.enumeration_failed || snapshot.monitors.empty())
     {
         return REACH_ERROR;
     }

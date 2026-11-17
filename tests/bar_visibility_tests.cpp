@@ -126,7 +126,8 @@ static void test_transparent_top_bar_scrim_renders_within_budget(void)
     {
         for (reach_config_top_bar_mode bar_mode : bar_modes)
         {
-            (void)reach_top_bar_apply_config(top_bar, REACH_CONFIG_TOP_BAR_STYLE_TRANSPARENT, bar_mode);
+            (void)reach_top_bar_apply_config(top_bar, REACH_CONFIG_TOP_BAR_STYLE_TRANSPARENT,
+                                             bar_mode);
             for (float dpi : dpis)
             {
                 for (reach_rect_f32 monitor : monitors)
