@@ -652,6 +652,9 @@ target_link_libraries(reach_update_helper PRIVATE
 
 add_executable(reach_updater WIN32
     src/tools/reach_updater/reach_updater.cpp
+    src/adapters/windows/diagnostics_log_win32.cpp
+    src/support/diagnostics_log.cpp
+    src/support/util.cpp
 )
 set_target_properties(reach_updater PROPERTIES OUTPUT_NAME "reachUpdater")
 
@@ -666,6 +669,7 @@ reach_configure_common(reach_updater)
 reach_configure_windows(reach_updater)
 target_compile_features(reach_updater PRIVATE cxx_std_17)
 target_link_libraries(reach_updater PRIVATE
+    ole32
     shell32
     shlwapi
     user32
