@@ -792,6 +792,7 @@ static void reach_platform_window_focus(HWND hwnd)
         foreground_thread = GetWindowThreadProcessId(foreground, nullptr);
     }
 
+    // Workaround: attaching to the target and foreground threads bypasses the foreground lock.
     BOOL attached_target = FALSE;
     BOOL attached_foreground = FALSE;
     if (target_thread != 0 && target_thread != current_thread)
