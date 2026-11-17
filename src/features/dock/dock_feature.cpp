@@ -38,6 +38,8 @@ static void reach_dock_gate_animating_hit(reach_dock *dock, reach_dock_hit_resul
 struct reach_dock
 {
     reach_motion y_motion;
+    float reveal_shown_y;
+    float reveal_travel;
     reach_motion slot_motions[REACH_DOCK_SLOT_CAPACITY];
     double sampled_seconds;
     reach_dock_state state;
@@ -396,8 +398,6 @@ static int32_t reach_dock_capsule_needs_frame(const void *capsule)
     const reach_dock *dock = static_cast<const reach_dock *>(capsule);
     if (dock == nullptr)
         return 0;
-    if (reach_motion_active_at(&dock->y_motion, dock->sampled_seconds))
-        return 1;
     for (const reach_motion &motion : dock->slot_motions)
         if (reach_motion_active_at(&motion, dock->sampled_seconds))
             return 1;
@@ -434,9 +434,28 @@ static void reach_dock_capsule_surface_geometry(const void *capsule,
     {
         out->visible_bounds = dock->pointer_layout.bounds;
     }
-    if (dock != nullptr)
+    if (dock == nullptr)
     {
-        out->deadline_seconds = dock->hover_deadline;
+        return;
+    }
+    out->deadline_seconds = dock->hover_deadline;
+    if (!dock->state.visibility.animation_initialized || !(dock->reveal_travel > 0.0f))
+    {
+        return;
+    }
+    out->presentation.retained = 1;
+    out->presentation.max_scale = 1.0f;
+    out->presentation.translation_bounds = {0.0f, 0.0f, 0.0f, dock->reveal_travel};
+    reach_motion_set(&out->presentation.group.opacity, 1.0f);
+    reach_motion_set(&out->presentation.group.scale, 1.0f);
+    out->presentation.group.y = reach_motion_affine(&dock->y_motion, 1.0f, -dock->reveal_shown_y);
+    if (reach_motion_active_at(&dock->y_motion, dock->sampled_seconds))
+    {
+        double reveal_deadline = reach_motion_deadline(&dock->y_motion);
+        if (out->deadline_seconds <= 0.0 || reveal_deadline < out->deadline_seconds)
+        {
+            out->deadline_seconds = reveal_deadline;
+        }
     }
 }
 
@@ -1028,6 +1047,11 @@ reach_dock_bar_update_visibility(void *capsule, const reach_bar_visibility_reque
 
     reach_bar_visibility_result result = reach_bar_update_visibility(
         &animations->state.visibility, &animations->y_motion, &bar_request);
+    animations->reveal_shown_y = request->shown_bounds.y;
+    animations->reveal_travel =
+        reach_bar_hidden_position(REACH_DOCK_EDGE, request->shown_bounds, request->monitor_bounds,
+                                  request->hidden_clearance) -
+        request->shown_bounds.y;
     if (!result.visible && reach_dock_clear_context_feedback(animations))
     {
         result.redraw = 1;

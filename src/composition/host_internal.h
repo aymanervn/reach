@@ -897,6 +897,8 @@ void reach_host_suspend_pointer_move_subscriptions(reach_host *host);
 void reach_host_request_bar_visibility_update(reach_host *host);
 void reach_host_sync_bar_layout_conditions(reach_host *host);
 int32_t reach_host_bar_reveal_enabled(const reach_feature_runtime *runtime);
+float reach_host_bar_parking_offset(const reach_feature_runtime *runtime,
+                                    reach_rect_f32 shown_bounds);
 float reach_host_bar_protected_clearance(const reach_host *host,
                                          const reach_feature_runtime *runtime);
 

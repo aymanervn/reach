@@ -845,7 +845,15 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
     {
         bounds = reach_host_reconcile_bar_visibility(
             host, desc->definition->id, geometry.visible_bounds, ctx->monitor_bounds, &geometry);
+        desc->definition->capsule_ops->surface_geometry(desc->capsule, &geometry);
     }
+    int32_t presentation_changed =
+        geometry.presentation.retained &&
+        (!desc->frame_geometry.presentation.retained ||
+         !reach_rect_equal(geometry.presentation.translation_bounds,
+                           desc->frame_geometry.presentation.translation_bounds) ||
+         !reach_render_group_equal(&geometry.presentation.group,
+                                   &desc->frame_geometry.presentation.group));
     if (desc->surface->window.ops.set_input_passthrough != nullptr)
         (void)desc->surface->window.ops.set_input_passthrough(
             desc->surface->window.window, (desc->definition->surface.behavior_flags &
@@ -866,6 +874,7 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
             geometry.visible_bounds, geometry.envelope_bounds, shadow_pad, translation,
             maximum_scale);
         bounds = frame.window_bounds;
+        bounds.y += reach_host_bar_parking_offset(desc, geometry.visible_bounds);
         surface_ctx.content_rect = frame.content_rect;
         surface_ctx.render_transform = frame.render_transform;
         surface_ctx.content_transform_active = 1;
@@ -947,7 +956,7 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
         &desc->surface->bounds_valid, &window_changed);
     int32_t position_only = reach_host_bar_position_only(desc);
     int32_t render_needed = host->dirty.render || desc->surface->dirty_flags || layout_changed ||
-                            geometry_changed || render_context_changed ||
+                            geometry_changed || render_context_changed || presentation_changed ||
                             (window_changed && !position_only);
     reach_result native_overlay_result = REACH_OK;
     if (result == REACH_OK && active && desc->definition->surface_ops->native_overlay != nullptr)

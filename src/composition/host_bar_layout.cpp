@@ -86,6 +86,31 @@ int32_t reach_host_bar_reveal_enabled(const reach_feature_runtime *runtime)
     return geometry.bar_reveal_policy != REACH_FEATURE_BAR_REVEAL_DISABLED;
 }
 
+static int32_t reach_host_bar_retained(const reach_feature_runtime *runtime)
+{
+    if (runtime->definition->capsule_ops == nullptr ||
+        runtime->definition->capsule_ops->surface_geometry == nullptr)
+    {
+        return 0;
+    }
+    reach_feature_surface_geometry geometry = {};
+    runtime->definition->capsule_ops->surface_geometry(runtime->capsule, &geometry);
+    return geometry.presentation.retained;
+}
+
+float reach_host_bar_parking_offset(const reach_feature_runtime *runtime,
+                                    reach_rect_f32 shown_bounds)
+{
+    if (runtime == nullptr || !reach_host_bar_reveal_enabled(runtime) ||
+        runtime->definition->surface.bar_reveal.ops->animation == nullptr)
+    {
+        return 0.0f;
+    }
+    reach_bar_reveal_animation animation =
+        runtime->definition->surface.bar_reveal.ops->animation(runtime->capsule);
+    return animation.position_animating ? 0.0f : animation.animated_y - shown_bounds.y;
+}
+
 float reach_host_bar_protected_clearance(const reach_host *host,
                                          const reach_feature_runtime *runtime)
 {
@@ -421,7 +446,8 @@ int32_t reach_host_can_move_bars_without_redraw(const reach_host *host)
     {
         const reach_feature_runtime *desc = &host->feature_runtimes[index];
         if (!reach_host_bar_reveal_enabled(desc) ||
-            desc->definition->surface.bar_reveal.ops->animation == nullptr)
+            desc->definition->surface.bar_reveal.ops->animation == nullptr ||
+            reach_host_bar_retained(desc))
         {
             continue;
         }
@@ -463,7 +489,7 @@ reach_result reach_host_move_bar_animation_frame(reach_host *host)
         reach_feature_runtime *desc = &host->feature_runtimes[index];
         if (!reach_host_bar_reveal_enabled(desc) ||
             desc->definition->surface.bar_reveal.ops->animation == nullptr ||
-            desc->surface == nullptr)
+            desc->surface == nullptr || reach_host_bar_retained(desc))
         {
             continue;
         }
