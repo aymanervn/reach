@@ -25,6 +25,9 @@ extern "C"
         float gpu_temperature_c;
         int32_t gpu_available;
         int32_t gpu_temperature_available;
+        uint32_t cpu_clock_mhz;
+        uint32_t memory_speed_mt_s;
+        uint32_t gpu_clock_mhz;
     } reach_system_stats_sample;
 
     typedef struct reach_system_stats_ops
@@ -32,7 +35,7 @@ extern "C"
         reach_result (*sample)(reach_system_stats_source *source,
                                reach_system_stats_sample *out_sample);
         void (*destroy)(reach_system_stats_source *source);
-        void (*sample_gpu)(reach_system_stats_source *source,
+        void (*sample_monitor)(reach_system_stats_source *source,
                            reach_system_stats_sample *out_sample);
     } reach_system_stats_ops;
 

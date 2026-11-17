@@ -110,6 +110,9 @@ static void reach_widgets_tick(void *capsule, double, reach_feature_tick_result 
         stats.cpu_percent != widgets->stats_snapshot.cpu_percent ||
         stats.memory_percent != widgets->stats_snapshot.memory_percent ||
         stats.gpu_percent != widgets->stats_snapshot.gpu_percent ||
+        stats.cpu_clock_mhz != widgets->stats_snapshot.cpu_clock_mhz ||
+        stats.memory_speed_mt_s != widgets->stats_snapshot.memory_speed_mt_s ||
+        stats.gpu_clock_mhz != widgets->stats_snapshot.gpu_clock_mhz ||
         stats.gpu_available != widgets->stats_snapshot.gpu_available ||
         stats.gpu_temperature_available != widgets->stats_snapshot.gpu_temperature_available ||
         stats.gpu_temperature_c != widgets->stats_snapshot.gpu_temperature_c ||
@@ -533,7 +536,7 @@ int32_t reach_widgets_set_enabled(reach_widgets *widgets, uint32_t mask)
     }
     widgets->enabled_mask = mask & REACH_DESKTOP_WIDGET_MASK;
     widgets->layout_dirty = true;
-    reach_system_stats_set_gpu_enabled(widgets->stats,
+    reach_system_stats_set_monitor_enabled(widgets->stats,
                                        (widgets->enabled_mask & (1u << REACH_WIDGET_SYSTEM)) != 0);
     return 1;
 }
@@ -668,25 +671,49 @@ static reach_color reach_widgets_intensity_color(float value)
 
 static void reach_widgets_meter(reach_render_command_buffer *commands, const reach_theme *theme,
                                 reach_rect_f32 card, float y, const wchar_t *label, float value,
-                                float scale, bool available)
+                                float scale, bool available, uint32_t speed, bool memory)
 {
-    wchar_t amount[24] = {};
+    wchar_t usage[24] = {};
     if (available)
     {
-        swprintf_s(amount, L"%.0f%%", value);
+        swprintf_s(usage, L"%ls  %.0f%%", label, value);
     }
     else
     {
-        wcscpy_s(amount, L"—");
+        swprintf_s(usage, L"%ls  —", label);
     }
-    reach_widgets_text(commands, {card.x + 18.0f * scale, y, 68.0f * scale, 22.0f * scale},
-                       reinterpret_cast<const uint16_t *>(label), REACH_TEXT_SIZE_SMALL * scale,
+
+    wchar_t clock[24] = {};
+    if (speed == 0)
+    {
+        wcscpy_s(clock, L"—");
+    }
+    else if (memory)
+    {
+        swprintf_s(clock, L"%u MT/s", speed);
+    }
+    else if (speed >= 1000)
+    {
+        swprintf_s(clock, L"%.2f GHz", speed / 1000.0);
+    }
+    else
+    {
+        swprintf_s(clock, L"%u MHz", speed);
+    }
+    const float inset = 18.0f * scale;
+    const float label_width = 76.0f * scale;
+    const float clock_width = 90.0f * scale;
+    const float column_gap = 8.0f * scale;
+    const float track_x = card.x + inset + label_width + column_gap;
+    const float clock_x = card.x + card.width - inset - clock_width;
+    reach_widgets_text(commands, {card.x + inset, y, label_width, 22.0f * scale},
+                       reinterpret_cast<const uint16_t *>(usage), REACH_TEXT_SIZE_SMALL * scale,
                        REACH_TEXT_WEIGHT_SEMIBOLD, theme->primary_text);
-    reach_widgets_text(commands,
-                       {card.x + card.width - 57.0f * scale, y, 42.0f * scale, 22.0f * scale},
-                       reinterpret_cast<const uint16_t *>(amount), REACH_TEXT_SIZE_SMALL * scale,
-                       REACH_TEXT_WEIGHT_SEMIBOLD, theme->primary_text);
-    float track_width = std::max(0.0f, card.width - 142.0f * scale);
+    reach_widgets_text(commands, {clock_x, y, clock_width, 22.0f * scale},
+                       reinterpret_cast<const uint16_t *>(clock), REACH_TEXT_SIZE_SMALL * scale,
+                       REACH_TEXT_WEIGHT_SEMIBOLD, theme->primary_text,
+                       REACH_TEXT_ALIGNMENT_TRAILING);
+    const float track_width = std::max(0.0f, clock_x - column_gap - track_x);
     float gap = 3.0f * scale;
     float pill_width = 8.0f * scale;
     int32_t segments = std::max(1, (int32_t)((track_width + gap) / (pill_width + gap)));
@@ -694,13 +721,13 @@ static void reach_widgets_meter(reach_render_command_buffer *commands, const rea
     for (int32_t segment = 0; segment < segments; ++segment)
     {
         float height = 10.0f * scale;
-        reach_rect_f32 pill = {card.x + 77.0f * scale + segment * (pill_width + gap),
+        reach_rect_f32 pill = {track_x + segment * (pill_width + gap),
                                y + (22.0f * scale - height) * 0.5f, pill_width, height};
         reach_color color =
             segment < amount_filled
                 ? reach_widgets_intensity_color(segment * 100.0f / std::max(1, segments - 1))
                 : theme->icon_box_background;
-        reach_widgets_rect(commands, pill, 2.5f * scale, color);
+        reach_widgets_rect(commands, pill, 3.0f * scale, color);
     }
 }
 
@@ -715,11 +742,12 @@ static void reach_widgets_system_render(reach_render_command_buffer *commands,
     const float first_row = card.y + 43.0f * scale;
     const float row_gap = 26.0f * scale;
     reach_widgets_meter(commands, theme, card, first_row, L"CPU", stats.cpu_percent, scale,
-                        stats.valid != 0);
+                        stats.valid != 0, stats.cpu_clock_mhz, false);
     reach_widgets_meter(commands, theme, card, first_row + row_gap, L"RAM", stats.memory_percent,
-                        scale, stats.valid != 0);
+                        scale, stats.valid != 0, stats.memory_speed_mt_s, true);
     reach_widgets_meter(commands, theme, card, first_row + 2.0f * row_gap, L"GPU",
-                        stats.gpu_percent, scale, stats.gpu_available != 0);
+                        stats.gpu_percent, scale, stats.gpu_available != 0, stats.gpu_clock_mhz,
+                        false);
 
     wchar_t temperature[48] = {};
     auto tint = theme->icon_box_background;

@@ -23,6 +23,9 @@ extern "C"
         float gpu_temperature_c;
         int32_t gpu_available;
         int32_t gpu_temperature_available;
+        uint32_t cpu_clock_mhz;
+        uint32_t memory_speed_mt_s;
+        uint32_t gpu_clock_mhz;
     } reach_system_stats_snapshot;
 
     reach_result reach_system_stats_create(reach_system_stats_port source,
@@ -32,7 +35,7 @@ extern "C"
 
     void reach_system_stats_stop(reach_system_stats *service);
 
-    void reach_system_stats_set_gpu_enabled(reach_system_stats *service, int32_t enabled);
+    void reach_system_stats_set_monitor_enabled(reach_system_stats *service, int32_t enabled);
     void reach_system_stats_set_enabled(reach_system_stats *service, int32_t enabled);
 
     void reach_system_stats_snapshot_take(const reach_system_stats *service,

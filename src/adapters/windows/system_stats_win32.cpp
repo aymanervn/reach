@@ -5,24 +5,30 @@
 #include <iphlpapi.h>
 #include <ws2tcpip.h>
 
+#include <winternl.h>
+#include <d3dkmthk.h>
 #include <pdh.h>
 #include <pdhmsg.h>
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <cwchar>
 #include <map>
 #include <string>
 #include <vector>
 
+#pragma comment(lib, "gdi32.lib")
 #pragma comment(lib, "pdh.lib")
 #pragma comment(lib, "iphlpapi.lib")
 #pragma comment(lib, "ws2_32.lib")
 
 struct reach_system_stats_source
 {
-    PDH_HQUERY gpu_query;
+    PDH_HQUERY monitor_query;
     PDH_HCOUNTER gpu_engine;
-    bool gpu_probe_attempted;
+    PDH_HCOUNTER cpu_frequency;
+    bool monitor_probe_attempted;
+    uint32_t memory_speed_mt_s;
 };
 
 static reach_system_stats_source reach_system_stats_instance = {};
@@ -110,11 +116,104 @@ static void reach_system_stats_sample_network(reach_system_stats_source *source,
     out_sample->network_sent_bytes = row.dwOutOctets;
 }
 
-static void reach_system_stats_sample_gpu_engines(reach_system_stats_source *source,
-                                          reach_system_stats_sample *out_sample)
+template <typename T>
+static T reach_system_stats_read_firmware_value(const BYTE *record, size_t offset)
 {
-    if (source->gpu_query == nullptr || source->gpu_engine == nullptr ||
-        PdhCollectQueryData(source->gpu_query) != ERROR_SUCCESS)
+    T value = {};
+    std::memcpy(&value, record + offset, sizeof(value));
+    return value;
+}
+
+static uint32_t reach_system_stats_read_memory_speed()
+{
+    constexpr DWORD raw_smbios = 0x52534d42;
+    constexpr size_t header_size = 8;
+    const UINT size = GetSystemFirmwareTable(raw_smbios, 0, nullptr, 0);
+    if (size < header_size)
+    {
+        return 0;
+    }
+    std::vector<BYTE> firmware(size);
+    if (GetSystemFirmwareTable(raw_smbios, 0, firmware.data(), size) != size)
+    {
+        return 0;
+    }
+    const auto table_size = reach_system_stats_read_firmware_value<uint32_t>(firmware.data(), 4);
+    if (table_size > size - header_size)
+    {
+        return 0;
+    }
+    uint32_t memory_speed = 0;
+    const BYTE *record = firmware.data() + header_size;
+    const BYTE *end = record + table_size;
+    while (end - record >= 4 && record[0] != 127)
+    {
+        const size_t length = record[1];
+        if (length < 4 || length > (size_t)(end - record))
+        {
+            break;
+        }
+        if (record[0] == 17 && length >= 0x22 &&
+            reach_system_stats_read_firmware_value<uint16_t>(record, 0x0c) != 0)
+        {
+            uint32_t speed = reach_system_stats_read_firmware_value<uint16_t>(record, 0x20);
+            if (speed == 0xffff)
+            {
+                speed = length >= 0x5c
+                            ? reach_system_stats_read_firmware_value<uint32_t>(record, 0x58)
+                            : 0;
+            }
+            if (speed != 0)
+            {
+                memory_speed = memory_speed == 0 ? speed : std::min(memory_speed, speed);
+            }
+        }
+        record += length;
+        while (end - record >= 2 && (record[0] != 0 || record[1] != 0))
+        {
+            ++record;
+        }
+        if (end - record < 2)
+        {
+            break;
+        }
+        record += 2;
+    }
+    return memory_speed;
+}
+
+static uint32_t reach_system_stats_read_gpu_clock(const wchar_t *identity)
+{
+    unsigned long high = 0;
+    unsigned long low = 0;
+    D3DKMT_NODE_PERFDATA frequency = {};
+    if (swscanf_s(identity, L"luid_0x%lx_0x%lx_phys_%u_eng_%u", &high, &low,
+                  &frequency.PhysicalAdapterIndex, &frequency.NodeOrdinal) != 4)
+    {
+        return 0;
+    }
+    D3DKMT_OPENADAPTERFROMLUID adapter = {};
+    adapter.AdapterLuid.HighPart = (LONG)high;
+    adapter.AdapterLuid.LowPart = low;
+    if (D3DKMTOpenAdapterFromLuid(&adapter) != 0)
+    {
+        return 0;
+    }
+    D3DKMT_QUERYADAPTERINFO query = {};
+    query.hAdapter = adapter.hAdapter;
+    query.Type = KMTQAITYPE_NODEPERFDATA;
+    query.pPrivateDriverData = &frequency;
+    query.PrivateDriverDataSize = sizeof(frequency);
+    const auto status = D3DKMTQueryAdapterInfo(&query);
+    D3DKMT_CLOSEADAPTER close = {adapter.hAdapter};
+    D3DKMTCloseAdapter(&close);
+    return status == 0 ? (uint32_t)(frequency.Frequency / 1'000'000u) : 0;
+}
+
+static void reach_system_stats_sample_gpu_engines(reach_system_stats_source *source,
+                                                  reach_system_stats_sample *out_sample)
+{
+    if (source->gpu_engine == nullptr)
         return;
     DWORD bytes = 0;
     DWORD count = 0;
@@ -140,11 +239,33 @@ static void reach_system_stats_sample_gpu_engines(reach_system_stats_source *sou
             continue;
         engines[identity] += std::max(0.0, item.FmtValue.doubleValue);
     }
-    for (const auto &engine : engines)
+    const auto most_used = std::max_element(engines.begin(), engines.end(),
+        [](const auto &a, const auto &b) { return a.second < b.second; });
+    if (most_used != engines.end())
     {
-        out_sample->gpu_percent =
-            std::max(out_sample->gpu_percent, (float)std::clamp(engine.second, 0.0, 100.0));
+        out_sample->gpu_percent = (float)std::clamp(most_used->second, 0.0, 100.0);
         out_sample->gpu_available = 1;
+        const auto &identity = most_used->first;
+        const size_t engine_offset = identity.find(L"_eng_");
+        if (engine_offset != std::wstring::npos)
+        {
+            const auto graphics = std::find_if(engines.begin(), engines.end(), [&](const auto &item)
+            {
+                const size_t kind = item.first.find(L"_engtype_", engine_offset);
+                return kind != std::wstring::npos &&
+                       item.first.compare(0, engine_offset, identity, 0, engine_offset) == 0 &&
+                       _wcsicmp(item.first.c_str() + kind, L"_engtype_3d") == 0;
+            });
+            if (graphics != engines.end())
+            {
+                out_sample->gpu_clock_mhz =
+                    reach_system_stats_read_gpu_clock(graphics->first.c_str());
+            }
+            if (out_sample->gpu_clock_mhz == 0 && graphics != most_used)
+            {
+                out_sample->gpu_clock_mhz = reach_system_stats_read_gpu_clock(identity.c_str());
+            }
+        }
     }
 }
 
@@ -206,23 +327,40 @@ static void reach_system_stats_sample_gpu_temperature(reach_system_stats_sample 
     }
 }
 
-
-static void reach_system_stats_sample_gpu(reach_system_stats_source *source,
-                                          reach_system_stats_sample *out_sample)
+static void reach_system_stats_sample_monitor(reach_system_stats_source *source,
+                                              reach_system_stats_sample *out_sample)
 {
-    if (source->gpu_query == nullptr && !source->gpu_probe_attempted)
+    if (!source->monitor_probe_attempted)
     {
-        source->gpu_probe_attempted = true;
-        if (PdhOpenQueryW(nullptr, 0, &source->gpu_query) == ERROR_SUCCESS &&
-            PdhAddEnglishCounterW(source->gpu_query,
-                                  L"\\GPU Engine(*)\\Utilization Percentage", 0,
-                                  &source->gpu_engine) != ERROR_SUCCESS)
+        source->monitor_probe_attempted = true;
+        source->memory_speed_mt_s = reach_system_stats_read_memory_speed();
+        if (PdhOpenQueryW(nullptr, 0, &source->monitor_query) == ERROR_SUCCESS)
         {
-            PdhCloseQuery(source->gpu_query);
-            source->gpu_query = nullptr;
+            (void)PdhAddEnglishCounterW(source->monitor_query,
+                                        L"\\GPU Engine(*)\\Utilization Percentage", 0,
+                                        &source->gpu_engine);
+            (void)PdhAddEnglishCounterW(source->monitor_query,
+                                        L"\\Processor Information(_Total)\\Processor Frequency", 0,
+                                        &source->cpu_frequency);
         }
     }
-    reach_system_stats_sample_gpu_engines(source, out_sample);
+
+    out_sample->memory_speed_mt_s = source->memory_speed_mt_s;
+    if (source->monitor_query != nullptr &&
+        PdhCollectQueryData(source->monitor_query) == ERROR_SUCCESS)
+    {
+        reach_system_stats_sample_gpu_engines(source, out_sample);
+        PDH_FMT_COUNTERVALUE frequency = {};
+        if (source->cpu_frequency != nullptr &&
+            PdhGetFormattedCounterValue(source->cpu_frequency, PDH_FMT_LONG, nullptr,
+                                        &frequency) == ERROR_SUCCESS &&
+            (frequency.CStatus == PDH_CSTATUS_VALID_DATA ||
+             frequency.CStatus == PDH_CSTATUS_NEW_DATA) &&
+            frequency.longValue > 0)
+        {
+            out_sample->cpu_clock_mhz = (uint32_t)frequency.longValue;
+        }
+    }
     reach_system_stats_sample_gpu_temperature(out_sample);
 }
 
@@ -245,8 +383,8 @@ static void reach_system_stats_destroy(reach_system_stats_source *source)
 {
     if (source != nullptr)
     {
-        if (source->gpu_query != nullptr)
-            PdhCloseQuery(source->gpu_query);
+        if (source->monitor_query != nullptr)
+            PdhCloseQuery(source->monitor_query);
         *source = {};
     }
 }
@@ -261,7 +399,7 @@ reach_result reach_windows_create_system_stats(reach_system_stats_port *out_port
     *out_port = {};
     out_port->source = &reach_system_stats_instance;
     out_port->ops.sample = reach_system_stats_sample_source;
-    out_port->ops.sample_gpu = reach_system_stats_sample_gpu;
+    out_port->ops.sample_monitor = reach_system_stats_sample_monitor;
     out_port->ops.destroy = reach_system_stats_destroy;
     return REACH_OK;
 }

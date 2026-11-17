@@ -1841,5 +1841,7 @@ can carry forward their selections and placements. Automatic packing starts on t
 During a drag the capsule previews the closest free drop position and saves it in whole DP
 on release. Cards can pass over siblings during the gesture while the siblings keep their
 positions. Stopwatch and Pomodoro use monotonic deadlines. The system monitor reads CPU and
-RAM usage and opts into GPU engine counters and available NVIDIA thermals on the existing
-system-stats worker. Now Playing uses the shared playback service and artwork render commands.
+RAM usage and opts into GPU engine counters, hardware speeds, and available NVIDIA thermals
+on the existing system-stats worker. The Windows adapter samples CPU frequency and the graphics
+clock of the GPU reporting the busiest engine, and caches configured RAM transfer speed from
+SMBIOS. Now Playing uses the shared playback service and artwork render commands.
