@@ -15,12 +15,14 @@ if(NOT REACH_VERSION)
         set(REACH_VERSION "0.0.0")
     endif()
 endif()
-foreach(REACH_TAG_SOURCE IN ITEMS "${CMAKE_CURRENT_SOURCE_DIR}/.git/refs/tags"
-                                  "${CMAKE_CURRENT_SOURCE_DIR}/.git/packed-refs")
-    if(EXISTS "${REACH_TAG_SOURCE}")
-        set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${REACH_TAG_SOURCE}")
+file(GLOB REACH_TAG_SOURCES LIST_DIRECTORIES false "${CMAKE_CURRENT_SOURCE_DIR}/.git/refs/tags/*")
+foreach(REACH_TAG_SOURCE IN ITEMS "${CMAKE_CURRENT_SOURCE_DIR}/.git/packed-refs"
+                                  "${CMAKE_CURRENT_SOURCE_DIR}/.git/FETCH_HEAD")
+    if(EXISTS "${REACH_TAG_SOURCE}" AND NOT IS_DIRECTORY "${REACH_TAG_SOURCE}")
+        list(APPEND REACH_TAG_SOURCES "${REACH_TAG_SOURCE}")
     endif()
 endforeach()
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${REACH_TAG_SOURCES})
 
 project(reach VERSION ${REACH_VERSION} LANGUAGES C CXX)
 
