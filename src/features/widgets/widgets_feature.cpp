@@ -662,13 +662,6 @@ static void reach_widgets_decorate(reach_render_command_buffer *commands, reach_
     }
 }
 
-static reach_color reach_widgets_intensity_color(float value)
-{
-    float amount = std::clamp(value / 100.0f, 0.0f, 1.0f);
-    return {std::min(0.96f, 0.20f + amount * 1.52f),
-            std::min(0.80f, 0.24f + (1.0f - amount) * 1.12f), 0.20f, 1.0f};
-}
-
 static void reach_widgets_format_speed(wchar_t (&clock)[24], uint32_t speed, bool memory)
 {
     if (speed == 0)
@@ -751,6 +744,36 @@ static void reach_widgets_system_render(reach_render_command_buffer *commands,
                                         const reach_system_stats_snapshot &stats,
                                         const reach_text_measure_port *text_measure)
 {
+    const bool has_temperature =
+        stats.gpu_temperature_available && std::isfinite(stats.gpu_temperature_c);
+    wchar_t temperature[24] = {};
+    float thermal_tint = 0.08f;
+    if (has_temperature)
+    {
+        swprintf_s(temperature, L"GPU temp  %.0f°C", stats.gpu_temperature_c);
+        const float heat = std::clamp((stats.gpu_temperature_c - 40.0f) / 50.0f, 0.0f, 1.0f);
+        thermal_tint = 0.14f + heat * 0.28f;
+    }
+    else
+    {
+        wcscpy_s(temperature, L"GPU temp  —");
+    }
+
+    const auto *thermal_label = reinterpret_cast<const uint16_t *>(temperature);
+    const float text_size = REACH_TEXT_SIZE_SMALL * scale;
+    const float badge_padding = 9.0f * scale;
+    const float badge_width = std::ceil(reach_text_width_or_estimate(
+        text_measure, thermal_label, text_size, REACH_TEXT_WEIGHT_SEMIBOLD, 0.65f)) +
+        2.0f * badge_padding;
+    const float badge_height = 22.0f * scale;
+    const reach_rect_f32 badge = {title.x + title.width - badge_width - 2.0f * scale,
+                                  title.y + (title.height - badge_height) * 0.5f,
+                                  badge_width, badge_height};
+    reach_widgets_rect(commands, badge, badge.height * 0.5f,
+                       reach_theme_color_alpha(theme->accent_text, thermal_tint));
+    reach_widgets_text(commands, badge, thermal_label, text_size, REACH_TEXT_WEIGHT_SEMIBOLD,
+                       theme->primary_text, REACH_TEXT_ALIGNMENT_CENTER);
+    title.width = badge.x - title.x - 8.0f * scale;
     reach_widgets_text(commands, title, (const uint16_t *)u"System monitor",
                        REACH_TEXT_SIZE_SMALL * scale, REACH_TEXT_WEIGHT_SEMIBOLD,
                        theme->primary_text);
@@ -767,35 +790,15 @@ static void reach_widgets_system_render(reach_render_command_buffer *commands,
     }
     clock_width = std::ceil(clock_width) + scale;
 
-    const float first_row = card.y + 43.0f * scale;
-    const float row_gap = 26.0f * scale;
+    const float first_row = card.y + 48.0f * scale;
+    const float last_row = card.y + card.height - 46.0f * scale;
+    const float row_gap = (last_row - first_row) * 0.5f;
     reach_widgets_meter(commands, theme, card, first_row, L"CPU", stats.cpu_percent, scale,
                         stats.valid != 0, speeds[0], clock_width);
     reach_widgets_meter(commands, theme, card, first_row + row_gap, L"RAM", stats.memory_percent,
                         scale, stats.valid != 0, speeds[1], clock_width);
     reach_widgets_meter(commands, theme, card, first_row + 2.0f * row_gap, L"GPU",
                         stats.gpu_percent, scale, stats.gpu_available != 0, speeds[2], clock_width);
-
-    wchar_t temperature[48] = {};
-    auto tint = theme->icon_box_background;
-    if (stats.gpu_temperature_available)
-    {
-        swprintf_s(temperature, L"GPU temperature   %.0f°C", stats.gpu_temperature_c);
-        tint = reach_widgets_intensity_color((stats.gpu_temperature_c - 40.0f) * 2.0f);
-        tint.a = 0.17f;
-    }
-    else
-    {
-        wcscpy_s(temperature, L"GPU temperature   Unavailable");
-    }
-    const reach_rect_f32 chip = {title.x, card.y + 126.0f * scale,
-                                 title.width - 12.0f * scale, 26.0f * scale};
-    reach_widgets_rect(commands, chip, 8.0f * scale, tint);
-    reach_widgets_text(commands,
-                       {chip.x + 9.0f * scale, chip.y, chip.width - 18.0f * scale, chip.height},
-                       reinterpret_cast<const uint16_t *>(temperature),
-                       REACH_TEXT_SIZE_SMALL * scale, REACH_TEXT_WEIGHT_SEMIBOLD,
-                       theme->primary_text);
 }
 
 static int32_t reach_widgets_days_in_month(int32_t year, int32_t month)
