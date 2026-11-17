@@ -339,6 +339,7 @@ void reach_host_apply_surface_open_change(reach_host *host, reach_feature_runtim
     if (next)
     {
         reach_host_capture_focus_restore(host, runtime->definition->id);
+        reach_host_cancel_close_handoff(host, runtime);
         runtime->presentation_visible = 1;
     }
     reach_host_sync_pointer_move_subscriptions(host);

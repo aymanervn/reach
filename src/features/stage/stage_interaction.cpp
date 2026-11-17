@@ -144,8 +144,6 @@ void reach_stage_handle_pointer(void *capsule, const reach_pointer_event *event,
 
     *out = {};
 
-    // TEMP: owner experiment letting Stage take clicks while it closes; restore the closing guard
-    // if rejected.
     if (stage == nullptr || event == nullptr || !stage->state.open)
     {
         return;

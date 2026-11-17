@@ -507,6 +507,14 @@ void reach_stage_apply_progress(reach_stage *stage)
             tile->current_rect = reach_stage_interpolate_rect(
                 tile->close_destination_rect, tile->close_from_rect, close_progress);
         }
+        else if (tile->reopening)
+        {
+            float span = 1.0f - tile->open_from_progress;
+            float open_progress =
+                span > 0.0001f ? (progress - tile->open_from_progress) / span : 1.0f;
+            tile->current_rect =
+                reach_stage_interpolate_rect(tile->open_from_rect, resolved, open_progress);
+        }
         else
         {
             reach_rect_f32 from = tile->minimized && !tile->desktop

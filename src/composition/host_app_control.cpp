@@ -230,6 +230,21 @@ static void reach_host_complete_close_handoff(reach_host *host, uint64_t request
     }
 }
 
+static void reach_host_clear_close_handoff(reach_host *host, reach_feature_runtime *runtime)
+{
+    runtime->surface->close_handoff_pending = 0;
+    runtime->surface->close_handoff_request_id = 0;
+    runtime->surface->close_handoff_completed = 0;
+    runtime->surface->close_handoff_window = 0;
+    if (runtime->definition != nullptr && runtime->definition->capsule_ops != nullptr &&
+        runtime->definition->capsule_ops->set_close_handoff_pending != nullptr)
+    {
+        reach_feature_tick_result tick = {};
+        runtime->definition->capsule_ops->set_close_handoff_pending(runtime->capsule, 0, &tick);
+        reach_host_apply_feature_tick_result(host, runtime, &tick);
+    }
+}
+
 void reach_host_settle_close_handoffs(reach_host *host)
 {
     if (host == nullptr)
@@ -252,18 +267,20 @@ void reach_host_settle_close_handoffs(reach_host *host)
         {
             continue;
         }
-        runtime->surface->close_handoff_pending = 0;
-        runtime->surface->close_handoff_request_id = 0;
-        runtime->surface->close_handoff_completed = 0;
-        runtime->surface->close_handoff_window = 0;
-        if (runtime->definition != nullptr && runtime->definition->capsule_ops != nullptr &&
-            runtime->definition->capsule_ops->set_close_handoff_pending != nullptr)
-        {
-            reach_feature_tick_result tick = {};
-            runtime->definition->capsule_ops->set_close_handoff_pending(runtime->capsule, 0, &tick);
-            reach_host_apply_feature_tick_result(host, runtime, &tick);
-        }
+        reach_host_clear_close_handoff(host, runtime);
     }
+}
+
+void reach_host_cancel_close_handoff(reach_host *host, reach_feature_runtime *runtime)
+{
+    if (host == nullptr || runtime == nullptr || runtime->surface == nullptr ||
+        !runtime->surface->close_handoff_pending)
+    {
+        return;
+    }
+    runtime->native_overlay_front_source = 0;
+    runtime->native_overlay_front_id = REACH_WINDOW_THUMBNAIL_NONE;
+    reach_host_clear_close_handoff(host, runtime);
 }
 
 void reach_host_apply_window_control_result(reach_host *host)

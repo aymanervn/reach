@@ -356,7 +356,13 @@ Stage selection state and does not fork movement, synchronization, fade, or tear
 never writes foreground tracking optimistically; the
 foreground watcher records the OS result. Stage does not wait for native window readiness before
 moving. Desktop publishes minimize-all through the same action contract and uses the same close
-choreography. Ordinary activation retains its existing
+choreography. The open/close transition is reversible from wherever it is: closing mid-open starts
+each tile's close from its current rectangle, and opening mid-close (`reach_stage_set_open` while
+`closing`) keeps the tiles, records each tile's current rectangle and progress as
+`open_from_rect`/`open_from_progress`, retargets the same progress tracks to open and reconciles
+the window set. Once the close has committed its transparent frame there is nothing left to
+reverse, so an open request then starts a fresh open. Reopening a surface cancels its pending close
+handoff and front-source preference (`reach_host_cancel_close_handoff`). Ordinary activation retains its existing
 topmost promotion/demotion sequence and native foreground-transfer compatibility path, including
 the final attached-input raise. Switcher uses the same ordinary activation path. Its non-activating
 overlay presents immediately and starts the shared close transition before publishing the selected
@@ -1315,7 +1321,11 @@ an in-flight sequence) before the rest of the table sees them — so no surface
 needs a hand-written branch to receive its own input. The source row is evaluated
 against the same flags as every other row, so a surface that receives its own
 press still closes or applies an unhandled result exactly as it would from the
-loop. Capsules report outcomes as one shared `reach_feature_action_kind`
+loop. Pointer delivery follows presentation, not lifecycle: a row receives pointer events while
+`reach_host_surface_presented` holds, so a surface animating closed still takes clicks and hover.
+Policies that act for an open surface — EXCLUSIVE_WHILE_OPEN capture and the
+DOWN_CLOSES_ON_UNHANDLED / DOWN_APPLIES_UNHANDLED outside-press flags — apply only while
+`is_open` holds, so a closing surface never swallows a press it did not handle. Capsules report outcomes as one shared `reach_feature_action_kind`
 (`include/reach/features/common/feature_action.h`); `host_feature_actions.cpp` dispatches
 every entry in a single generic switch keyed on the emitting runtime, so no feature has a
 composition-side translator. A press that only composition's pointer policy reads is not an action
