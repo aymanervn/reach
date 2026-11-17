@@ -122,7 +122,6 @@ reach_clipboard_layout reach_clipboard_compute_layout(reach_clipboard_model *mod
         reach_clipboard_clamp_float(monitor_bottom - height, monitor_top, monitor_bottom - height);
     layout.bounds.width = width;
     layout.bounds.height = height;
-    layout.chrome_height = reach_clipboard_min_float(chrome_height, height);
     layout.max_height = reach_clipboard_max_float(height, max_height);
 
     const float horizontal_border =
@@ -659,17 +658,9 @@ int32_t reach_clipboard_feature_relayout(reach_clipboard_feature *clipboard,
     int32_t animate = state->model.open && !constraints_changed && visible;
     double now = reach_motion_now_seconds();
     float target_height = state->layout.bounds.height;
-    if (!visible || constraints_changed)
+    if (!visible || constraints_changed || clipboard->height.generation == 0)
     {
         reach_motion_set(&clipboard->height, target_height);
-        clipboard->content_follows = 0;
-    }
-    else if (clipboard->height.generation == 0)
-    {
-        reach_motion_set(&clipboard->height,
-                         fminf(fmaxf(1.0f, state->layout.chrome_height), target_height));
-        reach_motion_animate_spec_to_at(&clipboard->height, target_height, clipboard->smooth_spec,
-                                        now);
         clipboard->content_follows = 0;
     }
     else if (animate && fabsf(clipboard->height.to - target_height) >= 0.5f)
@@ -1009,6 +1000,7 @@ reach_result reach_clipboard_feature_create(reach_clipboard_feature **out_clipbo
     reach_clipboard_feature_load_motion_specs(clipboard, reach_theme_default());
     reach_feature_transition_init(&clipboard->surface_transition,
                                   REACH_FEATURE_TRANSITION_FROM_BELOW);
+    reach_feature_transition_enable_rise(&clipboard->surface_transition);
     reach_pressable_init(&clipboard->state.pressable);
     clipboard->refresh_requested.store(0);
     clipboard->port = {};
@@ -1204,12 +1196,12 @@ int32_t reach_clipboard_set_open(reach_clipboard_feature *clipboard, int32_t ope
     {
         if (clipboard->height.generation == 0 || !was_visible)
         {
-            reach_motion_set(&clipboard->height,
-                             fminf(fmaxf(1.0f, layout.chrome_height), layout.bounds.height));
+            reach_motion_set(&clipboard->height, layout.bounds.height);
             clipboard->content_follows = 0;
         }
-        reach_motion_animate_spec_to_at(&clipboard->height, layout.bounds.height,
-                                        clipboard->smooth_spec, now);
+        else
+            reach_motion_animate_spec_to_at(&clipboard->height, layout.bounds.height,
+                                            clipboard->smooth_spec, now);
     }
     reach_clipboard_feature_refresh_deadline(clipboard);
     return 1;

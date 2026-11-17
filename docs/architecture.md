@@ -889,8 +889,8 @@ springs and normalized products of zero-span springs are rejected without output
 
 Reach has one motion vocabulary: `reach_theme.motion_presets`, indexed by `reach_motion_preset`
 and read through `reach_theme_motion_preset`. Springs `snappy`, `smooth`, `bouncy`, `press`,
-`release` and `bar_reveal` store only response and damping, so their settle time stays derived by the engine; the
-`fade_in`, `fade_out`, `card_fade_in` and `card_fade_out` ease-out curves store a duration. `reach_motion_spec_scaled`
+`release`, `bar_reveal` and `popup_rise` store only response and damping, so their settle time stays derived by the engine; the
+`fade_in`, `fade_out`, `card_fade_in`, `card_fade_out` and `popup_fade_in` ease-out curves store a duration. `reach_motion_spec_scaled`
 multiplies response and duration by one time scale, and `reach_theme_stage_motion_scale` derives
 that scale from the persisted Stage duration relative to `stage_motion_reference_seconds`.
 
@@ -901,7 +901,10 @@ popup and panel geometry, list survivors, resizes, Dock slots and Stage tiles us
 `smooth`; the Dock and Top Bar reveal use `bar_reveal` (0.28 s); compact bar widths, tray reorder and drag snaps use `snappy`; one-step selection pills,
 toggle knobs and the adjacent Settings sidebar step use `bouncy`; hover, tint and content opacity use
 `fade_in`/`fade_out`; cards appear with `card_fade_in` (0.05 s) and leave with `card_fade_out`
-(0.18 s); presses use `press`/`release`. Bounce never appears on popups, panels, Stage,
+(0.18 s); Quick Settings and Clipboard instead open with `popup_fade_in` (0.10 s) while
+`popup_rise` (0.30 s, critically damped) moves them `popup_rise_distance` (10dp) in from their
+bar edge and scales them from `popup_rise_scale` (0.97) about the trigger anchor; their close keeps
+the card fade with the rise frozen where it is (`reach_feature_transition_enable_rise`). Presses use `press`/`release`. Bounce never appears on popups, panels, Stage,
 the Top Bar or opacity. Stage open, close and reflow scale `smooth` by `reach_theme_stage_motion_scale`
 (configured duration over the theme reference, which is the 0.38 s `smooth` response), so the default
 0.30 s Stage duration yields a 0.30 s spring response.
@@ -967,8 +970,8 @@ port until the finite descriptors settle. Image and text expansions share the ex
 layer budgets. Source changes invalidate their bitmap, while hide/retirement removes fit ownership
 and sampling. No fields are added to the render command/group/buffer for this capability.
 Clipboard is fully retained. One `smooth` pixel height motion drives the bottom-anchored panel
-(`reach_clipboard_panel_frame`): opening springs from the chrome height to the target over the
-shared card transition with fixed, clipped content; closing freezes the height and only fades, while item-count changes animate the
+(`reach_clipboard_panel_frame`): opening presents the full height at once under the shared rise
+transition; closing freezes the height and only fades, while item-count changes animate the
 height with content riding the top edge. The window stays at the panel's maximum height, so height
 changes never resize it, and the card viewport clip extends to the panel bottom. Card width springs into the scrollbar gutter when no scrollbar is needed; text and
 thumbnails keep the narrow layout and the close button tracks the right edge. Cards are `keyed_rows` over a

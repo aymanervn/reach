@@ -74,7 +74,8 @@
     .tray_slot_size_ratio = 0.605f, .bar_separator_dot_size = 4.0f, .bar_separator_dot_gap = 9.0f, \
     .now_playing_width = 220.0f, .now_playing_padding = 9.0f, .now_playing_gap = 6.0f,             \
     .now_playing_control_gap = 8.0f, .now_playing_play_button_width = 20.0f,                       \
-    .now_playing_prev_next_button_width = 13.2f, .stage_animation_seconds = 0.30f
+    .now_playing_prev_next_button_width = 13.2f, .stage_animation_seconds = 0.30f,                 \
+    .popup_rise_distance = 10.0f, .popup_rise_scale = 0.97f
 
 #define REACH_THEME_SPRING(response, damping) {REACH_EASING_SPRING, (response), (damping), 0.0}
 #define REACH_THEME_FADE(seconds) {REACH_EASING_EASE_OUT, 0.0f, 0.0f, (seconds)}
@@ -92,6 +93,8 @@
             [REACH_MOTION_PRESET_CARD_FADE_IN] = REACH_THEME_FADE(0.05),                           \
             [REACH_MOTION_PRESET_CARD_FADE_OUT] = REACH_THEME_FADE(0.18),                          \
             [REACH_MOTION_PRESET_BAR_REVEAL] = REACH_THEME_SPRING(0.28f, 1.0f),                    \
+            [REACH_MOTION_PRESET_POPUP_RISE] = REACH_THEME_SPRING(0.30f, 1.0f),                    \
+            [REACH_MOTION_PRESET_POPUP_FADE_IN] = REACH_THEME_FADE(0.10),                          \
         },                                                                                         \
     .stage_motion_reference_seconds = 0.38f
 
