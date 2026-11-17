@@ -1409,7 +1409,7 @@ static reach_result reach_widgets_desktop_surface_render(
     reach_render_command_buffer *out_commands)
 {
     return reach_widgets_render_desktop(static_cast<reach_widgets *>(capsule), ctx->theme,
-                                        ctx->dpi_scale, out_commands);
+                                        ctx->dpi_scale, &ctx->text_measure, out_commands);
 }
 
 static const reach_feature_surface_ops reach_widgets_desktop_surface_ops = {

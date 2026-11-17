@@ -5,6 +5,7 @@
 #include "reach/core/config.h"
 #include "reach/core/theme.h"
 #include "reach/features/feature_capsule.h"
+#include "reach/ports/text_measure.h"
 #include "reach/services/clock.h"
 #include "reach/services/now_playing.h"
 #include "reach/services/system_stats.h"
@@ -39,6 +40,7 @@ extern "C"
                                           float dpi_scale);
     reach_result reach_widgets_render_desktop(const reach_widgets *widgets,
                                               const reach_theme *theme, float dpi_scale,
+                                              const reach_text_measure_port *text_measure,
                                               reach_render_command_buffer *commands);
 
 #ifdef __cplusplus

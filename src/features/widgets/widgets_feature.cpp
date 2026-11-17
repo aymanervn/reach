@@ -669,21 +669,8 @@ static reach_color reach_widgets_intensity_color(float value)
             std::min(0.80f, 0.24f + (1.0f - amount) * 1.12f), 0.20f, 1.0f};
 }
 
-static void reach_widgets_meter(reach_render_command_buffer *commands, const reach_theme *theme,
-                                reach_rect_f32 card, float y, const wchar_t *label, float value,
-                                float scale, bool available, uint32_t speed, bool memory)
+static void reach_widgets_format_speed(wchar_t (&clock)[24], uint32_t speed, bool memory)
 {
-    wchar_t usage[24] = {};
-    if (available)
-    {
-        swprintf_s(usage, L"%ls  %.0f%%", label, value);
-    }
-    else
-    {
-        swprintf_s(usage, L"%ls  —", label);
-    }
-
-    wchar_t clock[24] = {};
     if (speed == 0)
     {
         wcscpy_s(clock, L"—");
@@ -700,9 +687,24 @@ static void reach_widgets_meter(reach_render_command_buffer *commands, const rea
     {
         swprintf_s(clock, L"%u MHz", speed);
     }
+}
+
+static void reach_widgets_meter(reach_render_command_buffer *commands, const reach_theme *theme,
+                                reach_rect_f32 card, float y, const wchar_t *label, float value,
+                                float scale, bool available, const wchar_t *clock, float clock_width)
+{
+    wchar_t usage[24] = {};
+    if (available)
+    {
+        swprintf_s(usage, L"%ls  %.0f%%", label, value);
+    }
+    else
+    {
+        swprintf_s(usage, L"%ls  —", label);
+    }
+
     const float inset = 18.0f * scale;
     const float label_width = 76.0f * scale;
-    const float clock_width = 90.0f * scale;
     const float column_gap = 8.0f * scale;
     const float track_x = card.x + inset + label_width + column_gap;
     const float clock_x = card.x + card.width - inset - clock_width;
@@ -714,19 +716,31 @@ static void reach_widgets_meter(reach_render_command_buffer *commands, const rea
                        REACH_TEXT_WEIGHT_SEMIBOLD, theme->primary_text,
                        REACH_TEXT_ALIGNMENT_TRAILING);
     const float track_width = std::max(0.0f, clock_x - column_gap - track_x);
-    float gap = 3.0f * scale;
-    float pill_width = 8.0f * scale;
-    int32_t segments = std::max(1, (int32_t)((track_width + gap) / (pill_width + gap)));
-    float amount_filled = available ? std::clamp(value / 100.0f, 0.0f, 1.0f) * segments : 0.0f;
+    const float gap = 3.0f * scale;
+    const float pill_width = 8.0f * scale;
+    const float height = 10.0f * scale;
+    const int32_t segments = (int32_t)((track_width + gap) / (pill_width + gap));
+    if (segments == 0)
+    {
+        return;
+    }
+
+    const float meter_width = segments * (pill_width + gap) - gap;
+    const float meter_x = clock_x - column_gap - meter_width;
+    const float amount_filled =
+        available ? std::clamp(value / 100.0f, 0.0f, 1.0f) * segments : 0.0f;
+    auto empty = theme->accent_text;
+    empty.a = 0.18f;
+    auto muted = theme->accent_text;
+    muted.a = 0.55f;
     for (int32_t segment = 0; segment < segments; ++segment)
     {
-        float height = 10.0f * scale;
-        reach_rect_f32 pill = {track_x + segment * (pill_width + gap),
-                               y + (22.0f * scale - height) * 0.5f, pill_width, height};
-        reach_color color =
-            segment < amount_filled
-                ? reach_widgets_intensity_color(segment * 100.0f / std::max(1, segments - 1))
-                : theme->icon_box_background;
+        const reach_rect_f32 pill = {meter_x + segment * (pill_width + gap),
+                                      y + (22.0f * scale - height) * 0.5f, pill_width, height};
+        const float position = segments > 1 ? (float)segment / (segments - 1) : 1.0f;
+        const reach_color color = segment < amount_filled
+            ? reach_theme_color_mix(muted, theme->accent_text, position)
+            : empty;
         reach_widgets_rect(commands, pill, 3.0f * scale, color);
     }
 }
@@ -734,20 +748,33 @@ static void reach_widgets_meter(reach_render_command_buffer *commands, const rea
 static void reach_widgets_system_render(reach_render_command_buffer *commands,
                                         const reach_theme *theme, reach_rect_f32 card,
                                         reach_rect_f32 title, float scale,
-                                        const reach_system_stats_snapshot &stats)
+                                        const reach_system_stats_snapshot &stats,
+                                        const reach_text_measure_port *text_measure)
 {
     reach_widgets_text(commands, title, (const uint16_t *)u"System monitor",
                        REACH_TEXT_SIZE_SMALL * scale, REACH_TEXT_WEIGHT_SEMIBOLD,
                        theme->primary_text);
+    wchar_t speeds[3][24] = {};
+    reach_widgets_format_speed(speeds[0], stats.cpu_clock_mhz, false);
+    reach_widgets_format_speed(speeds[1], stats.memory_speed_mt_s, true);
+    reach_widgets_format_speed(speeds[2], stats.gpu_clock_mhz, false);
+    float clock_width = 0.0f;
+    for (const auto &speed : speeds)
+    {
+        clock_width = std::max(clock_width, reach_text_width_or_estimate(
+            text_measure, reinterpret_cast<const uint16_t *>(speed),
+            REACH_TEXT_SIZE_SMALL * scale, REACH_TEXT_WEIGHT_SEMIBOLD, 0.65f));
+    }
+    clock_width = std::ceil(clock_width) + scale;
+
     const float first_row = card.y + 43.0f * scale;
     const float row_gap = 26.0f * scale;
     reach_widgets_meter(commands, theme, card, first_row, L"CPU", stats.cpu_percent, scale,
-                        stats.valid != 0, stats.cpu_clock_mhz, false);
+                        stats.valid != 0, speeds[0], clock_width);
     reach_widgets_meter(commands, theme, card, first_row + row_gap, L"RAM", stats.memory_percent,
-                        scale, stats.valid != 0, stats.memory_speed_mt_s, true);
+                        scale, stats.valid != 0, speeds[1], clock_width);
     reach_widgets_meter(commands, theme, card, first_row + 2.0f * row_gap, L"GPU",
-                        stats.gpu_percent, scale, stats.gpu_available != 0, stats.gpu_clock_mhz,
-                        false);
+                        stats.gpu_percent, scale, stats.gpu_available != 0, speeds[2], clock_width);
 
     wchar_t temperature[48] = {};
     auto tint = theme->icon_box_background;
@@ -866,7 +893,8 @@ static void reach_widgets_pomodoro_render(const reach_widgets *widgets,
 }
 
 reach_result reach_widgets_render_desktop(const reach_widgets *widgets, const reach_theme *theme,
-                                          float dpi_scale, reach_render_command_buffer *commands)
+                                          float dpi_scale, const reach_text_measure_port *text_measure,
+                                          reach_render_command_buffer *commands)
 {
     if (widgets == nullptr || commands == nullptr)
     {
@@ -937,7 +965,7 @@ reach_result reach_widgets_render_desktop(const reach_widgets *widgets, const re
         else if (index == REACH_WIDGET_SYSTEM)
         {
             reach_widgets_system_render(commands, actual, rect, title, scale,
-                                        widgets->stats_snapshot);
+                                        widgets->stats_snapshot, text_measure);
             reach_widgets_resize_grip(commands, actual, rect, scale);
             continue;
         }
