@@ -378,8 +378,6 @@ static int32_t reach_context_menu_arrange_previews_as(reach_context_menu *menu,
     state->drop_direction = ctx->drop_direction;
     state->notch_anchor_x = ctx->anchor_button.x + ctx->anchor_button.width * .5f;
     state->visible_count = layout.count;
-    state->scroll_offset = state->scroll_max = 0;
-    state->item_height = content;
     (void)reach_context_menu_state_ptr(menu);
     menu->request.anchor_button = ctx->anchor_button;
     menu->request.bar_edge_y = ctx->bar_edge_y;

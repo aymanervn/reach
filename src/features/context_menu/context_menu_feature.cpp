@@ -245,8 +245,6 @@ void reach_context_menu_reset(reach_context_menu *menu)
     menu->state.visible_count = 0;
     menu->previews = {};
     ++menu->preview_generation;
-    menu->state.scroll_offset = 0.0f;
-    menu->state.scroll_max = 0.0f;
     for (size_t index = 0; index < REACH_MENU_MAX_WINDOWS; ++index)
     {
         menu->state.item_windows[index] = 0;
@@ -389,17 +387,7 @@ static void reach_context_menu_place(reach_context_menu_state *state,
     {
         state->item_viewport.height = 0.0f;
     }
-    state->item_height = item_height;
-    state->scroll_max = content_height - state->item_viewport.height;
-    if (state->scroll_max < 0.0f)
-    {
-        state->scroll_max = 0.0f;
-    }
-    if (state->scroll_offset > state->scroll_max)
-    {
-        state->scroll_offset = state->scroll_max;
-    }
-    float item_y = items_y - state->scroll_offset;
+    float item_y = items_y;
     for (size_t index = 0; index < state->item_count; ++index)
     {
         if (reach_context_menu_separator_before(state->item_commands, index))
@@ -420,7 +408,6 @@ void reach_context_menu_open_power(reach_context_menu *menu,
         return;
     }
     reach_context_menu_state *state = &menu->state;
-    state->scroll_offset = 0.0f;
     reach_context_menu_build_power_commands(state->item_commands, state->item_icon_ids,
                                             &state->item_count);
     state->power_open = 1;
@@ -539,7 +526,6 @@ void reach_context_menu_open_for_item(reach_context_menu *menu, size_t target_in
         return;
     }
     reach_context_menu_state *state = &menu->state;
-    state->scroll_offset = 0.0f;
     state->item_count = ctx->item_count < REACH_CONTEXT_MENU_MAX_ITEMS
                             ? ctx->item_count
                             : REACH_CONTEXT_MENU_MAX_ITEMS;
@@ -925,33 +911,7 @@ static void reach_context_menu_capsule_handle_pointer(void *capsule,
         if (menu->state.window_list_open)
         {
             out->handled = 1;
-            break;
         }
-        if (menu->state.scroll_max <= 0.0f || event->wheel_delta == 0)
-        {
-            break;
-        }
-        float previous = menu->state.scroll_offset;
-        float delta = menu->state.item_height * 3.0f;
-        menu->state.scroll_offset += event->wheel_delta > 0 ? -delta : delta;
-        if (menu->state.scroll_offset < 0.0f)
-        {
-            menu->state.scroll_offset = 0.0f;
-        }
-        if (menu->state.scroll_offset > menu->state.scroll_max)
-        {
-            menu->state.scroll_offset = menu->state.scroll_max;
-        }
-        float moved = menu->state.scroll_offset - previous;
-        if (moved != 0.0f)
-        {
-            for (size_t index = 0; index < menu->state.item_count; ++index)
-            {
-                menu->state.item_slots[index].y -= moved;
-            }
-            out->redraw = 1;
-        }
-        out->handled = 1;
         break;
     }
     default:

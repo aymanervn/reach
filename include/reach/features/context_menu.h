@@ -40,9 +40,6 @@ extern "C"
         size_t hovered_index;
         size_t close_hovered_index;
         float dpi_scale;
-        float scroll_offset;
-        float scroll_max;
-        float item_height;
 
         int32_t anchored;
         int32_t drop_direction;
