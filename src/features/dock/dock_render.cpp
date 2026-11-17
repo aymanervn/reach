@@ -322,8 +322,7 @@ reach_result reach_dock_append_render_commands(reach_dock *dock,
                 item_motion[index].duration_seconds = 0.0;
             }
             float slot_x = reach_dock_slot_box_x(ctx->theme, ctx->layout, index);
-            item_motion[index].from -= slot_x;
-            item_motion[index].to -= slot_x;
+            item_motion[index] = reach_motion_affine(&item_motion[index], 1.0f, -slot_x);
         }
         item_reveal[index] = reach_dock_item_reveal(dock, index);
     }

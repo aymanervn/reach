@@ -252,9 +252,7 @@ static void reach_top_bar_push_tray_item(const reach_top_bar_render_input *input
     reach_render_group group = {};
     group.id = input->tray_items[index].id;
     group.bounds = slot;
-    group.x = input->tray_motion[index];
-    group.x.from -= slot.x;
-    group.x.to -= slot.x;
+    group.x = reach_motion_affine(&input->tray_motion[index], 1.0f, -slot.x);
     reach_render_command_buffer_begin_group(commands, &group);
     if (input->tray_items[index].icon_id != 0)
     {

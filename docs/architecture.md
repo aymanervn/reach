@@ -1142,6 +1142,14 @@ at the button that opened it after the clamp moves the popup. Quick settings,
 the tray popup and the context menu all place through it; a popup that clamps
 its own bounds or re-derives its notch at render time has reintroduced the bug
 this helper exists to prevent.
+A popup that scrolls its own overflow sets `reach_popup_anchor.overflow_scrolls`: its anchored edge
+never moves, and `reach_popup_anchored_height_limit` caps its height at the space from that edge to
+the far monitor edge (less the margin), so taller content scrolls instead of sliding the popup over
+its bar. Quick Settings sets it and scrolls only each page's list: the header, rail and the page's
+fixed top (Wi-Fi/Bluetooth title and switch, Sound's master volume) stay put while one clipped list
+viewport (`layout.list_top`/`list_viewport`, Sound's outputs, apps and input together) rides the
+single scroll view, whose scrollbar spans that list. Popups that cannot scroll leave it clear and keep the
+fit-to-monitor clamp, as does any anchor whose edge lies outside the monitor.
 Top Bar dropdowns (Quick Settings, the tray dropdown and the power menu) keep that placement but
 draw `reach_popup_background_input.hide_notch`: a plain rounded card in the body below the notch
 strip, filled with the `top_bar_dropdown_background` token (the Top Bar colour in dark mode). They

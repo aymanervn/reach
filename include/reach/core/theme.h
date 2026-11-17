@@ -126,6 +126,8 @@ extern "C"
         reach_color quick_settings_button_background;
         reach_color quick_settings_secondary_text;
         reach_color quick_settings_toggle_track_off;
+        reach_color quick_settings_scrollbar_track;
+        reach_color quick_settings_scrollbar_thumb;
         reach_color quick_settings_app_volume_track;
         reach_color quick_settings_app_volume_muted_fill;
         reach_color quick_settings_section_label;

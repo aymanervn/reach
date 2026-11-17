@@ -255,6 +255,17 @@ static float reach_quick_settings_header_height(const reach_quick_settings_metri
     return reach_quick_settings_header_background_height(metrics) - metrics->surface_padding;
 }
 
+static float reach_quick_settings_list_offset(reach_quick_settings_page page,
+                                              const reach_quick_settings_metrics *metrics)
+{
+    float fixed = 0.0f;
+    if (page == REACH_QUICK_SETTINGS_PAGE_SOUND)
+        fixed = metrics->content_padding + metrics->overview_pill_height;
+    else if (page == REACH_QUICK_SETTINGS_PAGE_WIFI || page == REACH_QUICK_SETTINGS_PAGE_BLUETOOTH)
+        fixed = metrics->content_padding + metrics->wifi_header_height;
+    return reach_quick_settings_header_height(metrics) + fixed;
+}
+
 static float reach_quick_settings_overview_height(const reach_quick_settings_model *model,
                                                   const reach_quick_settings_metrics *metrics)
 {
@@ -563,7 +574,7 @@ static void reach_quick_settings_place_overview(reach_quick_settings_layout *lay
 static void reach_quick_settings_place_sound(reach_quick_settings_layout *layout,
                                              reach_rect_f32 page_bounds,
                                              const reach_quick_settings_model *model,
-                                             float output_span, float app_span,
+                                             float output_span, float app_span, float list_scroll,
                                              const reach_quick_settings_metrics *metrics,
                                              float dpi_scale)
 {
@@ -572,7 +583,7 @@ static void reach_quick_settings_place_sound(reach_quick_settings_layout *layout
         reach_quick_settings_content_line(page_bounds, page_bounds.y + metrics->content_padding,
                                           pill, metrics),
         0, metrics);
-    float section = layout->sound_volume.bounds.y + pill + metrics->overview_row_gap;
+    float section = layout->sound_volume.bounds.y + pill + metrics->overview_row_gap - list_scroll;
 
     size_t outputs = reach_quick_settings_visible_output_device_count(model);
     layout->output_label = reach_quick_settings_content_line(
@@ -695,13 +706,14 @@ static void reach_quick_settings_place_header_switch(reach_rect_f32 page_bounds,
 static void reach_quick_settings_place_bluetooth(reach_quick_settings_layout *layout,
                                                  reach_rect_f32 page_bounds,
                                                  const reach_quick_settings_model *model,
+                                                 float list_scroll,
                                                  const reach_quick_settings_metrics *metrics,
                                                  float dpi_scale)
 {
     reach_quick_settings_place_header_switch(page_bounds, metrics, &layout->bluetooth_title,
                                              &layout->bluetooth_switch);
-    float base =
-        layout->bluetooth_title.y + layout->bluetooth_title.height + metrics->overview_row_gap;
+    float base = layout->bluetooth_title.y + layout->bluetooth_title.height +
+                 metrics->overview_row_gap - list_scroll;
     int32_t message = reach_quick_settings_bluetooth_message_shown(model);
     layout->bluetooth_message =
         message ? reach_quick_settings_content_line(page_bounds, base,
@@ -741,11 +753,10 @@ static void reach_quick_settings_place_bluetooth(reach_quick_settings_layout *la
     }
 }
 
-static void reach_quick_settings_place_wifi(reach_quick_settings_layout *layout,
-                                            reach_rect_f32 page_bounds,
-                                            const reach_quick_settings_model *model,
-                                            const reach_quick_settings_metrics *metrics,
-                                            float dpi_scale)
+static void
+reach_quick_settings_place_wifi(reach_quick_settings_layout *layout, reach_rect_f32 page_bounds,
+                                const reach_quick_settings_model *model, float list_scroll,
+                                const reach_quick_settings_metrics *metrics, float dpi_scale)
 {
     reach_rect_f32 header =
         reach_quick_settings_content_line(page_bounds, page_bounds.y + metrics->content_padding,
@@ -757,7 +768,7 @@ static void reach_quick_settings_place_wifi(reach_quick_settings_layout *layout,
     layout->wifi_title = reach_quick_settings_rect(
         header.x + metrics->overview_pill_icon_inset, header.y,
         layout->wifi_switch.x - header.x - metrics->overview_pill_icon_inset * 2.0f, header.height);
-    float base = header.y + header.height + metrics->overview_row_gap;
+    float base = header.y + header.height + metrics->overview_row_gap - list_scroll;
     layout->wifi_message = reach_quick_settings_wifi_message_shown(model)
                                ? reach_quick_settings_content_line(
                                      page_bounds, base, metrics->section_label_height, metrics)
@@ -792,7 +803,7 @@ static void reach_quick_settings_place_wifi(reach_quick_settings_layout *layout,
 reach_quick_settings_layout reach_quick_settings_layout_for_sections_scaled(
     reach_rect_f32 content_bounds, const reach_theme *theme,
     const reach_quick_settings_model *model, float output_devices_span, float app_volumes_span,
-    float dpi_scale)
+    float list_scroll, float dpi_scale)
 {
     (void)theme;
 
@@ -815,14 +826,27 @@ reach_quick_settings_layout reach_quick_settings_layout_for_sections_scaled(
     page_bounds.x += metrics.rail_width;
     page_bounds.width = reach_quick_settings_clamp_min0(page_bounds.width - metrics.rail_width);
     layout.page_bounds = page_bounds;
-    reach_quick_settings_place_overview(&layout, page_bounds, model, &metrics);
+    for (size_t page = 0; page < REACH_QUICK_SETTINGS_PAGE_COUNT; ++page)
+        layout.list_top[page] = content_bounds.y + reach_quick_settings_list_offset(
+                                                       (reach_quick_settings_page)page, &metrics);
+    reach_quick_settings_page current =
+        model != nullptr ? model->page : REACH_QUICK_SETTINGS_PAGE_OVERVIEW;
+    layout.list_viewport = reach_quick_settings_rect(
+        page_bounds.x, layout.list_top[current], page_bounds.width,
+        reach_quick_settings_clamp_min0(content_bounds.y + content_bounds.height -
+                                        layout.list_top[current]));
+    reach_rect_f32 overview_bounds = page_bounds;
+    overview_bounds.y -= list_scroll;
+    reach_quick_settings_place_overview(&layout, overview_bounds, model, &metrics);
 
     reach_quick_settings_place_sound(&layout, page_bounds, model, output_devices_span,
-                                     app_volumes_span, &metrics, dpi_scale);
+                                     app_volumes_span, list_scroll, &metrics, dpi_scale);
     if (model != nullptr)
     {
-        reach_quick_settings_place_wifi(&layout, page_bounds, model, &metrics, dpi_scale);
-        reach_quick_settings_place_bluetooth(&layout, page_bounds, model, &metrics, dpi_scale);
+        reach_quick_settings_place_wifi(&layout, page_bounds, model, list_scroll, &metrics,
+                                        dpi_scale);
+        reach_quick_settings_place_bluetooth(&layout, page_bounds, model, list_scroll, &metrics,
+                                             dpi_scale);
     }
     return layout;
 }
@@ -834,7 +858,7 @@ reach_quick_settings_layout reach_quick_settings_layout_for_content_bounds_scale
     float output_span = 0, app_span = 0;
     reach_quick_settings_section_spans(model, dpi_scale, &output_span, &app_span);
     return reach_quick_settings_layout_for_sections_scaled(content_bounds, theme, model,
-                                                           output_span, app_span, dpi_scale);
+                                                           output_span, app_span, 0, dpi_scale);
 }
 static const float REACH_QUICK_SETTINGS_POPUP_MARGIN = 8.0f;
 
@@ -1458,8 +1482,11 @@ int32_t reach_quick_settings_select_page(reach_quick_settings *quick_settings,
     }
     reach_quick_settings_page previous = quick_settings->state.model.page;
     quick_settings->state.model.page = page;
+    (void)reach_scroll_view_set_position(&quick_settings->state.scroll, 0.0f);
     if (!reach_quick_settings_tiles_animate(quick_settings))
     {
+        (void)reach_scroll_view_sync(&quick_settings->state.scroll, nullptr, REACH_SCROLL_VIEW_SET,
+                                     reach_motion_now_seconds());
         reach_quick_settings_snap_pages(quick_settings);
         reach_quick_settings_set_bluetooth_scan(quick_settings,
                                                 page == REACH_QUICK_SETTINGS_PAGE_BLUETOOTH);
@@ -1471,6 +1498,8 @@ int32_t reach_quick_settings_select_page(reach_quick_settings *quick_settings,
     double now = reach_motion_now_seconds();
     reach_quick_settings_fade_to(quick_settings, &quick_settings->page_opacity[previous], 0, now);
     reach_quick_settings_fade_to(quick_settings, &quick_settings->page_opacity[page], 1, now);
+    (void)reach_scroll_view_sync(&quick_settings->state.scroll, theme, REACH_SCROLL_VIEW_GLIDE,
+                                 now);
     reach_motion_spec smooth = reach_theme_motion_preset(theme, REACH_MOTION_PRESET_SMOOTH);
     reach_motion_animate_spec_to_at(&quick_settings->page_shift[previous], -shift * direction,
                                     smooth, now);
@@ -1520,12 +1549,14 @@ static void reach_quick_settings_sample_input_layout(reach_quick_settings *quick
                                                                         quick_settings->layout_dpi);
 
     reach_rect_f32 bounds = state.content_bounds;
-    bounds.y -= fminf(reach_scroll_view_value_at(&state.scroll, now_seconds),
-                      fmaxf(0.0f, height - state.content_bounds.height));
     bounds.height = height;
+    float list_scroll = fminf(reach_scroll_view_value_at(&state.scroll, now_seconds),
+                              fmaxf(0.0f, height - state.content_bounds.height));
     state.layout = reach_quick_settings_layout_for_sections_scaled(
-        bounds, &quick_settings->layout_theme, &state.model, output, apps,
+        bounds, &quick_settings->layout_theme, &state.model, output, apps, list_scroll,
         quick_settings->layout_dpi);
+    reach_rect_f32 &list = state.layout.list_viewport;
+    list.height = fmaxf(0.0f, state.content_bounds.y + state.content_bounds.height - list.y);
 }
 
 uint64_t reach_quick_settings_press_feedback_target(const reach_quick_settings *quick_settings)
@@ -1941,8 +1972,10 @@ static int32_t reach_quick_settings_capsule_needs_frame(const void *capsule)
 static int32_t reach_quick_settings_capsule_wants_pointer_move(const void *capsule)
 {
     const reach_quick_settings *quick_settings = static_cast<const reach_quick_settings *>(capsule);
-    return quick_settings != nullptr && (reach_quick_settings_drag_active(quick_settings) ||
-                                         reach_pressable_tracking(&quick_settings->pressable));
+    return quick_settings != nullptr &&
+           (reach_quick_settings_drag_active(quick_settings) ||
+            reach_scroll_view_dragging(&quick_settings->state.scroll) ||
+            reach_pressable_tracking(&quick_settings->pressable));
 }
 
 static int32_t reach_quick_settings_capsule_pointer_sequence_active(const void *capsule)
@@ -2466,6 +2499,37 @@ static void reach_quick_settings_capsule_handle_pointer(void *capsule,
         out->action.kind = REACH_FEATURE_ACTION_CLOSE_SELF;
         out->cancel_source_sequence = event->button == REACH_POINTER_BUTTON_PRIMARY;
         out->continue_source_sequence = event->button != REACH_POINTER_BUTTON_PRIMARY;
+        return;
+    }
+
+    reach_scroll_view *scroll = &quick_settings->state.scroll;
+    if (event->kind == REACH_POINTER_EVENT_DOWN && event->button == REACH_POINTER_BUTTON_PRIMARY &&
+        reach_scroll_view_pointer_down(scroll, event->x, event->y, reach_motion_now_seconds()) != 0)
+    {
+        out->handled = 1;
+        out->capture = 1;
+        out->sync_pointer_subscriptions = 1;
+        out->redraw = 1;
+        out->relayout = 1;
+        return;
+    }
+    if (event->kind == REACH_POINTER_EVENT_MOVE && reach_scroll_view_dragging(scroll))
+    {
+        uint32_t moved =
+            reach_scroll_view_pointer_move(scroll, event->y, reach_motion_now_seconds());
+        out->handled = 1;
+        out->redraw = (moved & REACH_SCROLL_VIEW_CHANGED) != 0;
+        out->relayout = out->redraw;
+        return;
+    }
+    if (((event->kind == REACH_POINTER_EVENT_UP && event->button == REACH_POINTER_BUTTON_PRIMARY) ||
+         event->kind == REACH_POINTER_EVENT_CANCEL) &&
+        reach_scroll_view_dragging(scroll))
+    {
+        (void)reach_scroll_view_pointer_up(scroll);
+        out->handled = 1;
+        out->capture = -1;
+        out->sync_pointer_subscriptions = 1;
         return;
     }
 
@@ -3025,6 +3089,7 @@ reach_quick_settings_popup_anchor(const reach_quick_settings_layout_context *ctx
     anchor.has_bar_offset = 1;
     anchor.alignment = REACH_POPUP_ALIGN_MONITOR_RIGHT;
     anchor.edge_gap = reach_popup_bar_gap_scaled(ctx->dpi_scale);
+    anchor.overflow_scrolls = 1;
     return anchor;
 }
 
@@ -3250,8 +3315,15 @@ void reach_quick_settings_refresh_layout(reach_quick_settings *quick_settings,
     }
     if (animate || environment_changed || target_changed)
     {
-        reach_scroll_view_set_extents(&state.scroll, target_content,
-                                      fmaxf(0, target.bounds.height - viewport_padding));
+        reach_quick_settings_metrics metrics =
+            reach_quick_settings_metrics_for_scale(ctx->dpi_scale);
+        reach_scroll_view_config scroll = state.scroll.config;
+        scroll.minimum_thumb = metrics.scrollbar_minimum_thumb;
+        reach_scroll_view_configure(&state.scroll, &scroll);
+        float list_offset = reach_quick_settings_list_offset(state.model.page, &metrics);
+        reach_scroll_view_set_extents(
+            &state.scroll, fmaxf(0, target_content - list_offset),
+            fmaxf(0, target.bounds.height - viewport_padding - list_offset));
         (void)reach_scroll_view_limit(&state.scroll, &quick_settings->scroll_maximum);
     }
     quick_settings->relayout_animate_pending = 0;
@@ -3262,7 +3334,10 @@ void reach_quick_settings_refresh_layout(reach_quick_settings *quick_settings,
     state.target_bounds = target.bounds;
     float height_minimum = 0, height_maximum = 0;
     if (reach_motion_range(&quick_settings->height, &height_minimum, &height_maximum) != REACH_OK)
-        height_maximum = fmaxf(quick_settings->height.from, quick_settings->height.to);
+        height_maximum =
+            fmaxf(reach_motion_value_at(&quick_settings->height, now),
+                  reach_motion_value_at(&quick_settings->height,
+                                        reach_motion_deadline(&quick_settings->height)));
     float extent = environment_changed ? target.bounds.height
                    : quick_settings->section_cleanup_pending
                        ? fmaxf(state.render_bounds.height, height_maximum)
@@ -3282,6 +3357,20 @@ void reach_quick_settings_refresh_layout(reach_quick_settings *quick_settings,
     reach_feature_transition_set_trigger(&quick_settings->popup_transition, state.render_bounds,
                                          target.notch_anchor_x);
     state.drop_direction = ctx->drop_direction;
+    reach_rect_f32 inset =
+        reach_quick_settings_content_bounds_for({0, 0, target.bounds.width, target.bounds.height},
+                                                ctx->theme, ctx->dpi_scale, ctx->drop_direction);
+    reach_quick_settings_metrics metrics = reach_quick_settings_metrics_for_scale(ctx->dpi_scale);
+    float card_top = target.bounds.y - state.render_bounds.y;
+    float list_top =
+        card_top + inset.y + reach_quick_settings_list_offset(state.model.page, &metrics);
+    float list_bottom = card_top + inset.y + inset.height;
+    reach_rect_f32 viewport = {target.bounds.x - state.render_bounds.x + inset.x, list_top,
+                               inset.width, fmaxf(0.0f, list_bottom - list_top)};
+    reach_rect_f32 track = {viewport.x + viewport.width -
+                                (metrics.content_padding + metrics.scrollbar_track_width) * 0.5f,
+                            viewport.y, metrics.scrollbar_track_width, viewport.height};
+    reach_scroll_view_set_frame(&state.scroll, viewport, track);
     quick_settings->layout_theme = *ctx->theme;
     quick_settings->layout_dpi = ctx->dpi_scale;
     quick_settings->layout_context = *ctx;
