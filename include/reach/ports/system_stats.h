@@ -39,7 +39,7 @@ extern "C"
                                reach_system_stats_sample *out_sample);
         void (*destroy)(reach_system_stats_source *source);
         void (*sample_monitor)(reach_system_stats_source *source,
-                           reach_system_stats_sample *out_sample);
+                               reach_system_stats_sample *out_sample);
     } reach_system_stats_ops;
 
     typedef struct reach_system_stats_port

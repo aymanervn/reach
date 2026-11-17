@@ -1304,9 +1304,9 @@ static void render_widgets_page(const reach_settings_render_input *input,
     const reach_ui_toggle_style style = {theme->settings_toggle_track_off, theme->accent,
                                          theme->settings_toggle_knob};
     const bool reset_hover = input->model->hovered_button == REACH_SETTINGS_HIT_WIDGET_RESET;
-    reach_settings_push_rect(commands, layout->widget_reset,
-                             reach_settings_scale(input, theme->radius_small),
-                             reset_hover ? theme->accent_tint : theme->settings_icon_box_background);
+    reach_settings_push_rect(
+        commands, layout->widget_reset, reach_settings_scale(input, theme->radius_small),
+        reset_hover ? theme->accent_tint : theme->settings_icon_box_background);
     reach_settings_push_text(commands, layout->widget_reset, (const uint16_t *)u"Reset positions",
                              reach_settings_scale(input, REACH_TEXT_SIZE_MEDIUM),
                              REACH_TEXT_WEIGHT_SEMIBOLD, REACH_TEXT_ALIGNMENT_CENTER,
@@ -1316,12 +1316,13 @@ static void render_widgets_page(const reach_settings_render_input *input,
         const auto row = layout->widget_rows[index];
         reach_settings_push_rect(commands, row, reach_settings_scale(input, theme->radius_small),
                                  theme->settings_icon_box_background);
-        reach_settings_push_text(
-            commands, {row.x + reach_settings_scale(input, 16.0f), row.y,
-                       row.width - reach_settings_scale(input, 88.0f), row.height},
-            reach_widget_definition_at(index)->label,
-            reach_settings_scale(input, REACH_TEXT_SIZE_MEDIUM), REACH_TEXT_WEIGHT_SEMIBOLD,
-            input->text_alignment_leading, theme->settings_text, 1);
+        reach_settings_push_text(commands,
+                                 {row.x + reach_settings_scale(input, 16.0f), row.y,
+                                  row.width - reach_settings_scale(input, 88.0f), row.height},
+                                 reach_widget_definition_at(index)->label,
+                                 reach_settings_scale(input, REACH_TEXT_SIZE_MEDIUM),
+                                 REACH_TEXT_WEIGHT_SEMIBOLD, input->text_alignment_leading,
+                                 theme->settings_text, 1);
         reach_ui_toggle_render(commands, layout->widget_toggles[index], &style,
                                (input->model->desktop_widgets & (1u << index)) != 0 ? 1.0f : 0.0f);
     }

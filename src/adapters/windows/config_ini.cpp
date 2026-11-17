@@ -179,8 +179,7 @@ static reach_result reach_config_store_load(reach_config_store *store,
     GetPrivateProfileStringW(L"reach", L"version", L"",
                              reinterpret_cast<wchar_t *>(out_snapshot->version), 32, path);
     out_snapshot->dock_height = (float)GetPrivateProfileIntW(L"dock", L"height", 64, path);
-    const uint32_t saved_widgets =
-        (uint32_t)GetPrivateProfileIntW(L"widgets", L"enabled", 0, path);
+    const uint32_t saved_widgets = (uint32_t)GetPrivateProfileIntW(L"widgets", L"enabled", 0, path);
     for (size_t index = 0; index < REACH_MAX_DESKTOP_WIDGETS; ++index)
     {
         const size_t slot = reach_widget_definition_at(index)->ini_slot;

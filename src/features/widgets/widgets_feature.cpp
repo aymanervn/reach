@@ -71,15 +71,15 @@ struct reach_widget_timer
 };
 
 static const reach_widget_timer reach_widgets_timers[] = {
-    {REACH_WIDGET_STOPWATCH, &reach_widgets::stopwatch_deadline,
-     reach_widgets_stopwatch_interval, [](const reach_widgets &w) { return w.stopwatch_running != 0; },
-     nullptr},
-    {REACH_WIDGET_POMODORO, &reach_widgets::productivity_deadline,
-     reach_widgets_pomodoro_interval, [](const reach_widgets &w) { return w.pomodoro.running; },
-     [](reach_widgets &w, double now) { w.pomodoro_completed = reach_pomodoro_tick(w.pomodoro, now); }},
+    {REACH_WIDGET_STOPWATCH, &reach_widgets::stopwatch_deadline, reach_widgets_stopwatch_interval,
+     [](const reach_widgets &w) { return w.stopwatch_running != 0; }, nullptr},
+    {REACH_WIDGET_POMODORO, &reach_widgets::productivity_deadline, reach_widgets_pomodoro_interval,
+     [](const reach_widgets &w) { return w.pomodoro.running; }, [](reach_widgets &w, double now)
+     { w.pomodoro_completed = reach_pomodoro_tick(w.pomodoro, now); }},
 };
 
-static bool reach_widgets_timer_active(const reach_widgets &widgets, const reach_widget_timer &timer)
+static bool reach_widgets_timer_active(const reach_widgets &widgets,
+                                       const reach_widget_timer &timer)
 {
     return (widgets.enabled_mask & (1u << timer.widget)) != 0 && timer.running(widgets);
 }
@@ -126,7 +126,8 @@ static void reach_widgets_tick(void *capsule, double, reach_feature_tick_result 
     if (clock.valid != widgets->clock_snapshot.valid ||
         clock.minute != widgets->clock_snapshot.minute ||
         clock.hour != widgets->clock_snapshot.hour || clock.day != widgets->clock_snapshot.day ||
-        clock.month != widgets->clock_snapshot.month || clock.year != widgets->clock_snapshot.year ||
+        clock.month != widgets->clock_snapshot.month ||
+        clock.year != widgets->clock_snapshot.year ||
         stats.valid != widgets->stats_snapshot.valid ||
         stats.cpu_percent != widgets->stats_snapshot.cpu_percent ||
         stats.memory_percent != widgets->stats_snapshot.memory_percent ||
@@ -250,14 +251,14 @@ static bool reach_widgets_has_footer(int32_t widget)
 }
 
 static reach_rect_f32 reach_widgets_control_bounds(const reach_widget_chrome &chrome,
-                                                    int32_t widget, int32_t button, float scale)
+                                                   int32_t widget, int32_t button, float scale)
 {
     const auto &controls = reach_widgets_controls[widget];
     if (controls.slot == reach_widget_control_slot::header_edges)
     {
         const float edge_width = 20.0f * scale;
-        const float x = button == 0 ? chrome.header.x
-                                    : chrome.header.x + chrome.header.width - edge_width;
+        const float x =
+            button == 0 ? chrome.header.x : chrome.header.x + chrome.header.width - edge_width;
         return {x, chrome.header.y, edge_width, chrome.header.height};
     }
     const auto &footer = chrome.footer;
@@ -265,8 +266,8 @@ static reach_rect_f32 reach_widgets_control_bounds(const reach_widget_chrome &ch
     if (controls.slot == reach_widget_control_slot::footer_icons)
     {
         const float icon_slot = 36.0f * scale;
-        return {footer.x + cell * (button + 0.5f) - icon_slot * 0.5f, footer.y,
-                icon_slot, footer.height};
+        return {footer.x + cell * (button + 0.5f) - icon_slot * 0.5f, footer.y, icon_slot,
+                footer.height};
     }
     const float gap = 8.0f * scale;
     return {footer.x + button * cell + gap * 0.5f, footer.y, cell - gap, footer.height};
@@ -284,11 +285,11 @@ static uint64_t reach_widgets_control_target(const reach_widgets *widgets, float
 
     const auto &controls = reach_widgets_controls[index];
     const auto chrome = reach_widgets_chrome(widgets->cards[index], widgets->dpi_scale,
-                                              reach_widgets_has_footer(index));
+                                             reach_widgets_has_footer(index));
     for (int32_t button = 0; button < controls.count; ++button)
     {
-        if (reach_rect_contains(reach_widgets_control_bounds(chrome, index, button,
-                                                             widgets->dpi_scale), x, y))
+        if (reach_rect_contains(
+                reach_widgets_control_bounds(chrome, index, button, widgets->dpi_scale), x, y))
         {
             return controls.first + button;
         }
@@ -315,14 +316,12 @@ static void reach_widgets_update_drag(reach_widgets *widgets, float x, float y, 
     if (widgets->resizing)
     {
         const auto limits = reach_widget_definition_at(index)->limits;
-        const float maximum_width =
-            std::min(limits.max_width * scale, desktop.width - card.x);
-        const float maximum_height =
-            std::min(limits.max_height * scale, desktop.height - card.y);
-        card.width = std::clamp(card.width + dx,
-                                std::min(limits.min_width * scale, maximum_width), maximum_width);
-        card.height = std::clamp(card.height + dy,
-                                 std::min(limits.min_height * scale, maximum_height), maximum_height);
+        const float maximum_width = std::min(limits.max_width * scale, desktop.width - card.x);
+        const float maximum_height = std::min(limits.max_height * scale, desktop.height - card.y);
+        card.width = std::clamp(card.width + dx, std::min(limits.min_width * scale, maximum_width),
+                                maximum_width);
+        card.height = std::clamp(
+            card.height + dy, std::min(limits.min_height * scale, maximum_height), maximum_height);
     }
     else
     {
@@ -369,8 +368,8 @@ static void reach_widgets_desktop_pointer(void *capsule, const reach_pointer_eve
             widgets->drag_x = x;
             widgets->drag_y = y;
             widgets->drag_origin = widgets->cards[index];
-            const auto chrome = reach_widgets_chrome(widgets->cards[index], scale,
-                                                      reach_widgets_has_footer(index));
+            const auto chrome =
+                reach_widgets_chrome(widgets->cards[index], scale, reach_widgets_has_footer(index));
             widgets->resizing = reach_rect_contains(chrome.resize, x, y);
             widgets->moved = 0;
             widgets->drag_has_destination = false;
@@ -424,7 +423,8 @@ static void reach_widgets_desktop_pointer(void *capsule, const reach_pointer_eve
                 widgets->stopwatch_running = 0;
                 widgets->stopwatch_deadline = 0.0;
             }
-            else if (press.activated_target == REACH_WIDGET_CONTROL_STOPWATCH_START && widgets->stopwatch_running)
+            else if (press.activated_target == REACH_WIDGET_CONTROL_STOPWATCH_START &&
+                     widgets->stopwatch_running)
             {
                 widgets->stopwatch_elapsed += now - widgets->stopwatch_started;
                 widgets->stopwatch_running = 0;
@@ -455,7 +455,8 @@ static void reach_widgets_desktop_pointer(void *capsule, const reach_pointer_eve
                     REACH_NOW_PLAYING_ACTION_PREVIOUS, REACH_NOW_PLAYING_ACTION_PLAY_PAUSE,
                     REACH_NOW_PLAYING_ACTION_NEXT};
                 out->action.kind = REACH_FEATURE_ACTION_MEDIA_CONTROL;
-                out->action.id = actions[press.activated_target - REACH_WIDGET_CONTROL_MEDIA_PREVIOUS];
+                out->action.id =
+                    actions[press.activated_target - REACH_WIDGET_CONTROL_MEDIA_PREVIOUS];
             }
             else if (press.activated_target == REACH_WIDGET_CONTROL_CALENDAR_PREVIOUS ||
                      press.activated_target == REACH_WIDGET_CONTROL_CALENDAR_NEXT)
@@ -468,18 +469,21 @@ static void reach_widgets_desktop_pointer(void *capsule, const reach_pointer_eve
         }
         if (widgets->moved)
         {
-            const bool placed = event->kind == REACH_POINTER_EVENT_UP && widgets->drag_has_destination;
+            const bool placed =
+                event->kind == REACH_POINTER_EVENT_UP && widgets->drag_has_destination;
             auto &card = widgets->cards[index];
             card = placed ? widgets->drag_destination : widgets->drag_origin;
             if (placed && !reach_rect_equal(card, widgets->drag_origin))
             {
                 const reach_config_widget_placement placement = {
                     (int32_t)std::lround(card.x / scale), (int32_t)std::lround(card.y / scale),
-                    (int32_t)std::lround(card.width / scale), (int32_t)std::lround(card.height / scale)};
+                    (int32_t)std::lround(card.width / scale),
+                    (int32_t)std::lround(card.height / scale)};
                 widgets->placements[index] = placement;
                 if (widgets->routes.placement_changed != nullptr)
                 {
-                    widgets->routes.placement_changed(widgets->routes.user, (size_t)index, placement);
+                    widgets->routes.placement_changed(widgets->routes.user, (size_t)index,
+                                                      placement);
                 }
             }
         }
@@ -570,8 +574,8 @@ int32_t reach_widgets_set_enabled(reach_widgets *widgets, uint32_t mask)
     }
     widgets->enabled_mask = mask & REACH_DESKTOP_WIDGET_MASK;
     widgets->layout_dirty = true;
-    reach_system_stats_set_monitor_enabled(widgets->stats,
-                                       (widgets->enabled_mask & (1u << REACH_WIDGET_SYSTEM)) != 0);
+    reach_system_stats_set_monitor_enabled(
+        widgets->stats, (widgets->enabled_mask & (1u << REACH_WIDGET_SYSTEM)) != 0);
     return 1;
 }
 
@@ -583,8 +587,8 @@ int32_t reach_widgets_arrange_desktop(reach_widgets *widgets, reach_rect_f32 mon
         return 0;
     }
     const float scale = dpi_scale > 0.0f ? dpi_scale : 1.0f;
-    const bool monitor_changed = !reach_rect_equal(widgets->desktop_bounds, monitor) ||
-                                 widgets->dpi_scale != scale;
+    const bool monitor_changed =
+        !reach_rect_equal(widgets->desktop_bounds, monitor) || widgets->dpi_scale != scale;
     widgets->desktop_bounds = monitor;
     widgets->dpi_scale = scale;
     widgets->layout_dirty |= monitor_changed;
@@ -602,12 +606,13 @@ int32_t reach_widgets_arrange_desktop(reach_widgets *widgets, reach_rect_f32 mon
         auto &item = items[index];
         item.enabled = (widgets->enabled_mask & (1u << index)) != 0;
         item.custom = placement.width > 0 && placement.x >= 0 && placement.y >= 0;
-        item.preferred = {
-            placement.x * scale, placement.y * scale,
-            std::clamp(placement.width > 0 ? placement.width * scale : definition.default_width * scale,
-                       limits.min_width * scale, limits.max_width * scale),
-            std::clamp(placement.height > 0 ? placement.height * scale : definition.default_height * scale,
-                       limits.min_height * scale, limits.max_height * scale)};
+        item.preferred = {placement.x * scale, placement.y * scale,
+                          std::clamp(placement.width > 0 ? placement.width * scale
+                                                         : definition.default_width * scale,
+                                     limits.min_width * scale, limits.max_width * scale),
+                          std::clamp(placement.height > 0 ? placement.height * scale
+                                                          : definition.default_height * scale,
+                                     limits.min_height * scale, limits.max_height * scale)};
         item.minimum = {limits.min_width * scale, limits.min_height * scale};
     }
     reach_rect_f32 arranged[REACH_MAX_DESKTOP_WIDGETS] = {};
@@ -658,13 +663,12 @@ static void reach_widgets_card(reach_render_command_buffer *commands, const reac
     shape.rect = rect;
     shape.radius = theme->radius_large * scale;
     const auto background = reach_theme_color_mix(theme->popup_background, accent, 0.12f);
-    (void)reach_render_push_bordered_background(commands, &shape, background,
-                                                theme->popup_border, border, &theme->popup_shadow,
-                                                scale);
+    (void)reach_render_push_bordered_background(commands, &shape, background, theme->popup_border,
+                                                border, &theme->popup_shadow, scale);
 }
 
 static void reach_widgets_decorate(reach_render_command_buffer *commands, reach_rect_f32 inner,
-                                  float radius, reach_color accent)
+                                   float radius, reach_color accent)
 {
     reach_render_command tint = {};
     tint.type = REACH_RENDER_COMMAND_RECT;
@@ -681,8 +685,7 @@ static void reach_widgets_decorate(reach_render_command_buffer *commands, reach_
         reach_render_command ribbon = {};
         ribbon.type = REACH_RENDER_COMMAND_CLIPPED_ROUNDED_RECT;
         ribbon.rect = {inner.x + inner.width * (wave == 0 ? -0.55f : 0.16f),
-                       inner.y + inner.height * (wave == 0 ? 0.64f : 0.76f),
-                       span, span};
+                       inner.y + inner.height * (wave == 0 ? 0.64f : 0.76f), span, span};
         ribbon.radius = span * 0.5f;
         ribbon.color = accent;
         ribbon.color.a = wave == 0 ? 0.09f : 0.08f;
@@ -735,11 +738,11 @@ static void reach_widgets_segments(reach_render_command_buffer *commands, const 
     for (int32_t segment = 0; segment < segments; ++segment)
     {
         const reach_rect_f32 pill = {meter_x + segment * (pill_width + gap),
-                                      track.y + (track.height - height) * 0.5f, pill_width, height};
+                                     track.y + (track.height - height) * 0.5f, pill_width, height};
         const float position = segments > 1 ? (float)segment / (segments - 1) : 1.0f;
         const reach_color color = segment < amount_filled
-            ? reach_theme_color_mix(muted, theme->accent_text, position)
-            : empty;
+                                      ? reach_theme_color_mix(muted, theme->accent_text, position)
+                                      : empty;
         reach_widgets_rect(commands, pill, std::min(3.0f * scale, height * 0.5f), color);
     }
 }
@@ -788,8 +791,8 @@ static void reach_widgets_meter(reach_render_command_buffer *commands, const rea
     const reach_rect_f32 track = {track_x, y, track_width, 22.0f * scale};
     if (!available && detail != nullptr && !show_labeled_percentage)
     {
-        reach_widgets_text(commands, track, (const uint16_t *)u"—",
-                           REACH_TEXT_SIZE_SMALL * scale, REACH_TEXT_WEIGHT_SEMIBOLD,
+        reach_widgets_text(commands, track, (const uint16_t *)u"—", REACH_TEXT_SIZE_SMALL * scale,
+                           REACH_TEXT_WEIGHT_SEMIBOLD,
                            reach_theme_color_alpha(theme->primary_text, 0.55f),
                            REACH_TEXT_ALIGNMENT_CENTER);
         return;
@@ -814,21 +817,24 @@ static void reach_widgets_section_header(reach_render_command_buffer *commands,
 {
     const float text_size = REACH_TEXT_SIZE_SMALL * scale;
     const float badge_padding = 9.0f * scale;
-    const float badge_width = std::ceil(reach_text_width_or_estimate(
-        text_measure, badge_label, text_size, REACH_TEXT_WEIGHT_SEMIBOLD, 0.65f)) +
+    const float badge_width =
+        std::ceil(reach_text_width_or_estimate(text_measure, badge_label, text_size,
+                                               REACH_TEXT_WEIGHT_SEMIBOLD, 0.65f)) +
         2.0f * badge_padding;
     const float badge_height = 22.0f * scale;
     const reach_rect_f32 badge = {section.x + section.width - badge_width - 2.0f * scale,
-                                  section.y + (section.height - badge_height) * 0.5f,
-                                  badge_width, badge_height};
+                                  section.y + (section.height - badge_height) * 0.5f, badge_width,
+                                  badge_height};
     reach_widgets_rect(commands, badge, badge.height * 0.5f,
                        reach_theme_color_alpha(theme->accent_text, badge_alpha));
     reach_widgets_text(commands, badge, badge_label, text_size, REACH_TEXT_WEIGHT_SEMIBOLD,
                        theme->primary_text, REACH_TEXT_ALIGNMENT_CENTER);
-    const float label_width = std::ceil(reach_text_width_or_estimate(
-        text_measure, section_label, text_size, REACH_TEXT_WEIGHT_SEMIBOLD, 0.65f)) + scale;
-    reach_widgets_text(commands, {section.x, section.y, label_width, section.height},
-                       section_label, text_size, REACH_TEXT_WEIGHT_SEMIBOLD, theme->primary_text);
+    const float label_width =
+        std::ceil(reach_text_width_or_estimate(text_measure, section_label, text_size,
+                                               REACH_TEXT_WEIGHT_SEMIBOLD, 0.65f)) +
+        scale;
+    reach_widgets_text(commands, {section.x, section.y, label_width, section.height}, section_label,
+                       text_size, REACH_TEXT_WEIGHT_SEMIBOLD, theme->primary_text);
     const float divider_x = section.x + label_width + 8.0f * scale;
     const float divider_width = badge.x - divider_x - 8.0f * scale;
     if (divider_width > 0.0f)
@@ -840,39 +846,40 @@ static void reach_widgets_section_header(reach_render_command_buffer *commands,
 }
 
 static void reach_widgets_system_render(reach_render_command_buffer *commands,
-                                        const reach_theme *theme, const reach_widget_chrome &chrome, float scale,
-                                        const reach_system_stats_snapshot &stats,
+                                        const reach_theme *theme, const reach_widget_chrome &chrome,
+                                        float scale, const reach_system_stats_snapshot &stats,
                                         const reach_text_measure_port *text_measure)
 {
     reach_widgets_title(commands, theme, chrome.header,
-                         reach_widget_definition_at(REACH_WIDGET_SYSTEM)->label, scale);
+                        reach_widget_definition_at(REACH_WIDGET_SYSTEM)->label, scale);
     wchar_t speeds[3][24] = {};
     reach_widgets_format_speed(speeds[0], stats.cpu_clock_mhz, false);
     reach_widgets_format_speed(speeds[1], stats.memory_speed_mt_s, true);
     reach_widgets_format_speed(speeds[2], stats.gpu_clock_mhz, false);
-    float clock_width = reach_text_width_or_estimate(
-        text_measure, (const uint16_t *)u"100%", REACH_TEXT_SIZE_SMALL * scale,
-        REACH_TEXT_WEIGHT_SEMIBOLD, 0.65f);
+    float clock_width = reach_text_width_or_estimate(text_measure, (const uint16_t *)u"100%",
+                                                     REACH_TEXT_SIZE_SMALL * scale,
+                                                     REACH_TEXT_WEIGHT_SEMIBOLD, 0.65f);
     for (const auto &speed : speeds)
     {
-        clock_width = std::max(clock_width, reach_text_width_or_estimate(
-            text_measure, reinterpret_cast<const uint16_t *>(speed),
-            REACH_TEXT_SIZE_SMALL * scale, REACH_TEXT_WEIGHT_SEMIBOLD, 0.65f));
+        clock_width = std::max(
+            clock_width, reach_text_width_or_estimate(
+                             text_measure, reinterpret_cast<const uint16_t *>(speed),
+                             REACH_TEXT_SIZE_SMALL * scale, REACH_TEXT_WEIGHT_SEMIBOLD, 0.65f));
     }
     clock_width = std::ceil(clock_width) + scale;
 
     const float row_height = 22.0f * scale;
     const float before_section = 5.0f * scale;
     const float after_section = 4.0f * scale;
-    const float row_gap = (chrome.body.height - row_height - before_section - after_section) /
-                          5.0f;
+    const float row_gap = (chrome.body.height - row_height - before_section - after_section) / 5.0f;
     const float first_row = chrome.body.y;
     reach_widgets_meter(commands, theme, chrome.body, first_row, L"CPU", stats.cpu_percent, scale,
                         stats.valid != 0, speeds[0], clock_width);
-    reach_widgets_meter(commands, theme, chrome.body, first_row + row_gap, L"RAM", stats.memory_percent,
-                        scale, stats.valid != 0, speeds[1], clock_width);
+    reach_widgets_meter(commands, theme, chrome.body, first_row + row_gap, L"RAM",
+                        stats.memory_percent, scale, stats.valid != 0, speeds[1], clock_width);
 
-    const reach_rect_f32 section = {chrome.body.x + 2.0f * scale, first_row + 2.0f * row_gap + before_section,
+    const reach_rect_f32 section = {chrome.body.x + 2.0f * scale,
+                                    first_row + 2.0f * row_gap + before_section,
                                     chrome.body.width - 2.0f * scale, chrome.header.height};
     const bool has_temperature =
         stats.gpu_temperature_available && std::isfinite(stats.gpu_temperature_c);
@@ -890,21 +897,21 @@ static void reach_widgets_system_render(reach_render_command_buffer *commands,
     }
 
     reach_widgets_section_header(commands, theme, section, (const uint16_t *)u"GPU monitor",
-                                  reinterpret_cast<const uint16_t *>(temperature), thermal_tint,
-                                  scale, text_measure);
+                                 reinterpret_cast<const uint16_t *>(temperature), thermal_tint,
+                                 scale, text_measure);
 
     const float gpu_row = section.y + row_gap + after_section;
     reach_widgets_meter(commands, theme, chrome.body, gpu_row, L"GPU", stats.gpu_percent, scale,
                         stats.gpu_available != 0, nullptr, clock_width);
     const float clock_row = gpu_row + row_gap;
     const bool clock_range_available = stats.gpu_clock_mhz != 0 && stats.gpu_clock_max_mhz != 0;
-    const float clock_percent = clock_range_available
-        ? 100.0f * (float)stats.gpu_clock_mhz / (float)stats.gpu_clock_max_mhz
-        : 0.0f;
-    reach_widgets_meter(commands, theme, chrome.body, clock_row, L"Clock speed", clock_percent, scale,
-                        clock_range_available, speeds[2], clock_width, false);
-    reach_widgets_meter(commands, theme, chrome.body, clock_row + row_gap, L"VRAM", stats.vram_percent,
-                        scale, stats.vram_available != 0, nullptr, clock_width);
+    const float clock_percent =
+        clock_range_available ? 100.0f * (float)stats.gpu_clock_mhz / (float)stats.gpu_clock_max_mhz
+                              : 0.0f;
+    reach_widgets_meter(commands, theme, chrome.body, clock_row, L"Clock speed", clock_percent,
+                        scale, clock_range_available, speeds[2], clock_width, false);
+    reach_widgets_meter(commands, theme, chrome.body, clock_row + row_gap, L"VRAM",
+                        stats.vram_percent, scale, stats.vram_available != 0, nullptr, clock_width);
 }
 
 static int32_t reach_widgets_days_in_month(int32_t year, int32_t month)
@@ -937,18 +944,17 @@ static void reach_widgets_resize_grip(reach_render_command_buffer *commands,
 }
 
 static void reach_widgets_footer_button(reach_render_command_buffer *commands,
-                                         const reach_theme *theme, reach_rect_f32 bounds,
-                                         const wchar_t *label, float scale)
+                                        const reach_theme *theme, reach_rect_f32 bounds,
+                                        const wchar_t *label, float scale)
 {
     reach_widgets_rect(commands, bounds, 8.0f * scale, theme->accent_tint);
-    reach_widgets_title(commands, theme, bounds, reinterpret_cast<const uint16_t *>(label),
-                         scale, REACH_TEXT_ALIGNMENT_CENTER);
+    reach_widgets_title(commands, theme, bounds, reinterpret_cast<const uint16_t *>(label), scale,
+                        REACH_TEXT_ALIGNMENT_CENTER);
 }
 
-static void reach_widgets_pomodoro_render(const reach_widgets *widgets,
-                                              const reach_theme *theme,
-                                              const reach_widget_chrome &chrome, float scale,
-                                              reach_render_command_buffer *commands)
+static void reach_widgets_pomodoro_render(const reach_widgets *widgets, const reach_theme *theme,
+                                          const reach_widget_chrome &chrome, float scale,
+                                          reach_render_command_buffer *commands)
 {
     wchar_t buffer[260] = {};
     const wchar_t *phase = widgets->pomodoro.phase == 0   ? L"Focus"
@@ -957,14 +963,14 @@ static void reach_widgets_pomodoro_render(const reach_widgets *widgets,
     const auto *label = reach_widget_definition_at(REACH_WIDGET_POMODORO)->label;
     swprintf_s(buffer, L"%ls · %ls", reinterpret_cast<const wchar_t *>(label), phase);
     reach_widgets_title(commands, theme, chrome.header, reinterpret_cast<const uint16_t *>(buffer),
-                         scale);
+                        scale);
     uint64_t seconds = (uint64_t)std::ceil(
         reach_pomodoro_remaining(widgets->pomodoro, reach_motion_now_seconds()));
     swprintf_s(buffer, L"%02llu:%02llu", seconds / 60, seconds % 60);
-    reach_widgets_text(commands, {chrome.body.x, chrome.body.y + 5.0f * scale, chrome.body.width, 43.0f * scale},
-                       reinterpret_cast<const uint16_t *>(buffer), REACH_TEXT_SIZE_XLARGE * scale,
-                       REACH_TEXT_WEIGHT_DEMIBOLD, theme->primary_text,
-                       REACH_TEXT_ALIGNMENT_CENTER);
+    reach_widgets_text(
+        commands, {chrome.body.x, chrome.body.y + 5.0f * scale, chrome.body.width, 43.0f * scale},
+        reinterpret_cast<const uint16_t *>(buffer), REACH_TEXT_SIZE_XLARGE * scale,
+        REACH_TEXT_WEIGHT_DEMIBOLD, theme->primary_text, REACH_TEXT_ALIGNMENT_CENTER);
     const wchar_t *session = L"Session %d";
     if (widgets->pomodoro.phase != 0)
     {
@@ -975,32 +981,33 @@ static void reach_widgets_pomodoro_render(const reach_widgets *widgets,
         session = L"Break complete · session %d ready";
     }
     swprintf_s(buffer, session, widgets->pomodoro.completed + 1);
-    reach_widgets_text(commands, {chrome.body.x, chrome.body.y + 50.0f * scale, chrome.body.width, 18.0f * scale},
-                       reinterpret_cast<const uint16_t *>(buffer),
-                       REACH_TEXT_SIZE_XSMALL * scale, REACH_TEXT_WEIGHT_NORMAL,
-                       theme->primary_text, REACH_TEXT_ALIGNMENT_CENTER);
+    reach_widgets_text(
+        commands, {chrome.body.x, chrome.body.y + 50.0f * scale, chrome.body.width, 18.0f * scale},
+        reinterpret_cast<const uint16_t *>(buffer), REACH_TEXT_SIZE_XSMALL * scale,
+        REACH_TEXT_WEIGHT_NORMAL, theme->primary_text, REACH_TEXT_ALIGNMENT_CENTER);
     float duration = widgets->pomodoro.phase == 0   ? 1500.0f
                      : widgets->pomodoro.phase == 1 ? 300.0f
                                                     : 900.0f;
     const reach_rect_f32 track = {chrome.footer.x, chrome.footer.y - 9.0f * scale,
                                   chrome.footer.width, 4.0f * scale};
-    const float progress = 100.0f * (1.0f - (float)reach_pomodoro_remaining(
-        widgets->pomodoro, reach_motion_now_seconds()) / duration);
+    const float progress =
+        100.0f *
+        (1.0f -
+         (float)reach_pomodoro_remaining(widgets->pomodoro, reach_motion_now_seconds()) / duration);
     reach_widgets_segments(commands, theme, track, progress, scale, true);
-    const wchar_t *const labels[] = {
-        widgets->pomodoro.running ? L"Pause" : L"Start", L"Skip", L"Reset"};
+    const wchar_t *const labels[] = {widgets->pomodoro.running ? L"Pause" : L"Start", L"Skip",
+                                     L"Reset"};
     for (int button = 0; button < reach_widgets_controls[REACH_WIDGET_POMODORO].count; ++button)
     {
-        const auto bounds = reach_widgets_control_bounds(chrome, REACH_WIDGET_POMODORO,
-                                                         button, scale);
+        const auto bounds =
+            reach_widgets_control_bounds(chrome, REACH_WIDGET_POMODORO, button, scale);
         reach_widgets_footer_button(commands, theme, bounds, labels[button], scale);
     }
 }
 
 static void reach_widgets_render_body(const reach_widgets *widgets, size_t index,
-                                      const reach_widget_chrome &chrome,
-                                      const reach_theme *actual, float scale,
-                                      const reach_text_measure_port *text_measure,
+                                      const reach_widget_chrome &chrome, const reach_theme *actual,
+                                      float scale, const reach_text_measure_port *text_measure,
                                       reach_render_command_buffer *commands)
 {
     if (index == REACH_WIDGET_POMODORO)
@@ -1015,7 +1022,7 @@ static void reach_widgets_render_body(const reach_widgets *widgets, size_t index
     if (index == REACH_WIDGET_CLOCK)
     {
         reach_widgets_title(commands, actual, title, reach_widget_definition_at(index)->label,
-                             scale);
+                            scale);
         if (widgets->clock_snapshot.valid)
         {
             swprintf_s(buffer, L"%02d:%02d", widgets->clock_snapshot.hour,
@@ -1028,41 +1035,41 @@ static void reach_widgets_render_body(const reach_widgets *widgets, size_t index
     }
     else if (index == REACH_WIDGET_SYSTEM)
     {
-        reach_widgets_system_render(commands, actual, chrome, scale,
-                                    widgets->stats_snapshot, text_measure);
+        reach_widgets_system_render(commands, actual, chrome, scale, widgets->stats_snapshot,
+                                    text_measure);
         return;
     }
     else if (index == REACH_WIDGET_STOPWATCH)
     {
         reach_widgets_title(commands, actual, title, reach_widget_definition_at(index)->label,
-                             scale);
-        double seconds = widgets->stopwatch_elapsed +
-                         (widgets->stopwatch_running
-                              ? reach_motion_now_seconds() - widgets->stopwatch_started
-                              : 0.0);
+                            scale);
+        double seconds =
+            widgets->stopwatch_elapsed +
+            (widgets->stopwatch_running ? reach_motion_now_seconds() - widgets->stopwatch_started
+                                        : 0.0);
         uint64_t tenths = (uint64_t)(std::max(0.0, seconds) * 10.0);
         swprintf_s(buffer, L"%02llu:%02llu.%llu", tenths / 600, tenths / 10 % 60, tenths % 10);
         reach_widgets_text(commands, value, reinterpret_cast<const uint16_t *>(buffer),
-                           REACH_TEXT_SIZE_XLARGE * scale, REACH_TEXT_WEIGHT_DEMIBOLD, actual->primary_text,
-                           REACH_TEXT_ALIGNMENT_CENTER);
+                           REACH_TEXT_SIZE_XLARGE * scale, REACH_TEXT_WEIGHT_DEMIBOLD,
+                           actual->primary_text, REACH_TEXT_ALIGNMENT_CENTER);
         for (int32_t button = 0; button < reach_widgets_controls[index].count; ++button)
         {
             const auto bounds = reach_widgets_control_bounds(chrome, (int32_t)index, button, scale);
-            const wchar_t *label = button == 1 ? L"Reset"
-                                              : (widgets->stopwatch_running ? L"Pause" : L"Start");
+            const wchar_t *label =
+                button == 1 ? L"Reset" : (widgets->stopwatch_running ? L"Pause" : L"Start");
             reach_widgets_footer_button(commands, actual, bounds, label, scale);
         }
         return;
     }
     else if (index == REACH_WIDGET_CALENDAR)
     {
-        static const wchar_t *months[12] = {
-            L"January", L"February", L"March",     L"April",   L"May",      L"June",
-            L"July",    L"August",   L"September", L"October", L"November", L"December"};
+        static const wchar_t *months[12] = {L"January",   L"February", L"March",    L"April",
+                                            L"May",       L"June",     L"July",     L"August",
+                                            L"September", L"October",  L"November", L"December"};
         if (!widgets->clock_snapshot.valid)
         {
             reach_widgets_title(commands, actual, title, reach_widget_definition_at(index)->label,
-                                 scale);
+                                scale);
             reach_widgets_text(commands, body, (const uint16_t *)u"Date unavailable",
                                REACH_TEXT_SIZE_MEDIUM * scale, REACH_TEXT_WEIGHT_NORMAL,
                                actual->primary_text, REACH_TEXT_ALIGNMENT_CENTER);
@@ -1078,27 +1085,25 @@ static void reach_widgets_render_body(const reach_widgets *widgets, size_t index
         month_title.x += 20.0f * scale;
         month_title.width -= 40.0f * scale;
         reach_widgets_title(commands, actual, month_title,
-                             reinterpret_cast<const uint16_t *>(buffer), scale,
-                             REACH_TEXT_ALIGNMENT_CENTER, REACH_TEXT_SIZE_MEDIUM);
+                            reinterpret_cast<const uint16_t *>(buffer), scale,
+                            REACH_TEXT_ALIGNMENT_CENTER, REACH_TEXT_SIZE_MEDIUM);
         reach_widgets_text(commands, reach_widgets_control_bounds(chrome, (int32_t)index, 0, scale),
-                           reinterpret_cast<const uint16_t *>(L"‹"),
-                           REACH_TEXT_SIZE_MEDIUM * scale, REACH_TEXT_WEIGHT_SEMIBOLD,
-                           actual->primary_text, REACH_TEXT_ALIGNMENT_CENTER);
-        reach_widgets_text(
-            commands,
-            reach_widgets_control_bounds(chrome, (int32_t)index, 1, scale),
-            reinterpret_cast<const uint16_t *>(L"›"), REACH_TEXT_SIZE_MEDIUM * scale,
-            REACH_TEXT_WEIGHT_SEMIBOLD, actual->primary_text, REACH_TEXT_ALIGNMENT_CENTER);
+                           reinterpret_cast<const uint16_t *>(L"‹"), REACH_TEXT_SIZE_MEDIUM * scale,
+                           REACH_TEXT_WEIGHT_SEMIBOLD, actual->primary_text,
+                           REACH_TEXT_ALIGNMENT_CENTER);
+        reach_widgets_text(commands, reach_widgets_control_bounds(chrome, (int32_t)index, 1, scale),
+                           reinterpret_cast<const uint16_t *>(L"›"), REACH_TEXT_SIZE_MEDIUM * scale,
+                           REACH_TEXT_WEIGHT_SEMIBOLD, actual->primary_text,
+                           REACH_TEXT_ALIGNMENT_CENTER);
         const wchar_t *weekdays[7] = {L"S", L"M", L"T", L"W", L"T", L"F", L"S"};
         float cell_width = body.width / 7.0f;
         float cell_height = (body.height - 29.0f * scale) / 6.0f;
         int32_t first_weekday = reach_widgets_month_weekday(year, month);
         for (int32_t column = 0; column < 7; ++column)
         {
-            reach_rect_f32 cell = {body.x + column * cell_width,
-                                   body.y + 3.0f * scale, cell_width, 22.0f * scale};
-            reach_widgets_text(commands, cell,
-                               reinterpret_cast<const uint16_t *>(weekdays[column]),
+            reach_rect_f32 cell = {body.x + column * cell_width, body.y + 3.0f * scale, cell_width,
+                                   22.0f * scale};
+            reach_widgets_text(commands, cell, reinterpret_cast<const uint16_t *>(weekdays[column]),
                                REACH_TEXT_SIZE_XSMALL * scale, REACH_TEXT_WEIGHT_SEMIBOLD,
                                actual->primary_text);
         }
@@ -1111,8 +1116,8 @@ static void reach_widgets_render_body(const reach_widgets *widgets, size_t index
             reach_rect_f32 cell = {body.x + column * cell_width,
                                    body.y + 29.0f * scale + row * cell_height,
                                    cell_width - 3.0f * scale, cell_height - 3.0f * scale};
-            const bool today = widgets->calendar_month_offset == 0 &&
-                               day == widgets->clock_snapshot.day;
+            const bool today =
+                widgets->calendar_month_offset == 0 && day == widgets->clock_snapshot.day;
             if (today)
             {
                 reach_widgets_rect(commands, cell, 8.0f * scale, actual->accent);
@@ -1135,8 +1140,7 @@ static void reach_widgets_render_body(const reach_widgets *widgets, size_t index
         {
             reach_render_command cover = {};
             cover.type = REACH_RENDER_COMMAND_ICON;
-            cover.rect = {body.x, body.y + 4.0f * scale,
-                          62.0f * scale, 62.0f * scale};
+            cover.rect = {body.x, body.y + 4.0f * scale, 62.0f * scale, 62.0f * scale};
             cover.icon_id = widgets->media_snapshot.cover_image_id;
             cover.icon_crop_to_fill = 1;
             cover.radius = 12.0f * scale;
@@ -1145,7 +1149,7 @@ static void reach_widgets_render_body(const reach_widgets *widgets, size_t index
             (void)reach_render_command_buffer_push(commands, &cover);
         }
         reach_widgets_title(commands, actual, title, reach_widget_definition_at(index)->label,
-                             scale);
+                            scale);
         if (widgets->media_snapshot.has_session)
         {
             const float cover_space = has_cover ? 74.0f * scale : 0.0f;
@@ -1166,7 +1170,8 @@ static void reach_widgets_render_body(const reach_widgets *widgets, size_t index
                                                       REACH_VECTOR_ICON_NEXT};
             for (int32_t control = 0; control < reach_widgets_controls[index].count; ++control)
             {
-                const auto button = reach_widgets_control_bounds(chrome, (int32_t)index, control, scale);
+                const auto button =
+                    reach_widgets_control_bounds(chrome, (int32_t)index, control, scale);
                 reach_color wash = actual->accent;
                 wash.a = control == 1 ? 0.22f : 0.08f;
                 reach_widgets_rect(commands, button, 15.0f * scale, wash);
@@ -1182,15 +1187,15 @@ static void reach_widgets_render_body(const reach_widgets *widgets, size_t index
         }
         wcscpy_s(buffer, L"Nothing playing");
     }
-    reach_widgets_text(commands, value, reinterpret_cast<const uint16_t *>(buffer),
-                       (index == REACH_WIDGET_CLOCK ? REACH_TEXT_SIZE_XLARGE : REACH_TEXT_SIZE_LARGE) * scale,
-                       REACH_TEXT_WEIGHT_DEMIBOLD, actual->primary_text);
+    reach_widgets_text(
+        commands, value, reinterpret_cast<const uint16_t *>(buffer),
+        (index == REACH_WIDGET_CLOCK ? REACH_TEXT_SIZE_XLARGE : REACH_TEXT_SIZE_LARGE) * scale,
+        REACH_TEXT_WEIGHT_DEMIBOLD, actual->primary_text);
     if (index == REACH_WIDGET_CLOCK && widgets->clock_snapshot.valid)
     {
         swprintf_s(buffer, L"%04d / %02d / %02d", widgets->clock_snapshot.year,
                    widgets->clock_snapshot.month, widgets->clock_snapshot.day);
-        reach_widgets_text(commands,
-                           {body.x, body.y + 55.0f * scale, body.width, 24.0f * scale},
+        reach_widgets_text(commands, {body.x, body.y + 55.0f * scale, body.width, 24.0f * scale},
                            reinterpret_cast<const uint16_t *>(buffer),
                            REACH_TEXT_SIZE_SMALL * scale, REACH_TEXT_WEIGHT_NORMAL,
                            actual->primary_text);
@@ -1198,7 +1203,8 @@ static void reach_widgets_render_body(const reach_widgets *widgets, size_t index
 }
 
 reach_result reach_widgets_render_desktop(const reach_widgets *widgets, const reach_theme *theme,
-                                          float dpi_scale, const reach_text_measure_port *text_measure,
+                                          float dpi_scale,
+                                          const reach_text_measure_port *text_measure,
                                           reach_render_command_buffer *commands)
 {
     if (widgets == nullptr || commands == nullptr)
@@ -1223,8 +1229,8 @@ reach_result reach_widgets_render_desktop(const reach_widgets *widgets, const re
             continue;
         if (widgets->moved && (int32_t)index == widgets->drag_index)
         {
-            const auto target = widgets->drag_has_destination ? widgets->drag_destination
-                                                               : widgets->drag_origin;
+            const auto target =
+                widgets->drag_has_destination ? widgets->drag_destination : widgets->drag_origin;
             if (!reach_rect_equal(rect, target))
             {
                 auto marker = actual->accent;
@@ -1234,10 +1240,10 @@ reach_result reach_widgets_render_desktop(const reach_widgets *widgets, const re
         }
         reach_widgets_card(commands, actual, rect, scale, actual->accent);
         const auto inner = reach_theme_border_content_rect(actual, scale, rect);
-        const float inner_radius = std::max(
-            0.0f, actual->radius_large * scale - reach_theme_border_thickness(actual, scale));
-        const bool has_artwork = index == REACH_WIDGET_NOW_PLAYING &&
-                                 widgets->media_snapshot.cover_image_id != 0;
+        const float inner_radius = std::max(0.0f, actual->radius_large * scale -
+                                                      reach_theme_border_thickness(actual, scale));
+        const bool has_artwork =
+            index == REACH_WIDGET_NOW_PLAYING && widgets->media_snapshot.cover_image_id != 0;
         if (has_artwork)
         {
             reach_now_playing_artwork_render_input artwork = {};
@@ -1250,7 +1256,8 @@ reach_result reach_widgets_render_desktop(const reach_widgets *widgets, const re
             (void)reach_now_playing_artwork_build_render_commands(&artwork, commands);
         }
         reach_widgets_decorate(commands, inner, inner_radius, actual->accent);
-        const auto chrome = reach_widgets_chrome(rect, scale, reach_widgets_has_footer((int32_t)index));
+        const auto chrome =
+            reach_widgets_chrome(rect, scale, reach_widgets_has_footer((int32_t)index));
         reach_widgets_render_body(widgets, index, chrome, actual, scale, text_measure, commands);
         reach_widgets_resize_grip(commands, actual, chrome.resize, scale);
     }

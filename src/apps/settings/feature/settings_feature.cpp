@@ -440,8 +440,8 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
                                                  control_y, control_size, control_size);
 
     float nav_padding_x = 16.0f * scale;
-    const float nav_row_space = fminf(50.0f * scale, (bounds.height - 58.0f * scale) /
-                                                               REACH_SETTINGS_NAV_ITEM_COUNT);
+    const float nav_row_space =
+        fminf(50.0f * scale, (bounds.height - 58.0f * scale) / REACH_SETTINGS_NAV_ITEM_COUNT);
     const float item_gap = nav_row_space * 0.16f;
     const float item_height = nav_row_space - item_gap;
     float item_y = layout.nav.y + 20.0f * scale;
@@ -486,17 +486,17 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
         const float row_gap = 7.0f * scale;
         const float rows_top = top + reset_height + 10.0f * scale;
         const float rows_height = bounds.height - rows_top - 16.0f * scale;
-        const float row_height = fminf(56.0f * scale,
-            (rows_height - row_gap * (REACH_MAX_DESKTOP_WIDGETS - 1)) / REACH_MAX_DESKTOP_WIDGETS);
+        const float row_height =
+            fminf(56.0f * scale, (rows_height - row_gap * (REACH_MAX_DESKTOP_WIDGETS - 1)) /
+                                     REACH_MAX_DESKTOP_WIDGETS);
         layout.widget_reset = reach_settings_rect(x, top, 144.0f * scale, reset_height);
         for (size_t index = 0; index < REACH_MAX_DESKTOP_WIDGETS; ++index)
         {
             const float y = rows_top + index * (row_height + row_gap);
             layout.widget_rows[index] = reach_settings_rect(x, y, width, row_height);
-            layout.widget_toggles[index] =
-                reach_settings_rect(x + width - 56.0f * scale,
-                                    y + (row_height - 22.0f * scale) * 0.5f,
-                                    40.0f * scale, 22.0f * scale);
+            layout.widget_toggles[index] = reach_settings_rect(
+                x + width - 56.0f * scale, y + (row_height - 22.0f * scale) * 0.5f, 40.0f * scale,
+                22.0f * scale);
         }
         return layout;
     }

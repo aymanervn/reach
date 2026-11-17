@@ -79,8 +79,9 @@ extern "C"
     reach_result reach_config_service_set_top_bar(reach_config_service *service,
                                                   const reach_config_top_bar_settings *settings);
     reach_result reach_config_service_reset_widget_positions(reach_config_service *service);
-    reach_result reach_config_service_set_widget_placement(
-        reach_config_service *service, size_t index, reach_config_widget_placement placement);
+    reach_result reach_config_service_set_widget_placement(reach_config_service *service,
+                                                           size_t index,
+                                                           reach_config_widget_placement placement);
     reach_result reach_config_service_toggle_desktop_widget(reach_config_service *service,
                                                             size_t index);
 

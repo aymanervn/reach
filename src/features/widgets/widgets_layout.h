@@ -86,8 +86,8 @@ static inline bool reach_widgets_find_space(reach_rect_f32 area, reach_rect_f32 
 }
 
 static inline bool reach_widgets_find_drop(reach_rect_f32 desktop, reach_rect_f32 wanted,
-                                           const reach_rect_f32 *cards, size_t count,
-                                           size_t moving, bool resizing, float gap, float grid,
+                                           const reach_rect_f32 *cards, size_t count, size_t moving,
+                                           bool resizing, float gap, float grid,
                                            reach_rect_f32 *out)
 {
     *out = {};

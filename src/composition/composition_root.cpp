@@ -15,15 +15,15 @@ static void reach_app_on_input(void *user, const reach_ui_event *event)
 }
 
 static reach_result reach_app_create_surface_ports(void *user, reach_surface_role role,
-                                                     reach_platform_window_port *window,
-                                                     reach_render_backend_port *renderer)
+                                                   reach_platform_window_port *window,
+                                                   reach_render_backend_port *renderer)
 {
     auto *app = static_cast<reach_app *>(user);
     reach_result result = reach_windows_create_platform_window(role, window);
     if (result == REACH_OK)
     {
-        result = reach_windows_create_dcomp_render_backend(app->render_device, window->window,
-                                                           renderer);
+        result =
+            reach_windows_create_dcomp_render_backend(app->render_device, window->window, renderer);
     }
     return result;
 }

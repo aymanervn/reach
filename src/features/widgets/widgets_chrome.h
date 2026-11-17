@@ -24,11 +24,11 @@ static inline reach_widget_chrome reach_widgets_chrome(reach_rect_f32 card, floa
     chrome.footer = {chrome.header.x, card.y + card.height - grip_size - footer_height,
                      chrome.header.width, footer_height};
     const float body_y = chrome.header.y + chrome.header.height + gap;
-    const float body_bottom = has_footer ? chrome.footer.y - gap
-                                         : card.y + card.height - 18.0f * scale;
+    const float body_bottom =
+        has_footer ? chrome.footer.y - gap : card.y + card.height - 18.0f * scale;
     chrome.body = {chrome.header.x, body_y, chrome.header.width, body_bottom - body_y};
-    chrome.resize = {card.x + card.width - grip_size, card.y + card.height - grip_size,
-                     grip_size, grip_size};
+    chrome.resize = {card.x + card.width - grip_size, card.y + card.height - grip_size, grip_size,
+                     grip_size};
     return chrome;
 }
 

@@ -867,8 +867,8 @@ static reach_result reach_platform_window_show(reach_platform_window *window)
             if (previous != window->hwnd)
             {
                 HWND position = previous;
-                if (position == nullptr || (GetWindowLongPtrW(position, GWL_EXSTYLE) &
-                                            WS_EX_TOPMOST) != 0)
+                if (position == nullptr ||
+                    (GetWindowLongPtrW(position, GWL_EXSTYLE) & WS_EX_TOPMOST) != 0)
                 {
                     position = HWND_NOTOPMOST;
                 }

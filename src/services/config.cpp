@@ -153,9 +153,9 @@ static reach_result reach_config_apply_operation(reach_config_snapshot *snapshot
         {
             return REACH_INVALID_ARGUMENT;
         }
-        *out_changed = std::memcmp(&snapshot->widget_placements[operation->target_index],
-                                   &operation->widget_placement,
-                                   sizeof(operation->widget_placement)) != 0;
+        *out_changed =
+            std::memcmp(&snapshot->widget_placements[operation->target_index],
+                        &operation->widget_placement, sizeof(operation->widget_placement)) != 0;
         snapshot->widget_placements[operation->target_index] = operation->widget_placement;
         return REACH_OK;
     case REACH_CONFIG_OPERATION_TOGGLE_DESKTOP_WIDGET:
@@ -702,8 +702,8 @@ reach_result reach_config_service_reset_widget_positions(reach_config_service *s
     return reach_config_service_commit(service, &operation);
 }
 
-reach_result reach_config_service_set_widget_placement(
-    reach_config_service *service, size_t index, reach_config_widget_placement placement)
+reach_result reach_config_service_set_widget_placement(reach_config_service *service, size_t index,
+                                                       reach_config_widget_placement placement)
 {
     const auto *definition = reach_widget_definition_at(index);
     if (definition == nullptr)
@@ -711,9 +711,8 @@ reach_result reach_config_service_set_widget_placement(
         return REACH_INVALID_ARGUMENT;
     }
     const auto &limits = definition->limits;
-    if (placement.width < limits.min_width ||
-        placement.height < limits.min_height || placement.width > limits.max_width ||
-        placement.height > limits.max_height)
+    if (placement.width < limits.min_width || placement.height < limits.min_height ||
+        placement.width > limits.max_width || placement.height > limits.max_height)
     {
         return REACH_INVALID_ARGUMENT;
     }
@@ -724,8 +723,7 @@ reach_result reach_config_service_set_widget_placement(
     return reach_config_service_commit(service, &operation);
 }
 
-reach_result reach_config_service_toggle_desktop_widget(reach_config_service *service,
-                                                        size_t index)
+reach_result reach_config_service_toggle_desktop_widget(reach_config_service *service, size_t index)
 {
     if (index >= REACH_MAX_DESKTOP_WIDGETS)
     {

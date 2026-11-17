@@ -353,7 +353,7 @@ static void reach_host_route_screenshot_copied(void *user)
 }
 
 static void reach_host_route_widget_placement(void *user, size_t index,
-                                               reach_config_widget_placement placement)
+                                              reach_config_widget_placement placement)
 {
     reach_host *host = static_cast<reach_host *>(user);
     if (host != nullptr)

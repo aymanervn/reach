@@ -232,7 +232,7 @@ static void reach_feature_notify_widgets(void *capsule,
         return;
     }
     int32_t changed = reach_widgets_set_enabled(static_cast<reach_widgets *>(capsule),
-                                                 notification->config->desktop_widgets);
+                                                notification->config->desktop_widgets);
     for (size_t index = 0; index < REACH_MAX_DESKTOP_WIDGETS; ++index)
     {
         changed |= reach_widgets_set_placement(static_cast<reach_widgets *>(capsule), index,
@@ -928,9 +928,8 @@ static void reach_host_init_feature_definitions(reach_host *host)
                               nullptr, reach_screenshot_capsule_ops(),
                               REACH_SURFACE_POINTER_CAPTURE_CONSUMES_RELEASE);
 
-    reach_host_define_feature(host, REACH_SURFACE_ID_WIDGET_DESKTOP,
-                              REACH_SURFACE_CLASS_PERSISTENT, nullptr,
-                              reach_widgets_desktop_capsule_ops(),
+    reach_host_define_feature(host, REACH_SURFACE_ID_WIDGET_DESKTOP, REACH_SURFACE_CLASS_PERSISTENT,
+                              nullptr, reach_widgets_desktop_capsule_ops(),
                               REACH_SURFACE_POINTER_SOURCE_GATED |
                                   REACH_SURFACE_POINTER_CAPTURE_CONSUMES_RELEASE |
                                   REACH_SURFACE_POINTER_CAPTURE_OWNS_MOVE);
@@ -1400,13 +1399,13 @@ static const reach_feature_surface_ops reach_stage_surface_ops = {
 static int32_t reach_widgets_desktop_surface_arrange(void *capsule,
                                                      const reach_feature_surface_context *ctx)
 {
-    return reach_widgets_arrange_desktop(static_cast<reach_widgets *>(capsule),
-                                         ctx->monitor_bounds, ctx->dpi_scale);
+    return reach_widgets_arrange_desktop(static_cast<reach_widgets *>(capsule), ctx->monitor_bounds,
+                                         ctx->dpi_scale);
 }
 
-static reach_result reach_widgets_desktop_surface_render(
-    void *capsule, const reach_feature_surface_context *ctx,
-    reach_render_command_buffer *out_commands)
+static reach_result reach_widgets_desktop_surface_render(void *capsule,
+                                                         const reach_feature_surface_context *ctx,
+                                                         reach_render_command_buffer *out_commands)
 {
     return reach_widgets_render_desktop(static_cast<reach_widgets *>(capsule), ctx->theme,
                                         ctx->dpi_scale, &ctx->text_measure, out_commands);
@@ -1787,7 +1786,7 @@ void reach_host_init_feature_registry(reach_host *host)
 }
 
 reach_result reach_host_bind_registered_surface_ports(reach_host *host,
-                                              const reach_host_dependencies *dependencies)
+                                                      const reach_host_dependencies *dependencies)
 {
     if (host == nullptr || dependencies == nullptr)
     {

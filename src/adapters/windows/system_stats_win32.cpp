@@ -222,7 +222,7 @@ static void reach_system_stats_read_gpu_clock(const wchar_t *identity,
 }
 
 static bool reach_system_stats_read_counter_array(PDH_HCOUNTER counter, DWORD format,
-                                                   std::vector<BYTE> &buffer, DWORD &count)
+                                                  std::vector<BYTE> &buffer, DWORD &count)
 {
     DWORD bytes = 0;
     if (counter == nullptr ||
@@ -280,7 +280,8 @@ static void reach_system_stats_sample_vram(reach_system_stats_source *source, LU
     }
     Microsoft::WRL::ComPtr<IDXGIAdapter1> adapter;
     DXGI_ADAPTER_DESC1 desc = {};
-    if (SUCCEEDED(source->dxgi_factory->EnumAdapterByLuid(luid, IID_PPV_ARGS(adapter.GetAddressOf()))) &&
+    if (SUCCEEDED(
+            source->dxgi_factory->EnumAdapterByLuid(luid, IID_PPV_ARGS(adapter.GetAddressOf()))) &&
         SUCCEEDED(adapter->GetDesc1(&desc)) && desc.DedicatedVideoMemory != 0)
     {
         sample->vram_used_bytes = used;
@@ -289,7 +290,7 @@ static void reach_system_stats_sample_vram(reach_system_stats_source *source, LU
 }
 
 static void reach_system_stats_sample_gpu_temperature(LUID luid, UINT physical,
-                                                     reach_system_stats_sample *sample);
+                                                      reach_system_stats_sample *sample);
 
 static void reach_system_stats_sample_gpu_engines(reach_system_stats_source *source,
                                                   reach_system_stats_sample *out_sample)
@@ -314,8 +315,9 @@ static void reach_system_stats_sample_gpu_engines(reach_system_stats_source *sou
             continue;
         engines[identity] += std::max(0.0, item.FmtValue.doubleValue);
     }
-    const auto most_used = std::max_element(engines.begin(), engines.end(),
-        [](const auto &a, const auto &b) { return a.second < b.second; });
+    const auto most_used =
+        std::max_element(engines.begin(), engines.end(),
+                         [](const auto &a, const auto &b) { return a.second < b.second; });
     if (most_used != engines.end())
     {
         out_sample->gpu_percent = (float)std::clamp(most_used->second, 0.0, 100.0);
@@ -333,13 +335,15 @@ static void reach_system_stats_sample_gpu_engines(reach_system_stats_source *sou
         const size_t engine_offset = identity.find(L"_eng_");
         if (engine_offset != std::wstring::npos)
         {
-            const auto graphics = std::find_if(engines.begin(), engines.end(), [&](const auto &item)
-            {
-                const size_t kind = item.first.find(L"_engtype_", engine_offset);
-                return kind != std::wstring::npos &&
-                       item.first.compare(0, engine_offset, identity, 0, engine_offset) == 0 &&
-                       _wcsicmp(item.first.c_str() + kind, L"_engtype_3d") == 0;
-            });
+            const auto graphics = std::find_if(
+                engines.begin(), engines.end(),
+                [&](const auto &item)
+                {
+                    const size_t kind = item.first.find(L"_engtype_", engine_offset);
+                    return kind != std::wstring::npos &&
+                           item.first.compare(0, engine_offset, identity, 0, engine_offset) == 0 &&
+                           _wcsicmp(item.first.c_str() + kind, L"_engtype_3d") == 0;
+                });
             if (graphics != engines.end())
             {
                 reach_system_stats_read_gpu_clock(graphics->first.c_str(), out_sample);
@@ -370,12 +374,12 @@ struct reach_system_stats_nvml_session
             return;
         auto initialize = reinterpret_cast<initialize_fn>(GetProcAddress(library, "nvmlInit_v2"));
         shutdown = reinterpret_cast<initialize_fn>(GetProcAddress(library, "nvmlShutdown"));
-        device =
-            reinterpret_cast<device_fn>(GetProcAddress(library, "nvmlDeviceGetHandleByPciBusId_v2"));
+        device = reinterpret_cast<device_fn>(
+            GetProcAddress(library, "nvmlDeviceGetHandleByPciBusId_v2"));
         temperature =
             reinterpret_cast<temperature_fn>(GetProcAddress(library, "nvmlDeviceGetTemperature"));
-        initialized = initialize != nullptr && shutdown != nullptr &&
-                      device != nullptr && temperature != nullptr && initialize() == 0;
+        initialized = initialize != nullptr && shutdown != nullptr && device != nullptr &&
+                      temperature != nullptr && initialize() == 0;
     }
 
     ~reach_system_stats_nvml_session()
@@ -388,7 +392,7 @@ struct reach_system_stats_nvml_session
 };
 
 static void reach_system_stats_sample_gpu_temperature(LUID luid, UINT physical,
-                                                     reach_system_stats_sample *sample)
+                                                      reach_system_stats_sample *sample)
 {
     D3DKMT_OPENADAPTERFROMLUID adapter = {};
     adapter.AdapterLuid = luid;
@@ -398,8 +402,8 @@ static void reach_system_stats_sample_gpu_temperature(LUID luid, UINT physical,
     }
     D3DKMT_ADAPTER_PERFDATA performance = {};
     performance.PhysicalAdapterIndex = physical;
-    D3DKMT_QUERYADAPTERINFO query = {adapter.hAdapter, KMTQAITYPE_ADAPTERPERFDATA,
-                                    &performance, sizeof(performance)};
+    D3DKMT_QUERYADAPTERINFO query = {adapter.hAdapter, KMTQAITYPE_ADAPTERPERFDATA, &performance,
+                                     sizeof(performance)};
     const auto status = D3DKMTQueryAdapterInfo(&query);
 
     D3DKMT_ADAPTERADDRESS address = {};
@@ -465,8 +469,8 @@ static void reach_system_stats_sample_monitor(reach_system_stats_source *source,
         reach_system_stats_sample_gpu_engines(source, out_sample);
         PDH_FMT_COUNTERVALUE frequency = {};
         if (source->cpu_frequency != nullptr &&
-            PdhGetFormattedCounterValue(source->cpu_frequency, PDH_FMT_LONG, nullptr,
-                                        &frequency) == ERROR_SUCCESS &&
+            PdhGetFormattedCounterValue(source->cpu_frequency, PDH_FMT_LONG, nullptr, &frequency) ==
+                ERROR_SUCCESS &&
             (frequency.CStatus == PDH_CSTATUS_VALID_DATA ||
              frequency.CStatus == PDH_CSTATUS_NEW_DATA) &&
             frequency.longValue > 0)

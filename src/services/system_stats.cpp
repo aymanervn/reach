@@ -52,14 +52,11 @@ static int32_t reach_system_stats_snapshot_differs(const reach_system_stats_snap
     return a->gpu_available != b->gpu_available ||
            (int32_t)a->gpu_percent != (int32_t)b->gpu_percent ||
            a->gpu_temperature_available != b->gpu_temperature_available ||
-           a->gpu_temperature_c != b->gpu_temperature_c ||
-           a->cpu_clock_mhz != b->cpu_clock_mhz ||
-           a->memory_speed_mt_s != b->memory_speed_mt_s ||
-           a->gpu_clock_mhz != b->gpu_clock_mhz ||
-           a->gpu_clock_max_mhz != b->gpu_clock_max_mhz ||
-           a->vram_available != b->vram_available ||
-           (int32_t)a->vram_percent != (int32_t)b->vram_percent ||
-           a->valid != b->valid || (int32_t)a->cpu_percent != (int32_t)b->cpu_percent ||
+           a->gpu_temperature_c != b->gpu_temperature_c || a->cpu_clock_mhz != b->cpu_clock_mhz ||
+           a->memory_speed_mt_s != b->memory_speed_mt_s || a->gpu_clock_mhz != b->gpu_clock_mhz ||
+           a->gpu_clock_max_mhz != b->gpu_clock_max_mhz || a->vram_available != b->vram_available ||
+           (int32_t)a->vram_percent != (int32_t)b->vram_percent || a->valid != b->valid ||
+           (int32_t)a->cpu_percent != (int32_t)b->cpu_percent ||
            (int32_t)a->memory_percent != (int32_t)b->memory_percent ||
            a->network_received_bytes_per_second != b->network_received_bytes_per_second ||
            a->network_sent_bytes_per_second != b->network_sent_bytes_per_second;
@@ -152,7 +149,8 @@ static void reach_system_stats_thread_main(reach_system_stats *service)
         next.gpu_clock_mhz = sample.gpu_clock_mhz;
         next.gpu_clock_max_mhz = sample.gpu_clock_max_mhz;
         next.vram_available = sample.vram_total_bytes != 0;
-        next.vram_percent = reach_system_stats_percent(sample.vram_used_bytes, sample.vram_total_bytes);
+        next.vram_percent =
+            reach_system_stats_percent(sample.vram_used_bytes, sample.vram_total_bytes);
         next.gpu_temperature_c = sample.gpu_temperature_c;
         next.gpu_available = sample.gpu_available;
         next.gpu_temperature_available = sample.gpu_temperature_available;

@@ -652,7 +652,8 @@ static void reach_settings_save_theme_config(reach_settings_app *app)
 
 static void reach_settings_load_widget_config(reach_settings_app *app)
 {
-    auto snapshot = std::unique_ptr<reach_config_snapshot>(new (std::nothrow) reach_config_snapshot());
+    auto snapshot =
+        std::unique_ptr<reach_config_snapshot>(new (std::nothrow) reach_config_snapshot());
     if (snapshot != nullptr &&
         reach_config_service_snapshot(app->config_service, snapshot.get()) == REACH_OK)
     {

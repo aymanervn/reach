@@ -70,20 +70,20 @@ int main()
     const reach_rect_f32 siblings[] = {{310, 120, 200, 160}, {120, 120, 150, 160}};
     const reach_rect_f32 drop_bounds = {0, 0, 800, 600};
     reach_rect_f32 drop = {};
-    expect(reach_widgets_find_drop(drop_bounds, {250, 145, 200, 160}, siblings, 2, 0, false,
-                                  14, 1, &drop),
+    expect(reach_widgets_find_drop(drop_bounds, {250, 145, 200, 160}, siblings, 2, 0, false, 14, 1,
+                                   &drop),
            "drag finds a landing beside an existing card");
     expect(drop.x == 284 && drop.y == 145,
            "overlap resolves to the nearest free position with the sibling unchanged");
-    expect(reach_widgets_find_drop(drop_bounds, {689, 100, 200, 160}, siblings, 2, 0, false,
-                                  17.5f, 1.25f, &drop) &&
+    expect(reach_widgets_find_drop(drop_bounds, {689, 100, 200, 160}, siblings, 2, 0, false, 17.5f,
+                                   1.25f, &drop) &&
                drop.x == 600 && drop.y == 100,
            "drop stays on screen and is aligned to saved DP coordinates");
-    expect(!reach_widgets_find_drop(drop_bounds, {310, 120, 130, 160}, siblings, 2, 1, true,
-                                   14, 1, &drop),
+    expect(!reach_widgets_find_drop(drop_bounds, {310, 120, 130, 160}, siblings, 2, 1, true, 14, 1,
+                                    &drop),
            "a blocked resize cannot move another card");
-    expect(reach_widgets_find_drop(drop_bounds, {310, 120, 230, 160}, siblings, 2, 0, true,
-                                  14, 1, &drop) &&
+    expect(reach_widgets_find_drop(drop_bounds, {310, 120, 230, 160}, siblings, 2, 0, true, 14, 1,
+                                   &drop) &&
                drop.x == 310 && drop.y == 120 && drop.width == 230,
            "a valid resize retains its top-left anchor");
     return failed ? 1 : 0;

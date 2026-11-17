@@ -465,7 +465,7 @@ void reach_host_bind_interfeature_routes(reach_host *host);
 void reach_host_clear_interfeature_routes(reach_host *host);
 reach_result reach_host_create_registered_features(reach_host *host);
 reach_result reach_host_bind_registered_surface_ports(reach_host *host,
-                                              const reach_host_dependencies *dependencies);
+                                                      const reach_host_dependencies *dependencies);
 void reach_host_init_registered_surfaces(reach_host *host);
 void reach_host_destroy_registered_surface_ports(reach_host *host);
 void reach_host_attach_registered_features(reach_host *host,

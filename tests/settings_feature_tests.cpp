@@ -109,7 +109,8 @@ static void test_navigation_pages(void)
     reach_settings_model_select_page(model.get(), REACH_SETTINGS_PAGE_UPDATE);
     expect_true(model->selected_page == REACH_SETTINGS_PAGE_UPDATE,
                 "page state updates immediately");
-    expect_true(model->nav_selection.to == (float)(nav_count - 1) && reach_motion_active(&model->nav_selection),
+    expect_true(model->nav_selection.to == (float)(nav_count - 1) &&
+                    reach_motion_active(&model->nav_selection),
                 "page selection starts the navigation indicator animation");
     model->nav_selection.started_seconds -= 0.11;
     float interrupted_position = reach_motion_value(&model->nav_selection);
