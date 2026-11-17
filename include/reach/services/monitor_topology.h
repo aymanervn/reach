@@ -38,21 +38,20 @@ static inline void reach_monitor_topology_request(reach_monitor_topology *topolo
 
 static inline void reach_monitor_topology_confirm_later(reach_monitor_topology *topology)
 {
-    topology->confirmation_due =
-        std::chrono::steady_clock::now() + std::chrono::milliseconds(150);
+    topology->confirmation_due = std::chrono::steady_clock::now() + std::chrono::milliseconds(150);
     topology->confirmation_scheduled = 1;
     topology->confirmation_attempted = 1;
 }
 
-static inline int32_t reach_monitor_topology_confirmation_due(
-    const reach_monitor_topology *topology)
+static inline int32_t
+reach_monitor_topology_confirmation_due(const reach_monitor_topology *topology)
 {
     return topology->confirmation_scheduled &&
            std::chrono::steady_clock::now() >= topology->confirmation_due;
 }
 
-static inline uint32_t reach_monitor_topology_confirmation_wait_ms(
-    const reach_monitor_topology *topology)
+static inline uint32_t
+reach_monitor_topology_confirmation_wait_ms(const reach_monitor_topology *topology)
 {
     auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(
                          topology->confirmation_due - std::chrono::steady_clock::now())
@@ -60,25 +59,22 @@ static inline uint32_t reach_monitor_topology_confirmation_wait_ms(
     return remaining > 0 ? (uint32_t)remaining : 1u;
 }
 
-static inline int32_t reach_monitor_topology_rect_equal(reach_rect_i32 left,
-                                                        reach_rect_i32 right)
+static inline int32_t reach_monitor_topology_rect_equal(reach_rect_i32 left, reach_rect_i32 right)
 {
-    return left.left == right.left && left.top == right.top &&
-           left.right == right.right && left.bottom == right.bottom;
+    return left.left == right.left && left.top == right.top && left.right == right.right &&
+           left.bottom == right.bottom;
 }
 
 static inline int32_t reach_monitor_topology_info_equal(const reach_monitor_info &left,
                                                         const reach_monitor_info &right)
 {
-    return left.id == right.id && left.primary == right.primary &&
-           left.dpi_x == right.dpi_x && left.dpi_y == right.dpi_y &&
-           left.refresh_rate_hz == right.refresh_rate_hz &&
+    return left.id == right.id && left.primary == right.primary && left.dpi_x == right.dpi_x &&
+           left.dpi_y == right.dpi_y && left.refresh_rate_hz == right.refresh_rate_hz &&
            reach_monitor_topology_rect_equal(left.bounds, right.bounds) &&
            reach_monitor_topology_rect_equal(left.work_area, right.work_area);
 }
 
-static inline reach_monitor_topology_result reach_monitor_topology_refresh(
-    reach_monitor_port *port)
+static inline reach_monitor_topology_result reach_monitor_topology_refresh(reach_monitor_port *port)
 {
     if (port == nullptr || port->list == nullptr || port->ops.refresh == nullptr ||
         port->ops.count == nullptr || port->ops.get == nullptr)

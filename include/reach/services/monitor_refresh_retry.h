@@ -26,8 +26,8 @@ static inline int32_t reach_monitor_refresh_retry_defer(reach_monitor_refresh_re
         return 0;
     }
 
-    retry->next_attempt = std::chrono::steady_clock::now() +
-                          std::chrono::milliseconds(150 * retry->failures);
+    retry->next_attempt =
+        std::chrono::steady_clock::now() + std::chrono::milliseconds(150 * retry->failures);
     retry->scheduled = 1;
     return 1;
 }
@@ -37,8 +37,7 @@ static inline int32_t reach_monitor_refresh_retry_due(const reach_monitor_refres
     return retry->scheduled && std::chrono::steady_clock::now() >= retry->next_attempt;
 }
 
-static inline uint32_t reach_monitor_refresh_retry_wait_ms(
-    const reach_monitor_refresh_retry *retry)
+static inline uint32_t reach_monitor_refresh_retry_wait_ms(const reach_monitor_refresh_retry *retry)
 {
     auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(
                          retry->next_attempt - std::chrono::steady_clock::now())
