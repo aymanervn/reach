@@ -13,6 +13,12 @@
 #include <new>
 #include <vector>
 
+struct reach_widget_snap
+{
+    reach_motion x;
+    reach_motion y;
+};
+
 struct reach_widgets
 {
     reach_clock *clock;
@@ -25,6 +31,7 @@ struct reach_widgets
     reach_rect_f32 desktop_bounds;
     reach_rect_f32 placement_bounds;
     reach_rect_f32 cards[REACH_MAX_DESKTOP_WIDGETS];
+    reach_widget_snap snaps[REACH_MAX_DESKTOP_WIDGETS];
     reach_config_widget_placement placements[REACH_MAX_DESKTOP_WIDGETS];
     float dpi_scale;
     int32_t drag_index;
@@ -34,6 +41,7 @@ struct reach_widgets
     float drag_x;
     float drag_y;
     reach_rect_f32 drag_origin;
+    reach_rect_f32 drag_restore;
     reach_rect_f32 drag_destination;
     std::vector<reach_rect_f32> drag_occupied;
     double drag_preview_deadline;
@@ -63,11 +71,45 @@ static void reach_widgets_reset(void *capsule)
     (void)reach_widgets_set_enabled(widgets, 0);
     widgets->drag_index = -1;
     widgets->drag_preview_deadline = 0;
+    for (auto &snap : widgets->snaps)
+        snap = {};
 }
 
 static constexpr double reach_widgets_stopwatch_interval = 0.1;
 static constexpr double reach_widgets_pomodoro_interval = 1.0;
 static constexpr double reach_widgets_drag_preview_delay = 0.08;
+static constexpr double reach_widgets_snap_duration = 0.742;
+
+static reach_rect_f32 reach_widgets_card_at(const reach_widgets *widgets, size_t index, double now)
+{
+    auto card = widgets->cards[index];
+    const auto &snap = widgets->snaps[index];
+    if (snap.x.generation != 0)
+    {
+        card.x = reach_motion_value_at(&snap.x, now);
+        card.y = reach_motion_value_at(&snap.y, now);
+    }
+    return card;
+}
+
+static reach_widget_snap reach_widgets_start_snap(reach_rect_f32 from, reach_rect_f32 to,
+                                                  reach_rect_f32 area)
+{
+    static const reach_motion_spec spec = []
+    {
+        const auto spring = reach_motion_spec_spring(1.0f, 0.60f);
+        reach_motion progress = {};
+        reach_motion_start_spec_at(&progress, 0, 1, 0, spring, 0);
+        return reach_motion_spec_scaled(
+            spring, (float)(reach_widgets_snap_duration / progress.duration_seconds));
+    }();
+    reach_motion progress = {};
+    reach_motion_start_spec_at(&progress, 0, 1, 0, spec, reach_motion_now_seconds());
+    const auto x = reach_motion_affine(&progress, to.x - from.x, from.x);
+    const auto y = reach_motion_affine(&progress, to.y - from.y, from.y);
+    return {reach_motion_clamp(&x, area.x, area.x + area.width - to.width),
+            reach_motion_clamp(&y, area.y, area.y + area.height - to.height)};
+}
 
 static bool reach_widgets_update_drop(reach_widgets *widgets, float scale)
 {
@@ -77,7 +119,7 @@ static bool reach_widgets_update_drop(reach_widgets *widgets, float scale)
         widgets->resizing != 0, 14.0f * scale, scale, &destination);
     if (!found)
     {
-        destination = widgets->drag_origin;
+        destination = widgets->drag_restore;
     }
     const bool changed =
         !widgets->drag_preview_ready || !reach_rect_equal(destination, widgets->drag_destination);
@@ -213,8 +255,9 @@ static void reach_widgets_desktop_geometry(const void *capsule, reach_feature_su
     }
 }
 
-static size_t reach_widgets_desktop_input_regions(const void *capsule, reach_rect_f32 *out_regions,
-                                                  size_t max_regions)
+static size_t reach_widgets_desktop_input_regions_at(const void *capsule, double now,
+                                                     reach_rect_f32 *out_regions,
+                                                     size_t max_regions)
 {
     const reach_widgets *widgets = static_cast<const reach_widgets *>(capsule);
     if (widgets == nullptr || out_regions == nullptr)
@@ -224,13 +267,20 @@ static size_t reach_widgets_desktop_input_regions(const void *capsule, reach_rec
     size_t count = 0;
     for (size_t index = 0; index < REACH_MAX_DESKTOP_WIDGETS && count < max_regions; ++index)
     {
-        const auto card = widgets->cards[index];
+        const auto card = reach_widgets_card_at(widgets, index, now);
         if ((widgets->enabled_mask & (1u << index)) && card.width > 0.0f && card.height > 0.0f)
         {
             out_regions[count++] = card;
         }
     }
     return count;
+}
+
+static size_t reach_widgets_desktop_input_regions(const void *capsule, reach_rect_f32 *out_regions,
+                                                  size_t max_regions)
+{
+    return reach_widgets_desktop_input_regions_at(capsule, reach_motion_now_seconds(), out_regions,
+                                                  max_regions);
 }
 
 static int32_t reach_widgets_desktop_tracking(const void *capsule)
@@ -395,17 +445,23 @@ static void reach_widgets_desktop_pointer(void *capsule, const reach_pointer_eve
     }
     if (event->kind == REACH_POINTER_EVENT_DOWN && event->button == REACH_POINTER_BUTTON_PRIMARY)
     {
+        const double now = reach_motion_now_seconds();
         for (int32_t index = REACH_MAX_DESKTOP_WIDGETS - 1; index >= 0; --index)
         {
-            if ((widgets->enabled_mask & (1u << index)) == 0 ||
-                !reach_rect_contains(widgets->cards[index], x, y))
+            const auto card = reach_widgets_card_at(widgets, index, now);
+            if ((widgets->enabled_mask & (1u << index)) == 0 || !reach_rect_contains(card, x, y))
             {
                 continue;
             }
             widgets->drag_index = index;
             widgets->drag_x = x;
             widgets->drag_y = y;
-            widgets->drag_origin = widgets->cards[index];
+            widgets->drag_restore = widgets->cards[index];
+            widgets->drag_origin = card;
+            widgets->cards[index] = card;
+            out->redraw = reach_motion_active_at(&widgets->snaps[index].x, now) ||
+                          reach_motion_active_at(&widgets->snaps[index].y, now);
+            widgets->snaps[index] = {};
             const auto chrome =
                 reach_widgets_chrome(widgets->cards[index], scale, reach_widgets_has_footer(index));
             widgets->resizing = reach_rect_contains(chrome.resize, x, y);
@@ -536,8 +592,18 @@ static void reach_widgets_desktop_pointer(void *capsule, const reach_pointer_eve
             const bool placed =
                 event->kind == REACH_POINTER_EVENT_UP && widgets->drag_has_destination;
             auto &card = widgets->cards[index];
-            card = placed ? widgets->drag_destination : widgets->drag_origin;
-            if (placed && !reach_rect_equal(card, widgets->drag_origin))
+            const auto from = card;
+            card = placed ? widgets->drag_destination : widgets->drag_restore;
+            if (event->kind == REACH_POINTER_EVENT_UP && !widgets->resizing &&
+                (from.x != card.x || from.y != card.y) &&
+                std::any_of(widgets->drag_occupied.begin(), widgets->drag_occupied.end(),
+                            [&](reach_rect_f32 other)
+                            { return reach_widgets_overlap(from, other, 14.0f * scale); }))
+            {
+                widgets->snaps[index] =
+                    reach_widgets_start_snap(from, card, widgets->placement_bounds);
+            }
+            if (placed && !reach_rect_equal(card, widgets->drag_restore))
             {
                 const reach_config_widget_placement placement = {
                     (int32_t)std::lround(card.x / scale), (int32_t)std::lround(card.y / scale),
@@ -551,6 +617,10 @@ static void reach_widgets_desktop_pointer(void *capsule, const reach_pointer_eve
                 }
             }
         }
+        else if (!widgets->drag_interrupted)
+        {
+            widgets->cards[index] = widgets->drag_restore;
+        }
         widgets->drag_index = -1;
         widgets->drag_preview_deadline = 0;
         out->relayout = widgets->layout_dirty;
@@ -563,17 +633,21 @@ static void reach_widgets_desktop_pointer(void *capsule, const reach_pointer_eve
 
 const reach_feature_capsule_ops *reach_widgets_desktop_capsule_ops(void)
 {
-    static const reach_feature_capsule_ops ops = {reach_widgets_reset,
-                                                  reach_widgets_tick,
-                                                  reach_widgets_desktop_open,
-                                                  nullptr,
-                                                  nullptr,
-                                                  reach_widgets_desktop_tracking,
-                                                  reach_widgets_desktop_pointer,
-                                                  reach_widgets_desktop_tracking,
-                                                  reach_widgets_desktop_input_regions,
-                                                  reach_widgets_desktop_geometry,
-                                                  reach_widgets_desktop_tracking};
+    static const reach_feature_capsule_ops ops = []
+    {
+        reach_feature_capsule_ops ops = {};
+        ops.reset = reach_widgets_reset;
+        ops.tick = reach_widgets_tick;
+        ops.is_open = reach_widgets_desktop_open;
+        ops.wants_pointer_move = reach_widgets_desktop_tracking;
+        ops.handle_pointer = reach_widgets_desktop_pointer;
+        ops.pointer_sequence_active = reach_widgets_desktop_tracking;
+        ops.input_regions = reach_widgets_desktop_input_regions;
+        ops.surface_geometry = reach_widgets_desktop_geometry;
+        ops.pointer_capture_active = reach_widgets_desktop_tracking;
+        ops.input_regions_at = reach_widgets_desktop_input_regions_at;
+        return ops;
+    }();
     return &ops;
 }
 
@@ -702,6 +776,11 @@ int32_t reach_widgets_arrange_desktop(reach_widgets *widgets, reach_rect_f32 mon
     (void)reach_widgets_pack(available, automatic, items, REACH_MAX_DESKTOP_WIDGETS, 14.0f * scale,
                              arranged);
     bool changed = std::memcmp(arranged, widgets->cards, sizeof(arranged)) != 0;
+    for (size_t index = 0; index < REACH_MAX_DESKTOP_WIDGETS; ++index)
+    {
+        if (bounds_changed || !reach_rect_equal(arranged[index], widgets->cards[index]))
+            widgets->snaps[index] = {};
+    }
     std::memcpy(widgets->cards, arranged, sizeof(arranged));
     return changed || bounds_changed;
 }
@@ -1282,15 +1361,24 @@ static void reach_widgets_render_body(const reach_widgets *widgets, size_t index
 }
 
 static reach_result reach_widgets_begin_group(reach_render_command_buffer *commands, uint64_t id,
-                                              reach_rect_f32 rect, reach_shadow_pad pad)
+                                              reach_rect_f32 rect, reach_shadow_pad pad,
+                                              const reach_widget_snap *snap = nullptr)
 {
     reach_render_group group = {};
     group.id = id;
     group.bounds = {-pad.left, -pad.top, std::ceil(rect.width) + pad.left + pad.right,
                     std::ceil(rect.height) + pad.top + pad.bottom};
-    // Keep the raster origin pixel-aligned as the compositor moves the card.
-    reach_motion_set(&group.x, std::round(rect.x));
-    reach_motion_set(&group.y, std::round(rect.y));
+    if (snap != nullptr && snap->x.generation != 0)
+    {
+        group.x = snap->x;
+        group.y = snap->y;
+    }
+    else
+    {
+        // Keep the raster origin pixel-aligned as the compositor moves the card.
+        reach_motion_set(&group.x, std::round(rect.x));
+        reach_motion_set(&group.y, std::round(rect.y));
+    }
     return reach_render_command_buffer_begin_group(commands, &group);
 }
 
@@ -1337,8 +1425,8 @@ reach_result reach_widgets_render_desktop(const reach_widgets *widgets, const re
                                actual->radius_large * scale, marker);
             reach_render_command_buffer_end_group(commands);
         }
-        reach_result result =
-            reach_widgets_begin_group(commands, card_group_base + index, rect, shadow_pad);
+        reach_result result = reach_widgets_begin_group(commands, card_group_base + index, rect,
+                                                        shadow_pad, &widgets->snaps[index]);
         if (result != REACH_OK)
         {
             return result;

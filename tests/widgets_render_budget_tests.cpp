@@ -55,16 +55,26 @@ int main()
     ops->tick(widgets, 0, &tick);
 
     auto buffer = std::make_unique<reach_render_command_buffer>();
-    reach_render_command_buffer_clear(buffer.get());
-    if (reach_widgets_render_desktop(widgets, nullptr, 1, nullptr, buffer.get()) != REACH_OK ||
-        buffer->count >= REACH_MAX_RENDER_COMMANDS ||
-        buffer->group_count >= REACH_MAX_RENDER_GROUPS ||
-        buffer->group_count != REACH_MAX_DESKTOP_WIDGETS + 1 ||
-        reach_render_command_buffer_validate_groups(buffer.get()) != REACH_OK)
+    auto render_fits = [&](size_t expected_groups)
     {
+        reach_render_command_buffer_clear(buffer.get());
+        if (reach_widgets_render_desktop(widgets, nullptr, 1, nullptr, buffer.get()) == REACH_OK &&
+            buffer->count < REACH_MAX_RENDER_COMMANDS &&
+            buffer->group_count < REACH_MAX_RENDER_GROUPS &&
+            buffer->group_count == expected_groups &&
+            reach_render_command_buffer_validate_groups(buffer.get()) == REACH_OK)
+            return true;
         std::fprintf(stderr, "Invalid widget render buffer: %zu commands, %zu groups\n",
                      buffer->count, buffer->group_count);
+        return false;
+    };
+    if (!render_fits(REACH_MAX_DESKTOP_WIDGETS + 1))
         return 1;
-    }
-    return 0;
+
+    pointer.kind = REACH_POINTER_EVENT_UP;
+    ops->handle_pointer(widgets, &pointer, &pointer_result);
+    return render_fits(REACH_MAX_DESKTOP_WIDGETS) &&
+                   reach_render_command_buffer_motion_active(buffer.get())
+               ? 0
+               : 1;
 }
