@@ -211,7 +211,7 @@ const reach_settings_nav_item *reach_settings_nav_items(size_t *out_count)
         {REACH_SETTINGS_PAGE_POWER_SLEEP, REACH_VECTOR_ICON_SLEEP, (const uint16_t *)L"Energy"},
         {REACH_SETTINGS_PAGE_THEME, REACH_VECTOR_ICON_BRIGHTNESS, (const uint16_t *)L"Theme"},
         {REACH_SETTINGS_PAGE_DISPLAY, REACH_VECTOR_ICON_RESIZE, (const uint16_t *)L"Display"},
-        {REACH_SETTINGS_PAGE_WIDGETS, REACH_VECTOR_ICON_RESIZE, (const uint16_t *)u"Widgets"},
+        {REACH_SETTINGS_PAGE_WIDGETS, REACH_VECTOR_ICON_WIDGETS, (const uint16_t *)u"Widgets"},
         {REACH_SETTINGS_PAGE_UPDATE, REACH_VECTOR_ICON_RESTART, (const uint16_t *)L"Updates"},
     };
 
