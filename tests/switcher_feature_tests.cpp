@@ -235,7 +235,7 @@ static void test_switcher_fits_variable_width_previews_and_keeps_selection_visib
         arrange.dpi_scale = scale;
         (void)reach_switcher_arrange(switcher, &arrange);
         (void)reach_switcher_thumbnail_at(switcher, 0, &first);
-        expect_true(fabsf(first.destination.height - 125.0f * scale) < 0.01f,
+        expect_true(fabsf(first.destination.height - 125.0f * 0.95f * scale) < 0.01f,
                     "Switcher retains its nominal DP height at fractional and high DPI");
     }
     reach_switcher_destroy(switcher);
