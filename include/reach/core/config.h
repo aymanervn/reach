@@ -44,13 +44,16 @@ extern "C"
         int32_t max_height;
     } reach_config_widget_limits;
 
-    static inline reach_config_widget_limits reach_config_widget_size_limits(size_t index)
+    typedef struct reach_widget_definition
     {
-        static const reach_config_widget_limits limits[REACH_MAX_DESKTOP_WIDGETS] = {
-            {220, 136, 360, 190}, {300, 224, 440, 320}, {280, 180, 440, 280},
-            {280, 278, 420, 390}, {240, 160, 400, 240}, {260, 180, 420, 280}};
-        return limits[index < REACH_MAX_DESKTOP_WIDGETS ? index : 0];
-    }
+        const uint16_t *label;
+        size_t ini_slot;
+        int32_t default_width;
+        int32_t default_height;
+        reach_config_widget_limits limits;
+    } reach_widget_definition;
+
+    const reach_widget_definition *reach_widget_definition_at(size_t index);
 
     typedef enum reach_config_theme_preference
     {

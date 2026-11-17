@@ -56,6 +56,7 @@ static int32_t reach_system_stats_snapshot_differs(const reach_system_stats_snap
            a->cpu_clock_mhz != b->cpu_clock_mhz ||
            a->memory_speed_mt_s != b->memory_speed_mt_s ||
            a->gpu_clock_mhz != b->gpu_clock_mhz ||
+           a->gpu_clock_max_mhz != b->gpu_clock_max_mhz ||
            a->vram_available != b->vram_available ||
            (int32_t)a->vram_percent != (int32_t)b->vram_percent ||
            a->valid != b->valid || (int32_t)a->cpu_percent != (int32_t)b->cpu_percent ||
@@ -149,6 +150,7 @@ static void reach_system_stats_thread_main(reach_system_stats *service)
         next.cpu_clock_mhz = sample.cpu_clock_mhz;
         next.memory_speed_mt_s = sample.memory_speed_mt_s;
         next.gpu_clock_mhz = sample.gpu_clock_mhz;
+        next.gpu_clock_max_mhz = sample.gpu_clock_max_mhz;
         next.vram_available = sample.vram_total_bytes != 0;
         next.vram_percent = reach_system_stats_percent(sample.vram_used_bytes, sample.vram_total_bytes);
         next.gpu_temperature_c = sample.gpu_temperature_c;

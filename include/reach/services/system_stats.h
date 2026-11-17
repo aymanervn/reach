@@ -26,6 +26,7 @@ extern "C"
         uint32_t cpu_clock_mhz;
         uint32_t memory_speed_mt_s;
         uint32_t gpu_clock_mhz;
+        uint32_t gpu_clock_max_mhz;
         float vram_percent;
         int32_t vram_available;
     } reach_system_stats_snapshot;

@@ -1307,8 +1307,6 @@ static void render_widgets_page(const reach_settings_render_input *input,
 {
     const auto *theme = input->theme;
     const auto *layout = input->layout;
-    const wchar_t *const labels[REACH_MAX_DESKTOP_WIDGETS] = {
-        L"Clock & date", L"System monitor", L"Now playing", L"Calendar", L"Stopwatch", L"Pomodoro"};
     const reach_ui_toggle_style style = {theme->settings_toggle_track_off, theme->accent,
                                          theme->settings_toggle_knob};
     const bool reset_hover = input->model->hovered_button == REACH_SETTINGS_HIT_WIDGET_RESET;
@@ -1327,7 +1325,7 @@ static void render_widgets_page(const reach_settings_render_input *input,
         reach_settings_push_text(
             commands, {row.x + reach_settings_scale(input, 16.0f), row.y,
                        row.width - reach_settings_scale(input, 88.0f), row.height},
-            reinterpret_cast<const uint16_t *>(labels[index]),
+            reach_widget_definition_at(index)->label,
             reach_settings_scale(input, REACH_TEXT_SIZE_MEDIUM), REACH_TEXT_WEIGHT_SEMIBOLD,
             input->text_alignment_leading, theme->settings_text, 1);
         reach_ui_toggle_render(commands, layout->widget_toggles[index], &style,

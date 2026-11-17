@@ -705,8 +705,13 @@ reach_result reach_config_service_reset_widget_positions(reach_config_service *s
 reach_result reach_config_service_set_widget_placement(
     reach_config_service *service, size_t index, reach_config_widget_placement placement)
 {
-    reach_config_widget_limits limits = reach_config_widget_size_limits(index);
-    if (index >= REACH_MAX_DESKTOP_WIDGETS || placement.width < limits.min_width ||
+    const auto *definition = reach_widget_definition_at(index);
+    if (definition == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    const auto &limits = definition->limits;
+    if (placement.width < limits.min_width ||
         placement.height < limits.min_height || placement.width > limits.max_width ||
         placement.height > limits.max_height)
     {

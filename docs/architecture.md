@@ -1829,21 +1829,33 @@ an app — apps are leaves, like `tools`.
 
 ## Desktop widgets
 
-One persistent capsule owns the clock, calendar, system monitor, Now Playing, stopwatch, and
-Pomodoro cards. Its surface uses the shared DirectComposition render device and reports
-card hit regions to the window adapter. The native surface sits above Reach's desktop
-and below application windows. Surface ports can be provided by the host caller or created
-from the registered role by the composition root's platform factory.
+One persistent feature capsule hosts the clock, calendar, system monitor, Now Playing,
+stopwatch, and Pomodoro. Settings, config validation, and desktop placement all read the
+same core widget definitions. Each definition has one stable ID, one Settings label, a storage
+slot, and default, minimum, and maximum sizes in DP. The stored slot preserves compatibility
+with existing enable flags and placements. A widget display title may add state, such as the
+calendar's month or the Pomodoro phase.
 
-Settings toggles and position resets use typed config mutations. Card placements are stored
-in DP, and the INI adapter keeps the retained widgets' original disk slots so older installs
-can carry forward their selections and placements. Automatic packing starts on the right.
-During a drag the capsule previews the closest free drop position and saves it in whole DP
-on release. Cards can pass over siblings during the gesture while the siblings keep their
-positions. Stopwatch and Pomodoro use monotonic deadlines. The system monitor reads CPU and
-RAM usage and opts into GPU engine counters, hardware speeds, dedicated video memory, and
-thermals on the existing system-stats worker. The Windows adapter caches configured RAM
-transfer speed from SMBIOS and samples CPU frequency. The GPU section reports the graphics
-clock, temperature, and dedicated memory of the adapter with the busiest engine. VRAM usage
-matches the Windows adapter memory counter to the same DXGI adapter's dedicated capacity.
-Now Playing uses the shared playback service and artwork render commands.
+The framework owns the card frame, theme decoration, header, body insets, optional footer,
+and resize affordance. A widget supplies its body content and chooses from header-edge
+controls or footer buttons and icons. The same slot geometry drives drawing and hit testing.
+Bodies can use a section divider with a trailing badge, and meters and timed progress use the
+same segment width, gap, and theme accent treatment. A body may lay out its own content within
+the assigned space, such as the calendar grid or the Now Playing artwork. The frame owns
+background layering so an artwork background can sit below the theme decoration and controls.
+
+The capsule handles hit regions, pointer capture, dragging, drop previews, resizing, and
+saving placements. Automatic packing starts on the right. During a drag the capsule previews
+the closest free drop and saves it in whole DP on release. Settings toggles and position resets
+use typed config mutations. The native surface sits above Reach's desktop and below application
+windows and uses the shared DirectComposition render device.
+
+Widgets read snapshots from Reach services. The capsule publishes redraws from snapshot changes
+and schedules timers using a shared monotonic deadline loop. Each timer registers its interval
+and can provide a callback to advance its own state. System Monitor uses the system-stats worker
+for CPU and RAM usage, CPU frequency, GPU usage, GPU clocks, and thermals. The Windows adapter
+caches configured RAM transfer speed from SMBIOS and matches the Windows adapter memory counter
+to the same DXGI adapter's dedicated capacity. The GPU clock meter uses the current and maximum
+frequencies returned by the same Windows GPU engine query. An unavailable maximum leaves the
+numeric clock speed visible and marks the meter unavailable. Now Playing uses the shared
+playback service and artwork render commands.

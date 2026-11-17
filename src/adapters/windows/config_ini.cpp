@@ -164,11 +164,6 @@ static void reach_config_resolve_pinned_shortcut(reach_application *application)
     }
 }
 
-static size_t reach_config_widget_ini_slot(size_t index)
-{
-    return index >= REACH_WIDGET_STOPWATCH ? index + 2 : index;
-}
-
 static reach_result reach_config_store_load(reach_config_store *store,
                                             reach_config_snapshot *out_snapshot)
 {
@@ -188,7 +183,7 @@ static reach_result reach_config_store_load(reach_config_store *store,
         (uint32_t)GetPrivateProfileIntW(L"widgets", L"enabled", 0, path);
     for (size_t index = 0; index < REACH_MAX_DESKTOP_WIDGETS; ++index)
     {
-        const size_t slot = reach_config_widget_ini_slot(index);
+        const size_t slot = reach_widget_definition_at(index)->ini_slot;
         if ((saved_widgets & (1u << slot)) != 0)
         {
             out_snapshot->desktop_widgets |= 1u << index;
@@ -375,7 +370,7 @@ static reach_result reach_config_store_save(reach_config_store *store,
     {
         if ((snapshot->desktop_widgets & (1u << index)) != 0)
         {
-            saved_widgets |= 1u << reach_config_widget_ini_slot(index);
+            saved_widgets |= 1u << reach_widget_definition_at(index)->ini_slot;
         }
     }
     text.append(L"\r\n\r\n[widgets]\r\nenabled=");
@@ -384,7 +379,7 @@ static reach_result reach_config_store_save(reach_config_store *store,
     {
         const auto &placement = snapshot->widget_placements[index];
         text.append(L"\r\n\r\n[widget_");
-        text.append(std::to_wstring(reach_config_widget_ini_slot(index)));
+        text.append(std::to_wstring(reach_widget_definition_at(index)->ini_slot));
         text.append(L"]\r\nx=");
         text.append(std::to_wstring(placement.x));
         text.append(L"\r\ny=");

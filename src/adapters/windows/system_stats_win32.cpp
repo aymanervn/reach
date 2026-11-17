@@ -188,7 +188,8 @@ static uint32_t reach_system_stats_read_memory_speed()
     return memory_speed;
 }
 
-static uint32_t reach_system_stats_read_gpu_clock(const wchar_t *identity)
+static void reach_system_stats_read_gpu_clock(const wchar_t *identity,
+                                              reach_system_stats_sample *sample)
 {
     unsigned long high = 0;
     unsigned long low = 0;
@@ -196,14 +197,14 @@ static uint32_t reach_system_stats_read_gpu_clock(const wchar_t *identity)
     if (swscanf_s(identity, L"luid_0x%lx_0x%lx_phys_%u_eng_%u", &high, &low,
                   &frequency.PhysicalAdapterIndex, &frequency.NodeOrdinal) != 4)
     {
-        return 0;
+        return;
     }
     D3DKMT_OPENADAPTERFROMLUID adapter = {};
     adapter.AdapterLuid.HighPart = (LONG)high;
     adapter.AdapterLuid.LowPart = low;
     if (D3DKMTOpenAdapterFromLuid(&adapter) != 0)
     {
-        return 0;
+        return;
     }
     D3DKMT_QUERYADAPTERINFO query = {};
     query.hAdapter = adapter.hAdapter;
@@ -213,7 +214,11 @@ static uint32_t reach_system_stats_read_gpu_clock(const wchar_t *identity)
     const auto status = D3DKMTQueryAdapterInfo(&query);
     D3DKMT_CLOSEADAPTER close = {adapter.hAdapter};
     D3DKMTCloseAdapter(&close);
-    return status == 0 ? (uint32_t)(frequency.Frequency / 1'000'000u) : 0;
+    if (status == 0 && frequency.Frequency >= 1'000'000u)
+    {
+        sample->gpu_clock_mhz = (uint32_t)(frequency.Frequency / 1'000'000u);
+        sample->gpu_clock_max_mhz = (uint32_t)(frequency.MaxFrequency / 1'000'000u);
+    }
 }
 
 static bool reach_system_stats_read_counter_array(PDH_HCOUNTER counter, DWORD format,
@@ -337,12 +342,11 @@ static void reach_system_stats_sample_gpu_engines(reach_system_stats_source *sou
             });
             if (graphics != engines.end())
             {
-                out_sample->gpu_clock_mhz =
-                    reach_system_stats_read_gpu_clock(graphics->first.c_str());
+                reach_system_stats_read_gpu_clock(graphics->first.c_str(), out_sample);
             }
             if (out_sample->gpu_clock_mhz == 0 && graphics != most_used)
             {
-                out_sample->gpu_clock_mhz = reach_system_stats_read_gpu_clock(identity.c_str());
+                reach_system_stats_read_gpu_clock(identity.c_str(), out_sample);
             }
         }
     }
