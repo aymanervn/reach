@@ -1890,6 +1890,8 @@ static void reach_quick_settings_capsule_tick(void *capsule, double delta_second
                          reach_motion_value_at(&state.output_devices_span, now_seconds));
         reach_motion_set(&state.app_volumes_span,
                          reach_motion_value_at(&state.app_volumes_span, now_seconds));
+        reach_motion_set(&quick_settings->height,
+                         reach_motion_value_at(&quick_settings->height, now_seconds));
         reach_quick_settings_sample_input_layout(quick_settings, now_seconds);
     }
     if (out != nullptr)
@@ -3255,7 +3257,9 @@ void reach_quick_settings_refresh_layout(reach_quick_settings *quick_settings,
     if (reach_motion_range(&quick_settings->height, &height_minimum, &height_maximum) != REACH_OK)
         height_maximum = fmaxf(quick_settings->height.from, quick_settings->height.to);
     float extent = environment_changed ? target.bounds.height
-                                       : fmaxf(state.render_bounds.height, height_maximum);
+                   : quick_settings->section_cleanup_pending
+                       ? fmaxf(state.render_bounds.height, height_maximum)
+                       : height_maximum;
     state.render_bounds = reach_quick_settings_placement(quick_settings, ctx, extent).bounds;
     reach_popup_anchor anchor = reach_quick_settings_popup_anchor(ctx);
     reach_rect_motion screen = {};

@@ -19,8 +19,31 @@ static int32_t reach_host_surface_contains_point(const reach_feature_runtime *de
         bounds = surface->last_bounds;
     }
 
-    return (float)point.x >= bounds.x && (float)point.x <= bounds.x + bounds.width &&
-           (float)point.y >= bounds.y && (float)point.y <= bounds.y + bounds.height;
+    if ((float)point.x < bounds.x || (float)point.x > bounds.x + bounds.width ||
+        (float)point.y < bounds.y || (float)point.y > bounds.y + bounds.height)
+    {
+        return 0;
+    }
+
+    const reach_feature_capsule_ops *ops = desc->definition->capsule_ops;
+    if (ops == nullptr)
+    {
+        return 1;
+    }
+    reach_feature_surface_geometry geometry = {};
+    if (ops->surface_geometry != nullptr)
+    {
+        ops->surface_geometry(desc->capsule, &geometry);
+    }
+    if (ops->input_regions_at == nullptr && !geometry.has_input_bounds)
+    {
+        return 1;
+    }
+    reach_ui_event event = {};
+    event.x = point.x;
+    event.y = point.y;
+    return reach_host_surface_pointer_event(desc, &event, REACH_POINTER_EVENT_DOWN)
+               .surface_relation != REACH_POINTER_SURFACE_OUTSIDE;
 }
 
 /* A press on the control a surface hangs off belongs to that control, not to the dismissal
