@@ -47,7 +47,7 @@ extern "C"
     static inline reach_config_widget_limits reach_config_widget_size_limits(size_t index)
     {
         static const reach_config_widget_limits limits[REACH_MAX_DESKTOP_WIDGETS] = {
-            {220, 136, 360, 190}, {300, 168, 440, 260}, {280, 180, 440, 280},
+            {220, 136, 360, 190}, {300, 224, 440, 320}, {280, 180, 440, 280},
             {280, 278, 420, 390}, {240, 160, 400, 240}, {260, 180, 420, 280}};
         return limits[index < REACH_MAX_DESKTOP_WIDGETS ? index : 0];
     }

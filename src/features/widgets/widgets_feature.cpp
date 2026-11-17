@@ -113,6 +113,8 @@ static void reach_widgets_tick(void *capsule, double, reach_feature_tick_result 
         stats.cpu_clock_mhz != widgets->stats_snapshot.cpu_clock_mhz ||
         stats.memory_speed_mt_s != widgets->stats_snapshot.memory_speed_mt_s ||
         stats.gpu_clock_mhz != widgets->stats_snapshot.gpu_clock_mhz ||
+        stats.vram_available != widgets->stats_snapshot.vram_available ||
+        stats.vram_percent != widgets->stats_snapshot.vram_percent ||
         stats.gpu_available != widgets->stats_snapshot.gpu_available ||
         stats.gpu_temperature_available != widgets->stats_snapshot.gpu_temperature_available ||
         stats.gpu_temperature_c != widgets->stats_snapshot.gpu_temperature_c ||
@@ -560,7 +562,7 @@ int32_t reach_widgets_arrange_desktop(reach_widgets *widgets, reach_rect_f32 mon
     }
     widgets->layout_dirty = false;
     const float widths[REACH_MAX_DESKTOP_WIDGETS] = {244, 320, 300, 300, 280, 280};
-    const float heights[REACH_MAX_DESKTOP_WIDGETS] = {144, 184, 196, 300, 160, 200};
+    const float heights[REACH_MAX_DESKTOP_WIDGETS] = {144, 236, 196, 300, 160, 200};
     reach_widget_layout_item items[REACH_MAX_DESKTOP_WIDGETS] = {};
     for (size_t index = 0; index < REACH_MAX_DESKTOP_WIDGETS; ++index)
     {
@@ -684,31 +686,42 @@ static void reach_widgets_format_speed(wchar_t (&clock)[24], uint32_t speed, boo
 
 static void reach_widgets_meter(reach_render_command_buffer *commands, const reach_theme *theme,
                                 reach_rect_f32 card, float y, const wchar_t *label, float value,
-                                float scale, bool available, const wchar_t *clock, float clock_width)
+                                float scale, bool available, const wchar_t *detail,
+                                float detail_width)
 {
-    wchar_t usage[24] = {};
+    wchar_t percentage[16] = {};
     if (available)
     {
-        swprintf_s(usage, L"%ls  %.0f%%", label, value);
+        swprintf_s(percentage, L"%.0f%%", value);
     }
     else
     {
-        swprintf_s(usage, L"%ls  —", label);
+        wcscpy_s(percentage, L"—");
+    }
+
+    wchar_t labeled_percentage[24] = {};
+    const wchar_t *left = label;
+    const wchar_t *right = percentage;
+    if (detail != nullptr)
+    {
+        swprintf_s(labeled_percentage, L"%ls  %ls", label, percentage);
+        left = labeled_percentage;
+        right = detail;
     }
 
     const float inset = 18.0f * scale;
     const float label_width = 76.0f * scale;
     const float column_gap = 8.0f * scale;
     const float track_x = card.x + inset + label_width + column_gap;
-    const float clock_x = card.x + card.width - inset - clock_width;
+    const float detail_x = card.x + card.width - inset - detail_width;
     reach_widgets_text(commands, {card.x + inset, y, label_width, 22.0f * scale},
-                       reinterpret_cast<const uint16_t *>(usage), REACH_TEXT_SIZE_SMALL * scale,
+                       reinterpret_cast<const uint16_t *>(left), REACH_TEXT_SIZE_SMALL * scale,
                        REACH_TEXT_WEIGHT_SEMIBOLD, theme->primary_text);
-    reach_widgets_text(commands, {clock_x, y, clock_width, 22.0f * scale},
-                       reinterpret_cast<const uint16_t *>(clock), REACH_TEXT_SIZE_SMALL * scale,
+    reach_widgets_text(commands, {detail_x, y, detail_width, 22.0f * scale},
+                       reinterpret_cast<const uint16_t *>(right), REACH_TEXT_SIZE_SMALL * scale,
                        REACH_TEXT_WEIGHT_SEMIBOLD, theme->primary_text,
                        REACH_TEXT_ALIGNMENT_TRAILING);
-    const float track_width = std::max(0.0f, clock_x - column_gap - track_x);
+    const float track_width = std::max(0.0f, detail_x - column_gap - track_x);
     const float gap = 3.0f * scale;
     const float pill_width = 8.0f * scale;
     const float height = 10.0f * scale;
@@ -719,7 +732,7 @@ static void reach_widgets_meter(reach_render_command_buffer *commands, const rea
     }
 
     const float meter_width = segments * (pill_width + gap) - gap;
-    const float meter_x = clock_x - column_gap - meter_width;
+    const float meter_x = detail_x - column_gap - meter_width;
     const float amount_filled =
         available ? std::clamp(value / 100.0f, 0.0f, 1.0f) * segments : 0.0f;
     auto empty = theme->accent_text;
@@ -744,6 +757,35 @@ static void reach_widgets_system_render(reach_render_command_buffer *commands,
                                         const reach_system_stats_snapshot &stats,
                                         const reach_text_measure_port *text_measure)
 {
+    reach_widgets_text(commands, title, (const uint16_t *)u"System monitor",
+                       REACH_TEXT_SIZE_SMALL * scale, REACH_TEXT_WEIGHT_SEMIBOLD,
+                       theme->primary_text);
+    wchar_t speeds[3][24] = {};
+    reach_widgets_format_speed(speeds[0], stats.cpu_clock_mhz, false);
+    reach_widgets_format_speed(speeds[1], stats.memory_speed_mt_s, true);
+    reach_widgets_format_speed(speeds[2], stats.gpu_clock_mhz, false);
+    float clock_width = reach_text_width_or_estimate(
+        text_measure, (const uint16_t *)u"100%", REACH_TEXT_SIZE_SMALL * scale,
+        REACH_TEXT_WEIGHT_SEMIBOLD, 0.65f);
+    for (const auto &speed : speeds)
+    {
+        clock_width = std::max(clock_width, reach_text_width_or_estimate(
+            text_measure, reinterpret_cast<const uint16_t *>(speed),
+            REACH_TEXT_SIZE_SMALL * scale, REACH_TEXT_WEIGHT_SEMIBOLD, 0.65f));
+    }
+    clock_width = std::ceil(clock_width) + scale;
+
+    const auto limits = reach_config_widget_size_limits(REACH_WIDGET_SYSTEM);
+    const float row_gap = 26.0f * scale +
+                          std::max(0.0f, card.height - limits.min_height * scale) / 5.0f;
+    const float first_row = card.y + 43.0f * scale;
+    reach_widgets_meter(commands, theme, card, first_row, L"CPU", stats.cpu_percent, scale,
+                        stats.valid != 0, speeds[0], clock_width);
+    reach_widgets_meter(commands, theme, card, first_row + row_gap, L"RAM", stats.memory_percent,
+                        scale, stats.valid != 0, speeds[1], clock_width);
+
+    const reach_rect_f32 section = {title.x + 2.0f * scale, first_row + 2.0f * row_gap + 5.0f * scale,
+                                    title.width - 2.0f * scale, title.height};
     const bool has_temperature =
         stats.gpu_temperature_available && std::isfinite(stats.gpu_temperature_c);
     wchar_t temperature[24] = {};
@@ -766,39 +808,43 @@ static void reach_widgets_system_render(reach_render_command_buffer *commands,
         text_measure, thermal_label, text_size, REACH_TEXT_WEIGHT_SEMIBOLD, 0.65f)) +
         2.0f * badge_padding;
     const float badge_height = 22.0f * scale;
-    const reach_rect_f32 badge = {title.x + title.width - badge_width - 2.0f * scale,
-                                  title.y + (title.height - badge_height) * 0.5f,
+    const reach_rect_f32 badge = {section.x + section.width - badge_width - 2.0f * scale,
+                                  section.y + (section.height - badge_height) * 0.5f,
                                   badge_width, badge_height};
     reach_widgets_rect(commands, badge, badge.height * 0.5f,
                        reach_theme_color_alpha(theme->accent_text, thermal_tint));
     reach_widgets_text(commands, badge, thermal_label, text_size, REACH_TEXT_WEIGHT_SEMIBOLD,
                        theme->primary_text, REACH_TEXT_ALIGNMENT_CENTER);
-    title.width = badge.x - title.x - 8.0f * scale;
-    reach_widgets_text(commands, title, (const uint16_t *)u"System monitor",
-                       REACH_TEXT_SIZE_SMALL * scale, REACH_TEXT_WEIGHT_SEMIBOLD,
-                       theme->primary_text);
-    wchar_t speeds[3][24] = {};
-    reach_widgets_format_speed(speeds[0], stats.cpu_clock_mhz, false);
-    reach_widgets_format_speed(speeds[1], stats.memory_speed_mt_s, true);
-    reach_widgets_format_speed(speeds[2], stats.gpu_clock_mhz, false);
-    float clock_width = 0.0f;
-    for (const auto &speed : speeds)
+    const auto *section_label = (const uint16_t *)u"GPU monitor";
+    const float label_width = std::ceil(reach_text_width_or_estimate(
+        text_measure, section_label, text_size, REACH_TEXT_WEIGHT_SEMIBOLD, 0.65f)) + scale;
+    reach_widgets_text(commands, {section.x, section.y, label_width, section.height},
+                       section_label, text_size, REACH_TEXT_WEIGHT_SEMIBOLD, theme->primary_text);
+    const float divider_x = section.x + label_width + 8.0f * scale;
+    const float divider_width = badge.x - divider_x - 8.0f * scale;
+    if (divider_width > 0.0f)
     {
-        clock_width = std::max(clock_width, reach_text_width_or_estimate(
-            text_measure, reinterpret_cast<const uint16_t *>(speed),
-            REACH_TEXT_SIZE_SMALL * scale, REACH_TEXT_WEIGHT_SEMIBOLD, 0.65f));
+        reach_widgets_rect(commands,
+                           {divider_x, section.y + section.height * 0.5f, divider_width, scale},
+                           0.0f, reach_theme_color_alpha(theme->accent_text, 0.25f));
     }
-    clock_width = std::ceil(clock_width) + scale;
 
-    const float first_row = card.y + 48.0f * scale;
-    const float last_row = card.y + card.height - 46.0f * scale;
-    const float row_gap = (last_row - first_row) * 0.5f;
-    reach_widgets_meter(commands, theme, card, first_row, L"CPU", stats.cpu_percent, scale,
-                        stats.valid != 0, speeds[0], clock_width);
-    reach_widgets_meter(commands, theme, card, first_row + row_gap, L"RAM", stats.memory_percent,
-                        scale, stats.valid != 0, speeds[1], clock_width);
-    reach_widgets_meter(commands, theme, card, first_row + 2.0f * row_gap, L"GPU",
-                        stats.gpu_percent, scale, stats.gpu_available != 0, speeds[2], clock_width);
+    const float gpu_row = section.y + row_gap + 4.0f * scale;
+    reach_widgets_meter(commands, theme, card, gpu_row, L"GPU", stats.gpu_percent, scale,
+                        stats.gpu_available != 0, nullptr, clock_width);
+    const float clock_row = gpu_row + row_gap;
+    const float row_inset = 18.0f * scale;
+    const float clock_x = card.x + card.width - row_inset - clock_width;
+    reach_widgets_text(commands,
+                       {card.x + row_inset, clock_row, 100.0f * scale, 22.0f * scale},
+                       (const uint16_t *)u"Clock speed", text_size, REACH_TEXT_WEIGHT_SEMIBOLD,
+                       theme->primary_text);
+    reach_widgets_text(commands, {clock_x, clock_row, clock_width, 22.0f * scale},
+                       reinterpret_cast<const uint16_t *>(speeds[2]), text_size,
+                       REACH_TEXT_WEIGHT_SEMIBOLD, theme->primary_text,
+                       REACH_TEXT_ALIGNMENT_TRAILING);
+    reach_widgets_meter(commands, theme, card, clock_row + row_gap, L"VRAM", stats.vram_percent,
+                        scale, stats.vram_available != 0, nullptr, clock_width);
 }
 
 static int32_t reach_widgets_days_in_month(int32_t year, int32_t month)

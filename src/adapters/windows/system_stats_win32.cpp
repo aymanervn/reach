@@ -7,10 +7,13 @@
 
 #include <winternl.h>
 #include <d3dkmthk.h>
+#include <dxgi1_4.h>
+#include <wrl/client.h>
 #include <pdh.h>
 #include <pdhmsg.h>
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <cstring>
 #include <cwchar>
 #include <map>
@@ -18,6 +21,7 @@
 #include <vector>
 
 #pragma comment(lib, "gdi32.lib")
+#pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "pdh.lib")
 #pragma comment(lib, "iphlpapi.lib")
 #pragma comment(lib, "ws2_32.lib")
@@ -26,6 +30,8 @@ struct reach_system_stats_source
 {
     PDH_HQUERY monitor_query;
     PDH_HCOUNTER gpu_engine;
+    PDH_HCOUNTER gpu_memory;
+    Microsoft::WRL::ComPtr<IDXGIFactory4> dxgi_factory;
     PDH_HCOUNTER cpu_frequency;
     bool monitor_probe_attempted;
     uint32_t memory_speed_mt_s;
@@ -210,22 +216,86 @@ static uint32_t reach_system_stats_read_gpu_clock(const wchar_t *identity)
     return status == 0 ? (uint32_t)(frequency.Frequency / 1'000'000u) : 0;
 }
 
+static bool reach_system_stats_read_counter_array(PDH_HCOUNTER counter, DWORD format,
+                                                   std::vector<BYTE> &buffer, DWORD &count)
+{
+    DWORD bytes = 0;
+    if (counter == nullptr ||
+        PdhGetFormattedCounterArrayW(counter, format, &bytes, &count, nullptr) != PDH_MORE_DATA ||
+        bytes == 0)
+    {
+        return false;
+    }
+    buffer.resize(bytes);
+    return PdhGetFormattedCounterArrayW(
+               counter, format, &bytes, &count,
+               reinterpret_cast<PDH_FMT_COUNTERVALUE_ITEM_W *>(buffer.data())) == ERROR_SUCCESS;
+}
+
+static void reach_system_stats_sample_vram(reach_system_stats_source *source, LUID luid,
+                                           reach_system_stats_sample *sample)
+{
+    std::vector<BYTE> buffer;
+    DWORD count = 0;
+    if (!reach_system_stats_read_counter_array(source->gpu_memory, PDH_FMT_LARGE, buffer, count))
+    {
+        return;
+    }
+    const auto *items = reinterpret_cast<const PDH_FMT_COUNTERVALUE_ITEM_W *>(buffer.data());
+    uint64_t used = 0;
+    bool found = false;
+    for (DWORD index = 0; index < count; ++index)
+    {
+        const auto &item = items[index];
+        unsigned long high = 0;
+        unsigned long low = 0;
+        if ((item.FmtValue.CStatus == PDH_CSTATUS_VALID_DATA ||
+             item.FmtValue.CStatus == PDH_CSTATUS_NEW_DATA) &&
+            item.FmtValue.largeValue >= 0 && item.szName != nullptr &&
+            swscanf_s(item.szName, L"luid_0x%lx_0x%lx_phys_", &high, &low) == 2 &&
+            (LONG)high == luid.HighPart && low == luid.LowPart)
+        {
+            used += (uint64_t)item.FmtValue.largeValue;
+            found = true;
+        }
+    }
+    if (!found)
+    {
+        return;
+    }
+
+    if (source->dxgi_factory != nullptr && !source->dxgi_factory->IsCurrent())
+    {
+        source->dxgi_factory.Reset();
+    }
+    if (source->dxgi_factory == nullptr &&
+        FAILED(CreateDXGIFactory1(IID_PPV_ARGS(source->dxgi_factory.ReleaseAndGetAddressOf()))))
+    {
+        return;
+    }
+    Microsoft::WRL::ComPtr<IDXGIAdapter1> adapter;
+    DXGI_ADAPTER_DESC1 desc = {};
+    if (SUCCEEDED(source->dxgi_factory->EnumAdapterByLuid(luid, IID_PPV_ARGS(adapter.GetAddressOf()))) &&
+        SUCCEEDED(adapter->GetDesc1(&desc)) && desc.DedicatedVideoMemory != 0)
+    {
+        sample->vram_used_bytes = used;
+        sample->vram_total_bytes = desc.DedicatedVideoMemory;
+    }
+}
+
+static void reach_system_stats_sample_gpu_temperature(LUID luid, UINT physical,
+                                                     reach_system_stats_sample *sample);
+
 static void reach_system_stats_sample_gpu_engines(reach_system_stats_source *source,
                                                   reach_system_stats_sample *out_sample)
 {
-    if (source->gpu_engine == nullptr)
-        return;
-    DWORD bytes = 0;
+    std::vector<BYTE> buffer;
     DWORD count = 0;
-    if (PdhGetFormattedCounterArrayW(source->gpu_engine, PDH_FMT_DOUBLE, &bytes, &count, nullptr) !=
-            PDH_MORE_DATA ||
-        bytes == 0)
+    if (!reach_system_stats_read_counter_array(source->gpu_engine, PDH_FMT_DOUBLE, buffer, count))
+    {
         return;
-    std::vector<BYTE> buffer(bytes);
-    auto *items = reinterpret_cast<PDH_FMT_COUNTERVALUE_ITEM_W *>(buffer.data());
-    if (PdhGetFormattedCounterArrayW(source->gpu_engine, PDH_FMT_DOUBLE, &bytes, &count, items) !=
-        ERROR_SUCCESS)
-        return;
+    }
+    const auto *items = reinterpret_cast<const PDH_FMT_COUNTERVALUE_ITEM_W *>(buffer.data());
     std::map<std::wstring, double> engines;
     for (DWORD index = 0; index < count; ++index)
     {
@@ -246,6 +316,15 @@ static void reach_system_stats_sample_gpu_engines(reach_system_stats_source *sou
         out_sample->gpu_percent = (float)std::clamp(most_used->second, 0.0, 100.0);
         out_sample->gpu_available = 1;
         const auto &identity = most_used->first;
+        unsigned long high = 0;
+        unsigned long low = 0;
+        UINT physical = 0;
+        if (swscanf_s(identity.c_str(), L"luid_0x%lx_0x%lx_phys_%u", &high, &low, &physical) == 3)
+        {
+            const LUID luid = {low, (LONG)high};
+            reach_system_stats_sample_vram(source, luid, out_sample);
+            reach_system_stats_sample_gpu_temperature(luid, physical, out_sample);
+        }
         const size_t engine_offset = identity.find(L"_eng_");
         if (engine_offset != std::wstring::npos)
         {
@@ -272,12 +351,10 @@ static void reach_system_stats_sample_gpu_engines(reach_system_stats_source *sou
 struct reach_system_stats_nvml_session
 {
     using initialize_fn = int (*)();
-    using count_fn = int (*)(unsigned int *);
-    using device_fn = int (*)(unsigned int, void **);
+    using device_fn = int (*)(const char *, void **);
     using temperature_fn = int (*)(void *, unsigned int, unsigned int *);
     HMODULE library = nullptr;
     initialize_fn shutdown = nullptr;
-    count_fn count = nullptr;
     device_fn device = nullptr;
     temperature_fn temperature = nullptr;
     bool initialized = false;
@@ -289,12 +366,11 @@ struct reach_system_stats_nvml_session
             return;
         auto initialize = reinterpret_cast<initialize_fn>(GetProcAddress(library, "nvmlInit_v2"));
         shutdown = reinterpret_cast<initialize_fn>(GetProcAddress(library, "nvmlShutdown"));
-        count = reinterpret_cast<count_fn>(GetProcAddress(library, "nvmlDeviceGetCount_v2"));
         device =
-            reinterpret_cast<device_fn>(GetProcAddress(library, "nvmlDeviceGetHandleByIndex_v2"));
+            reinterpret_cast<device_fn>(GetProcAddress(library, "nvmlDeviceGetHandleByPciBusId_v2"));
         temperature =
             reinterpret_cast<temperature_fn>(GetProcAddress(library, "nvmlDeviceGetTemperature"));
-        initialized = initialize != nullptr && shutdown != nullptr && count != nullptr &&
+        initialized = initialize != nullptr && shutdown != nullptr &&
                       device != nullptr && temperature != nullptr && initialize() == 0;
     }
 
@@ -307,22 +383,52 @@ struct reach_system_stats_nvml_session
     }
 };
 
-static void reach_system_stats_sample_gpu_temperature(reach_system_stats_sample *out_sample)
+static void reach_system_stats_sample_gpu_temperature(LUID luid, UINT physical,
+                                                     reach_system_stats_sample *sample)
 {
-    thread_local reach_system_stats_nvml_session session;
-    unsigned int count = 0;
-    if (!session.initialized || session.count(&count) != 0)
-        return;
-    for (unsigned int index = 0; index < count; ++index)
+    D3DKMT_OPENADAPTERFROMLUID adapter = {};
+    adapter.AdapterLuid = luid;
+    if (D3DKMTOpenAdapterFromLuid(&adapter) != 0)
     {
-        void *device = nullptr;
-        unsigned int temperature = 0;
-        if (session.device(index, &device) == 0 &&
-            session.temperature(device, 0, &temperature) == 0 && temperature < 150)
+        return;
+    }
+    D3DKMT_ADAPTER_PERFDATA performance = {};
+    performance.PhysicalAdapterIndex = physical;
+    D3DKMT_QUERYADAPTERINFO query = {adapter.hAdapter, KMTQAITYPE_ADAPTERPERFDATA,
+                                    &performance, sizeof(performance)};
+    const auto status = D3DKMTQueryAdapterInfo(&query);
+
+    D3DKMT_ADAPTERADDRESS address = {};
+    bool has_address = false;
+    if (status == 0 && performance.Temperature > 0 && performance.Temperature < 1500)
+    {
+        sample->gpu_temperature_c = performance.Temperature / 10.0f;
+        sample->gpu_temperature_available = 1;
+    }
+    else if (physical == 0)
+    {
+        query = {adapter.hAdapter, KMTQAITYPE_ADAPTERADDRESS, &address, sizeof(address)};
+        has_address = D3DKMTQueryAdapterInfo(&query) == 0;
+    }
+    D3DKMT_CLOSEADAPTER close = {adapter.hAdapter};
+    D3DKMTCloseAdapter(&close);
+
+    if (has_address)
+    {
+        thread_local reach_system_stats_nvml_session session;
+        if (session.initialized)
         {
-            out_sample->gpu_temperature_c =
-                std::max(out_sample->gpu_temperature_c, (float)temperature);
-            out_sample->gpu_temperature_available = 1;
+            char pci_id[24] = {};
+            sprintf_s(pci_id, "0000:%02x:%02x.%x", (unsigned int)address.BusNumber,
+                      (unsigned int)address.DeviceNumber, (unsigned int)address.FunctionNumber);
+            void *device = nullptr;
+            unsigned int temperature = 0;
+            if (session.device(pci_id, &device) == 0 &&
+                session.temperature(device, 0, &temperature) == 0 && temperature < 150)
+            {
+                sample->gpu_temperature_c = (float)temperature;
+                sample->gpu_temperature_available = 1;
+            }
         }
     }
 }
@@ -339,6 +445,9 @@ static void reach_system_stats_sample_monitor(reach_system_stats_source *source,
             (void)PdhAddEnglishCounterW(source->monitor_query,
                                         L"\\GPU Engine(*)\\Utilization Percentage", 0,
                                         &source->gpu_engine);
+            (void)PdhAddEnglishCounterW(source->monitor_query,
+                                        L"\\GPU Adapter Memory(*)\\Dedicated Usage", 0,
+                                        &source->gpu_memory);
             (void)PdhAddEnglishCounterW(source->monitor_query,
                                         L"\\Processor Information(_Total)\\Processor Frequency", 0,
                                         &source->cpu_frequency);
@@ -361,7 +470,6 @@ static void reach_system_stats_sample_monitor(reach_system_stats_source *source,
             out_sample->cpu_clock_mhz = (uint32_t)frequency.longValue;
         }
     }
-    reach_system_stats_sample_gpu_temperature(out_sample);
 }
 
 static reach_result reach_system_stats_sample_source(reach_system_stats_source *source,
