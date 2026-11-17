@@ -1509,7 +1509,7 @@ reach_quick_settings_build_render_commands(const reach_quick_settings_render_inp
     if (input->surface_motion.height.generation != 0)
         viewport_bottom =
             reach_motion_affine(&input->surface_motion.height, -1, body_bounds.height);
-    reach_motion scrolling = reach_motion_affine(&input->scroll_motion, -1, 0);
+    reach_motion scrolling = input->scroll_content_y;
     const reach_rect_f32 &interior = input->layout.interior;
     float interior_radius = reach_nested_radius(
         reach_popup_radius_scaled(&input->theme, input->dpi_scale), interior.x - body_bounds.x);
@@ -1562,7 +1562,7 @@ reach_result reach_quick_settings_append_render_commands(
                                                                    &state->model, 0, 0, dpi_scale);
     input.viewport = source_bounds;
     input.surface_motion = state->surface_motion;
-    input.scroll_motion = state->scroll_motion;
+    input.scroll_content_y = reach_scroll_view_content_offset(&state->scroll);
     input.render_bounds = {0, 0, state->render_bounds.width, state->render_bounds.height};
     input.has_background = 1;
     input.notch_center_x = state->notch_anchor_x - state->render_bounds.x;

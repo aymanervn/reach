@@ -904,9 +904,10 @@ rows) carry the same presets through `reach_motion_animate_spec_to_at`. Drag ges
 feed `reach_drag_velocity` (`features/common/draggable`) with the value they display and hand its
 release velocity to the snap spring. Documented exceptions, which are periodic effects or holds
 rather than transitions: caret blink, the shared loader cycle, the now-playing marquee and the HUD
-lifetime. Scrolling goes through `features/common/scroll_view`; Launcher and Clipboard present it
-retained, while Settings pages and Quick Settings still sample or own their scroll motion pending
-migration.
+lifetime. Scrolling goes through `features/common/scroll_view`; Launcher, Clipboard and Quick
+Settings present it retained. Quick Settings feeds its animated content extent to
+`reach_scroll_view_limit`, which folds the moving maximum into the offset motion. The Settings app
+is the confirmed exception and keeps CPU-sampled scrolling.
 
 Every size, envelope, clip, raster allocation or budget derived from a motion uses
 `reach_motion_range`, never endpoints or the current sample, so spring overshoot stays inside it.
