@@ -328,7 +328,11 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
     host->quick_settings_system_change_flags.store(0);
     host->audio_volume_changed.store(0);
 
-    reach_host_bind_registered_surface_ports(host, dependencies);
+    reach_result bind_result = reach_host_bind_registered_surface_ports(host, dependencies);
+    if (result == REACH_OK)
+    {
+        result = bind_result;
+    }
     host->screen_hotspots = dependencies->screen_hotspots;
     host->image_loader = dependencies->image_loader;
     host->window_thumbnails = dependencies->window_thumbnails;

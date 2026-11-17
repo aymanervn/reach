@@ -6,6 +6,7 @@
 #include "reach/features/quick_settings.h"
 #include "reach/features/screenshot.h"
 #include "reach/features/system_hud.h"
+#include "reach/features/widgets.h"
 #include "reach/features/top_bar.h"
 
 static reach_rect_f32 reach_host_menu_monitor(reach_host *host, reach_rect_f32 fallback)
@@ -351,6 +352,16 @@ static void reach_host_route_screenshot_copied(void *user)
     reach_host_apply_feature_tick_result(host, runtime, &result);
 }
 
+static void reach_host_route_widget_placement(void *user, size_t index,
+                                               reach_config_widget_placement placement)
+{
+    reach_host *host = static_cast<reach_host *>(user);
+    if (host != nullptr)
+    {
+        (void)reach_config_service_set_widget_placement(host->config_service, index, placement);
+    }
+}
+
 void reach_host_bind_interfeature_routes(reach_host *host)
 {
     if (host == nullptr)
@@ -392,6 +403,12 @@ void reach_host_bind_interfeature_routes(reach_host *host)
         reach_host_feature_capsule<reach_quick_settings>(host, REACH_SURFACE_ID_QUICK_SETTINGS),
         &quick_settings);
 
+    reach_widgets_routes widgets = {};
+    widgets.user = host;
+    widgets.placement_changed = reach_host_route_widget_placement;
+    reach_widgets_set_routes(
+        reach_host_feature_capsule<reach_widgets>(host, REACH_SURFACE_ID_WIDGET_DESKTOP), &widgets);
+
     reach_screenshot_routes screenshot = {};
     screenshot.user = host;
     screenshot.copied = reach_host_route_screenshot_copied;
@@ -415,6 +432,9 @@ void reach_host_clear_interfeature_routes(reach_host *host)
             nullptr);
         reach_battery_set_routes(
             reach_host_feature_capsule<reach_battery>(host, REACH_SURFACE_ID_BATTERY), nullptr);
+        reach_widgets_set_routes(
+            reach_host_feature_capsule<reach_widgets>(host, REACH_SURFACE_ID_WIDGET_DESKTOP),
+            nullptr);
         reach_screenshot_set_routes(
             reach_host_feature_capsule<reach_screenshot>(host, REACH_SURFACE_ID_SCREENSHOT),
             nullptr);

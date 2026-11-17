@@ -21,6 +21,7 @@ struct reach_system_stats
     int32_t thread_started = 0;
     int32_t stop = 0;
     int32_t enabled = 0;
+    int32_t gpu_enabled = 0;
     int32_t rebaseline = 0;
 
     reach_system_stats_snapshot snapshot = {};
@@ -48,7 +49,11 @@ static float reach_system_stats_percent(uint64_t used, uint64_t total)
 static int32_t reach_system_stats_snapshot_differs(const reach_system_stats_snapshot *a,
                                                    const reach_system_stats_snapshot *b)
 {
-    return a->valid != b->valid || (int32_t)a->cpu_percent != (int32_t)b->cpu_percent ||
+    return a->gpu_available != b->gpu_available ||
+           (int32_t)a->gpu_percent != (int32_t)b->gpu_percent ||
+           a->gpu_temperature_available != b->gpu_temperature_available ||
+           a->gpu_temperature_c != b->gpu_temperature_c ||
+           a->valid != b->valid || (int32_t)a->cpu_percent != (int32_t)b->cpu_percent ||
            (int32_t)a->memory_percent != (int32_t)b->memory_percent ||
            a->network_received_bytes_per_second != b->network_received_bytes_per_second ||
            a->network_sent_bytes_per_second != b->network_sent_bytes_per_second;
@@ -66,6 +71,7 @@ static void reach_system_stats_thread_main(reach_system_stats *service)
 
     for (;;)
     {
+        bool sample_gpu = false;
         {
             std::unique_lock<std::mutex> lock(service->mutex);
             if (!service->stop && !service->enabled)
@@ -85,6 +91,7 @@ static void reach_system_stats_thread_main(reach_system_stats *service)
             {
                 continue;
             }
+            sample_gpu = service->gpu_enabled != 0;
             if (service->rebaseline)
             {
                 service->rebaseline = 0;
@@ -129,6 +136,14 @@ static void reach_system_stats_thread_main(reach_system_stats *service)
             has_previous = 1;
         }
 
+        if (sample_gpu && service->source.ops.sample_gpu != nullptr)
+        {
+            service->source.ops.sample_gpu(service->source.source, &sample);
+        }
+        next.gpu_percent = sample.gpu_percent;
+        next.gpu_temperature_c = sample.gpu_temperature_c;
+        next.gpu_available = sample.gpu_available;
+        next.gpu_temperature_available = sample.gpu_temperature_available;
         int32_t differs = reach_system_stats_snapshot_differs(&next, &published);
         published = next;
 
@@ -209,6 +224,15 @@ void reach_system_stats_destroy(reach_system_stats *service)
         service->source.ops.destroy(service->source.source);
     }
     delete service;
+}
+
+void reach_system_stats_set_gpu_enabled(reach_system_stats *service, int32_t enabled)
+{
+    if (service != nullptr)
+    {
+        std::lock_guard<std::mutex> lock(service->mutex);
+        service->gpu_enabled = enabled != 0;
+    }
 }
 
 void reach_system_stats_set_enabled(reach_system_stats *service, int32_t enabled)

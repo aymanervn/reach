@@ -1302,6 +1302,39 @@ static void render_update_page(const reach_settings_render_input *input,
     }
 }
 
+static void render_widgets_page(const reach_settings_render_input *input,
+                                reach_render_command_buffer *commands)
+{
+    const auto *theme = input->theme;
+    const auto *layout = input->layout;
+    const wchar_t *const labels[REACH_MAX_DESKTOP_WIDGETS] = {
+        L"Clock & date", L"System monitor", L"Now playing", L"Calendar", L"Stopwatch", L"Pomodoro"};
+    const reach_ui_toggle_style style = {theme->settings_toggle_track_off, theme->accent,
+                                         theme->settings_toggle_knob};
+    const bool reset_hover = input->model->hovered_button == REACH_SETTINGS_HIT_WIDGET_RESET;
+    reach_settings_push_rect(commands, layout->widget_reset,
+                             reach_settings_scale(input, theme->radius_small),
+                             reset_hover ? theme->accent_tint : theme->settings_icon_box_background);
+    reach_settings_push_text(commands, layout->widget_reset, (const uint16_t *)u"Reset positions",
+                             reach_settings_scale(input, REACH_TEXT_SIZE_MEDIUM),
+                             REACH_TEXT_WEIGHT_SEMIBOLD, REACH_TEXT_ALIGNMENT_CENTER,
+                             theme->settings_text, 1);
+    for (size_t index = 0; index < REACH_MAX_DESKTOP_WIDGETS; ++index)
+    {
+        const auto row = layout->widget_rows[index];
+        reach_settings_push_rect(commands, row, reach_settings_scale(input, theme->radius_small),
+                                 theme->settings_icon_box_background);
+        reach_settings_push_text(
+            commands, {row.x + reach_settings_scale(input, 16.0f), row.y,
+                       row.width - reach_settings_scale(input, 88.0f), row.height},
+            reinterpret_cast<const uint16_t *>(labels[index]),
+            reach_settings_scale(input, REACH_TEXT_SIZE_MEDIUM), REACH_TEXT_WEIGHT_SEMIBOLD,
+            input->text_alignment_leading, theme->settings_text, 1);
+        reach_ui_toggle_render(commands, layout->widget_toggles[index], &style,
+                               (input->model->desktop_widgets & (1u << index)) != 0 ? 1.0f : 0.0f);
+    }
+}
+
 reach_result reach_settings_build_render_commands(const reach_settings_render_input *input,
                                                   reach_render_command_buffer *commands)
 {
@@ -1397,6 +1430,8 @@ reach_result reach_settings_build_render_commands(const reach_settings_render_in
         render_power_page(input, commands);
     else if (input->model->selected_page == REACH_SETTINGS_PAGE_ACCOUNT)
         render_account_page(input, commands);
+    else if (input->model->selected_page == REACH_SETTINGS_PAGE_WIDGETS)
+        render_widgets_page(input, commands);
     else if (input->model->selected_page == REACH_SETTINGS_PAGE_THEME)
         render_theme_page(input, commands);
     else if (input->model->selected_page == REACH_SETTINGS_PAGE_STARTUP_APPS)

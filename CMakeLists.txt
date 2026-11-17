@@ -203,6 +203,7 @@ add_library(reach_features STATIC
     src/features/dock/dock_feature.cpp
     src/features/dock/dock_interaction.cpp
     src/features/dock/dock_model.cpp
+    src/features/widgets/widgets_feature.cpp
     src/features/dock/dock_render.cpp
     src/features/launcher/launcher_feature.cpp
     src/features/launcher/launcher_interaction.cpp
@@ -1214,6 +1215,14 @@ reach_configure_common(reach_window_tracking_tests)
 target_compile_features(reach_window_tracking_tests PRIVATE cxx_std_17)
 target_link_libraries(reach_window_tracking_tests PRIVATE reach_services)
 
+add_executable(reach_widgets_layout_tests tests/widgets_layout_tests.cpp)
+reach_configure_common(reach_widgets_layout_tests)
+target_compile_features(reach_widgets_layout_tests PRIVATE cxx_std_17)
+
+add_executable(reach_widgets_timers_tests tests/widgets_timers_tests.cpp)
+reach_configure_common(reach_widgets_timers_tests)
+target_compile_features(reach_widgets_timers_tests PRIVATE cxx_std_17)
+
 add_executable(reach_window_query_tests
     tests/window_query_tests.cpp
     src/adapters/windows/window_management/window_query_win32.cpp
@@ -1354,6 +1363,8 @@ target_compile_features(reach_system_controls_network_tests PRIVATE
     add_test(NAME reach_frame_wait_tests COMMAND reach_frame_wait_tests)
     add_test(NAME reach_loader_tests COMMAND reach_loader_tests)
     add_test(NAME reach_window_tracking_tests COMMAND reach_window_tracking_tests)
+    add_test(NAME reach_widgets_layout_tests COMMAND reach_widgets_layout_tests)
+    add_test(NAME reach_widgets_timers_tests COMMAND reach_widgets_timers_tests)
     add_test(NAME reach_window_query_tests COMMAND reach_window_query_tests)
     add_test(
         NAME reach_architecture_checker_tests

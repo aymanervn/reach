@@ -749,7 +749,8 @@ static int32_t reach_window_no_activate_surface(reach_surface_role role)
            role == REACH_SURFACE_TRAY_MENU || role == REACH_SURFACE_SWITCHER ||
            role == REACH_SURFACE_CONTEXT_MENU || role == REACH_SURFACE_QUICK_SETTINGS ||
            role == REACH_SURFACE_BATTERY || role == REACH_SURFACE_CLIPBOARD ||
-           role == REACH_SURFACE_STAGE || role == REACH_SURFACE_SYSTEM_HUD;
+           role == REACH_SURFACE_STAGE || role == REACH_SURFACE_SYSTEM_HUD ||
+           role == REACH_SURFACE_WIDGET_DESKTOP;
 }
 
 static DWORD reach_window_ex_style(reach_surface_role role)
@@ -761,7 +762,7 @@ static DWORD reach_window_ex_style(reach_surface_role role)
         role == REACH_SURFACE_QUICK_SETTINGS || role == REACH_SURFACE_BATTERY ||
         role == REACH_SURFACE_CLIPBOARD || role == REACH_SURFACE_SETTINGS ||
         role == REACH_SURFACE_STAGE || role == REACH_SURFACE_SYSTEM_HUD ||
-        role == REACH_SURFACE_SCREENSHOT)
+        role == REACH_SURFACE_SCREENSHOT || role == REACH_SURFACE_WIDGET_DESKTOP)
     {
         style |= WS_EX_NOREDIRECTIONBITMAP;
     }
@@ -853,6 +854,29 @@ static reach_result reach_platform_window_show(reach_platform_window *window)
     int show_command =
         no_activate ? SW_SHOWNOACTIVATE : (IsIconic(window->hwnd) ? SW_RESTORE : SW_SHOW);
     ShowWindow(window->hwnd, show_command);
+    if (window->role == REACH_SURFACE_WIDGET_DESKTOP)
+    {
+        HWND desktop = reinterpret_cast<HWND>(reach_windows_desktop_compat_window());
+        if (desktop == nullptr)
+        {
+            desktop = GetShellWindow();
+        }
+        if (desktop != nullptr)
+        {
+            HWND previous = GetWindow(desktop, GW_HWNDPREV);
+            if (previous != window->hwnd)
+            {
+                HWND position = previous;
+                if (position == nullptr || (GetWindowLongPtrW(position, GWL_EXSTYLE) &
+                                            WS_EX_TOPMOST) != 0)
+                {
+                    position = HWND_NOTOPMOST;
+                }
+                SetWindowPos(window->hwnd, position, 0, 0, 0, 0,
+                             SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
+            }
+        }
+    }
     if (no_activate)
     {
         SetWindowPos(window->hwnd, nullptr, 0, 0, 0, 0,

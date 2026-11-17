@@ -75,6 +75,7 @@ typedef enum reach_surface_id
     REACH_SURFACE_ID_BATTERY,
     REACH_SURFACE_ID_SYSTEM_HUD,
     REACH_SURFACE_ID_SCREENSHOT,
+    REACH_SURFACE_ID_WIDGET_DESKTOP,
     REACH_HOST_SURFACE_COUNT
 } reach_surface_id;
 
@@ -463,7 +464,7 @@ reach_result reach_host_apply_feature_action(reach_host *host, reach_feature_run
 void reach_host_bind_interfeature_routes(reach_host *host);
 void reach_host_clear_interfeature_routes(reach_host *host);
 reach_result reach_host_create_registered_features(reach_host *host);
-void reach_host_bind_registered_surface_ports(reach_host *host,
+reach_result reach_host_bind_registered_surface_ports(reach_host *host,
                                               const reach_host_dependencies *dependencies);
 void reach_host_init_registered_surfaces(reach_host *host);
 void reach_host_destroy_registered_surface_ports(reach_host *host);

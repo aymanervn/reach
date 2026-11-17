@@ -10,6 +10,7 @@
 #include "reach/features/stage.h"
 #include "reach/features/switcher.h"
 #include "reach/features/system_hud.h"
+#include "reach/features/widgets.h"
 #include "reach/features/top_bar.h"
 
 static void reach_feature_attach_launcher(void *capsule,
@@ -89,6 +90,15 @@ static void reach_feature_attach_battery(void *capsule,
 {
     reach_battery_attach_services(static_cast<reach_battery *>(capsule),
                                   dependencies != nullptr ? dependencies->system_status : nullptr);
+}
+
+static void reach_feature_attach_widgets(void *capsule,
+                                         const reach_feature_dependencies *dependencies)
+{
+    reach_widgets_attach_services(static_cast<reach_widgets *>(capsule),
+                                  dependencies != nullptr ? dependencies->clock : nullptr,
+                                  dependencies != nullptr ? dependencies->system_stats : nullptr,
+                                  dependencies != nullptr ? dependencies->now_playing : nullptr);
 }
 
 static void reach_feature_attach_system_hud(void *capsule,
@@ -209,6 +219,30 @@ static int32_t reach_feature_control_stage_open(void *capsule, int32_t open,
         out->request_update = 1;
     }
     return changed;
+}
+
+static void reach_feature_notify_widgets(void *capsule,
+                                         const reach_feature_notification *notification,
+                                         reach_feature_tick_result *out)
+{
+    if (capsule == nullptr || notification == nullptr || out == nullptr ||
+        notification->kind != REACH_FEATURE_NOTIFICATION_CONFIG_CHANGED ||
+        notification->config == nullptr)
+    {
+        return;
+    }
+    int32_t changed = reach_widgets_set_enabled(static_cast<reach_widgets *>(capsule),
+                                                 notification->config->desktop_widgets);
+    for (size_t index = 0; index < REACH_MAX_DESKTOP_WIDGETS; ++index)
+    {
+        changed |= reach_widgets_set_placement(static_cast<reach_widgets *>(capsule), index,
+                                               notification->config->widget_placements[index]);
+    }
+    if (changed)
+    {
+        out->relayout = 1;
+        out->redraw = 1;
+    }
 }
 
 static void reach_feature_notify_stage(void *capsule,
@@ -788,6 +822,9 @@ static const reach_feature_render_resource_ops reach_clipboard_resource_ops = {
     reach_feature_clipboard_active_at, reach_feature_clipboard_release_source,
     reach_feature_clipboard_clear_active};
 
+static const reach_feature_control_ops reach_widgets_control_ops = {
+    nullptr, nullptr, reach_feature_notify_widgets, nullptr, nullptr};
+
 static const reach_feature_control_ops reach_stage_control_ops = {
     reach_feature_control_stage_open, nullptr, reach_feature_notify_stage, nullptr, nullptr};
 static const reach_feature_control_ops reach_context_menu_control_ops = {
@@ -891,6 +928,13 @@ static void reach_host_init_feature_definitions(reach_host *host)
                               nullptr, reach_screenshot_capsule_ops(),
                               REACH_SURFACE_POINTER_CAPTURE_CONSUMES_RELEASE);
 
+    reach_host_define_feature(host, REACH_SURFACE_ID_WIDGET_DESKTOP,
+                              REACH_SURFACE_CLASS_PERSISTENT, nullptr,
+                              reach_widgets_desktop_capsule_ops(),
+                              REACH_SURFACE_POINTER_SOURCE_GATED |
+                                  REACH_SURFACE_POINTER_CAPTURE_CONSUMES_RELEASE |
+                                  REACH_SURFACE_POINTER_CAPTURE_OWNS_MOVE);
+
     reach_feature_definition *definitions = host->feature_definitions;
 
     definitions[REACH_SURFACE_ID_DOCK].lifecycle.attach = reach_feature_attach_dock;
@@ -908,6 +952,13 @@ static void reach_host_init_feature_definitions(reach_host *host)
     definitions[REACH_SURFACE_ID_QUICK_SETTINGS].lifecycle.stop = reach_feature_stop_quick_settings;
     definitions[REACH_SURFACE_ID_BATTERY].lifecycle.attach = reach_feature_attach_battery;
     definitions[REACH_SURFACE_ID_BATTERY].lifecycle.stop = reach_feature_stop_battery;
+    auto &widgets = definitions[REACH_SURFACE_ID_WIDGET_DESKTOP];
+    widgets.lifecycle.attach = reach_feature_attach_widgets;
+    widgets.control_ops = &reach_widgets_control_ops;
+    widgets.surface.role = REACH_SURFACE_WIDGET_DESKTOP;
+    widgets.surface.pointer_priority = 5;
+    widgets.layout.priority = 5;
+
     definitions[REACH_SURFACE_ID_SYSTEM_HUD].lifecycle.attach = reach_feature_attach_system_hud;
     definitions[REACH_SURFACE_ID_SYSTEM_HUD].lifecycle.stop = reach_feature_stop_system_hud;
     definitions[REACH_SURFACE_ID_CONTEXT_MENU].lifecycle.attach = reach_feature_attach_context_menu;
@@ -1346,6 +1397,24 @@ static const reach_feature_surface_ops reach_stage_surface_ops = {
     &reach_stage_native_overlay_ops,
 };
 
+static int32_t reach_widgets_desktop_surface_arrange(void *capsule,
+                                                     const reach_feature_surface_context *ctx)
+{
+    return reach_widgets_arrange_desktop(static_cast<reach_widgets *>(capsule),
+                                         ctx->monitor_bounds, ctx->dpi_scale);
+}
+
+static reach_result reach_widgets_desktop_surface_render(
+    void *capsule, const reach_feature_surface_context *ctx,
+    reach_render_command_buffer *out_commands)
+{
+    return reach_widgets_render_desktop(static_cast<reach_widgets *>(capsule), ctx->theme,
+                                        ctx->dpi_scale, out_commands);
+}
+
+static const reach_feature_surface_ops reach_widgets_desktop_surface_ops = {
+    reach_widgets_desktop_surface_arrange, reach_widgets_desktop_surface_render};
+
 static int32_t reach_system_hud_surface_arrange(void *capsule,
                                                 const reach_feature_surface_context *ctx)
 {
@@ -1680,6 +1749,10 @@ void reach_host_init_feature_registry(reach_host *host)
     definitions[REACH_SURFACE_ID_BATTERY].factory = {
         reach_feature_create<reach_battery, reach_battery_create>,
         reach_feature_destroy<reach_battery, reach_battery_destroy>};
+    definitions[REACH_SURFACE_ID_WIDGET_DESKTOP].factory = {
+        reach_feature_create<reach_widgets, reach_widgets_create>,
+        reach_feature_destroy<reach_widgets, reach_widgets_destroy>};
+    definitions[REACH_SURFACE_ID_WIDGET_DESKTOP].surface_ops = &reach_widgets_desktop_surface_ops;
     definitions[REACH_SURFACE_ID_SYSTEM_HUD].factory = {
         reach_feature_create<reach_system_hud, reach_system_hud_create>,
         reach_feature_destroy<reach_system_hud, reach_system_hud_destroy>};
@@ -1713,12 +1786,12 @@ void reach_host_init_feature_registry(reach_host *host)
     definitions[REACH_SURFACE_ID_TOP_BAR].resolve_anchor = reach_top_bar_resolve_anchor;
 }
 
-void reach_host_bind_registered_surface_ports(reach_host *host,
+reach_result reach_host_bind_registered_surface_ports(reach_host *host,
                                               const reach_host_dependencies *dependencies)
 {
     if (host == nullptr || dependencies == nullptr)
     {
-        return;
+        return REACH_INVALID_ARGUMENT;
     }
 
     host->surfaces[REACH_SURFACE_ID_LAUNCHER].window = dependencies->launcher_window;
@@ -1751,6 +1824,16 @@ void reach_host_bind_registered_surface_ports(reach_host *host,
     {
         reach_feature_runtime *runtime = &host->feature_runtimes[index];
         reach_platform_window_port *window = &runtime->surface->window;
+        if (window->window == nullptr && dependencies->create_surface_ports != nullptr)
+        {
+            reach_result result = dependencies->create_surface_ports(
+                dependencies->surface_factory_user, runtime->definition->surface.role, window,
+                &runtime->surface->renderer);
+            if (result != REACH_OK)
+            {
+                return result;
+            }
+        }
         if (window->ops.set_input_passthrough != nullptr)
         {
             int32_t enabled = (runtime->definition->surface.behavior_flags &
@@ -1758,6 +1841,7 @@ void reach_host_bind_registered_surface_ports(reach_host *host,
             (void)window->ops.set_input_passthrough(window->window, enabled);
         }
     }
+    return REACH_OK;
 }
 
 void reach_host_init_registered_surfaces(reach_host *host)

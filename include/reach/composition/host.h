@@ -53,6 +53,10 @@ extern "C"
 
     typedef struct reach_host_dependencies
     {
+        void *surface_factory_user;
+        reach_result (*create_surface_ports)(void *user, reach_surface_role role,
+                                             reach_platform_window_port *window,
+                                             reach_render_backend_port *renderer);
         reach_platform_window_port launcher_window;
         reach_render_backend_port launcher_renderer;
         reach_platform_window_port dock_window;
