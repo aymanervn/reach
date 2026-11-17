@@ -86,7 +86,7 @@ jobs:
           cmake -B build
           -G "Visual Studio 17 2022"
           -A x64
-          -DREACH_VERSION=${{ steps.version.outputs.version }}
+          "-DREACH_VERSION=${{ steps.version.outputs.version }}"
 
       - name: Build Debug
         run: cmake --build build --config Debug
