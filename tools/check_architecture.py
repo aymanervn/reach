@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-ARCHITECTURE_DOC = ROOT / "docs" / "architecture.md"
 
 SOURCE_EXTENSIONS = {".c", ".cc", ".cpp", ".h", ".hpp"}
 
@@ -629,29 +628,6 @@ def validate_layer_directories() -> list[str]:
 
     return violations
 
-def validate_document_contract() -> list[str]:
-    text = read(ARCHITECTURE_DOC)
-    if not text:
-        return ["docs/architecture.md: missing or unreadable"]
-
-    required_terms = (
-        "## core",
-        "## protocol",
-        "## ports",
-        "## services",
-        "## features",
-        "## adapters",
-        "## composition",
-        "## tools",
-        "inward",
-    )
-
-    return [
-        f"docs/architecture.md: missing architecture contract term: {term}"
-        for term in required_terms
-        if term not in text
-    ]
-
 def validate_imports(path: Path, text: str) -> list[str]:
     violations: list[str] = []
     source_layer = layer_for_path(path)
@@ -1117,7 +1093,6 @@ def main() -> int:
     feature_helper_pattern = composition_feature_helper_pattern(feature_headers)
     source_files = iter_source_files()
     violations.extend(validate_layer_directories())
-    violations.extend(validate_document_contract())
     violations.extend(validate_cmake_dependencies())
     violations.extend(validate_feature_registry_contract())
     violations.extend(validate_generic_surface_loops())

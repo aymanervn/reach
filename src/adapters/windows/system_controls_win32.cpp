@@ -1449,6 +1449,8 @@ static reach_result reach_system_controls_open_project_menu(void *userdata)
 {
     (void)userdata;
 
+    // Workaround: Windows exposes no API to open the Project flyout, so Win+P is injected.
+
     INPUT inputs[] = {
         reach_system_controls_key_input(VK_LWIN, 0),
         reach_system_controls_key_input(0x50, 0),
