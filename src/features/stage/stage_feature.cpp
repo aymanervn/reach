@@ -318,6 +318,30 @@ static reach_rect_f32 reach_stage_close_destination(const reach_stage_state *sta
                            : tile->source_rect;
 }
 
+static void reach_stage_drive_presentation(reach_stage *stage, float target)
+{
+    if (reach_stage_has_apps(&stage->state))
+    {
+        reach_stage_track_to(stage, REACH_STAGE_ANIMATION_PROGRESS, target,
+                             reach_stage_presentation_spec(stage->state.animation_seconds, 1.0f));
+    }
+    else
+    {
+        reach_motion_set(&stage->motions[REACH_STAGE_ANIMATION_PROGRESS], target);
+    }
+    if (reach_stage_has_desktop(&stage->state))
+    {
+        reach_stage_track_to(
+            stage, REACH_STAGE_ANIMATION_DESKTOP_PROGRESS, target,
+            reach_stage_presentation_spec(stage->state.animation_seconds,
+                                          (float)REACH_STAGE_DESKTOP_ANIMATION_FACTOR));
+    }
+    else
+    {
+        reach_motion_set(&stage->motions[REACH_STAGE_ANIMATION_DESKTOP_PROGRESS], target);
+    }
+}
+
 void reach_stage_begin_close(reach_stage *stage)
 {
     if (stage == nullptr || !stage->state.open || stage->state.closing)
@@ -346,26 +370,42 @@ void reach_stage_begin_close(reach_stage *stage)
     reach_motion_animate_spec_to_at(&stage->close_hover, 0.0f,
                                     reach_stage_motion_preset(REACH_MOTION_PRESET_FADE_OUT),
                                     reach_motion_now_seconds());
-    if (reach_stage_has_apps(&stage->state))
+    reach_stage_drive_presentation(stage, 0.0f);
+}
+
+static int32_t reach_stage_reopen(reach_stage *stage, const reach_stage_open_window *windows,
+                                  size_t window_count)
+{
+    reach_stage_state *state = &stage->state;
+    if (state->close_phase >= REACH_STAGE_CLOSE_TRANSPARENT)
     {
-        reach_stage_track_to(stage, REACH_STAGE_ANIMATION_PROGRESS, 0.0f,
-                             reach_stage_presentation_spec(stage->state.animation_seconds, 1.0f));
+        if (window_count == 0)
+        {
+            return 0;
+        }
+        reach_stage_force_close(stage);
+        return reach_stage_open(stage, stage->display.primary_bounds, stage->display.dpi_scale,
+                                windows, window_count) == REACH_OK;
     }
-    else
+
+    state->closing = 0;
+    state->close_phase = REACH_STAGE_CLOSE_NONE;
+    state->close_aligned_committed = 0;
+    state->close_handoff_pending = 0;
+    state->retarget_progress = 0.0f;
+    reach_motion_set(&stage->motions[REACH_STAGE_ANIMATION_RETARGET], 0.0f);
+    for (size_t index = 0; index < state->tile_count; ++index)
     {
-        reach_motion_set(&stage->motions[REACH_STAGE_ANIMATION_PROGRESS], 0.0f);
+        reach_stage_tile *tile = &state->tiles[index];
+        tile->open_from_rect = tile->current_rect;
+        tile->open_from_progress = tile->desktop ? state->desktop_progress : state->progress;
+        tile->reopening = 1;
+        tile->close_retargeting = 0;
     }
-    if (reach_stage_has_desktop(&stage->state))
-    {
-        reach_stage_track_to(
-            stage, REACH_STAGE_ANIMATION_DESKTOP_PROGRESS, 0.0f,
-            reach_stage_presentation_spec(stage->state.animation_seconds,
-                                          (float)REACH_STAGE_DESKTOP_ANIMATION_FACTOR));
-    }
-    else
-    {
-        reach_motion_set(&stage->motions[REACH_STAGE_ANIMATION_DESKTOP_PROGRESS], 0.0f);
-    }
+    reach_stage_drive_presentation(stage, 1.0f);
+    (void)reach_stage_update_windows(stage, windows, window_count);
+    reach_stage_apply_progress(stage);
+    return 1;
 }
 
 void reach_stage_force_close(reach_stage *stage)
@@ -1053,6 +1093,10 @@ int32_t reach_stage_set_open(reach_stage *stage, int32_t open)
         return 0;
     }
 
+    if (stage->state.closing)
+    {
+        return reach_stage_reopen(stage, windows, count);
+    }
     if (reach_stage_is_open(stage) || count == 0)
     {
         return 0;

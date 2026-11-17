@@ -47,6 +47,9 @@ extern "C"
         reach_rect_f32 close_destination_rect;
         float close_from_progress;
         int32_t close_retargeting;
+        reach_rect_f32 open_from_rect;
+        float open_from_progress;
+        int32_t reopening;
     } reach_stage_tile;
 
     typedef enum reach_stage_close_phase

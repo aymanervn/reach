@@ -270,7 +270,7 @@ reach_result reach_stage_append_render_commands(reach_stage *stage,
             reach_rect_f32 item = rect;
             item.y -= tile->current_bar.height;
             item.height += tile->current_bar.height;
-            int32_t hovered = !state->closing && state->has_hover && state->hover_index == index;
+            int32_t hovered = state->has_hover && state->hover_index == index;
             reach_result result =
                 reach_stage_push_tile_background(ctx, out_commands, item, border, hovered, alpha);
             if (result != REACH_OK)
