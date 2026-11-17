@@ -46,7 +46,6 @@ extern "C"
         reach_rect_f32 close_buttons[REACH_CLIPBOARD_MAX_ITEMS];
         reach_rect_f32 scrollbar_track;
         float content_height;
-        float chrome_height;
         float item_large_size;
         float item_pitch;
         float item_width;

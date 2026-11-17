@@ -5,8 +5,22 @@
 static void reach_feature_transition_apply_theme(reach_feature_transition *transition,
                                                  const reach_theme *theme)
 {
-    transition->fade_in = reach_theme_motion_preset(theme, REACH_MOTION_PRESET_CARD_FADE_IN);
-    transition->fade_out = reach_theme_motion_preset(theme, REACH_MOTION_PRESET_CARD_FADE_OUT);
+    const reach_theme *actual = theme != nullptr ? theme : reach_theme_default();
+    transition->fade_in =
+        reach_theme_motion_preset(actual, transition->rises ? REACH_MOTION_PRESET_POPUP_FADE_IN
+                                                            : REACH_MOTION_PRESET_CARD_FADE_IN);
+    transition->fade_out = reach_theme_motion_preset(actual, REACH_MOTION_PRESET_CARD_FADE_OUT);
+    transition->rise_in = reach_theme_motion_preset(actual, REACH_MOTION_PRESET_POPUP_RISE);
+    transition->rise_distance = actual->popup_rise_distance;
+    transition->rise_scale = actual->popup_rise_scale;
+}
+
+void reach_feature_transition_enable_rise(reach_feature_transition *transition)
+{
+    if (transition == nullptr)
+        return;
+    transition->rises = 1;
+    reach_feature_transition_apply_theme(transition, nullptr);
 }
 
 void reach_feature_transition_init(reach_feature_transition *transition, int32_t direction)
@@ -28,6 +42,7 @@ void reach_feature_transition_reset(reach_feature_transition *transition)
     transition->target_open = 0;
     transition->completion_seconds = 0.0;
     reach_motion_set(&transition->opacity, 0.0f);
+    reach_motion_set(&transition->rise, 0.0f);
 }
 
 void reach_feature_transition_configure(reach_feature_transition *transition,
@@ -78,6 +93,7 @@ int32_t reach_feature_transition_set_open(reach_feature_transition *transition, 
     {
         transition->visible = 1;
         reach_motion_set(&transition->opacity, 0.0f);
+        reach_motion_set(&transition->rise, 0.0f);
     }
     if (transition->visible)
     {
@@ -86,6 +102,18 @@ int32_t reach_feature_transition_set_open(reach_feature_transition *transition, 
                                         target ? transition->fade_in : transition->fade_out,
                                         now_seconds);
         transition->completion_seconds = reach_motion_deadline(&transition->opacity);
+        if (!transition->rises)
+            reach_motion_set(&transition->rise, 1.0f);
+        else if (target)
+        {
+            reach_motion_animate_spec_to_at(&transition->rise, 1.0f, transition->rise_in,
+                                            now_seconds);
+            transition->completion_seconds =
+                fmax(transition->completion_seconds, reach_motion_deadline(&transition->rise));
+        }
+        else
+            reach_motion_set(&transition->rise,
+                             reach_motion_value_at(&transition->rise, now_seconds));
         if (transition->completion_seconds == 0.0)
             transition->completion_seconds = now_seconds;
     }
@@ -139,6 +167,16 @@ void reach_feature_transition_presentation(const reach_feature_transition *trans
     geometry->presentation.group.opacity = transition->opacity;
     reach_motion_set(&geometry->presentation.group.scale, 1.0f);
     reach_motion_set(&geometry->presentation.group.y, 0.0f);
+    if (transition->rises)
+    {
+        float distance = transition->rise_distance * transition->dpi_scale;
+        float start =
+            transition->direction == REACH_FEATURE_TRANSITION_FROM_ABOVE ? -distance : distance;
+        geometry->presentation.group.scale = reach_motion_affine(
+            &transition->rise, 1.0f - transition->rise_scale, transition->rise_scale);
+        geometry->presentation.group.y = reach_motion_affine(&transition->rise, -start, start);
+        geometry->presentation.translation_bounds = {0.0f, fminf(start, 0.0f), 0.0f, distance};
+    }
     reach_rect_f32 bounds = geometry->visible_bounds;
     float anchor_x = transition->has_anchor ? transition->anchor_x : bounds.width * 0.5f;
     float anchor_y = transition->has_anchor ? transition->anchor_y

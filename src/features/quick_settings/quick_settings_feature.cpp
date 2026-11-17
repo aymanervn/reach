@@ -2685,6 +2685,7 @@ reach_result reach_quick_settings_create(reach_quick_settings **out_quick_settin
     }
     reach_feature_transition_init(&quick_settings->popup_transition,
                                   REACH_FEATURE_TRANSITION_FROM_ABOVE);
+    reach_feature_transition_enable_rise(&quick_settings->popup_transition);
     reach_pressable_init(&quick_settings->pressable);
     reach_quick_settings_model_init(&quick_settings->state.model);
     reach_quick_settings_scroll_init(&quick_settings->state.scroll);
