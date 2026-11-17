@@ -86,7 +86,7 @@ static inline bool reach_widgets_find_space(reach_rect_f32 area, reach_rect_f32 
 }
 
 static inline bool reach_widgets_find_drop(reach_rect_f32 desktop, reach_rect_f32 wanted,
-                                           const reach_rect_f32 *cards, size_t count, size_t moving,
+                                           const std::vector<reach_rect_f32> &occupied,
                                            bool resizing, float gap, float grid,
                                            reach_rect_f32 *out)
 {
@@ -96,14 +96,6 @@ static inline bool reach_widgets_find_drop(reach_rect_f32 desktop, reach_rect_f3
     if (wanted.width <= 0.0f || wanted.height <= 0.0f)
     {
         return false;
-    }
-    std::vector<reach_rect_f32> occupied;
-    for (size_t index = 0; index < count; ++index)
-    {
-        if (index != moving && cards[index].width > 0.0f && cards[index].height > 0.0f)
-        {
-            occupied.push_back(cards[index]);
-        }
     }
     if (!resizing)
     {

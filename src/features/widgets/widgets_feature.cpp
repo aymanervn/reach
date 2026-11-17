@@ -11,6 +11,7 @@
 #include <cstring>
 #include <cmath>
 #include <new>
+#include <vector>
 
 struct reach_widgets
 {
@@ -33,7 +34,10 @@ struct reach_widgets
     float drag_y;
     reach_rect_f32 drag_origin;
     reach_rect_f32 drag_destination;
+    std::vector<reach_rect_f32> drag_occupied;
+    double drag_preview_deadline;
     bool drag_has_destination;
+    bool drag_preview_ready;
     bool layout_dirty;
     uint32_t enabled_mask;
     reach_pressable control_pressable;
@@ -56,10 +60,33 @@ static void reach_widgets_reset(void *capsule)
     reach_pressable_reset(&widgets->control_pressable, nullptr);
     (void)reach_widgets_set_enabled(widgets, 0);
     widgets->drag_index = -1;
+    widgets->drag_preview_deadline = 0;
 }
 
 static constexpr double reach_widgets_stopwatch_interval = 0.1;
 static constexpr double reach_widgets_pomodoro_interval = 1.0;
+static constexpr double reach_widgets_drag_preview_delay = 0.08;
+
+static bool reach_widgets_update_drop(reach_widgets *widgets, float scale)
+{
+    const reach_rect_f32 desktop = {0, 0, widgets->desktop_bounds.width,
+                                    widgets->desktop_bounds.height};
+    reach_rect_f32 destination = {};
+    const bool found = reach_widgets_find_drop(desktop, widgets->cards[widgets->drag_index],
+                                               widgets->drag_occupied, widgets->resizing != 0,
+                                               14.0f * scale, scale, &destination);
+    if (!found)
+    {
+        destination = widgets->drag_origin;
+    }
+    const bool changed =
+        !widgets->drag_preview_ready || !reach_rect_equal(destination, widgets->drag_destination);
+    widgets->drag_has_destination = found;
+    widgets->drag_preview_ready = true;
+    widgets->drag_destination = destination;
+    widgets->drag_preview_deadline = 0;
+    return changed;
+}
 
 struct reach_widget_timer
 {
@@ -94,6 +121,12 @@ static void reach_widgets_tick(void *capsule, double, reach_feature_tick_result 
     if (widgets->enabled_mask == 0)
         return;
     double now = reach_motion_now_seconds();
+    if (widgets->drag_index >= 0 && widgets->drag_preview_deadline > 0 &&
+        now >= widgets->drag_preview_deadline &&
+        reach_widgets_update_drop(widgets, widgets->dpi_scale))
+    {
+        out->redraw = 1;
+    }
     for (const auto &timer : reach_widgets_timers)
     {
         if (reach_widgets_timer_active(*widgets, timer) && now >= widgets->*(timer.deadline))
@@ -166,6 +199,7 @@ static void reach_widgets_desktop_geometry(const void *capsule, reach_feature_su
     *out = {};
     out->visible_bounds = widgets->desktop_bounds;
     out->envelope_bounds = widgets->desktop_bounds;
+    out->deadline_seconds = widgets->drag_preview_deadline;
     for (const auto &timer : reach_widgets_timers)
     {
         if (reach_widgets_timer_active(*widgets, timer))
@@ -297,17 +331,21 @@ static uint64_t reach_widgets_control_target(const reach_widgets *widgets, float
     return REACH_PRESSABLE_TARGET_NONE;
 }
 
-static void reach_widgets_update_drag(reach_widgets *widgets, float x, float y, float scale)
+static bool reach_widgets_update_drag(reach_widgets *widgets, float x, float y, float scale)
 {
     const float dx = x - widgets->drag_x;
     const float dy = y - widgets->drag_y;
     if (!widgets->moved && dx * dx + dy * dy <= 16.0f * scale * scale)
     {
-        return;
+        return false;
     }
-    widgets->moved = 1;
-    reach_pressable_result ignored = {};
-    reach_pressable_disarm(&widgets->control_pressable, nullptr, &ignored);
+    const bool started = !widgets->moved;
+    if (started)
+    {
+        widgets->moved = 1;
+        reach_pressable_result ignored = {};
+        reach_pressable_disarm(&widgets->control_pressable, nullptr, &ignored);
+    }
 
     const int32_t index = widgets->drag_index;
     const reach_rect_f32 desktop = {0, 0, widgets->desktop_bounds.width,
@@ -328,10 +366,9 @@ static void reach_widgets_update_drag(reach_widgets *widgets, float x, float y, 
         card.x = std::clamp(card.x + dx, 0.0f, std::max(0.0f, desktop.width - card.width));
         card.y = std::clamp(card.y + dy, 0.0f, std::max(0.0f, desktop.height - card.height));
     }
+    const bool changed = !reach_rect_equal(widgets->cards[index], card);
     widgets->cards[index] = card;
-    widgets->drag_has_destination = reach_widgets_find_drop(
-        desktop, card, widgets->cards, REACH_MAX_DESKTOP_WIDGETS, (size_t)index,
-        widgets->resizing != 0, 14.0f * scale, scale, &widgets->drag_destination);
+    return started || changed;
 }
 
 static void reach_widgets_desktop_pointer(void *capsule, const reach_pointer_event *event,
@@ -373,6 +410,18 @@ static void reach_widgets_desktop_pointer(void *capsule, const reach_pointer_eve
             widgets->resizing = reach_rect_contains(chrome.resize, x, y);
             widgets->moved = 0;
             widgets->drag_has_destination = false;
+            widgets->drag_preview_ready = false;
+            widgets->drag_preview_deadline = 0;
+            widgets->drag_occupied.clear();
+            for (int32_t other = 0; other < REACH_MAX_DESKTOP_WIDGETS; ++other)
+            {
+                const auto &card = widgets->cards[other];
+                if (other != index && (widgets->enabled_mask & (1u << other)) != 0 &&
+                    card.width > 0 && card.height > 0)
+                {
+                    widgets->drag_occupied.push_back(card);
+                }
+            }
             if (!widgets->resizing)
             {
                 reach_pressable_result press = {};
@@ -393,11 +442,18 @@ static void reach_widgets_desktop_pointer(void *capsule, const reach_pointer_eve
     int32_t index = widgets->drag_index;
     if (event->kind == REACH_POINTER_EVENT_MOVE)
     {
-        reach_pressable_result press = {};
-        reach_pressable_update(&widgets->control_pressable,
-                               reach_widgets_control_target(widgets, x, y), &press);
-        reach_widgets_update_drag(widgets, x, y, scale);
-        out->redraw = widgets->moved;
+        if (!widgets->moved)
+        {
+            reach_pressable_result press = {};
+            reach_pressable_update(&widgets->control_pressable,
+                                   reach_widgets_control_target(widgets, x, y), &press);
+        }
+        out->redraw = reach_widgets_update_drag(widgets, x, y, scale);
+        if (out->redraw)
+        {
+            widgets->drag_preview_deadline =
+                reach_motion_now_seconds() + reach_widgets_drag_preview_delay;
+        }
         out->handled = 1;
         return;
     }
@@ -407,6 +463,10 @@ static void reach_widgets_desktop_pointer(void *capsule, const reach_pointer_eve
         if (event->kind == REACH_POINTER_EVENT_UP)
         {
             reach_widgets_update_drag(widgets, x, y, scale);
+            if (widgets->moved)
+            {
+                reach_widgets_update_drop(widgets, scale);
+            }
             reach_pressable_release(&widgets->control_pressable, REACH_POINTER_BUTTON_PRIMARY,
                                     reach_widgets_control_target(widgets, x, y), nullptr, &press);
         }
@@ -488,6 +548,7 @@ static void reach_widgets_desktop_pointer(void *capsule, const reach_pointer_eve
             }
         }
         widgets->drag_index = -1;
+        widgets->drag_preview_deadline = 0;
         out->relayout = widgets->layout_dirty;
         out->handled = 1;
         out->capture = -1;
@@ -1202,6 +1263,19 @@ static void reach_widgets_render_body(const reach_widgets *widgets, size_t index
     }
 }
 
+static reach_result reach_widgets_begin_group(reach_render_command_buffer *commands, uint64_t id,
+                                              reach_rect_f32 rect, reach_shadow_pad pad)
+{
+    reach_render_group group = {};
+    group.id = id;
+    group.bounds = {-pad.left, -pad.top, std::ceil(rect.width) + pad.left + pad.right,
+                    std::ceil(rect.height) + pad.top + pad.bottom};
+    // Keep the raster origin pixel-aligned as the compositor moves the card.
+    reach_motion_set(&group.x, std::round(rect.x));
+    reach_motion_set(&group.y, std::round(rect.y));
+    return reach_render_command_buffer_begin_group(commands, &group);
+}
+
 reach_result reach_widgets_render_desktop(const reach_widgets *widgets, const reach_theme *theme,
                                           float dpi_scale,
                                           const reach_text_measure_port *text_measure,
@@ -1213,6 +1287,9 @@ reach_result reach_widgets_render_desktop(const reach_widgets *widgets, const re
     }
     const reach_theme *actual = theme != nullptr ? theme : reach_theme_default();
     float scale = dpi_scale > 0.0f ? dpi_scale : 1.0f;
+    const auto shadow_pad = reach_theme_shadow_pad(&actual->popup_shadow, scale);
+    constexpr uint64_t card_group_base = 1;
+    constexpr uint64_t preview_group = card_group_base + REACH_MAX_DESKTOP_WIDGETS;
     for (size_t draw = 0; draw < REACH_MAX_DESKTOP_WIDGETS; ++draw)
     {
         size_t index = draw;
@@ -1227,17 +1304,29 @@ reach_result reach_widgets_render_desktop(const reach_widgets *widgets, const re
         reach_rect_f32 rect = widgets->cards[index];
         if (rect.width <= 0 || rect.height <= 0)
             continue;
-        if (widgets->moved && (int32_t)index == widgets->drag_index)
+        if ((int32_t)index == widgets->drag_index && widgets->drag_preview_ready &&
+            !reach_rect_equal(rect, widgets->drag_destination))
         {
-            const auto target =
-                widgets->drag_has_destination ? widgets->drag_destination : widgets->drag_origin;
-            if (!reach_rect_equal(rect, target))
+            const auto &target = widgets->drag_destination;
+            reach_result result = reach_widgets_begin_group(commands, preview_group, target, {});
+            if (result != REACH_OK)
             {
-                auto marker = actual->accent;
-                marker.a = 0.28f;
-                reach_widgets_rect(commands, target, actual->radius_large * scale, marker);
+                return result;
             }
+            auto marker = actual->accent;
+            marker.a = 0.28f;
+            reach_widgets_rect(commands, {0, 0, target.width, target.height},
+                               actual->radius_large * scale, marker);
+            reach_render_command_buffer_end_group(commands);
         }
+        reach_result result =
+            reach_widgets_begin_group(commands, card_group_base + index, rect, shadow_pad);
+        if (result != REACH_OK)
+        {
+            return result;
+        }
+        rect.x = 0;
+        rect.y = 0;
         reach_widgets_card(commands, actual, rect, scale, actual->accent);
         const auto inner = reach_theme_border_content_rect(actual, scale, rect);
         const float inner_radius = std::max(0.0f, actual->radius_large * scale -
@@ -1260,6 +1349,7 @@ reach_result reach_widgets_render_desktop(const reach_widgets *widgets, const re
             reach_widgets_chrome(rect, scale, reach_widgets_has_footer((int32_t)index));
         reach_widgets_render_body(widgets, index, chrome, actual, scale, text_measure, commands);
         reach_widgets_resize_grip(commands, actual, chrome.resize, scale);
+        reach_render_command_buffer_end_group(commands);
     }
     return REACH_OK;
 }
