@@ -322,10 +322,10 @@ reach_result reach_ui_bordered_color_feedback_render(reach_render_command_buffer
             reach_motion weight = reach_motion_affine(&hover, outline.a, 0);
             group.tint_rgb_mix = reach_motion_clamp(&weight, 0, 1);
         }
+        commands->current_group_id = 0;
         reach_result result = reach_render_command_buffer_begin_group(commands, &group);
-        if (result != REACH_OK)
-            return result;
-        result = reach_render_command_buffer_push(commands, &shapes[index]);
+        if (result == REACH_OK)
+            result = reach_render_command_buffer_push(commands, &shapes[index]);
         reach_render_command_buffer_end_group(commands);
         commands->current_group_id = parent_id;
         if (result != REACH_OK)

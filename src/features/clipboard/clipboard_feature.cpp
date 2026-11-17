@@ -6,6 +6,7 @@
 #include "clipboard_metrics.h"
 
 #include <atomic>
+#include <initializer_list>
 #include <math.h>
 #include <new>
 
@@ -42,9 +43,21 @@ static int32_t reach_clipboard_contains(reach_rect_f32 rect, int32_t x, int32_t 
            (float)x < rect.x + rect.width && (float)y >= rect.y && (float)y < rect.y + rect.height;
 }
 
-static reach_clipboard_layout reach_clipboard_compute_layout_for_height(
-    reach_clipboard_model *model, reach_rect_f32 monitor_bounds, reach_rect_f32 launcher_bounds,
-    float dpi_scale, float border_thickness, float animated_height)
+static reach_rect_f32 reach_clipboard_close_button_for(reach_rect_f32 item, float border_thickness,
+                                                       const reach_clipboard_metrics &metrics)
+{
+    float item_border = reach_clipboard_min_float(
+        border_thickness, reach_clipboard_min_float(item.width, item.height) * 0.5f);
+    return {item.x + item.width - item_border - metrics.close_button_size -
+                metrics.close_button_margin,
+            item.y + item_border + metrics.close_button_margin, metrics.close_button_size,
+            metrics.close_button_size};
+}
+
+reach_clipboard_layout reach_clipboard_compute_layout(reach_clipboard_model *model,
+                                                      reach_rect_f32 monitor_bounds,
+                                                      reach_rect_f32 launcher_bounds,
+                                                      float dpi_scale, float border_thickness)
 {
     reach_clipboard_layout layout = {};
     if (model == nullptr)
@@ -97,11 +110,6 @@ static reach_clipboard_layout reach_clipboard_compute_layout_for_height(
         height = default_height;
     }
     height = reach_clipboard_min_float(height, available_height);
-    const float target_height = height;
-    if (animated_height > 0.0f)
-    {
-        height = reach_clipboard_clamp_float(animated_height, default_height, available_height);
-    }
 
     const float monitor_left = monitor_bounds.x + screen_edge_margin;
     const float monitor_top = monitor_bounds.y + screen_edge_margin;
@@ -114,6 +122,8 @@ static reach_clipboard_layout reach_clipboard_compute_layout_for_height(
         reach_clipboard_clamp_float(monitor_bottom - height, monitor_top, monitor_bottom - height);
     layout.bounds.width = width;
     layout.bounds.height = height;
+    layout.chrome_height = reach_clipboard_min_float(chrome_height, height);
+    layout.max_height = reach_clipboard_max_float(height, max_height);
 
     const float horizontal_border =
         reach_clipboard_min_float(border_thickness, layout.bounds.width * 0.5f);
@@ -135,8 +145,6 @@ static reach_clipboard_layout reach_clipboard_compute_layout_for_height(
                     layout.bounds.y + vertical_border + metrics.padding, title_width,
                     metrics.title_height};
 
-    const float target_viewport_height =
-        reach_clipboard_max_float(0.0f, target_height - chrome_height);
     layout.viewport = {
         layout.bounds.x + horizontal_border + metrics.padding,
         layout.title.y + metrics.title_height + metrics.title_gap, content_width,
@@ -144,66 +152,42 @@ static reach_clipboard_layout reach_clipboard_compute_layout_for_height(
                                             metrics.title_height - metrics.title_gap)};
 
     layout.item_large_size = metrics.item_large_size;
+    layout.item_pitch = metrics.item_large_size + metrics.item_gap;
     layout.content_height = item_count > 0 ? metrics.item_large_size * (float)item_count +
                                                  metrics.item_gap * (float)(item_count - 1)
                                            : 0.0f;
-
+    layout.item_text_width = reach_clipboard_max_float(
+        0.0f, layout.viewport.width - metrics.scrollbar_gutter - metrics.item_scrollbar_gap);
     const int32_t needs_scrollbar =
-        layout.content_height > target_viewport_height && target_viewport_height > 0.0f;
+        layout.content_height > layout.viewport.height && layout.viewport.height > 0.0f;
+    layout.item_width = needs_scrollbar ? layout.item_text_width : layout.viewport.width;
 
     reach_scroll_view_config scroll = model->scroll.config;
     scroll.minimum_thumb = metrics.thumb_size;
     reach_scroll_view_configure(&model->scroll, &scroll);
     reach_scroll_view_set_extents(&model->scroll, layout.content_height, layout.viewport.height);
-    layout.scroll_time = reach_motion_now_seconds();
     (void)reach_scroll_view_sync(&model->scroll, nullptr, REACH_SCROLL_VIEW_WHEEL,
-                                 layout.scroll_time);
-    const float scroll_offset = reach_scroll_view_value_at(&model->scroll, layout.scroll_time);
-
-    float item_width = layout.viewport.width;
-    if (needs_scrollbar)
-    {
-        item_width -= metrics.scrollbar_gutter + metrics.item_scrollbar_gap;
-    }
-    item_width = reach_clipboard_max_float(0.0f, item_width);
-    layout.item_width = item_width;
+                                 reach_motion_now_seconds());
+    const float scroll_offset = reach_scroll_view_position(&model->scroll);
 
     for (size_t index = 0; index < item_count; ++index)
     {
         layout.items[index] = {layout.viewport.x,
-                               layout.viewport.y +
-                                   (metrics.item_large_size + metrics.item_gap) * (float)index -
-                                   scroll_offset,
-                               item_width, metrics.item_large_size};
-        float item_border = reach_clipboard_min_float(
-            border_thickness,
-            reach_clipboard_min_float(layout.items[index].width, layout.items[index].height) *
-                0.5f);
-        layout.close_buttons[index] = {
-            layout.items[index].x + layout.items[index].width - item_border -
-                metrics.close_button_size - metrics.close_button_margin,
-            layout.items[index].y + item_border + metrics.close_button_margin,
-            metrics.close_button_size, metrics.close_button_size};
+                               layout.viewport.y + layout.item_pitch * (float)index - scroll_offset,
+                               layout.item_width, metrics.item_large_size};
+        layout.close_buttons[index] =
+            reach_clipboard_close_button_for(layout.items[index], border_thickness, metrics);
     }
 
     if (needs_scrollbar)
     {
-        layout.scrollbar_track = {layout.viewport.x + item_width + metrics.item_scrollbar_gap +
-                                      metrics.track_x_offset,
+        layout.scrollbar_track = {layout.viewport.x + layout.item_text_width +
+                                      metrics.item_scrollbar_gap + metrics.track_x_offset,
                                   layout.viewport.y, metrics.track_width, layout.viewport.height};
     }
     reach_scroll_view_set_frame(&model->scroll, layout.viewport, layout.scrollbar_track);
 
     return layout;
-}
-
-reach_clipboard_layout reach_clipboard_compute_layout(reach_clipboard_model *model,
-                                                      reach_rect_f32 monitor_bounds,
-                                                      reach_rect_f32 launcher_bounds,
-                                                      float dpi_scale, float border_thickness)
-{
-    return reach_clipboard_compute_layout_for_height(model, monitor_bounds, launcher_bounds,
-                                                     dpi_scale, border_thickness, 0.0f);
 }
 
 reach_clipboard_hit_result reach_clipboard_hit_test(const reach_clipboard_model *model,
@@ -257,19 +241,26 @@ struct reach_clipboard_feature
 {
     reach_motion height;
     reach_motion item_width;
-    double item_width_deadline;
+    int32_t content_follows;
     reach_motion_spec smooth_spec;
     reach_motion_spec fade_in_spec;
     reach_motion_spec fade_out_spec;
     float layout_scale;
     float layout_border;
-    reach_motion hover[REACH_CLIPBOARD_MAX_ITEMS];
-    uint64_t hover_item_ids[REACH_CLIPBOARD_MAX_ITEMS];
-    reach_motion item_offset[REACH_CLIPBOARD_MAX_ITEMS];
-    uint64_t offset_item_ids[REACH_CLIPBOARD_MAX_ITEMS];
-    float offset_pitch;
-    uint64_t hover_group_ids[REACH_CLIPBOARD_MAX_ITEMS];
-    uint64_t next_hover_group_id;
+    reach_keyed_row rows[REACH_CLIPBOARD_ROW_CAPACITY];
+    reach_clipboard_item row_items[REACH_CLIPBOARD_ROW_CAPACITY];
+    reach_motion row_hover[REACH_CLIPBOARD_ROW_CAPACITY];
+    uint64_t synced_ids[REACH_CLIPBOARD_MAX_ITEMS];
+    size_t synced_count;
+    size_t synced_first;
+    size_t synced_window;
+    int32_t rows_synced;
+    double motion_deadline;
+    int32_t pointer_inside;
+    int32_t pointer_x;
+    int32_t pointer_y;
+    reach_clipboard_item held_removed[REACH_CLIPBOARD_MAX_ITEMS * 2];
+    size_t held_removed_count;
     reach_feature_transition surface_transition;
     reach_clipboard_state state;
     std::atomic<int32_t> refresh_requested;
@@ -292,6 +283,74 @@ static void reach_clipboard_feature_retire(reach_clipboard_feature *clipboard,
     clipboard->retired[clipboard->retired_count++] = {item->id, item->thumbnail_id};
 }
 
+static int32_t reach_clipboard_feature_row_holds(const reach_clipboard_feature *clipboard,
+                                                 uint64_t id)
+{
+    for (size_t slot = 0; slot < REACH_CLIPBOARD_ROW_CAPACITY; ++slot)
+    {
+        if (clipboard->rows[slot].lifecycle != REACH_KEYED_ROW_EMPTY &&
+            clipboard->row_items[slot].id == id)
+            return 1;
+    }
+    return 0;
+}
+
+static void reach_clipboard_feature_drop(reach_clipboard_feature *clipboard,
+                                         const reach_clipboard_item *item)
+{
+    if (clipboard == nullptr || item == nullptr || item->id == 0)
+        return;
+    if (reach_clipboard_feature_row_holds(clipboard, item->id) &&
+        clipboard->held_removed_count < REACH_CLIPBOARD_MAX_ITEMS * 2)
+    {
+        clipboard->held_removed[clipboard->held_removed_count++] = *item;
+        return;
+    }
+    reach_clipboard_feature_retire(clipboard, item);
+}
+
+static void reach_clipboard_feature_release_slot(reach_clipboard_feature *clipboard, size_t slot)
+{
+    uint64_t id = clipboard->row_items[slot].id;
+    for (size_t index = 0; id != 0 && index < clipboard->held_removed_count; ++index)
+    {
+        if (clipboard->held_removed[index].id != id)
+            continue;
+        reach_clipboard_feature_retire(clipboard, &clipboard->held_removed[index]);
+        clipboard->held_removed[index] = clipboard->held_removed[--clipboard->held_removed_count];
+        break;
+    }
+    clipboard->row_items[slot] = {};
+    reach_motion_set(&clipboard->row_hover[slot], 0.0f);
+}
+
+static void reach_clipboard_feature_apply_row_changes(reach_clipboard_feature *clipboard,
+                                                      const reach_keyed_row_change *changes,
+                                                      size_t count)
+{
+    for (size_t index = 0; index < count; ++index)
+    {
+        if (changes[index].kind == REACH_KEYED_ROW_RELEASED)
+            reach_clipboard_feature_release_slot(clipboard, changes[index].slot);
+        else if (changes[index].kind == REACH_KEYED_ROW_ALLOCATED)
+            reach_motion_set(&clipboard->row_hover[changes[index].slot], 0.0f);
+    }
+}
+
+static void reach_clipboard_feature_release_rows(reach_clipboard_feature *clipboard)
+{
+    for (size_t slot = 0; slot < REACH_CLIPBOARD_ROW_CAPACITY; ++slot)
+    {
+        if (clipboard->rows[slot].lifecycle != REACH_KEYED_ROW_EMPTY)
+            reach_clipboard_feature_release_slot(clipboard, slot);
+        clipboard->rows[slot] = {};
+    }
+    for (size_t index = 0; index < clipboard->held_removed_count; ++index)
+        reach_clipboard_feature_retire(clipboard, &clipboard->held_removed[index]);
+    clipboard->held_removed_count = 0;
+    clipboard->rows_synced = 0;
+}
+
 static void reach_clipboard_feature_capture(reach_clipboard_feature *clipboard,
                                             reach_feature_tick_result *out)
 {
@@ -309,8 +368,8 @@ static void reach_clipboard_feature_capture(reach_clipboard_feature *clipboard,
     }
     reach_clipboard_insert_outcome outcome = {};
     reach_clipboard_insert_captured(clipboard, item, &outcome);
-    reach_clipboard_feature_retire(clipboard, &outcome.release_rejected);
-    reach_clipboard_feature_retire(clipboard, &outcome.release_evicted);
+    reach_clipboard_feature_drop(clipboard, &outcome.release_rejected);
+    reach_clipboard_feature_drop(clipboard, &outcome.release_evicted);
     if (outcome.accepted)
     {
         out->redraw = 1;
@@ -335,58 +394,73 @@ void reach_clipboard_feature_reset(reach_clipboard_feature *clipboard)
     {
         reach_pressable_reset(&clipboard->state.pressable, nullptr);
         clipboard->state.press_identity = 0;
+        reach_clipboard_feature_release_rows(clipboard);
         reach_clipboard_model_init(&clipboard->state.model);
         reach_feature_transition_reset(&clipboard->surface_transition);
-        reach_motion_set(&clipboard->item_width, 0);
-        clipboard->item_width_deadline = 0;
-        for (auto &hover : clipboard->hover)
-            reach_motion_set(&hover, 0);
+        clipboard->height = {};
+        clipboard->item_width = {};
+        clipboard->content_follows = 0;
+        clipboard->motion_deadline = 0;
+        clipboard->pointer_inside = 0;
     }
 }
 
-reach_motion reach_clipboard_feature_item_width(const reach_clipboard_feature *clipboard)
+static size_t reach_clipboard_feature_slot_for(const reach_clipboard_feature *clipboard,
+                                               size_t item_index)
 {
-    reach_motion result = {};
-    if (clipboard != nullptr)
-        result = clipboard->item_width;
-    return result;
-}
-
-void reach_clipboard_layout_set_item_width(reach_clipboard_layout *layout, size_t count,
-                                           float width, float border_thickness)
-{
-    float delta = width - layout->item_width;
-    layout->item_width = width;
-    for (size_t index = 0; index < count && index < REACH_CLIPBOARD_MAX_ITEMS; ++index)
+    for (size_t slot = 0; slot < REACH_CLIPBOARD_ROW_CAPACITY; ++slot)
     {
-        auto &item = layout->items[index];
-        float old_border = fminf(border_thickness, fminf(item.width, item.height) * .5f);
-        float next_border = fminf(border_thickness, fminf(width, item.height) * .5f);
-        item.width = width;
-        layout->close_buttons[index].x += delta + old_border - next_border;
+        const reach_keyed_row &row = clipboard->rows[slot];
+        if (row.lifecycle == REACH_KEYED_ROW_LIVE &&
+            clipboard->synced_first + row.index == item_index)
+            return slot;
     }
-    layout->scrollbar_track.x += delta;
+    return REACH_CLIPBOARD_ROW_CAPACITY;
 }
 
 reach_clipboard_layout
 reach_clipboard_feature_input_layout(const reach_clipboard_feature *clipboard, double now_seconds)
 {
     reach_clipboard_layout result = {};
-    if (clipboard != nullptr)
+    if (clipboard == nullptr)
+        return result;
+    result = clipboard->state.layout;
+    const reach_clipboard_model &model = clipboard->state.model;
+    const reach_clipboard_metrics metrics =
+        reach_clipboard_metrics_for_scale(clipboard->layout_scale);
+    float scroll = reach_scroll_view_value_at(&model.scroll, now_seconds);
+    float width = clipboard->item_width.generation != 0
+                      ? reach_motion_value_at(&clipboard->item_width, now_seconds)
+                      : result.item_width;
+    float shift =
+        clipboard->content_follows && clipboard->height.generation != 0
+            ? result.bounds.height - reach_motion_value_at(&clipboard->height, now_seconds)
+            : 0.0f;
+    result.title.y += shift;
+    result.clear_button.y += shift;
+    result.viewport.y += shift;
+    result.scrollbar_track.y += shift;
+    for (size_t index = 0; index < REACH_CLIPBOARD_MAX_ITEMS; ++index)
     {
-        result = clipboard->state.layout;
-        if (clipboard->item_width.generation != 0)
-            reach_clipboard_layout_set_item_width(
-                &result, clipboard->state.model.count,
-                fminf(result.viewport.width,
-                      fmaxf(0, reach_motion_value_at(&clipboard->item_width, now_seconds))),
-                clipboard->layout_border);
+        result.items[index] = {};
+        result.close_buttons[index] = {};
+    }
+    size_t count = reach_clipboard_count_clamped(&model);
+    for (size_t slot = 0; slot < REACH_CLIPBOARD_ROW_CAPACITY; ++slot)
+    {
+        const reach_keyed_row &row = clipboard->rows[slot];
+        size_t index = clipboard->synced_first + row.index;
+        if (row.lifecycle != REACH_KEYED_ROW_LIVE || index >= count)
+            continue;
+        result.items[index] = {result.viewport.x,
+                               result.viewport.y + reach_motion_value_at(&row.y, now_seconds) -
+                                   scroll,
+                               width, result.item_large_size};
+        result.close_buttons[index] = reach_clipboard_close_button_for(
+            result.items[index], clipboard->layout_border, metrics);
     }
     return result;
 }
-
-static float reach_clipboard_feature_animate_height(reach_clipboard_feature *clipboard,
-                                                    float target, int32_t *out_active);
 
 static void reach_clipboard_feature_load_motion_specs(reach_clipboard_feature *clipboard,
                                                       const reach_theme *theme)
@@ -396,60 +470,160 @@ static void reach_clipboard_feature_load_motion_specs(reach_clipboard_feature *c
     clipboard->fade_out_spec = reach_theme_motion_preset(theme, REACH_MOTION_PRESET_FADE_OUT);
 }
 
-static int32_t reach_clipboard_feature_apply_item_offsets(reach_clipboard_feature *clipboard,
-                                                          float pitch, int32_t animate, double now)
+static void reach_clipboard_feature_refresh_deadline(reach_clipboard_feature *clipboard)
+{
+    double deadline = 0;
+    if (reach_keyed_rows_active(clipboard->rows, REACH_CLIPBOARD_ROW_CAPACITY))
+        deadline = reach_keyed_rows_deadline(clipboard->rows, REACH_CLIPBOARD_ROW_CAPACITY);
+    if (reach_scroll_view_active(&clipboard->state.model.scroll))
+        deadline = fmax(deadline, reach_scroll_view_deadline(&clipboard->state.model.scroll));
+    for (const reach_motion *motion : {&clipboard->height, &clipboard->item_width})
+    {
+        if (motion->generation != 0 && reach_motion_active(motion))
+            deadline = fmax(deadline, reach_motion_deadline(motion));
+    }
+    clipboard->motion_deadline = deadline;
+}
+
+void reach_clipboard_feature_collapse_all_hover(reach_clipboard_feature *clipboard)
+{
+    if (clipboard == nullptr)
+        return;
+    double now = reach_motion_now_seconds();
+    for (reach_motion &hover : clipboard->row_hover)
+    {
+        if (hover.generation != 0 && hover.to != 0.0f)
+            reach_motion_animate_spec_to_at(&hover, 0, clipboard->fade_out_spec, now);
+    }
+}
+
+void reach_clipboard_feature_move_hover(reach_clipboard_feature *clipboard, size_t previous,
+                                        size_t next)
+{
+    if (clipboard == nullptr)
+        return;
+    double now = reach_motion_now_seconds();
+    size_t from = reach_clipboard_feature_slot_for(clipboard, previous);
+    size_t to = reach_clipboard_feature_slot_for(clipboard, next);
+    if (from < REACH_CLIPBOARD_ROW_CAPACITY && from != to)
+        reach_motion_animate_spec_to_at(&clipboard->row_hover[from], 0, clipboard->fade_out_spec,
+                                        now);
+    if (to < REACH_CLIPBOARD_ROW_CAPACITY)
+        reach_motion_animate_spec_to_at(&clipboard->row_hover[to], 1, clipboard->fade_in_spec, now);
+}
+
+void reach_clipboard_feature_track_pointer(reach_clipboard_feature *clipboard, int32_t inside,
+                                           int32_t x, int32_t y)
+{
+    if (clipboard == nullptr)
+        return;
+    clipboard->pointer_inside = inside;
+    clipboard->pointer_x = x;
+    clipboard->pointer_y = y;
+}
+
+static int32_t reach_clipboard_feature_refresh_hover(reach_clipboard_feature *clipboard)
+{
+    reach_clipboard_state *state = &clipboard->state;
+    if (!state->model.open || !clipboard->pointer_inside ||
+        reach_pressable_tracking(&state->pressable) ||
+        reach_scroll_view_dragging(&state->model.scroll))
+        return 0;
+    reach_clipboard_layout layout =
+        reach_clipboard_feature_input_layout(clipboard, reach_motion_now_seconds());
+    reach_clipboard_hit_result hit = reach_clipboard_hit_test(
+        &state->model, &layout, clipboard->pointer_x, clipboard->pointer_y);
+    size_t next =
+        (hit.type == REACH_CLIPBOARD_HIT_ITEM || hit.type == REACH_CLIPBOARD_HIT_ITEM_CLOSE)
+            ? hit.index
+            : REACH_CLIPBOARD_MAX_ITEMS;
+    if (next == state->model.hovered_index)
+        return 0;
+    size_t previous = state->model.hovered_index;
+    state->model.hovered_index = next;
+    reach_clipboard_feature_move_hover(clipboard, previous, next);
+    return 1;
+}
+
+struct reach_clipboard_row_match
+{
+    const reach_clipboard_feature *clipboard;
+    size_t first;
+};
+
+static int32_t reach_clipboard_row_same(const void *context, size_t slot, size_t item_index)
+{
+    const reach_clipboard_row_match *match =
+        static_cast<const reach_clipboard_row_match *>(context);
+    uint64_t held = match->clipboard->row_items[slot].id;
+    return held != 0 && held == match->clipboard->state.model.items[match->first + item_index].id;
+}
+
+static int32_t reach_clipboard_feature_sync_rows(reach_clipboard_feature *clipboard,
+                                                 const reach_theme *theme,
+                                                 int32_t constraints_changed, double now)
 {
     reach_clipboard_state *state = &clipboard->state;
     const reach_clipboard_model &model = state->model;
-    size_t count =
-        model.count < REACH_CLIPBOARD_MAX_ITEMS ? model.count : REACH_CLIPBOARD_MAX_ITEMS;
-    bool changed = false;
+    const reach_clipboard_layout &layout = state->layout;
+    size_t count = reach_clipboard_count_clamped(&model);
+    int32_t items_changed = count != clipboard->synced_count;
+    for (size_t index = 0; !items_changed && index < count; ++index)
+        items_changed = clipboard->synced_ids[index] != model.items[index].id;
+    reach_scroll_view_window window = {};
+    if (layout.item_pitch > 0.0f && count > 0)
+    {
+        size_t visible = (size_t)ceilf(layout.viewport.height / layout.item_pitch) + 1;
+        window = reach_scroll_view_item_window(&model.scroll, layout.item_pitch, count, visible, 1,
+                                               REACH_CLIPBOARD_ROW_CAPACITY);
+    }
+    if (clipboard->rows_synced && !items_changed && !constraints_changed &&
+        window.first == clipboard->synced_first && window.count == clipboard->synced_window)
+    {
+        reach_clipboard_feature_refresh_deadline(clipboard);
+        return 0;
+    }
+    int32_t animate = clipboard->rows_synced && items_changed && !constraints_changed &&
+                      model.open &&
+                      reach_feature_transition_visible(&clipboard->surface_transition);
+    if (items_changed)
+    {
+        reach_clipboard_feature_collapse_all_hover(clipboard);
+        state->model.hovered_index = REACH_CLIPBOARD_MAX_ITEMS;
+    }
+    reach_keyed_row_change changes[REACH_KEYED_ROWS_MAX_CHANGES(REACH_CLIPBOARD_ROW_CAPACITY)];
+    size_t changed = reach_keyed_rows_release_settled(clipboard->rows, REACH_CLIPBOARD_ROW_CAPACITY,
+                                                      changes, REACH_CLIPBOARD_ROW_CAPACITY);
+    reach_clipboard_feature_apply_row_changes(clipboard, changes, changed);
+    float targets[REACH_CLIPBOARD_ROW_CAPACITY] = {};
+    for (size_t index = 0; index < window.count; ++index)
+        targets[index] = (float)(window.first + index) * layout.item_pitch;
+    reach_clipboard_row_match match = {clipboard, window.first};
+    reach_keyed_rows_sync_input input = {};
+    input.count = window.count;
+    input.targets = targets;
+    input.same = reach_clipboard_row_same;
+    input.context = &match;
+    input.animate = animate;
+    input.theme = theme;
+    input.now_seconds = now;
+    changed = reach_keyed_rows_sync(clipboard->rows, REACH_CLIPBOARD_ROW_CAPACITY, &input, changes,
+                                    REACH_KEYED_ROWS_MAX_CHANGES(REACH_CLIPBOARD_ROW_CAPACITY));
+    reach_clipboard_feature_apply_row_changes(clipboard, changes, changed);
+    for (size_t slot = 0; slot < REACH_CLIPBOARD_ROW_CAPACITY; ++slot)
+    {
+        const reach_keyed_row &row = clipboard->rows[slot];
+        if (row.lifecycle == REACH_KEYED_ROW_LIVE && window.first + row.index < count)
+            clipboard->row_items[slot] = model.items[window.first + row.index];
+    }
     for (size_t index = 0; index < REACH_CLIPBOARD_MAX_ITEMS; ++index)
-        changed = changed ||
-                  clipboard->offset_item_ids[index] != (index < count ? model.items[index].id : 0);
-    if (changed)
-    {
-        reach_motion previous[REACH_CLIPBOARD_MAX_ITEMS];
-        uint64_t previous_ids[REACH_CLIPBOARD_MAX_ITEMS];
-        for (size_t index = 0; index < REACH_CLIPBOARD_MAX_ITEMS; ++index)
-        {
-            previous[index] = clipboard->item_offset[index];
-            previous_ids[index] = clipboard->offset_item_ids[index];
-        }
-        bool carry = animate && pitch > 0.0f && clipboard->offset_pitch == pitch;
-        for (size_t index = 0; index < REACH_CLIPBOARD_MAX_ITEMS; ++index)
-        {
-            uint64_t id = index < count ? model.items[index].id : 0;
-            size_t previous_index = 0;
-            while (previous_index < REACH_CLIPBOARD_MAX_ITEMS &&
-                   (id == 0 || previous_ids[previous_index] != id))
-                ++previous_index;
-            clipboard->offset_item_ids[index] = id;
-            float from = 0.0f, velocity = 0.0f;
-            if (carry && previous_index < REACH_CLIPBOARD_MAX_ITEMS)
-            {
-                from = ((float)previous_index - (float)index) * pitch +
-                       reach_motion_value_at(&previous[previous_index], now);
-                velocity = reach_motion_velocity_at(&previous[previous_index], now);
-            }
-            REACH_ASSERT(isfinite(from) && isfinite(velocity));
-            if (fabsf(from) < 0.5f)
-                reach_motion_set(&clipboard->item_offset[index], 0.0f);
-            else
-                reach_motion_start_spec_at(&clipboard->item_offset[index], from, 0.0f, velocity,
-                                           clipboard->smooth_spec, now);
-        }
-    }
-    clipboard->offset_pitch = pitch;
-    int32_t active = 0;
-    for (size_t index = 0; index < count; ++index)
-    {
-        float offset = reach_motion_value_at(&clipboard->item_offset[index], now);
-        state->layout.items[index].y += offset;
-        state->layout.close_buttons[index].y += offset;
-        active |= reach_motion_active_at(&clipboard->item_offset[index], now);
-    }
-    return active;
+        clipboard->synced_ids[index] = index < count ? model.items[index].id : 0;
+    clipboard->synced_count = count;
+    clipboard->synced_first = window.first;
+    clipboard->synced_window = window.count;
+    clipboard->rows_synced = 1;
+    reach_clipboard_feature_refresh_deadline(clipboard);
+    return 1;
 }
 
 static int32_t reach_clipboard_rect_equal(reach_rect_f32 a, reach_rect_f32 b)
@@ -460,13 +634,8 @@ static int32_t reach_clipboard_rect_equal(reach_rect_f32 a, reach_rect_f32 b)
 
 int32_t reach_clipboard_feature_relayout(reach_clipboard_feature *clipboard,
                                          const reach_theme *theme, reach_rect_f32 monitor_bounds,
-                                         reach_rect_f32 launcher_bounds, float dpi_scale,
-                                         int32_t *out_animating)
+                                         reach_rect_f32 launcher_bounds, float dpi_scale)
 {
-    if (out_animating != nullptr)
-    {
-        *out_animating = 0;
-    }
     if (clipboard == nullptr)
     {
         return 0;
@@ -479,48 +648,46 @@ int32_t reach_clipboard_feature_relayout(reach_clipboard_feature *clipboard,
     float border_thickness = reach_theme_border_thickness(resolved_theme, dpi_scale);
     reach_clipboard_state *state = &clipboard->state;
     reach_clipboard_layout previous_layout = state->layout;
-    reach_clipboard_layout target_layout = reach_clipboard_compute_layout(
-        &state->model, monitor_bounds, launcher_bounds, dpi_scale, border_thickness);
-
-    int32_t height_active = 0;
-    float animated_height = reach_clipboard_feature_animate_height(
-        clipboard, target_layout.bounds.height, &height_active);
-    double now = reach_motion_now_seconds();
-    bool width_changed = fabsf(clipboard->item_width.to - target_layout.item_width) >= .5f;
-    bool constraints_changed =
-        fabsf(previous_layout.bounds.width - target_layout.bounds.width) >= .5f ||
+    state->layout = reach_clipboard_compute_layout(&state->model, monitor_bounds, launcher_bounds,
+                                                   dpi_scale, border_thickness);
+    int32_t constraints_changed =
+        fabsf(previous_layout.bounds.width - state->layout.bounds.width) >= .5f ||
         clipboard->layout_scale != dpi_scale || clipboard->layout_border != border_thickness;
-    if (clipboard->item_width.generation == 0 || clipboard->item_width.to <= 0 ||
-        target_layout.item_width <= 0 || constraints_changed ||
-        !reach_feature_transition_visible(&clipboard->surface_transition))
-    {
-        reach_motion_set(&clipboard->item_width, target_layout.item_width);
-        clipboard->item_width_deadline = 0;
-    }
-    else if (width_changed)
-    {
-        reach_motion_animate_spec_to_at(&clipboard->item_width, target_layout.item_width,
-                                        clipboard->smooth_spec, now);
-        clipboard->item_width_deadline = reach_motion_deadline(&clipboard->item_width);
-    }
     clipboard->layout_scale = dpi_scale;
     clipboard->layout_border = border_thickness;
-
-    state->layout =
-        reach_clipboard_compute_layout_for_height(&state->model, monitor_bounds, launcher_bounds,
-                                                  dpi_scale, border_thickness, animated_height);
-    const reach_clipboard_metrics metrics = reach_clipboard_metrics_for_scale(dpi_scale);
-    int32_t offsets_active = reach_clipboard_feature_apply_item_offsets(
-        clipboard, metrics.item_large_size + metrics.item_gap,
-        state->model.open && !constraints_changed &&
-            reach_feature_transition_visible(&clipboard->surface_transition),
-        now);
-
-    if (out_animating != nullptr)
+    int32_t visible = reach_feature_transition_visible(&clipboard->surface_transition);
+    int32_t animate = state->model.open && !constraints_changed && visible;
+    double now = reach_motion_now_seconds();
+    float target_height = state->layout.bounds.height;
+    if (!visible || constraints_changed)
     {
-        *out_animating = height_active || offsets_active;
+        reach_motion_set(&clipboard->height, target_height);
+        clipboard->content_follows = 0;
     }
-    return width_changed || constraints_changed || offsets_active ||
+    else if (clipboard->height.generation == 0)
+    {
+        reach_motion_set(&clipboard->height,
+                         fminf(fmaxf(1.0f, state->layout.chrome_height), target_height));
+        reach_motion_animate_spec_to_at(&clipboard->height, target_height, clipboard->smooth_spec,
+                                        now);
+        clipboard->content_follows = 0;
+    }
+    else if (animate && fabsf(clipboard->height.to - target_height) >= 0.5f)
+    {
+        clipboard->content_follows =
+            clipboard->content_follows || !reach_motion_active_at(&clipboard->height, now);
+        reach_motion_animate_spec_to_at(&clipboard->height, target_height, clipboard->smooth_spec,
+                                        now);
+    }
+    float target_width = state->layout.item_width;
+    if (!animate || clipboard->item_width.generation == 0)
+        reach_motion_set(&clipboard->item_width, target_width);
+    else if (fabsf(clipboard->item_width.to - target_width) >= 0.5f)
+        reach_motion_animate_spec_to_at(&clipboard->item_width, target_width,
+                                        clipboard->smooth_spec, now);
+    int32_t rows_changed = reach_clipboard_feature_sync_rows(
+        clipboard, resolved_theme, constraints_changed, reach_motion_now_seconds());
+    return rows_changed || constraints_changed ||
            !reach_clipboard_rect_equal(previous_layout.bounds, state->layout.bounds) ||
            !reach_clipboard_rect_equal(previous_layout.viewport, state->layout.viewport);
 }
@@ -535,17 +702,34 @@ static void reach_clipboard_capsule_tick(void *capsule, double delta_seconds,
     }
     int32_t transition_changed =
         reach_feature_transition_tick(&clipboard->surface_transition, delta_seconds);
-    double now = reach_motion_now_seconds();
-    reach_clipboard_feature_sample_at(clipboard, now);
-    if (clipboard->item_width_deadline > 0 &&
-        (now >= clipboard->item_width_deadline ||
-         !reach_feature_transition_visible(&clipboard->surface_transition)))
+    if (transition_changed && !reach_feature_transition_visible(&clipboard->surface_transition))
     {
-        reach_motion_set(&clipboard->item_width, clipboard->item_width.to);
-        clipboard->item_width_deadline = 0;
+        clipboard->height = {};
+        clipboard->content_follows = 0;
+        reach_scroll_view_settle(&clipboard->state.model.scroll);
+        clipboard->rows_synced = 0;
+        reach_clipboard_feature_refresh_deadline(clipboard);
+        if (out != nullptr)
+            out->relayout = 1;
+    }
+    if (clipboard->motion_deadline > 0 && reach_motion_wait_ms(clipboard->motion_deadline) == 0)
+    {
+        reach_scroll_view_settle(&clipboard->state.model.scroll);
+        for (reach_motion *motion : {&clipboard->height, &clipboard->item_width})
+        {
+            if (motion->generation != 0)
+                reach_motion_set(motion, motion->to);
+        }
+        reach_keyed_row_change released[REACH_CLIPBOARD_ROW_CAPACITY];
+        size_t count = reach_keyed_rows_release_settled(
+            clipboard->rows, REACH_CLIPBOARD_ROW_CAPACITY, released, REACH_CLIPBOARD_ROW_CAPACITY);
+        reach_clipboard_feature_apply_row_changes(clipboard, released, count);
+        reach_clipboard_feature_refresh_deadline(clipboard);
+        (void)reach_clipboard_feature_refresh_hover(clipboard);
         if (out != nullptr)
         {
             out->redraw = 1;
+            out->relayout = 1;
             out->request_update = 1;
         }
     }
@@ -553,13 +737,8 @@ static void reach_clipboard_capsule_tick(void *capsule, double delta_seconds,
     if (out != nullptr && transition_changed)
     {
         out->redraw = 1;
-        out->request_update = reach_feature_transition_needs_update(&clipboard->surface_transition);
-    }
-    if (out != nullptr && reach_clipboard_tick_scroll(clipboard, now))
-    {
-        out->redraw = 1;
-        out->relayout = 1;
-        out->request_update = 1;
+        out->request_update = out->request_update ||
+                              reach_feature_transition_needs_update(&clipboard->surface_transition);
     }
 }
 
@@ -583,23 +762,18 @@ static void reach_clipboard_capsule_on_game_mode(void *capsule, int32_t enabled)
     if (enabled && clipboard != nullptr)
     {
         (void)reach_clipboard_set_open(clipboard, 0);
-        reach_motion_set(&clipboard->item_width, clipboard->item_width.to);
-        clipboard->item_width_deadline = 0;
         reach_feature_transition_reset(&clipboard->surface_transition);
+        clipboard->height = {};
+        clipboard->content_follows = 0;
+        reach_scroll_view_settle(&clipboard->state.model.scroll);
+        clipboard->rows_synced = 0;
+        reach_clipboard_feature_refresh_deadline(clipboard);
     }
 }
 
-static int32_t reach_clipboard_capsule_needs_frame(const void *capsule)
+static int32_t reach_clipboard_capsule_needs_frame(const void *)
 {
-    reach_clipboard_feature *clipboard = const_cast<reach_clipboard_feature *>(
-        static_cast<const reach_clipboard_feature *>(capsule));
-    if (clipboard == nullptr)
-    {
-        return 0;
-    }
-    return reach_feature_transition_needs_update(&clipboard->surface_transition) ||
-           reach_clipboard_feature_any_animation_active(clipboard) ||
-           reach_scroll_view_pending(&clipboard->state.model.scroll);
+    return 0;
 }
 
 static int32_t reach_clipboard_capsule_presentation_visible(const void *capsule)
@@ -635,7 +809,7 @@ reach_clipboard_capsule_apply_event_result(const reach_clipboard_event_result *e
         size_t count = reach_clipboard_item_count(clipboard);
         for (size_t index = 0; index < count; ++index)
         {
-            reach_clipboard_feature_retire(clipboard, reach_clipboard_item_at(clipboard, index));
+            reach_clipboard_feature_drop(clipboard, reach_clipboard_item_at(clipboard, index));
         }
         reach_clipboard_clear_all(clipboard);
         out->redraw = 1;
@@ -651,7 +825,7 @@ reach_clipboard_capsule_apply_event_result(const reach_clipboard_event_result *e
             if (reach_clipboard_remove_item(clipboard, event_result->item_index,
                                             event_result->item_id))
             {
-                reach_clipboard_feature_retire(clipboard, &removed);
+                reach_clipboard_feature_drop(clipboard, &removed);
                 out->redraw = 1;
                 out->relayout = 1;
             }
@@ -750,12 +924,16 @@ static void reach_clipboard_capsule_surface_geometry(const void *capsule,
     {
         return;
     }
-    out->visible_bounds = clipboard->state.layout.bounds;
-    out->envelope_bounds = clipboard->state.layout.bounds;
+    reach_clipboard_frame frame = reach_clipboard_panel_frame(
+        &clipboard->state.layout, &clipboard->height, clipboard->content_follows);
+    out->visible_bounds = frame.origin;
+    out->envelope_bounds = frame.origin;
+    out->has_input_bounds = 1;
+    out->input_bounds = frame.panel;
     reach_feature_transition_presentation(&clipboard->surface_transition, out);
-    if (clipboard->item_width_deadline > 0 &&
-        (out->deadline_seconds <= 0 || clipboard->item_width_deadline < out->deadline_seconds))
-        out->deadline_seconds = clipboard->item_width_deadline;
+    if (clipboard->motion_deadline > 0 &&
+        (out->deadline_seconds <= 0 || clipboard->motion_deadline < out->deadline_seconds))
+        out->deadline_seconds = clipboard->motion_deadline;
 }
 
 const reach_ui_event_type *reach_clipboard_activation_events(size_t *out_count)
@@ -828,7 +1006,6 @@ reach_result reach_clipboard_feature_create(reach_clipboard_feature **out_clipbo
     {
         return REACH_ERROR;
     }
-    reach_motion_set(&clipboard->height, 0.0f);
     reach_clipboard_feature_load_motion_specs(clipboard, reach_theme_default());
     reach_feature_transition_init(&clipboard->surface_transition,
                                   REACH_FEATURE_TRANSITION_FROM_BELOW);
@@ -837,14 +1014,8 @@ reach_result reach_clipboard_feature_create(reach_clipboard_feature **out_clipbo
     clipboard->port = {};
     clipboard->retired_count = 0;
     reach_clipboard_model_init(&clipboard->state.model);
-    for (auto &hover : clipboard->hover)
-        reach_motion_set(&hover, 0);
-    clipboard->next_hover_group_id = UINT64_C(0x7000000000000000);
-    for (size_t index = 0; index < REACH_CLIPBOARD_MAX_ITEMS; ++index)
-    {
-        clipboard->hover_item_ids[index] = 0;
-        clipboard->hover_group_ids[index] = 0;
-    }
+    for (reach_motion &hover : clipboard->row_hover)
+        reach_motion_set(&hover, 0.0f);
     *out_clipboard = clipboard;
     return REACH_OK;
 }
@@ -939,153 +1110,29 @@ void reach_clipboard_feature_release_resource(reach_clipboard_feature *clipboard
     }
 }
 
-void reach_clipboard_feature_sample_at(reach_clipboard_feature *clipboard, double now_seconds)
+reach_result reach_clipboard_append_render_commands(reach_clipboard_feature *clipboard,
+                                                    const reach_theme *theme, float dpi_scale,
+                                                    reach_render_command_buffer *out_commands)
 {
-    if (clipboard == nullptr)
+    if (clipboard == nullptr || theme == nullptr || out_commands == nullptr)
     {
-        return;
-    }
-    (void)reach_motion_advance_at(&clipboard->height, now_seconds);
-}
-
-static void reach_clipboard_feature_sync_hover(reach_clipboard_feature *clipboard)
-{
-    const auto &model = clipboard->state.model;
-    bool changed = false;
-    for (size_t index = 0; index < REACH_CLIPBOARD_MAX_ITEMS; ++index)
-        changed = changed || clipboard->hover_item_ids[index] !=
-                                 (index < model.count ? model.items[index].id : 0);
-    if (!changed)
-        return;
-    reach_motion previous[REACH_CLIPBOARD_MAX_ITEMS];
-    uint64_t previous_ids[REACH_CLIPBOARD_MAX_ITEMS];
-    uint64_t previous_groups[REACH_CLIPBOARD_MAX_ITEMS];
-    for (size_t index = 0; index < REACH_CLIPBOARD_MAX_ITEMS; ++index)
-    {
-        previous[index] = clipboard->hover[index];
-        previous_ids[index] = clipboard->hover_item_ids[index];
-        previous_groups[index] = clipboard->hover_group_ids[index];
-    }
-    double now = reach_motion_now_seconds();
-    for (size_t index = 0; index < REACH_CLIPBOARD_MAX_ITEMS; ++index)
-    {
-        uint64_t id = index < model.count ? model.items[index].id : 0;
-        size_t previous_index = 0;
-        while (previous_index < REACH_CLIPBOARD_MAX_ITEMS &&
-               (id == 0 || previous_ids[previous_index] != id))
-            ++previous_index;
-        clipboard->hover_item_ids[index] = id;
-        if (previous_index < REACH_CLIPBOARD_MAX_ITEMS)
-        {
-            clipboard->hover[index] = previous[previous_index];
-            clipboard->hover_group_ids[index] = previous_groups[previous_index];
-            reach_motion_animate_spec_to_at(&clipboard->hover[index], 0, clipboard->fade_out_spec,
-                                            now);
-        }
-        else
-        {
-            reach_motion_set(&clipboard->hover[index], 0);
-            clipboard->hover_group_ids[index] = 0;
-            if (id != 0)
-            {
-                clipboard->hover_group_ids[index] = clipboard->next_hover_group_id;
-                clipboard->next_hover_group_id += 128;
-            }
-        }
-    }
-}
-
-void reach_clipboard_feature_collapse_all_hover(reach_clipboard_feature *clipboard)
-{
-    if (clipboard == nullptr)
-        return;
-    reach_clipboard_feature_sync_hover(clipboard);
-    double now = reach_motion_now_seconds();
-    for (auto &hover : clipboard->hover)
-        reach_motion_animate_spec_to_at(&hover, 0, clipboard->fade_out_spec, now);
-}
-
-void reach_clipboard_feature_move_hover(reach_clipboard_feature *clipboard, size_t previous,
-                                        size_t next)
-{
-    if (clipboard == nullptr)
-        return;
-    reach_clipboard_feature_sync_hover(clipboard);
-    double now = reach_motion_now_seconds();
-    if (previous < REACH_CLIPBOARD_MAX_ITEMS)
-        reach_motion_animate_spec_to_at(&clipboard->hover[previous], 0, clipboard->fade_out_spec,
-                                        now);
-    if (next < REACH_CLIPBOARD_MAX_ITEMS)
-        reach_motion_animate_spec_to_at(&clipboard->hover[next], 1, clipboard->fade_in_spec, now);
-}
-
-void reach_clipboard_feature_clear_hover(reach_clipboard_feature *clipboard, size_t previous)
-{
-    if (clipboard != nullptr && previous < REACH_CLIPBOARD_MAX_ITEMS)
-    {
-        reach_clipboard_feature_sync_hover(clipboard);
-        reach_motion_animate_spec_to_at(&clipboard->hover[previous], 0, clipboard->fade_out_spec,
-                                        reach_motion_now_seconds());
-    }
-}
-
-int32_t reach_clipboard_feature_any_animation_active(const reach_clipboard_feature *clipboard)
-{
-    if (clipboard == nullptr)
-        return 0;
-    for (const reach_motion &offset : clipboard->item_offset)
-    {
-        if (reach_motion_active(&offset))
-            return 1;
-    }
-    return reach_motion_pending(&clipboard->height);
-}
-
-const reach_motion *reach_clipboard_feature_hover_motions(reach_clipboard_feature *clipboard)
-{
-    if (clipboard != nullptr)
-        reach_clipboard_feature_sync_hover(clipboard);
-    return clipboard != nullptr ? clipboard->hover : nullptr;
-}
-
-const uint64_t *reach_clipboard_feature_hover_group_ids(const reach_clipboard_feature *clipboard)
-{
-    return clipboard != nullptr ? clipboard->hover_group_ids : nullptr;
-}
-
-static float reach_clipboard_feature_animate_height(reach_clipboard_feature *clipboard,
-                                                    float target, int32_t *out_active)
-{
-    if (out_active != nullptr)
-    {
-        *out_active = 0;
-    }
-    if (clipboard == nullptr || target <= 0.0f)
-    {
-        return target;
+        return REACH_INVALID_ARGUMENT;
     }
 
-    reach_motion *height = &clipboard->height;
-    double now = reach_motion_now_seconds();
-    if (reach_motion_value_at(height, now) <= 0.0f)
-    {
-        reach_motion_set(height, target);
-        return target;
-    }
+    reach_clipboard_render_input input = {};
+    input.theme = theme;
+    input.model = &clipboard->state.model;
+    input.layout = &clipboard->state.layout;
+    input.rows = clipboard->rows;
+    input.row_items = clipboard->row_items;
+    input.row_hover = clipboard->row_hover;
+    input.height = clipboard->height;
+    input.item_width = clipboard->item_width;
+    input.content_follows = clipboard->content_follows;
+    input.dpi_scale = dpi_scale;
+    input.text_alignment_leading = REACH_TEXT_ALIGNMENT_LEADING;
 
-    if (fabsf(height->to - target) >= 0.5f)
-        reach_motion_animate_spec_to_at(height, target, clipboard->smooth_spec, now);
-
-    if (reach_motion_active_at(height, now))
-    {
-        if (out_active != nullptr)
-        {
-            *out_active = 1;
-        }
-        return reach_motion_value_at(height, now);
-    }
-
-    return target;
+    return reach_clipboard_build_render_commands(&input, out_commands);
 }
 
 int32_t reach_clipboard_is_open(reach_clipboard_feature *clipboard)
@@ -1144,7 +1191,27 @@ int32_t reach_clipboard_set_open(reach_clipboard_feature *clipboard, int32_t ope
     state->press_identity = 0;
     (void)reach_scroll_view_pointer_up(&state->model.scroll);
     reach_clipboard_feature_collapse_all_hover(clipboard);
+    int32_t was_visible = reach_feature_transition_visible(&clipboard->surface_transition);
     (void)reach_feature_transition_set_open(&clipboard->surface_transition, next);
+    double now = reach_motion_now_seconds();
+    const reach_clipboard_layout &layout = state->layout;
+    if (!next)
+    {
+        if (clipboard->height.generation != 0)
+            reach_motion_set(&clipboard->height, reach_motion_value_at(&clipboard->height, now));
+    }
+    else if (layout.bounds.height > 0.0f)
+    {
+        if (clipboard->height.generation == 0 || !was_visible)
+        {
+            reach_motion_set(&clipboard->height,
+                             fminf(fmaxf(1.0f, layout.chrome_height), layout.bounds.height));
+            clipboard->content_follows = 0;
+        }
+        reach_motion_animate_spec_to_at(&clipboard->height, layout.bounds.height,
+                                        clipboard->smooth_spec, now);
+    }
+    reach_clipboard_feature_refresh_deadline(clipboard);
     return 1;
 }
 
@@ -1186,6 +1253,7 @@ int32_t reach_clipboard_pointer_leave(reach_clipboard_feature *clipboard)
     {
         return 0;
     }
+    reach_clipboard_feature_track_pointer(clipboard, 0, 0, 0);
     reach_clipboard_state *state = reach_clipboard_feature_state_mut(clipboard);
     if (state->model.hovered_index >= REACH_CLIPBOARD_MAX_ITEMS)
     {
@@ -1193,16 +1261,6 @@ int32_t reach_clipboard_pointer_leave(reach_clipboard_feature *clipboard)
     }
     size_t previous = state->model.hovered_index;
     state->model.hovered_index = REACH_CLIPBOARD_MAX_ITEMS;
-    reach_clipboard_feature_clear_hover(clipboard, previous);
+    reach_clipboard_feature_move_hover(clipboard, previous, REACH_CLIPBOARD_MAX_ITEMS);
     return 1;
-}
-
-int32_t reach_clipboard_tick_scroll(reach_clipboard_feature *clipboard, double now_seconds)
-{
-    if (clipboard == nullptr)
-    {
-        return 0;
-    }
-    return reach_scroll_view_advance(&reach_clipboard_feature_state_mut(clipboard)->model.scroll,
-                                     now_seconds);
 }

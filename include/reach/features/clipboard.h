@@ -6,6 +6,7 @@
 #include "reach/features/feature_capsule.h"
 #include "reach/core/theme.h"
 #include "reach/core/clipboard.h"
+#include "reach/features/common/keyed_rows.h"
 #include "reach/features/common/pressable.h"
 #include "reach/features/common/scroll_view.h"
 #include "reach/ports/clipboard.h"
@@ -17,6 +18,7 @@ extern "C"
 #endif
 
 #define REACH_CLIPBOARD_MAX_ITEMS 20
+#define REACH_CLIPBOARD_ROW_CAPACITY 8
     typedef struct reach_clipboard_model
     {
         int32_t open;
@@ -43,10 +45,13 @@ extern "C"
         reach_rect_f32 items[REACH_CLIPBOARD_MAX_ITEMS];
         reach_rect_f32 close_buttons[REACH_CLIPBOARD_MAX_ITEMS];
         reach_rect_f32 scrollbar_track;
-        double scroll_time;
         float content_height;
+        float chrome_height;
         float item_large_size;
+        float item_pitch;
         float item_width;
+        float item_text_width;
+        float max_height;
     } reach_clipboard_layout;
 
     typedef struct reach_clipboard_render_input
@@ -54,9 +59,12 @@ extern "C"
         const reach_theme *theme;
         const reach_clipboard_model *model;
         const reach_clipboard_layout *layout;
-        const reach_motion *hover_motions;
-        const reach_motion *item_width;
-        const uint64_t *hover_group_ids;
+        const reach_keyed_row *rows;
+        const reach_clipboard_item *row_items;
+        const reach_motion *row_hover;
+        reach_motion height;
+        reach_motion item_width;
+        int32_t content_follows;
         float dpi_scale;
         int32_t text_alignment_leading;
     } reach_clipboard_render_input;
@@ -95,8 +103,7 @@ extern "C"
     int32_t reach_clipboard_feature_relayout(reach_clipboard_feature *clipboard,
                                              const reach_theme *theme,
                                              reach_rect_f32 monitor_bounds,
-                                             reach_rect_f32 launcher_bounds, float dpi_scale,
-                                             int32_t *out_animating);
+                                             reach_rect_f32 launcher_bounds, float dpi_scale);
 
     int32_t reach_clipboard_is_open(reach_clipboard_feature *clipboard);
     size_t reach_clipboard_item_count(reach_clipboard_feature *clipboard);
@@ -122,8 +129,6 @@ extern "C"
     void reach_clipboard_insert_captured(reach_clipboard_feature *clipboard,
                                          reach_clipboard_item item,
                                          reach_clipboard_insert_outcome *out);
-
-    int32_t reach_clipboard_tick_scroll(reach_clipboard_feature *clipboard, double now_seconds);
 
     void reach_clipboard_confirm_restore(reach_clipboard_feature *clipboard, size_t index);
 
