@@ -55,8 +55,7 @@ void reach_clipboard_pointer_down(reach_clipboard_feature *clipboard, int32_t x,
 
     if (hit.type == REACH_CLIPBOARD_HIT_SCROLLBAR)
     {
-        float track_x = (float)x - layout.scrollbar_track.x + state->layout.scrollbar_track.x;
-        if (reach_scroll_view_pointer_down(&state->model.scroll, track_x, (float)y,
+        if (reach_scroll_view_pointer_down(&state->model.scroll, (float)x, (float)y,
                                            reach_motion_now_seconds()) == 0)
             return;
         out->handled = 1;
@@ -198,6 +197,7 @@ void reach_clipboard_pointer_move(reach_clipboard_feature *clipboard, int32_t x,
         return;
     }
 
+    reach_clipboard_feature_track_pointer(clipboard, 1, x, y);
     reach_clipboard_hit_result hit = reach_clipboard_hit_test(&state->model, &layout, x, y);
     if (reach_pressable_tracking(&state->pressable))
     {

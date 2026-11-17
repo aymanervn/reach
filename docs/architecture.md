@@ -773,12 +773,12 @@ coverage tint. Fallback samples both intents at the same frame timestamp. Normal
 semantic equality, native cancellation and repeating-property retirement share the retained contract.
 The mix is a leaf capability and is rejected on root presentation.
 
-Clipboard item feedback uses canonical hover motion and item-keyed retained source identities.
+Clipboard item feedback uses canonical hover motion keyed to its keyed-row slots.
 Shared bordered feedback consumes `reach_render_bordered_background_shapes`, the same pixel-aligned
 opaque outer/inner geometry used by ordinary bordered backgrounds. The RGB blend preserves the
 previous nested hover border colors without overlapping translucent rounded layers. Close background
 and glyph coverage use separate retained opacity. Hover tracks, sampled render values, tick redraw
-and hover-only frame demand are removed; sizing and scrolling remain separate CPU consumers. Stationary
+and hover-only frame demand are removed. Stationary
 Clipboard and Settings scrollbar drags retain event-driven pointer capture and movement without
 requesting periodic frames; actual sizing/scrolling and renderer fallback work retain their own
 active scheduling.
@@ -899,13 +899,14 @@ toggle knobs and the adjacent Settings sidebar step use `bouncy`; hover, tint an
 the Top Bar or opacity. Stage open, close and reflow scale `smooth` by `reach_theme_stage_motion_scale`
 (configured duration over the theme reference, which is the 0.38 s `smooth` response), so the default
 0.30 s Stage duration yields a 0.30 s spring response.
-Scalars sampled on the CPU (Stage, Dock slots, bar reveal, Top Bar widths, Clipboard height, Settings
+Scalars sampled on the CPU (Stage, Dock slots, bar reveal, Top Bar widths, Settings
 rows) carry the same presets through `reach_motion_animate_spec_to_at`. Drag gestures
 feed `reach_drag_velocity` (`features/common/draggable`) with the value they display and hand its
 release velocity to the snap spring. Documented exceptions, which are periodic effects or holds
 rather than transitions: caret blink, the shared loader cycle, the now-playing marquee and the HUD
-lifetime. Scroll motion is not migrated: `core/scrollbar`, Clipboard scroll and Quick Settings
-scroll keep their existing behaviour until one shared scroll component replaces them.
+lifetime. Scrolling goes through `features/common/scroll_view`; Launcher and Clipboard present it
+retained, while Settings pages and Quick Settings still sample or own their scroll motion pending
+migration.
 
 Every size, envelope, clip, raster allocation or budget derived from a motion uses
 `reach_motion_range`, never endpoints or the current sample, so spring overshoot stays inside it.
@@ -958,18 +959,20 @@ sources or over-budget expansions use renderer-owned source sampling through the
 port until the finite descriptors settle. Image and text expansions share the existing 128MiB and
 layer budgets. Source changes invalidate their bitmap, while hide/retirement removes fit ownership
 and sampling. No fields are added to the render command/group/buffer for this capability.
-Clipboard item width now owns one canonical `smooth` motion and one cleanup deadline.
-Endpoint layout stays authoritative; pointer operations sample a separate current-width snapshot.
-Normal scrollbar-gutter changes retain fixed-radius item borders, independent hover paint, close
-controls, image crops, custom preview line variants and scrollbar placement. Stable item source
-identities reserve 128 IDs each. The renderer retains at most five visible items and four bounded
-line-capacity variants per item; no width-only capsule frame or layout tick advances the effect.
-Monitor/DPI constraints and hidden initialization cut the width. Extremely narrow, horizontally
-clipped close glyphs use generic active-only content sampling until the same canonical deadline.
-Height and smooth scrolling remain CPU consumers pending their own migration.
+Clipboard is fully retained. One `smooth` pixel height motion drives the bottom-anchored panel
+(`reach_clipboard_panel_frame`): opening springs from the chrome height to the target over the
+shared card transition with fixed, clipped content; closing freezes the height and only fades, while item-count changes animate the
+height with content riding the top edge. The window stays at the panel's maximum height, so height
+changes never resize it, and the card viewport clip extends to the panel bottom. Card width springs into the scrollbar gutter when no scrollbar is needed; text and
+thumbnails keep the narrow layout and the close button tracks the right edge. Cards are `keyed_rows` over a
+`reach_scroll_view_item_window` of at most `REACH_CLIPBOARD_ROW_CAPACITY` slots inside the
+`scroll_view` retained viewport: inserts fade in, removals fade out while the rest slide, and
+scroll-only window shifts sync without animation. A removed item's native resources retire only
+when its row releases. One motion deadline settles rows, scroll and reveal, then re-evaluates hover
+at the last pointer position. The capsule requests no frames.
 
 Width-text callers own their ellipsis policy. Dock and Switcher explicitly request DWrite ellipsis;
-Clipboard preserves its custom line splitting and literal dots. The vertical-overflow fit mode
+Clipboard draws its custom line splitting and literal dots as ordinary text lines. The vertical-overflow fit mode
 expands native source bounds using DWrite glyph overhang while retaining horizontal width clipping.
 It preserves the ordinary CPU text fallback's unclipped glyph ink instead of applying the metadata
 viewport there. Sampled native sources bake horizontal clipping into their raster; active sources

@@ -34,19 +34,24 @@ reach_clipboard_hit_result reach_clipboard_hit_test(const reach_clipboard_model 
                                                     int32_t y);
 
 void reach_clipboard_feature_reset(reach_clipboard_feature *clipboard);
-void reach_clipboard_feature_sample_at(reach_clipboard_feature *clipboard, double now_seconds);
 void reach_clipboard_feature_collapse_all_hover(reach_clipboard_feature *clipboard);
 void reach_clipboard_feature_move_hover(reach_clipboard_feature *clipboard, size_t previous,
                                         size_t next);
-void reach_clipboard_feature_clear_hover(reach_clipboard_feature *clipboard, size_t previous);
-int32_t reach_clipboard_feature_any_animation_active(const reach_clipboard_feature *clipboard);
-const reach_motion *reach_clipboard_feature_hover_motions(reach_clipboard_feature *clipboard);
-const uint64_t *reach_clipboard_feature_hover_group_ids(const reach_clipboard_feature *clipboard);
-reach_motion reach_clipboard_feature_item_width(const reach_clipboard_feature *clipboard);
 reach_clipboard_layout
 reach_clipboard_feature_input_layout(const reach_clipboard_feature *clipboard, double now_seconds);
-void reach_clipboard_layout_set_item_width(reach_clipboard_layout *layout, size_t count,
-                                           float width, float border_thickness);
+typedef struct reach_clipboard_frame
+{
+    float envelope_height;
+    reach_rect_f32 origin;
+    reach_rect_motion panel;
+    reach_motion content_y;
+} reach_clipboard_frame;
+
+reach_clipboard_frame reach_clipboard_panel_frame(const reach_clipboard_layout *layout,
+                                                  const reach_motion *height,
+                                                  int32_t content_follows);
+void reach_clipboard_feature_track_pointer(reach_clipboard_feature *clipboard, int32_t inside,
+                                           int32_t x, int32_t y);
 
 typedef enum reach_clipboard_action_type
 {
