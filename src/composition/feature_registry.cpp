@@ -956,7 +956,6 @@ static void reach_host_init_feature_definitions(reach_host *host)
     widgets.control_ops = &reach_widgets_control_ops;
     widgets.surface.role = REACH_SURFACE_WIDGET_DESKTOP;
     widgets.surface.pointer_priority = 5;
-    widgets.layout.priority = 5;
 
     definitions[REACH_SURFACE_ID_SYSTEM_HUD].lifecycle.attach = reach_feature_attach_system_hud;
     definitions[REACH_SURFACE_ID_SYSTEM_HUD].lifecycle.stop = reach_feature_stop_system_hud;
@@ -1079,6 +1078,8 @@ static void reach_host_init_feature_definitions(reach_host *host)
     definitions[REACH_SURFACE_ID_CLIPBOARD].layout.priority = 20;
     definitions[REACH_SURFACE_ID_DOCK].layout.priority = 30;
     definitions[REACH_SURFACE_ID_TOP_BAR].layout.priority = 35;
+    definitions[REACH_SURFACE_ID_WIDGET_DESKTOP].layout.priority = 36;
+    definitions[REACH_SURFACE_ID_WIDGET_DESKTOP].layout.uses_reserved_bounds = 1;
     definitions[REACH_SURFACE_ID_TRAY].layout.priority = 40;
     definitions[REACH_SURFACE_ID_QUICK_SETTINGS].layout.priority = 50;
     definitions[REACH_SURFACE_ID_BATTERY].layout.priority = 55;
@@ -1400,7 +1401,7 @@ static int32_t reach_widgets_desktop_surface_arrange(void *capsule,
                                                      const reach_feature_surface_context *ctx)
 {
     return reach_widgets_arrange_desktop(static_cast<reach_widgets *>(capsule), ctx->monitor_bounds,
-                                         ctx->dpi_scale);
+                                         ctx->available_bounds, ctx->dpi_scale);
 }
 
 static reach_result reach_widgets_desktop_surface_render(void *capsule,

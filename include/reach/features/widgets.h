@@ -37,7 +37,7 @@ extern "C"
     const reach_feature_capsule_ops *reach_widgets_desktop_capsule_ops(void);
 
     int32_t reach_widgets_arrange_desktop(reach_widgets *widgets, reach_rect_f32 monitor,
-                                          float dpi_scale);
+                                          reach_rect_f32 available, float dpi_scale);
     reach_result reach_widgets_render_desktop(const reach_widgets *widgets,
                                               const reach_theme *theme, float dpi_scale,
                                               const reach_text_measure_port *text_measure,

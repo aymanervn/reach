@@ -23,6 +23,7 @@ struct reach_widgets
     reach_system_stats_snapshot stats_snapshot;
     reach_now_playing_snapshot media_snapshot;
     reach_rect_f32 desktop_bounds;
+    reach_rect_f32 placement_bounds;
     reach_rect_f32 cards[REACH_MAX_DESKTOP_WIDGETS];
     reach_config_widget_placement placements[REACH_MAX_DESKTOP_WIDGETS];
     float dpi_scale;
@@ -38,6 +39,7 @@ struct reach_widgets
     double drag_preview_deadline;
     bool drag_has_destination;
     bool drag_preview_ready;
+    bool drag_interrupted;
     bool layout_dirty;
     uint32_t enabled_mask;
     reach_pressable control_pressable;
@@ -69,12 +71,10 @@ static constexpr double reach_widgets_drag_preview_delay = 0.08;
 
 static bool reach_widgets_update_drop(reach_widgets *widgets, float scale)
 {
-    const reach_rect_f32 desktop = {0, 0, widgets->desktop_bounds.width,
-                                    widgets->desktop_bounds.height};
     reach_rect_f32 destination = {};
-    const bool found = reach_widgets_find_drop(desktop, widgets->cards[widgets->drag_index],
-                                               widgets->drag_occupied, widgets->resizing != 0,
-                                               14.0f * scale, scale, &destination);
+    const bool found = reach_widgets_find_drop(
+        widgets->placement_bounds, widgets->cards[widgets->drag_index], widgets->drag_occupied,
+        widgets->resizing != 0, 14.0f * scale, scale, &destination);
     if (!found)
     {
         destination = widgets->drag_origin;
@@ -348,14 +348,15 @@ static bool reach_widgets_update_drag(reach_widgets *widgets, float x, float y, 
     }
 
     const int32_t index = widgets->drag_index;
-    const reach_rect_f32 desktop = {0, 0, widgets->desktop_bounds.width,
-                                    widgets->desktop_bounds.height};
+    const auto &area = widgets->placement_bounds;
+    const float right = area.x + area.width;
+    const float bottom = area.y + area.height;
     auto card = widgets->drag_origin;
     if (widgets->resizing)
     {
         const auto limits = reach_widget_definition_at(index)->limits;
-        const float maximum_width = std::min(limits.max_width * scale, desktop.width - card.x);
-        const float maximum_height = std::min(limits.max_height * scale, desktop.height - card.y);
+        const float maximum_width = std::min(limits.max_width * scale, right - card.x);
+        const float maximum_height = std::min(limits.max_height * scale, bottom - card.y);
         card.width = std::clamp(card.width + dx, std::min(limits.min_width * scale, maximum_width),
                                 maximum_width);
         card.height = std::clamp(
@@ -363,8 +364,8 @@ static bool reach_widgets_update_drag(reach_widgets *widgets, float x, float y, 
     }
     else
     {
-        card.x = std::clamp(card.x + dx, 0.0f, std::max(0.0f, desktop.width - card.width));
-        card.y = std::clamp(card.y + dy, 0.0f, std::max(0.0f, desktop.height - card.height));
+        card.x = std::clamp(card.x + dx, area.x, std::max(area.x, right - card.width));
+        card.y = std::clamp(card.y + dy, area.y, std::max(area.y, bottom - card.height));
     }
     const bool changed = !reach_rect_equal(widgets->cards[index], card);
     widgets->cards[index] = card;
@@ -412,6 +413,7 @@ static void reach_widgets_desktop_pointer(void *capsule, const reach_pointer_eve
             widgets->drag_has_destination = false;
             widgets->drag_preview_ready = false;
             widgets->drag_preview_deadline = 0;
+            widgets->drag_interrupted = false;
             widgets->drag_occupied.clear();
             for (int32_t other = 0; other < REACH_MAX_DESKTOP_WIDGETS; ++other)
             {
@@ -442,6 +444,9 @@ static void reach_widgets_desktop_pointer(void *capsule, const reach_pointer_eve
     int32_t index = widgets->drag_index;
     if (event->kind == REACH_POINTER_EVENT_MOVE)
     {
+        out->handled = 1;
+        if (widgets->drag_interrupted)
+            return;
         if (!widgets->moved)
         {
             reach_pressable_result press = {};
@@ -454,13 +459,12 @@ static void reach_widgets_desktop_pointer(void *capsule, const reach_pointer_eve
             widgets->drag_preview_deadline =
                 reach_motion_now_seconds() + reach_widgets_drag_preview_delay;
         }
-        out->handled = 1;
         return;
     }
     if (event->kind == REACH_POINTER_EVENT_UP || event->kind == REACH_POINTER_EVENT_CANCEL)
     {
         reach_pressable_result press = {};
-        if (event->kind == REACH_POINTER_EVENT_UP)
+        if (event->kind == REACH_POINTER_EVENT_UP && !widgets->drag_interrupted)
         {
             reach_widgets_update_drag(widgets, x, y, scale);
             if (widgets->moved)
@@ -641,22 +645,34 @@ int32_t reach_widgets_set_enabled(reach_widgets *widgets, uint32_t mask)
 }
 
 int32_t reach_widgets_arrange_desktop(reach_widgets *widgets, reach_rect_f32 monitor,
-                                      float dpi_scale)
+                                      reach_rect_f32 available, float dpi_scale)
 {
     if (widgets == nullptr)
     {
         return 0;
     }
     const float scale = dpi_scale > 0.0f ? dpi_scale : 1.0f;
-    const bool monitor_changed =
-        !reach_rect_equal(widgets->desktop_bounds, monitor) || widgets->dpi_scale != scale;
+    // The host supplies screen coordinates. Cards and saved positions are monitor-relative.
+    available.x -= monitor.x;
+    available.y -= monitor.y;
+    const bool bounds_changed = !reach_rect_equal(widgets->desktop_bounds, monitor) ||
+                                !reach_rect_equal(widgets->placement_bounds, available) ||
+                                widgets->dpi_scale != scale;
     widgets->desktop_bounds = monitor;
+    widgets->placement_bounds = available;
     widgets->dpi_scale = scale;
-    widgets->layout_dirty |= monitor_changed;
-    if (widgets->drag_index >= 0 || !widgets->layout_dirty)
+    widgets->layout_dirty |= bounds_changed;
+    if (widgets->drag_index >= 0 && bounds_changed)
     {
-        return monitor_changed;
+        // Repack stale positions now. Release capture through the normal pointer-up/cancel path.
+        widgets->drag_interrupted = true;
+        widgets->moved = 0;
+        widgets->drag_preview_ready = false;
+        widgets->drag_preview_deadline = 0;
+        reach_pressable_reset(&widgets->control_pressable, nullptr);
     }
+    if ((widgets->drag_index >= 0 && !widgets->drag_interrupted) || !widgets->layout_dirty)
+        return 0;
     widgets->layout_dirty = false;
     reach_widget_layout_item items[REACH_MAX_DESKTOP_WIDGETS] = {};
     for (size_t index = 0; index < REACH_MAX_DESKTOP_WIDGETS; ++index)
@@ -677,15 +693,17 @@ int32_t reach_widgets_arrange_desktop(reach_widgets *widgets, reach_rect_f32 mon
         item.minimum = {limits.min_width * scale, limits.min_height * scale};
     }
     reach_rect_f32 arranged[REACH_MAX_DESKTOP_WIDGETS] = {};
-    reach_rect_f32 desktop = {0, 0, monitor.width, monitor.height};
-    reach_rect_f32 automatic = {24.0f * scale, 84.0f * scale,
-                                std::max(0.0f, monitor.width - 48.0f * scale),
-                                std::max(0.0f, monitor.height - 108.0f * scale)};
-    (void)reach_widgets_pack(desktop, automatic, items, REACH_MAX_DESKTOP_WIDGETS, 14.0f * scale,
+    const float left = std::max(available.x, 24.0f * scale);
+    const float top = std::max(available.y, 84.0f * scale);
+    const float right = std::min(available.x + available.width, monitor.width - 24.0f * scale);
+    const float bottom = std::min(available.y + available.height, monitor.height - 24.0f * scale);
+    const reach_rect_f32 automatic = {left, top, std::max(0.0f, right - left),
+                                      std::max(0.0f, bottom - top)};
+    (void)reach_widgets_pack(available, automatic, items, REACH_MAX_DESKTOP_WIDGETS, 14.0f * scale,
                              arranged);
     bool changed = std::memcmp(arranged, widgets->cards, sizeof(arranged)) != 0;
     std::memcpy(widgets->cards, arranged, sizeof(arranged));
-    return changed || monitor_changed;
+    return changed || bounds_changed;
 }
 
 static void reach_widgets_rect(reach_render_command_buffer *commands, reach_rect_f32 rect,

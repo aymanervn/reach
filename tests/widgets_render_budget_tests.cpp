@@ -36,15 +36,15 @@ int main()
                                      60 + static_cast<int32_t>(index / 3) * 440, limits.max_width,
                                      limits.max_height});
     }
-    reach_widgets_arrange_desktop(widgets, {0, 0, 1920, 1080}, 1);
+    reach_widgets_arrange_desktop(widgets, {100, 200, 1920, 1080}, {100, 248, 1920, 952}, 1);
 
     // Include the drop preview by placing the dragged clock over the system monitor.
     const auto *ops = reach_widgets_desktop_capsule_ops();
     reach_pointer_event pointer = {};
     pointer.kind = REACH_POINTER_EVENT_DOWN;
     pointer.button = REACH_POINTER_BUTTON_PRIMARY;
-    pointer.x = 60;
-    pointer.y = 80;
+    pointer.x = 160;
+    pointer.y = 280;
     reach_capsule_pointer_result pointer_result = {};
     ops->handle_pointer(widgets, &pointer, &pointer_result);
     pointer.kind = REACH_POINTER_EVENT_MOVE;
