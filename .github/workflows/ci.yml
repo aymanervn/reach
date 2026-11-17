@@ -44,10 +44,17 @@ jobs:
 
       - name: Check formatting
         run: |
+          $failed = @()
           Get-ChildItem -Recurse -Include *.c,*.h,*.cpp,*.hpp src,include,tests,tools |
             ForEach-Object {
               clang-format --dry-run --Werror $_.FullName
+              if ($LASTEXITCODE -ne 0) { $failed += $_.FullName }
             }
+          if ($failed.Count -gt 0) {
+            Write-Output "clang-format violations in $($failed.Count) file(s):"
+            $failed | ForEach-Object { Write-Output "  $_" }
+            exit 1
+          }
 
       - name: Determine version
         id: version
