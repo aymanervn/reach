@@ -488,13 +488,6 @@ static reach_result reach_quick_settings_push_header(const reach_quick_settings_
     reach_result result = reach_render_command_buffer_begin_group(commands, &group);
     if (result == REACH_OK)
     {
-        reach_render_command tint = {};
-        tint.type = REACH_RENDER_COMMAND_RECT;
-        tint.rect = layout.header;
-        tint.color = reach_theme_color_alpha(theme.accent, 0.6f);
-        tint.fill_gradient = REACH_RENDER_FILL_EASED_FADE_DOWN;
-        (void)reach_render_command_buffer_push(commands, &tint);
-
         reach_quick_settings_push_rounded_rect(commands, layout.settings_button,
                                                layout.settings_button.height * 0.5f,
                                                theme.quick_settings_button_background);
