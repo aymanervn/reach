@@ -1496,6 +1496,13 @@ static int32_t reach_quick_settings_tiles_animate(const reach_quick_settings *qu
            reach_feature_transition_visible(&quick_settings->popup_transition);
 }
 
+static void reach_quick_settings_scroll_init(reach_scroll_view *view)
+{
+    reach_scroll_view_config config = {};
+    config.unit = 1.0f;
+    reach_scroll_view_init(view, &config);
+}
+
 static void reach_quick_settings_sample_input_layout(reach_quick_settings *quick_settings,
                                                      double now_seconds)
 {
@@ -1506,17 +1513,15 @@ static void reach_quick_settings_sample_input_layout(reach_quick_settings *quick
     state.bounds.y += state.render_bounds.y;
     state.content_bounds = reach_quick_settings_content_bounds_for(
         body, &quick_settings->layout_theme, quick_settings->layout_dpi, state.drop_direction);
-    state.scroll_offset = reach_motion_value_at(&state.scroll_motion, now_seconds);
     float output = reach_motion_value_at(&state.output_devices_span, now_seconds);
     float apps = reach_motion_value_at(&state.app_volumes_span, now_seconds);
     REACH_ASSERT(isfinite(output) && isfinite(apps));
     float height = reach_quick_settings_content_height_for_spans_scaled(&state.model, output, apps,
                                                                         quick_settings->layout_dpi);
 
-    state.scroll_max = fmaxf(0.0f, height - state.content_bounds.height);
-    state.scroll_offset = fminf(state.scroll_offset, state.scroll_max);
     reach_rect_f32 bounds = state.content_bounds;
-    bounds.y -= state.scroll_offset;
+    bounds.y -= fminf(reach_scroll_view_value_at(&state.scroll, now_seconds),
+                      fmaxf(0.0f, height - state.content_bounds.height));
     bounds.height = height;
     state.layout = reach_quick_settings_layout_for_sections_scaled(
         bounds, &quick_settings->layout_theme, &state.model, output, apps,
@@ -1686,8 +1691,7 @@ int32_t reach_quick_settings_set_open(reach_quick_settings *quick_settings, int3
     reach_quick_settings_set_bluetooth_pending(quick_settings, 0, 0);
     if (next_open)
     {
-        state->scroll_offset = 0.0f;
-        reach_motion_set(&state->scroll_motion, 0);
+        reach_quick_settings_scroll_init(&state->scroll);
         reach_motion_set(&quick_settings->scroll_maximum, 0);
         reach_quick_settings_refresh_system(quick_settings, 0);
         reach_quick_settings_refresh_audio(quick_settings);
@@ -1739,7 +1743,7 @@ void reach_quick_settings_reset(reach_quick_settings *quick_settings)
     reach_motion_set(&quick_settings->scroll_maximum, 0);
     state->surface_motion = {};
     state->render_bounds = {};
-    reach_motion_set(&state->scroll_motion, 0);
+    reach_quick_settings_scroll_init(&state->scroll);
     quick_settings->layout_initialized = 0;
     quick_settings->pending_motion_seconds = 0;
     reach_quick_settings_snap_sections(quick_settings, quick_settings->layout_dpi);
@@ -1751,8 +1755,6 @@ void reach_quick_settings_reset(reach_quick_settings *quick_settings)
     state->bounds = {};
     state->target_bounds = {};
     state->content_bounds = {};
-    state->scroll_offset = 0.0f;
-    state->scroll_max = 0.0f;
     state->layout = {};
     state->drag = {};
     reach_feature_transition_reset(&quick_settings->popup_transition);
@@ -1894,6 +1896,13 @@ static void reach_quick_settings_capsule_tick(void *capsule, double delta_second
                          reach_motion_value_at(&quick_settings->height, now_seconds));
         reach_quick_settings_sample_input_layout(quick_settings, now_seconds);
     }
+    if (quick_settings != nullptr && reach_scroll_view_pending(&quick_settings->state.scroll) &&
+        reach_motion_wait_ms(reach_scroll_view_deadline(&quick_settings->state.scroll)) == 0)
+    {
+        reach_scroll_view_settle(&quick_settings->state.scroll);
+        reach_quick_settings_sample_input_layout(quick_settings, reach_motion_now_seconds());
+        changes.redraw = 1;
+    }
     if (out != nullptr)
     {
         out->redraw = changes.redraw || popup_changed;
@@ -1961,6 +1970,12 @@ static void reach_quick_settings_capsule_surface_geometry(const void *capsule,
         (out->deadline_seconds <= 0 || quick_settings->uptime_deadline < out->deadline_seconds))
     {
         out->deadline_seconds = quick_settings->uptime_deadline;
+    }
+    if (reach_scroll_view_pending(&quick_settings->state.scroll))
+    {
+        double scroll_deadline = reach_scroll_view_deadline(&quick_settings->state.scroll);
+        if (out->deadline_seconds <= 0 || scroll_deadline < out->deadline_seconds)
+            out->deadline_seconds = scroll_deadline;
     }
     if (quick_settings->section_cleanup_pending)
     {
@@ -2557,22 +2572,13 @@ static void reach_quick_settings_capsule_handle_pointer(void *capsule,
         out->sync_pointer_subscriptions = 1;
     }
     if (event->kind == REACH_POINTER_EVENT_WHEEL && event->wheel_delta != 0 &&
-        quick_settings->state.scroll_max > 0.0f)
+        quick_settings->state.scroll.model.maximum > 0.0f)
     {
         float scale = quick_settings->layout_dpi > 0.0f ? quick_settings->layout_dpi : 1.0f;
-        quick_settings->state.scroll_offset +=
-            event->wheel_delta > 0 ? -86.0f * scale : 86.0f * scale;
-        if (quick_settings->state.scroll_offset < 0.0f)
-        {
-            quick_settings->state.scroll_offset = 0.0f;
-        }
-        if (quick_settings->state.scroll_offset > quick_settings->state.scroll_max)
-        {
-            quick_settings->state.scroll_offset = quick_settings->state.scroll_max;
-        }
+        (void)reach_scroll_view_scroll_by(&quick_settings->state.scroll,
+                                          event->wheel_delta > 0 ? -86.0f * scale : 86.0f * scale,
+                                          reach_motion_now_seconds());
         out->handled = 1;
-        quick_settings->state.scroll_motion = reach_motion_clamp(
-            &quick_settings->scroll_maximum, 0, quick_settings->state.scroll_offset);
         out->redraw = 1;
         out->relayout = 1;
     }
@@ -2617,6 +2623,7 @@ reach_result reach_quick_settings_create(reach_quick_settings **out_quick_settin
                                   REACH_FEATURE_TRANSITION_FROM_ABOVE);
     reach_pressable_init(&quick_settings->pressable);
     reach_quick_settings_model_init(&quick_settings->state.model);
+    reach_quick_settings_scroll_init(&quick_settings->state.scroll);
     reach_wifi_session_init(&quick_settings->wifi_session);
     reach_bluetooth_session_init(&quick_settings->bluetooth_session);
     reach_quick_settings_snap_pages(quick_settings);
@@ -3168,7 +3175,6 @@ void reach_quick_settings_refresh_layout(reach_quick_settings *quick_settings,
     float current_height = quick_settings->height.generation != 0
                                ? reach_motion_value_at(&quick_settings->height, now)
                                : state.bounds.height;
-    float current_scroll = reach_motion_value_at(&state.scroll_motion, now);
     reach_popup_placement target = reach_quick_settings_placement(quick_settings, ctx, 0);
     float target_content =
         reach_quick_settings_content_height_for_model_scaled(&state.model, ctx->dpi_scale);
@@ -3191,7 +3197,6 @@ void reach_quick_settings_refresh_layout(reach_quick_settings *quick_settings,
                                 ? quick_settings->pending_motion_seconds
                                 : now;
         current_height = reach_motion_value_at(&quick_settings->height, event_time);
-        current_scroll = reach_motion_value_at(&state.scroll_motion, event_time);
         float output_span_from = reach_motion_value_at(&state.output_devices_span, event_time);
         float app_span_from = reach_motion_value_at(&state.app_volumes_span, event_time);
         float output_span_velocity =
@@ -3232,8 +3237,6 @@ void reach_quick_settings_refresh_layout(reach_quick_settings *quick_settings,
             0};
         quick_settings->scroll_maximum =
             reach_quick_settings_channel_motion(progress, &square, &scroll);
-        state.scroll_motion =
-            reach_motion_clamp(&quick_settings->scroll_maximum, 0, fmaxf(0, current_scroll));
         quick_settings->section_cleanup_pending = 1;
     }
     else if (environment_changed || target_changed)
@@ -3244,8 +3247,12 @@ void reach_quick_settings_refresh_layout(reach_quick_settings *quick_settings,
         quick_settings->section_cleanup_pending = 0;
         reach_motion_set(&quick_settings->scroll_maximum,
                          fmaxf(0, target_content - target.bounds.height + viewport_padding));
-        state.scroll_motion =
-            reach_motion_clamp(&quick_settings->scroll_maximum, 0, fmaxf(0, current_scroll));
+    }
+    if (animate || environment_changed || target_changed)
+    {
+        reach_scroll_view_set_extents(&state.scroll, target_content,
+                                      fmaxf(0, target.bounds.height - viewport_padding));
+        (void)reach_scroll_view_limit(&state.scroll, &quick_settings->scroll_maximum);
     }
     quick_settings->relayout_animate_pending = 0;
     quick_settings->pending_motion_seconds = 0;

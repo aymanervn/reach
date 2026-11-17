@@ -255,6 +255,29 @@ void reach_scroll_view_settle(reach_scroll_view *view)
         reach_motion_set(&view->offset, view->offset.to);
 }
 
+reach_result reach_scroll_view_limit(reach_scroll_view *view, const reach_motion *maximum)
+{
+    if (view == nullptr || maximum == nullptr || maximum->generation == 0)
+        return REACH_INVALID_ARGUMENT;
+    if (view->offset.generation == 0)
+        reach_motion_set(&view->offset, 0.0f);
+    reach_motion floor = {};
+    reach_motion_set(&floor, 0.0f);
+    reach_motion bound = {}, limited = {};
+    reach_result result = reach_motion_max(maximum, &floor, &bound);
+    if (result == REACH_OK)
+        result = reach_motion_min(&view->offset, &bound, &limited);
+    if (result == REACH_OK)
+    {
+        view->offset = limited;
+        return REACH_OK;
+    }
+    double now = reach_motion_now_seconds();
+    reach_motion_set(&view->offset, fminf(reach_motion_value_at(&view->offset, now),
+                                          fmaxf(0.0f, reach_motion_value_at(maximum, now))));
+    return result;
+}
+
 reach_scroll_view_window reach_scroll_view_item_window(const reach_scroll_view *view, float pitch,
                                                        size_t item_count, size_t visible_count,
                                                        size_t overscan, size_t capacity)

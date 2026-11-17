@@ -100,6 +100,7 @@ extern "C"
     int32_t reach_scroll_view_advance(reach_scroll_view *view, double now_seconds);
     double reach_scroll_view_deadline(const reach_scroll_view *view);
     void reach_scroll_view_settle(reach_scroll_view *view);
+    reach_result reach_scroll_view_limit(reach_scroll_view *view, const reach_motion *maximum);
     reach_scroll_view_window reach_scroll_view_item_window(const reach_scroll_view *view,
                                                            float pitch, size_t item_count,
                                                            size_t visible_count, size_t overscan,

@@ -2974,6 +2974,20 @@ static void test_quick_settings_section_motion_renders_worst_case(void)
                     }
                     fill_lists();
                     step(0.6);
+                    for (size_t round = 0; round < 6; ++round)
+                    {
+                        reach_pointer_event wheel = make_pointer_event(
+                            REACH_POINTER_EVENT_WHEEL, REACH_POINTER_COORDINATE_SURFACE_LOCAL,
+                            arrow_x, arrow_y);
+                        wheel.wheel_delta = -120;
+                        send_pointer(ops, capsule, wheel);
+                        step(0.016);
+                    }
+                    toggle_apps();
+                    for (size_t frame = 0; frame < 8; ++frame)
+                        step(0.016);
+                    toggle_apps();
+                    step(0.6);
                 }
                 {
                     auto click = [&](reach_rect_f32 control)
@@ -3214,7 +3228,7 @@ static void test_quick_settings_section_motion_renders_worst_case(void)
     }
     expect_true(presentation_render_failures == 0,
                 "every Quick Settings section-motion render stays valid");
-    expect_true(presentation_render_count == 4 * 3 * 2 * 302,
+    expect_true(presentation_render_count == 4 * 3 * 2 * 317,
                 "Quick Settings renders every section-motion step at every DPI and monitor");
     const size_t largest_rows = (size_t)REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES * 5 +
                                 (size_t)REACH_AUDIO_VOLUME_MAX_SESSIONS * 5;
