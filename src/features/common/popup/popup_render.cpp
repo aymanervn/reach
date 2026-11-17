@@ -72,6 +72,21 @@ reach_rect_f32 reach_popup_constrain_bounds(reach_rect_f32 bounds, reach_rect_f3
     return bounds;
 }
 
+float reach_popup_anchored_height_limit(const reach_popup_anchor *anchor, float margin)
+{
+    if (anchor == nullptr || !(anchor->monitor.width > 0.0f) || !(anchor->monitor.height > 0.0f))
+        return INFINITY;
+    float vertical_margin = margin * 2.0f < anchor->monitor.height ? margin : 0.0f;
+    float top = anchor->monitor.y + vertical_margin;
+    float bottom = anchor->monitor.y + anchor->monitor.height - vertical_margin;
+    float offset = anchor->has_bar_offset ? anchor->bar_offset : margin;
+    float edge = anchor->direction == REACH_POPUP_DROP_DOWN ? anchor->bar_edge_y + offset
+                                                            : anchor->bar_edge_y - offset;
+    if (!anchor->overflow_scrolls || !(edge >= top && edge <= bottom))
+        return fmaxf(0.0f, bottom - top);
+    return anchor->direction == REACH_POPUP_DROP_DOWN ? bottom - edge : edge - top;
+}
+
 reach_popup_placement reach_popup_place(const reach_popup_anchor *anchor, float width, float height,
                                         float margin)
 {
@@ -81,6 +96,9 @@ reach_popup_placement reach_popup_place(const reach_popup_anchor *anchor, float 
         return placement;
     }
 
+    float limit = reach_popup_anchored_height_limit(anchor, margin);
+    if (height > limit)
+        height = limit;
     placement.bounds.width = width;
     placement.bounds.height = height;
     placement.bounds.x = anchor->button.x + anchor->button.width * 0.5f - width * 0.5f;
@@ -126,7 +144,8 @@ reach_result reach_popup_height_motion(const reach_popup_anchor *anchor, float w
     float top = anchor->monitor.y + vertical_margin;
     float bottom = anchor->monitor.y + anchor->monitor.height - vertical_margin;
     if (constrained)
-        result.height = reach_motion_clamp(height, 0, bottom - top);
+        result.height =
+            reach_motion_clamp(height, 0, reach_popup_anchored_height_limit(anchor, margin));
     float minimum = 0, maximum = 0;
     if (!reach_popup_positive_extent(&result.height) ||
         reach_motion_range(&result.height, &minimum, &maximum) != REACH_OK)
