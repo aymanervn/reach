@@ -102,6 +102,8 @@ jobs:
         run: |
           $zip = "build/dist/reach-v${{ steps.version.outputs.version }}-Release.zip"
           if (-not (Test-Path $zip)) {
+            Get-ChildItem -Recurse build/dist -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName }
+            Select-String -Path build/CMakeCache.txt -Pattern 'REACH_VERSION|CMAKE_PROJECT_VERSION'
             throw "Missing $zip"
           }
           Add-Type -AssemblyName System.IO.Compression.FileSystem
