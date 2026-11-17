@@ -294,6 +294,19 @@ Final acceptance requires:
 - Unavailable evidence is explicit, scoped obsolete paths are removed, and architecture/docs describe
   the implemented final balance and justified CPU/native responsibilities.
 
+## Deferred investigations
+
+- **Retained shadow trails under a moving shape (deferred 2026-11-17, owner decision).** A
+  shadow-casting group whose child rect moves its origin while it resizes leaves every intermediate
+  edge painted in the shadow's captured source. Seen in Clipboard when
+  `reach_ui_motion_background_render` received an animated `y` with an animated `height`. Clipboard
+  and Switcher avoid it by drawing the background at a fixed origin under a parent translation
+  group. Root cause is unproven (uncleared captured source, source reuse on unchanged paint, or a
+  shadow built from the initial pose) and sits in the retained shadow path
+  (`src/adapters/windows/render_d2d/render_d2d_shadow*.cpp`, `render_d2d_retained.cpp`). Before
+  fixing: reproduce in `reach_render_d2d_retained_tests` with a caster over a moving child and assert
+  the vacated area is cleared; then fix the renderer and remove both caller workarounds.
+
 ## Platform references
 
 - [Composition architecture](https://learn.microsoft.com/en-us/windows/win32/directcomp/architecture-and-components): independent composition and asynchronous submission.

@@ -59,6 +59,8 @@ struct reach_quick_settings_metrics
     float wifi_connect_width;
     float wifi_forget_inset;
     float wifi_forget_width;
+    float scrollbar_track_width;
+    float scrollbar_minimum_thumb;
 
     float toggle_title_text_size;
     float toggle_status_text_size;
@@ -78,6 +80,8 @@ static constexpr reach_quick_settings_metrics reach_quick_settings_make_metrics(
 
     metrics.surface_padding = 4.0f;
     metrics.content_padding = 8.0f;
+    metrics.scrollbar_track_width = 4.0f;
+    metrics.scrollbar_minimum_thumb = 22.0f;
     metrics.panel_width = 340.0f;
     metrics.avatar_size = 40.0f;
     metrics.avatar_ring = 2.0f;
@@ -159,6 +163,10 @@ static inline reach_quick_settings_metrics reach_quick_settings_metrics_for_scal
         reach_quick_settings_metric_scale_value(metrics.surface_padding, dpi_scale);
     metrics.content_padding =
         reach_quick_settings_metric_scale_value(metrics.content_padding, dpi_scale);
+    metrics.scrollbar_track_width =
+        reach_quick_settings_metric_scale_value(metrics.scrollbar_track_width, dpi_scale);
+    metrics.scrollbar_minimum_thumb =
+        reach_quick_settings_metric_scale_value(metrics.scrollbar_minimum_thumb, dpi_scale);
     metrics.panel_width = reach_quick_settings_metric_scale_value(metrics.panel_width, dpi_scale);
     metrics.avatar_size = reach_quick_settings_metric_scale_value(metrics.avatar_size, dpi_scale);
     metrics.avatar_ring = reach_quick_settings_metric_scale_value(metrics.avatar_ring, dpi_scale);

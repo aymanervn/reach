@@ -46,6 +46,10 @@ reach_quick_settings_hit_test_overview(const reach_quick_settings_layout *layout
                                        const reach_quick_settings_model *model, float x, float y)
 {
     reach_quick_settings_hit_result result = {};
+    if (!reach_quick_settings_point_in_rect(layout->list_viewport, x, y))
+    {
+        return result;
+    }
     if (reach_quick_settings_hit_pill(&layout->overview_volume, x, y,
                                       REACH_QUICK_SETTINGS_HIT_OVERVIEW_VOLUME_SLIDER,
                                       REACH_QUICK_SETTINGS_MUTE_OVERVIEW, 1, &result))
@@ -90,7 +94,8 @@ reach_quick_settings_hit_test_sound(const reach_quick_settings_layout *layout,
     reach_quick_settings_hit_result result = {};
     if (reach_quick_settings_hit_pill(&layout->sound_volume, x, y,
                                       REACH_QUICK_SETTINGS_HIT_MAIN_SLIDER,
-                                      REACH_QUICK_SETTINGS_MUTE_SOUND, 1, &result))
+                                      REACH_QUICK_SETTINGS_MUTE_SOUND, 1, &result) ||
+        !reach_quick_settings_point_in_rect(layout->list_viewport, x, y))
     {
         return result;
     }
@@ -155,6 +160,10 @@ reach_quick_settings_hit_test_wifi(const reach_quick_settings_layout *layout,
         result.type = REACH_QUICK_SETTINGS_HIT_WIFI_SWITCH;
         return result;
     }
+    if (!reach_quick_settings_point_in_rect(layout->list_viewport, x, y))
+    {
+        return result;
+    }
     if (model->wifi_key_row >= 0)
     {
         if (reach_quick_settings_point_in_rect(layout->wifi_key_field, x, y))
@@ -198,6 +207,10 @@ reach_quick_settings_hit_test_bluetooth(const reach_quick_settings_layout *layou
         reach_quick_settings_point_in_rect(layout->bluetooth_switch, x, y))
     {
         result.type = REACH_QUICK_SETTINGS_HIT_BLUETOOTH_SWITCH;
+        return result;
+    }
+    if (!reach_quick_settings_point_in_rect(layout->list_viewport, x, y))
+    {
         return result;
     }
     for (size_t button = 0; button < 2; ++button)

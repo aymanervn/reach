@@ -51,10 +51,7 @@ static void render_nav_selection_indicator(const reach_settings_render_input *in
     reach_render_group group = {};
     group.id = 1;
     group.bounds = indicator;
-    group.y = input->model->nav_selection;
-    group.y.from *= pitch;
-    group.y.to *= pitch;
-    group.y.spring_velocity *= pitch;
+    group.y = reach_motion_affine(&input->model->nav_selection, pitch, 0.0f);
 
     reach_color color = input->theme->accent_tint;
     if (reach_render_command_buffer_begin_group(commands, &group) != REACH_OK)
@@ -537,10 +534,7 @@ static void render_accent_card(const reach_settings_render_input *input,
     reach_render_group group = {};
     group.id = reach_settings_control_group_id(REACH_SETTINGS_HIT_THEME_ACCENT, 0);
     group.bounds = ring;
-    group.x = input->model->theme_accent_selection;
-    group.x.from *= pitch;
-    group.x.to *= pitch;
-    group.x.spring_velocity *= pitch;
+    group.x = reach_motion_affine(&input->model->theme_accent_selection, pitch, 0.0f);
     if (reach_render_command_buffer_begin_group(commands, &group) == REACH_OK)
     {
         reach_settings_push_bordered_background(commands, ring, ring.width * 0.5f, ring_width,

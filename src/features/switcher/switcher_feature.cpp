@@ -573,11 +573,20 @@ reach_result reach_switcher_thumbnail_motion_at(const reach_switcher *switcher, 
     const auto &card = switcher->layout.cards[index];
     *out_window = card.preview_visible ? card.window : 0;
     *out_visible = card.preview_visible;
-    *out_destination = card.preview_motion;
-    if (reach_motion_combine(&switcher->layout.body.x, 1, &card.preview_motion.x, 1,
-                             switcher->layout.envelope.x, &out_destination->x) != REACH_OK ||
-        reach_motion_combine(&switcher->layout.body.y, 1, &card.preview_motion.y, 1,
-                             switcher->layout.envelope.y, &out_destination->y) != REACH_OK)
+    float margin = (1 - REACH_SWITCHER_THUMBNAIL_SCALE) * .5f;
+    reach_motion x = {}, y = {};
+    out_destination->width =
+        reach_motion_affine(&card.preview_motion.width, REACH_SWITCHER_THUMBNAIL_SCALE, 0);
+    out_destination->height =
+        reach_motion_affine(&card.preview_motion.height, REACH_SWITCHER_THUMBNAIL_SCALE, 0);
+    if (reach_motion_combine(&card.preview_motion.x, 1, &switcher->layout.fit,
+                             card.preview.width * margin, 0, &x) != REACH_OK ||
+        reach_motion_combine(&card.preview_motion.y, 1, &switcher->layout.fit,
+                             card.preview.height * margin, 0, &y) != REACH_OK ||
+        reach_motion_combine(&switcher->layout.body.x, 1, &x, 1, switcher->layout.envelope.x,
+                             &out_destination->x) != REACH_OK ||
+        reach_motion_combine(&switcher->layout.body.y, 1, &y, 1, switcher->layout.envelope.y,
+                             &out_destination->y) != REACH_OK)
         return REACH_INVALID_ARGUMENT;
     return REACH_OK;
 }

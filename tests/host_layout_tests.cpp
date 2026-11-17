@@ -2974,6 +2974,20 @@ static void test_quick_settings_section_motion_renders_worst_case(void)
                     }
                     fill_lists();
                     step(0.6);
+                    for (size_t round = 0; round < 6; ++round)
+                    {
+                        reach_pointer_event wheel = make_pointer_event(
+                            REACH_POINTER_EVENT_WHEEL, REACH_POINTER_COORDINATE_SURFACE_LOCAL,
+                            arrow_x, arrow_y);
+                        wheel.wheel_delta = -120;
+                        send_pointer(ops, capsule, wheel);
+                        step(0.016);
+                    }
+                    toggle_apps();
+                    for (size_t frame = 0; frame < 8; ++frame)
+                        step(0.016);
+                    toggle_apps();
+                    step(0.6);
                 }
                 {
                     auto click = [&](reach_rect_f32 control)
@@ -3214,7 +3228,7 @@ static void test_quick_settings_section_motion_renders_worst_case(void)
     }
     expect_true(presentation_render_failures == 0,
                 "every Quick Settings section-motion render stays valid");
-    expect_true(presentation_render_count == 4 * 3 * 2 * 302,
+    expect_true(presentation_render_count == 4 * 3 * 2 * 317,
                 "Quick Settings renders every section-motion step at every DPI and monitor");
     const size_t largest_rows = (size_t)REACH_AUDIO_VOLUME_MAX_OUTPUT_DEVICES * 5 +
                                 (size_t)REACH_AUDIO_VOLUME_MAX_SESSIONS * 5;
@@ -3348,6 +3362,134 @@ static void test_launcher_result_motion_renders_worst_case(void)
     reach_host_destroy_registered_features(host);
 }
 
+static void test_clipboard_card_motion_renders_worst_case(void)
+{
+    reach_host *host = &presentation_render_host;
+    presentation_render_count = 0;
+    presentation_render_failures = 0;
+    presentation_max_groups = 0;
+    reach_host_init_feature_registry(host);
+    expect_true(reach_host_create_registered_features(host) == REACH_OK,
+                "registered features are available for Clipboard card motion");
+    reach_host_init_layout(host);
+
+    const reach_surface_id id = REACH_SURFACE_ID_CLIPBOARD;
+    reach_clipboard_feature *clipboard =
+        reach_host_feature_capsule<reach_clipboard_feature>(host, id);
+    const reach_feature_capsule_ops *ops = host->feature_runtimes[id].definition->capsule_ops;
+    void *capsule = host->feature_runtimes[id].capsule;
+    uint64_t next_id = 1;
+    auto insert = [&]
+    {
+        reach_clipboard_item item = {};
+        item.id = next_id;
+        item.content_hash = next_id * 2654435761u;
+        item.kind = next_id % 3 == 0 ? REACH_CLIPBOARD_ITEM_IMAGE : REACH_CLIPBOARD_ITEM_TEXT;
+        item.thumbnail_id = item.kind == REACH_CLIPBOARD_ITEM_IMAGE ? 9000 + next_id : 0;
+        item.image_width = next_id % 2 == 0 ? 1920 : 300;
+        item.image_height = next_id % 2 == 0 ? 200 : 900;
+        for (size_t at = 0; at + 1 < REACH_CLIPBOARD_PREVIEW_CAPACITY; ++at)
+            item.preview[at] = at % 37 == 36 ? '\n' : (uint16_t)('a' + (next_id + at) % 26);
+        ++next_id;
+        reach_clipboard_insert_outcome outcome = {};
+        reach_clipboard_insert_captured(clipboard, item, &outcome);
+    };
+    auto press_at = [&](reach_rect_f32 rect)
+    {
+        float x = rect.x + rect.width * 0.5f, y = rect.y + rect.height * 0.5f;
+        send_pointer(
+            ops, capsule,
+            make_pointer_event(REACH_POINTER_EVENT_DOWN, REACH_POINTER_COORDINATE_SCREEN, x, y));
+        send_pointer(
+            ops, capsule,
+            make_pointer_event(REACH_POINTER_EVENT_UP, REACH_POINTER_COORDINATE_SCREEN, x, y));
+    };
+    auto wheel = [&](int32_t delta)
+    {
+        reach_rect_f32 viewport = reach_clipboard_feature_state_ptr(clipboard)->layout.viewport;
+        reach_pointer_event event = make_pointer_event(
+            REACH_POINTER_EVENT_WHEEL, REACH_POINTER_COORDINATE_SCREEN,
+            viewport.x + viewport.width * 0.25f, viewport.y + viewport.height * 0.5f);
+        event.wheel_delta = delta;
+        send_pointer(ops, capsule, event);
+    };
+
+    const float dpis[] = {1.0f, 1.25f, 1.5f, 2.0f};
+    const reach_rect_f32 monitors[] = {{0.0f, 0.0f, 3840.0f, 2160.0f},
+                                       {-1920.0f, 0.0f, 1920.0f, 1080.0f},
+                                       {0.0f, 0.0f, 360.0f, 280.0f}};
+    const char *label = "the Clipboard renders card motion within budget";
+    for (float dpi : dpis)
+    {
+        for (reach_rect_f32 monitor : monitors)
+        {
+            host->layout_dpi_scale = dpi;
+            presentation_contexts contexts = make_presentation_contexts(dpi, monitor);
+            auto render = [&] { render_presented_surface(host, id, contexts.base, label); };
+            auto step = [&](double seconds)
+            {
+                tick_presented_surface(host, id, seconds);
+                render();
+            };
+            while (reach_clipboard_item_count(clipboard) < REACH_CLIPBOARD_MAX_ITEMS)
+                insert();
+            (void)reach_clipboard_set_open(clipboard, 1);
+            render();
+            step(0.05);
+            step(0.6);
+            for (size_t round = 0; round < 6; ++round)
+            {
+                press_at(reach_clipboard_feature_state_ptr(clipboard)->layout.close_buttons[0]);
+                step(0.03);
+            }
+            for (size_t round = 0; round < 4; ++round)
+            {
+                insert();
+                step(0.02);
+            }
+            for (size_t round = 0; round < 8; ++round)
+            {
+                wheel(-120);
+                step(0.01);
+            }
+            for (size_t round = 0; round < 3; ++round)
+            {
+                press_at(reach_clipboard_feature_state_ptr(clipboard)->layout.close_buttons[0]);
+                step(0.016);
+            }
+            for (size_t round = 0; round < 8; ++round)
+            {
+                wheel(120);
+                step(0.01);
+            }
+            while (reach_clipboard_item_count(clipboard) > 2)
+            {
+                press_at(reach_clipboard_feature_state_ptr(clipboard)->layout.close_buttons[0]);
+                step(0.03);
+            }
+            for (size_t round = 0; round < 4; ++round)
+            {
+                insert();
+                step(0.02);
+            }
+            press_at(reach_clipboard_feature_state_ptr(clipboard)->layout.clear_button);
+            step(0.02);
+            insert();
+            step(0.02);
+            step(0.6);
+            (void)reach_clipboard_set_open(clipboard, 0);
+            render();
+            tick_presented_surface(host, id, 0.6);
+            tick_presented_surface(host, id, 0.6);
+        }
+    }
+    expect_true(presentation_render_failures == 0,
+                "every Clipboard card-motion render stays valid");
+    expect_true(presentation_max_groups >= REACH_CLIPBOARD_ROW_CAPACITY * 6,
+                "the Clipboard rendered a full card row pool");
+    reach_host_destroy_registered_features(host);
+}
+
 int main(void)
 {
     test_close_handoff_readiness_waits_for_observed_restore();
@@ -3387,6 +3529,7 @@ int main(void)
     test_max_items_and_pressed_states_render_worst_case();
     test_quick_settings_section_motion_renders_worst_case();
     test_launcher_result_motion_renders_worst_case();
+    test_clipboard_card_motion_renders_worst_case();
 
     if (failures != 0)
     {

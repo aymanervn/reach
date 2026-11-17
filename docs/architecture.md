@@ -356,7 +356,13 @@ Stage selection state and does not fork movement, synchronization, fade, or tear
 never writes foreground tracking optimistically; the
 foreground watcher records the OS result. Stage does not wait for native window readiness before
 moving. Desktop publishes minimize-all through the same action contract and uses the same close
-choreography. Ordinary activation retains its existing
+choreography. The open/close transition is reversible from wherever it is: closing mid-open starts
+each tile's close from its current rectangle, and opening mid-close (`reach_stage_set_open` while
+`closing`) keeps the tiles, records each tile's current rectangle and progress as
+`open_from_rect`/`open_from_progress`, retargets the same progress tracks to open and reconciles
+the window set. Once the close has committed its transparent frame there is nothing left to
+reverse, so an open request then starts a fresh open. Reopening a surface cancels its pending close
+handoff and front-source preference (`reach_host_cancel_close_handoff`). Ordinary activation retains its existing
 topmost promotion/demotion sequence and native foreground-transfer compatibility path, including
 the final attached-input raise. Switcher uses the same ordinary activation path. Its non-activating
 overlay presents immediately and starts the shared close transition before publishing the selected
@@ -773,12 +779,12 @@ coverage tint. Fallback samples both intents at the same frame timestamp. Normal
 semantic equality, native cancellation and repeating-property retirement share the retained contract.
 The mix is a leaf capability and is rejected on root presentation.
 
-Clipboard item feedback uses canonical hover motion and item-keyed retained source identities.
+Clipboard item feedback uses canonical hover motion keyed to its keyed-row slots.
 Shared bordered feedback consumes `reach_render_bordered_background_shapes`, the same pixel-aligned
 opaque outer/inner geometry used by ordinary bordered backgrounds. The RGB blend preserves the
 previous nested hover border colors without overlapping translucent rounded layers. Close background
 and glyph coverage use separate retained opacity. Hover tracks, sampled render values, tick redraw
-and hover-only frame demand are removed; sizing and scrolling remain separate CPU consumers. Stationary
+and hover-only frame demand are removed. Stationary
 Clipboard and Settings scrollbar drags retain event-driven pointer capture and movement without
 requesting periodic frames; actual sizing/scrolling and renderer fallback work retain their own
 active scheduling.
@@ -883,8 +889,8 @@ springs and normalized products of zero-span springs are rejected without output
 
 Reach has one motion vocabulary: `reach_theme.motion_presets`, indexed by `reach_motion_preset`
 and read through `reach_theme_motion_preset`. Springs `snappy`, `smooth`, `bouncy`, `press`,
-`release` and `bar_reveal` store only response and damping, so their settle time stays derived by the engine; the
-`fade_in`, `fade_out`, `card_fade_in` and `card_fade_out` ease-out curves store a duration. `reach_motion_spec_scaled`
+`release`, `bar_reveal` and `popup_rise` store only response and damping, so their settle time stays derived by the engine; the
+`fade_in`, `fade_out`, `card_fade_in`, `card_fade_out` and `popup_fade_in` ease-out curves store a duration. `reach_motion_spec_scaled`
 multiplies response and duration by one time scale, and `reach_theme_stage_motion_scale` derives
 that scale from the persisted Stage duration relative to `stage_motion_reference_seconds`.
 
@@ -895,17 +901,22 @@ popup and panel geometry, list survivors, resizes, Dock slots and Stage tiles us
 `smooth`; the Dock and Top Bar reveal use `bar_reveal` (0.28 s); compact bar widths, tray reorder and drag snaps use `snappy`; one-step selection pills,
 toggle knobs and the adjacent Settings sidebar step use `bouncy`; hover, tint and content opacity use
 `fade_in`/`fade_out`; cards appear with `card_fade_in` (0.05 s) and leave with `card_fade_out`
-(0.18 s); presses use `press`/`release`. Bounce never appears on popups, panels, Stage,
+(0.18 s); Quick Settings and Clipboard instead open with `popup_fade_in` (0.10 s) while
+`popup_rise` (0.30 s, critically damped) moves them `popup_rise_distance` (10dp) in from their
+bar edge and scales them from `popup_rise_scale` (0.97) about the trigger anchor; their close keeps
+the card fade with the rise frozen where it is (`reach_feature_transition_enable_rise`). Presses use `press`/`release`. Bounce never appears on popups, panels, Stage,
 the Top Bar or opacity. Stage open, close and reflow scale `smooth` by `reach_theme_stage_motion_scale`
 (configured duration over the theme reference, which is the 0.38 s `smooth` response), so the default
 0.30 s Stage duration yields a 0.30 s spring response.
-Scalars sampled on the CPU (Stage, Dock slots, bar reveal, Top Bar widths, Clipboard height, Settings
+Scalars sampled on the CPU (Stage, Dock slots, bar reveal, Top Bar widths, Settings
 rows) carry the same presets through `reach_motion_animate_spec_to_at`. Drag gestures
 feed `reach_drag_velocity` (`features/common/draggable`) with the value they display and hand its
 release velocity to the snap spring. Documented exceptions, which are periodic effects or holds
 rather than transitions: caret blink, the shared loader cycle, the now-playing marquee and the HUD
-lifetime. Scroll motion is not migrated: `core/scrollbar`, Clipboard scroll and Quick Settings
-scroll keep their existing behaviour until one shared scroll component replaces them.
+lifetime. Scrolling goes through `features/common/scroll_view`; Launcher, Clipboard and Quick
+Settings present it retained. Quick Settings feeds its animated content extent to
+`reach_scroll_view_limit`, which folds the moving maximum into the offset motion. The Settings app
+is the confirmed exception and keeps CPU-sampled scrolling.
 
 Every size, envelope, clip, raster allocation or budget derived from a motion uses
 `reach_motion_range`, never endpoints or the current sample, so spring overshoot stays inside it.
@@ -958,18 +969,20 @@ sources or over-budget expansions use renderer-owned source sampling through the
 port until the finite descriptors settle. Image and text expansions share the existing 128MiB and
 layer budgets. Source changes invalidate their bitmap, while hide/retirement removes fit ownership
 and sampling. No fields are added to the render command/group/buffer for this capability.
-Clipboard item width now owns one canonical `smooth` motion and one cleanup deadline.
-Endpoint layout stays authoritative; pointer operations sample a separate current-width snapshot.
-Normal scrollbar-gutter changes retain fixed-radius item borders, independent hover paint, close
-controls, image crops, custom preview line variants and scrollbar placement. Stable item source
-identities reserve 128 IDs each. The renderer retains at most five visible items and four bounded
-line-capacity variants per item; no width-only capsule frame or layout tick advances the effect.
-Monitor/DPI constraints and hidden initialization cut the width. Extremely narrow, horizontally
-clipped close glyphs use generic active-only content sampling until the same canonical deadline.
-Height and smooth scrolling remain CPU consumers pending their own migration.
+Clipboard is fully retained. One `smooth` pixel height motion drives the bottom-anchored panel
+(`reach_clipboard_panel_frame`): opening presents the full height at once under the shared rise
+transition; closing freezes the height and only fades, while item-count changes animate the
+height with content riding the top edge. The window stays at the panel's maximum height, so height
+changes never resize it, and the card viewport clip extends to the panel bottom. Card width springs into the scrollbar gutter when no scrollbar is needed; text and
+thumbnails keep the narrow layout and the close button tracks the right edge. Cards are `keyed_rows` over a
+`reach_scroll_view_item_window` of at most `REACH_CLIPBOARD_ROW_CAPACITY` slots inside the
+`scroll_view` retained viewport: inserts fade in, removals fade out while the rest slide, and
+scroll-only window shifts sync without animation. A removed item's native resources retire only
+when its row releases. One motion deadline settles rows, scroll and reveal, then re-evaluates hover
+at the last pointer position. The capsule requests no frames.
 
 Width-text callers own their ellipsis policy. Dock and Switcher explicitly request DWrite ellipsis;
-Clipboard preserves its custom line splitting and literal dots. The vertical-overflow fit mode
+Clipboard draws its custom line splitting and literal dots as ordinary text lines. The vertical-overflow fit mode
 expands native source bounds using DWrite glyph overhang while retaining horizontal width clipping.
 It preserves the ordinary CPU text fallback's unclipped glyph ink instead of applying the metadata
 viewport there. Sampled native sources bake horizontal clipping into their raster; active sources
@@ -1138,6 +1151,14 @@ at the button that opened it after the clamp moves the popup. Quick settings,
 the tray popup and the context menu all place through it; a popup that clamps
 its own bounds or re-derives its notch at render time has reintroduced the bug
 this helper exists to prevent.
+A popup that scrolls its own overflow sets `reach_popup_anchor.overflow_scrolls`: its anchored edge
+never moves, and `reach_popup_anchored_height_limit` caps its height at the space from that edge to
+the far monitor edge (less the margin), so taller content scrolls instead of sliding the popup over
+its bar. Quick Settings sets it and scrolls only each page's list: the header, rail and the page's
+fixed top (Wi-Fi/Bluetooth title and switch, Sound's master volume) stay put while one clipped list
+viewport (`layout.list_top`/`list_viewport`, Sound's outputs, apps and input together) rides the
+single scroll view, whose scrollbar spans that list. Popups that cannot scroll leave it clear and keep the
+fit-to-monitor clamp, as does any anchor whose edge lies outside the monitor.
 Top Bar dropdowns (Quick Settings, the tray dropdown and the power menu) keep that placement but
 draw `reach_popup_background_input.hide_notch`: a plain rounded card in the body below the notch
 strip, filled with the `top_bar_dropdown_background` token (the Top Bar colour in dark mode). They
@@ -1303,7 +1324,11 @@ an in-flight sequence) before the rest of the table sees them — so no surface
 needs a hand-written branch to receive its own input. The source row is evaluated
 against the same flags as every other row, so a surface that receives its own
 press still closes or applies an unhandled result exactly as it would from the
-loop. Capsules report outcomes as one shared `reach_feature_action_kind`
+loop. Pointer delivery follows presentation, not lifecycle: a row receives pointer events while
+`reach_host_surface_presented` holds, so a surface animating closed still takes clicks and hover.
+Policies that act for an open surface — EXCLUSIVE_WHILE_OPEN capture and the
+DOWN_CLOSES_ON_UNHANDLED / DOWN_APPLIES_UNHANDLED outside-press flags — apply only while
+`is_open` holds, so a closing surface never swallows a press it did not handle. Capsules report outcomes as one shared `reach_feature_action_kind`
 (`include/reach/features/common/feature_action.h`); `host_feature_actions.cpp` dispatches
 every entry in a single generic switch keyed on the emitting runtime, so no feature has a
 composition-side translator. A press that only composition's pointer policy reads is not an action

@@ -488,13 +488,6 @@ static reach_result reach_quick_settings_push_header(const reach_quick_settings_
     reach_result result = reach_render_command_buffer_begin_group(commands, &group);
     if (result == REACH_OK)
     {
-        reach_render_command tint = {};
-        tint.type = REACH_RENDER_COMMAND_RECT;
-        tint.rect = layout.header;
-        tint.color = reach_theme_color_alpha(theme.accent, 0.6f);
-        tint.fill_gradient = REACH_RENDER_FILL_EASED_FADE_DOWN;
-        (void)reach_render_command_buffer_push(commands, &tint);
-
         reach_quick_settings_push_rounded_rect(commands, layout.settings_button,
                                                layout.settings_button.height * 0.5f,
                                                theme.quick_settings_button_background);
@@ -627,6 +620,29 @@ static reach_result reach_quick_settings_begin_page(const reach_quick_settings_r
     group.opacity = input->page_opacity[page];
     group.x = input->page_shift[page];
     return reach_render_command_buffer_begin_group(commands, &group);
+}
+
+static reach_result reach_quick_settings_begin_list(const reach_quick_settings_render_input *input,
+                                                    reach_render_command_buffer *commands,
+                                                    reach_quick_settings_page page,
+                                                    uint64_t page_group, uint64_t list_id)
+{
+    const reach_quick_settings_layout &layout = input->layout;
+    reach_rect_f32 viewport = input->viewport.width > 0 ? input->viewport : layout.content_bounds;
+    float top = layout.list_top[page];
+    reach_scroll_view_group frame = {};
+    frame.id = list_id;
+    frame.parent_id = page_group;
+    frame.bounds = {layout.page_bounds.x, top, fmaxf(1.0f, layout.page_bounds.width),
+                    fmaxf(1.0f, viewport.y + viewport.height - top)};
+    reach_result result = reach_scroll_view_push_viewport(&input->scroll, &frame, commands);
+    if (result != REACH_OK)
+        return result;
+    reach_render_group labels = {};
+    labels.id = 90 + (uint64_t)page;
+    labels.parent_id = list_id + 1;
+    labels.bounds = frame.bounds;
+    return reach_render_command_buffer_begin_group(commands, &labels);
 }
 
 static int32_t reach_quick_settings_page_visible(const reach_quick_settings_render_input *input,
@@ -815,12 +831,16 @@ static reach_result reach_quick_settings_push_sound(const reach_quick_settings_r
     if (result == REACH_OK)
         result = reach_quick_settings_push_press_feedback(input, commands,
                                                           REACH_QUICK_SETTINGS_FEEDBACK_SOUND_TOP);
+    if (result == REACH_OK)
+        result = reach_quick_settings_begin_list(input, commands, REACH_QUICK_SETTINGS_PAGE_SOUND,
+                                                 21, 52);
+    reach_render_command_buffer_end_group(commands);
     if (result != REACH_OK)
         return result;
 
     reach_render_group output_group = {};
     output_group.id = 3;
-    output_group.parent_id = 21;
+    output_group.parent_id = 53;
     output_group.bounds = output_frame;
     output_group.has_clip = 1;
     output_group.clip = output_frame;
@@ -856,7 +876,7 @@ static reach_result reach_quick_settings_push_sound(const reach_quick_settings_r
         result = reach_quick_settings_push_press_feedback(input, commands,
                                                           REACH_QUICK_SETTINGS_FEEDBACK_OUTPUTS);
     if (result != REACH_OK || reach_quick_settings_declare_group(
-                                  commands, 2, 21, input->viewport, input->viewport,
+                                  commands, 2, 53, input->viewport, input->viewport,
                                   &input->output_devices_span, nullptr, nullptr, false) != REACH_OK)
         return REACH_ERROR;
 
@@ -1049,6 +1069,22 @@ static reach_result reach_quick_settings_push_wifi(const reach_quick_settings_re
         reach_quick_settings_push_text(commands, layout.wifi_title, title,
                                        metrics->wifi_title_text_size, REACH_TEXT_WEIGHT_SEMIBOLD,
                                        REACH_TEXT_ALIGNMENT_LEADING, theme.primary_text);
+        if (model.wifi_radio != REACH_WIFI_RADIO_UNAVAILABLE)
+        {
+            reach_ui_toggle_style style = {};
+            style.track_off = theme.quick_settings_toggle_track_off;
+            style.track_on = theme.accent;
+            style.knob = theme.toggle_knob;
+            result = reach_ui_toggle_motion_render(commands, layout.wifi_switch, &style, 700,
+                                                   &input->wifi_switch);
+        }
+    }
+    reach_render_command_buffer_end_group(commands);
+    if (result == REACH_OK)
+        result = reach_quick_settings_begin_list(input, commands, REACH_QUICK_SETTINGS_PAGE_WIFI,
+                                                 22, 54);
+    if (result == REACH_OK)
+    {
         static const uint16_t off[] = {'W', 'i', '-', 'F', 'i', ' ', 'i',
                                        's', ' ', 'o', 'f', 'f', 0};
         static const uint16_t unavailable[] = {'N', 'o', ' ', 'W', 'i', '-', 'F', 'i', ' ',
@@ -1076,15 +1112,6 @@ static reach_result reach_quick_settings_push_wifi(const reach_quick_settings_re
                 model.wifi_status == REACH_WIFI_SESSION_STATUS_SCANNING ? searching : nearby,
                 &theme, metrics);
         }
-        if (model.wifi_radio != REACH_WIFI_RADIO_UNAVAILABLE)
-        {
-            reach_ui_toggle_style style = {};
-            style.track_off = theme.quick_settings_toggle_track_off;
-            style.track_on = theme.accent;
-            style.knob = theme.toggle_knob;
-            result = reach_ui_toggle_motion_render(commands, layout.wifi_switch, &style, 700,
-                                                   &input->wifi_switch);
-        }
     }
     reach_render_command_buffer_end_group(commands);
     if (result != REACH_OK)
@@ -1107,8 +1134,8 @@ static reach_result reach_quick_settings_push_wifi(const reach_quick_settings_re
         int32_t expanded = model.wifi_key_row >= 0 && row.lifecycle == REACH_KEYED_ROW_LIVE &&
                            row.index == (size_t)model.wifi_key_row;
         reach_render_group group = {};
-        group.id = 720 + slot;
-        group.parent_id = 22;
+        group.id = 1000 + slot;
+        group.parent_id = 55;
         group.bounds = row_layout.bounds;
         if (expanded)
             group.bounds.height += metrics->wifi_key_area_height;
@@ -1242,22 +1269,6 @@ reach_quick_settings_push_bluetooth(const reach_quick_settings_render_input *inp
         static const uint16_t none[] = {'N', 'o', ' ', 'd', 'e', 'v', 'i', 'c', 'e', 's', 0};
         static const uint16_t mine[] = {'M', 'y', ' ', 'd', 'e', 'v', 'i', 'c', 'e', 's', 0};
         static const uint16_t nearby[] = {'N', 'e', 'a', 'r', 'b', 'y', 0};
-        if (layout.bluetooth_message.height > 0.0f)
-        {
-            const uint16_t *message = !model.bluetooth.available ? unavailable
-                                      : !model.bluetooth.enabled ? off
-                                      : model.bluetooth_scanning ? looking
-                                                                 : none;
-            reach_quick_settings_push_section_label(commands, layout.bluetooth_message, message,
-                                                    &theme, metrics);
-        }
-        if (layout.bluetooth_mine_label.height > 0.0f)
-            reach_quick_settings_push_section_label(commands, layout.bluetooth_mine_label, mine,
-                                                    &theme, metrics);
-        if (layout.bluetooth_nearby_label.height > 0.0f)
-            reach_quick_settings_push_section_label(commands, layout.bluetooth_nearby_label,
-                                                    model.bluetooth_scanning ? looking : nearby,
-                                                    &theme, metrics);
         if (model.bluetooth.available)
         {
             reach_ui_toggle_style style = {};
@@ -1267,6 +1278,28 @@ reach_quick_settings_push_bluetooth(const reach_quick_settings_render_input *inp
             result = reach_ui_toggle_motion_render(commands, layout.bluetooth_switch, &style, 704,
                                                    &input->bluetooth_switch);
         }
+        if (result == REACH_OK)
+        {
+            reach_render_command_buffer_end_group(commands);
+            result = reach_quick_settings_begin_list(input, commands,
+                                                     REACH_QUICK_SETTINGS_PAGE_BLUETOOTH, 23, 56);
+        }
+        if (result == REACH_OK && layout.bluetooth_message.height > 0.0f)
+        {
+            const uint16_t *message = !model.bluetooth.available ? unavailable
+                                      : !model.bluetooth.enabled ? off
+                                      : model.bluetooth_scanning ? looking
+                                                                 : none;
+            reach_quick_settings_push_section_label(commands, layout.bluetooth_message, message,
+                                                    &theme, metrics);
+        }
+        if (result == REACH_OK && layout.bluetooth_mine_label.height > 0.0f)
+            reach_quick_settings_push_section_label(commands, layout.bluetooth_mine_label, mine,
+                                                    &theme, metrics);
+        if (result == REACH_OK && layout.bluetooth_nearby_label.height > 0.0f)
+            reach_quick_settings_push_section_label(commands, layout.bluetooth_nearby_label,
+                                                    model.bluetooth_scanning ? looking : nearby,
+                                                    &theme, metrics);
     }
     reach_render_command_buffer_end_group(commands);
     if (result != REACH_OK)
@@ -1289,8 +1322,8 @@ reach_quick_settings_push_bluetooth(const reach_quick_settings_render_input *inp
                            row.lifecycle == REACH_KEYED_ROW_LIVE &&
                            row.index == (size_t)model.bluetooth_action_row;
         reach_render_group group = {};
-        group.id = 740 + slot;
-        group.parent_id = 23;
+        group.id = 1100 + slot;
+        group.parent_id = 57;
         group.bounds = row_layout.bounds;
         if (expanded)
             group.bounds.height += metrics->wifi_key_area_height;
@@ -1422,7 +1455,7 @@ reach_quick_settings_push_press_feedback(const reach_quick_settings_render_input
     {
         return REACH_OK;
     }
-    static const uint64_t parents[] = {20, 21, 3, 4, 13, 22, 23, 8};
+    static const uint64_t parents[] = {51, 21, 3, 4, 13, 55, 57, 8};
     reach_render_group placement = {};
     placement.bounds = bounds;
     placement.parent_id = parents[slot];
@@ -1440,6 +1473,10 @@ reach_quick_settings_push_overview(const reach_quick_settings_render_input *inpu
     const reach_theme &theme = input->theme;
     reach_result result =
         reach_quick_settings_begin_page(input, commands, REACH_QUICK_SETTINGS_PAGE_OVERVIEW, 20);
+    reach_render_command_buffer_end_group(commands);
+    if (result == REACH_OK)
+        result = reach_quick_settings_begin_list(input, commands,
+                                                 REACH_QUICK_SETTINGS_PAGE_OVERVIEW, 20, 50);
     if (result == REACH_OK)
     {
         reach_quick_settings_push_pill(commands, &layout.overview_volume,
@@ -1470,7 +1507,7 @@ reach_quick_settings_push_overview(const reach_quick_settings_render_input *inpu
     {
         result = reach_quick_settings_push_toggle(
             commands, &layout.toggles[index], &input->model, index, &input->toggle_states[index],
-            &theme, metrics, &input->text_measure, 600 + index * 2, 20);
+            &theme, metrics, &input->text_measure, 600 + index * 2, 51);
     }
     return result == REACH_OK ? reach_quick_settings_push_press_feedback(
                                     input, commands, REACH_QUICK_SETTINGS_FEEDBACK_OVERVIEW)
@@ -1516,7 +1553,6 @@ reach_quick_settings_build_render_commands(const reach_quick_settings_render_inp
     if (input->surface_motion.height.generation != 0)
         viewport_bottom =
             reach_motion_affine(&input->surface_motion.height, -1, body_bounds.height);
-    reach_motion scrolling = reach_motion_affine(&input->scroll_motion, -1, 0);
     const reach_rect_f32 &interior = input->layout.interior;
     float interior_radius = reach_nested_radius(
         reach_popup_radius_scaled(&input->theme, input->dpi_scale), interior.x - body_bounds.x);
@@ -1524,7 +1560,7 @@ reach_quick_settings_build_render_commands(const reach_quick_settings_render_inp
                                            &viewport_bottom, nullptr, true,
                                            interior_radius) != REACH_OK ||
         reach_quick_settings_push_rail_background(input, commands) != REACH_OK ||
-        reach_quick_settings_declare_group(commands, 8, 1, viewport, viewport, &scrolling, nullptr,
+        reach_quick_settings_declare_group(commands, 8, 1, viewport, viewport, nullptr, nullptr,
                                            nullptr, false) != REACH_OK)
         return REACH_ERROR;
     reach_result result = reach_quick_settings_push_header(input, commands, &metrics);
@@ -1542,10 +1578,21 @@ reach_quick_settings_build_render_commands(const reach_quick_settings_render_inp
     if (result == REACH_OK &&
         reach_quick_settings_page_visible(input, REACH_QUICK_SETTINGS_PAGE_BLUETOOTH))
         result = reach_quick_settings_push_bluetooth(input, commands, &metrics);
+    if (result == REACH_OK)
+        result = reach_quick_settings_push_press_feedback(input, commands,
+                                                          REACH_QUICK_SETTINGS_FEEDBACK_TRAILING);
     if (result != REACH_OK)
         return result;
-    return reach_quick_settings_push_press_feedback(input, commands,
-                                                    REACH_QUICK_SETTINGS_FEEDBACK_TRAILING);
+    reach_motion opaque = {};
+    reach_motion_set(&opaque, 1.0f);
+    reach_scroll_view_group scrollbar = {};
+    scrollbar.id = 60;
+    scrollbar.parent_id = 1;
+    scrollbar.opacity = &opaque;
+    return reach_scroll_view_push_scrollbar(
+        &input->scroll, {},
+        {input->theme.quick_settings_scrollbar_track, input->theme.quick_settings_scrollbar_thumb},
+        &scrollbar, reach_motion_now_seconds(), commands);
 }
 
 reach_result reach_quick_settings_append_render_commands(
@@ -1565,11 +1612,11 @@ reach_result reach_quick_settings_append_render_commands(
     reach_rect_f32 source_bounds = reach_quick_settings_content_bounds_for(
         {0, 0, state->render_bounds.width, state->render_bounds.height}, theme, dpi_scale,
         state->drop_direction);
-    input.layout = reach_quick_settings_layout_for_sections_scaled(source_bounds, theme,
-                                                                   &state->model, 0, 0, dpi_scale);
+    input.layout = reach_quick_settings_layout_for_sections_scaled(
+        source_bounds, theme, &state->model, 0, 0, 0, dpi_scale);
     input.viewport = source_bounds;
     input.surface_motion = state->surface_motion;
-    input.scroll_motion = state->scroll_motion;
+    input.scroll = state->scroll;
     input.render_bounds = {0, 0, state->render_bounds.width, state->render_bounds.height};
     input.has_background = 1;
     input.notch_center_x = state->notch_anchor_x - state->render_bounds.x;

@@ -1516,6 +1516,8 @@ static void test_theme_motion_presets(void)
         {REACH_MOTION_PRESET_CARD_FADE_IN, REACH_EASING_EASE_OUT, 0, 0, .05},
         {REACH_MOTION_PRESET_CARD_FADE_OUT, REACH_EASING_EASE_OUT, 0, 0, .18},
         {REACH_MOTION_PRESET_BAR_REVEAL, REACH_EASING_SPRING, .28f, 1, 0},
+        {REACH_MOTION_PRESET_POPUP_RISE, REACH_EASING_SPRING, .30f, 1, 0},
+        {REACH_MOTION_PRESET_POPUP_FADE_IN, REACH_EASING_EASE_OUT, 0, 0, .10},
     };
     expect(sizeof(table) / sizeof(table[0]) == REACH_MOTION_PRESET_COUNT,
            "every motion preset has an expected value");

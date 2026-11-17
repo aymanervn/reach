@@ -27,6 +27,11 @@ static float reach_scroll_view_pixels(const reach_scroll_view *view, float posit
     return view->config.unit > 0.0f ? position * view->config.unit : 0.0f;
 }
 
+static float reach_scroll_view_resting_offset(const reach_scroll_view *view)
+{
+    return reach_motion_value_at(&view->offset, reach_motion_deadline(&view->offset));
+}
+
 static reach_result reach_scroll_view_wheel_retarget(reach_motion *motion, float target,
                                                      double now_seconds)
 {
@@ -116,12 +121,13 @@ int32_t reach_scroll_view_sync(reach_scroll_view *view, const reach_theme *theme
         mode = REACH_SCROLL_VIEW_SET;
     if (mode == REACH_SCROLL_VIEW_SET)
     {
-        int32_t changed = view->offset.generation == 0 || view->offset.to != target ||
+        int32_t changed = view->offset.generation == 0 ||
+                          reach_scroll_view_resting_offset(view) != target ||
                           reach_motion_active_at(&view->offset, now_seconds);
         reach_motion_set(&view->offset, target);
         return changed;
     }
-    if (view->offset.to == target)
+    if (reach_scroll_view_resting_offset(view) == target)
         return 0;
     float travel = reach_scroll_view_pixels(view, view->config.max_travel);
     float current = reach_motion_value_at(&view->offset, now_seconds);
@@ -252,7 +258,30 @@ double reach_scroll_view_deadline(const reach_scroll_view *view)
 void reach_scroll_view_settle(reach_scroll_view *view)
 {
     if (view != nullptr && view->offset.generation != 0)
-        reach_motion_set(&view->offset, view->offset.to);
+        reach_motion_set(&view->offset, reach_scroll_view_resting_offset(view));
+}
+
+reach_result reach_scroll_view_limit(reach_scroll_view *view, const reach_motion *maximum)
+{
+    if (view == nullptr || maximum == nullptr || maximum->generation == 0)
+        return REACH_INVALID_ARGUMENT;
+    if (view->offset.generation == 0)
+        reach_motion_set(&view->offset, 0.0f);
+    reach_motion floor = {};
+    reach_motion_set(&floor, 0.0f);
+    reach_motion bound = {}, limited = {};
+    reach_result result = reach_motion_max(maximum, &floor, &bound);
+    if (result == REACH_OK)
+        result = reach_motion_min(&view->offset, &bound, &limited);
+    if (result == REACH_OK)
+    {
+        view->offset = limited;
+        return REACH_OK;
+    }
+    double now = reach_motion_now_seconds();
+    reach_motion_set(&view->offset, fminf(reach_motion_value_at(&view->offset, now),
+                                          fmaxf(0.0f, reach_motion_value_at(maximum, now))));
+    return result;
 }
 
 reach_scroll_view_window reach_scroll_view_item_window(const reach_scroll_view *view, float pitch,
@@ -263,9 +292,10 @@ reach_scroll_view_window reach_scroll_view_item_window(const reach_scroll_view *
     REACH_ASSERT(pitch > 0.0f && capacity > 0);
     if (view == nullptr || !(pitch > 0.0f) || item_count == 0 || capacity == 0)
         return window;
-    float minimum = view->offset.to, maximum = view->offset.to;
+    float resting = reach_scroll_view_resting_offset(view);
+    float minimum = resting, maximum = resting;
     if (reach_motion_range(&view->offset, &minimum, &maximum) != REACH_OK)
-        minimum = maximum = view->offset.to;
+        minimum = maximum = resting;
     auto index_at = [&](float offset, int32_t round_up)
     {
         float rows = fmaxf(0.0f, offset) / pitch;
@@ -284,7 +314,7 @@ reach_scroll_view_window reach_scroll_view_item_window(const reach_scroll_view *
     window = span(index_at(minimum, 0), index_at(maximum, 1));
     if (window.count > capacity)
     {
-        size_t target = index_at(view->offset.to, 0);
+        size_t target = index_at(resting, 0);
         window = span(target, target);
     }
     if (window.count > capacity)
@@ -376,7 +406,8 @@ reach_result reach_scroll_view_push_scrollbar(const reach_scroll_view *view, rea
     if (travel > 0.0f && maximum > 0.0f && view->offset.generation != 0)
     {
         float ratio = travel / maximum;
-        thumb_offset = reach_motion_affine(&view->offset, ratio, -ratio * view->offset.to);
+        thumb_offset = reach_motion_affine(&view->offset, ratio,
+                                           -ratio * reach_scroll_view_resting_offset(view));
     }
     size_t first = out->count;
     reach_render_command_buffer_push(out, &track);

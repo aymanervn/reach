@@ -110,7 +110,7 @@ extern "C"
     reach_quick_settings_layout reach_quick_settings_layout_for_sections_scaled(
         reach_rect_f32 content_bounds, const reach_theme *theme,
         const reach_quick_settings_model *model, float output_devices_span, float app_volumes_span,
-        float dpi_scale);
+        float list_scroll, float dpi_scale);
     reach_quick_settings_output_device_row_layout
     reach_quick_settings_output_device_row_layout_at(reach_rect_f32 panel, float top,
                                                      float dpi_scale);

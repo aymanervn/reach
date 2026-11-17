@@ -19,10 +19,15 @@ extern "C"
     typedef struct reach_feature_transition
     {
         reach_motion opacity;
+        reach_motion rise;
         reach_motion_spec fade_in;
         reach_motion_spec fade_out;
+        reach_motion_spec rise_in;
         double completion_seconds;
         float dpi_scale;
+        float rise_distance;
+        float rise_scale;
+        int32_t rises;
         float anchor_x;
         float anchor_y;
         int32_t has_anchor;
@@ -32,6 +37,7 @@ extern "C"
     } reach_feature_transition;
 
     void reach_feature_transition_init(reach_feature_transition *transition, int32_t direction);
+    void reach_feature_transition_enable_rise(reach_feature_transition *transition);
     void reach_feature_transition_reset(reach_feature_transition *transition);
     void reach_feature_transition_configure(reach_feature_transition *transition,
                                             const reach_theme *theme, float dpi_scale,

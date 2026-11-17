@@ -28,7 +28,7 @@ static constexpr reach_dock_metrics reach_dock_make_metrics()
 
     metrics.reorder_neighbor_threshold_ratio = 0.25f;
 
-    metrics.hover_reveal_delay_seconds = 0.3;
+    metrics.hover_reveal_delay_seconds = 0.2;
 
     return metrics;
 }

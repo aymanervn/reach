@@ -74,7 +74,8 @@
     .tray_slot_size_ratio = 0.605f, .bar_separator_dot_size = 4.0f, .bar_separator_dot_gap = 9.0f, \
     .now_playing_width = 220.0f, .now_playing_padding = 9.0f, .now_playing_gap = 6.0f,             \
     .now_playing_control_gap = 8.0f, .now_playing_play_button_width = 20.0f,                       \
-    .now_playing_prev_next_button_width = 13.2f, .stage_animation_seconds = 0.30f
+    .now_playing_prev_next_button_width = 13.2f, .stage_animation_seconds = 0.30f,                 \
+    .popup_rise_distance = 10.0f, .popup_rise_scale = 0.97f
 
 #define REACH_THEME_SPRING(response, damping) {REACH_EASING_SPRING, (response), (damping), 0.0}
 #define REACH_THEME_FADE(seconds) {REACH_EASING_EASE_OUT, 0.0f, 0.0f, (seconds)}
@@ -92,6 +93,8 @@
             [REACH_MOTION_PRESET_CARD_FADE_IN] = REACH_THEME_FADE(0.05),                           \
             [REACH_MOTION_PRESET_CARD_FADE_OUT] = REACH_THEME_FADE(0.18),                          \
             [REACH_MOTION_PRESET_BAR_REVEAL] = REACH_THEME_SPRING(0.28f, 1.0f),                    \
+            [REACH_MOTION_PRESET_POPUP_RISE] = REACH_THEME_SPRING(0.30f, 1.0f),                    \
+            [REACH_MOTION_PRESET_POPUP_FADE_IN] = REACH_THEME_FADE(0.10),                          \
         },                                                                                         \
     .stage_motion_reference_seconds = 0.38f
 
@@ -145,6 +148,8 @@ static const reach_theme reach_theme_dark = {
     .quick_settings_button_background = REACH_DARK_HIGH_CONTRAST_WHITE(0.10f),
     .quick_settings_secondary_text = REACH_DARK_MID_CONTRAST_GRAY(1.0f),
     .quick_settings_toggle_track_off = REACH_DARK_MIDTONE(1.0f),
+    .quick_settings_scrollbar_track = REACH_DARK_STRUCTURE(1.0f),
+    .quick_settings_scrollbar_thumb = REACH_DARK_MID_CONTRAST_GRAY(1.0f),
     .quick_settings_app_volume_track = REACH_DARK_HIGH_CONTRAST_WHITE(0.32f),
     .quick_settings_app_volume_muted_fill = REACH_DARK_HIGH_CONTRAST_WHITE(0.42f),
     .quick_settings_section_label = REACH_DARK_MID_CONTRAST_GRAY(1.0f),
@@ -275,6 +280,8 @@ static const reach_theme reach_theme_light = {
     .quick_settings_button_background = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.07f),
     .quick_settings_secondary_text = REACH_LIGHT_MID_CONTRAST_GRAY(1.0f),
     .quick_settings_toggle_track_off = REACH_LIGHT_MID_CONTRAST_GRAY(0.8f),
+    .quick_settings_scrollbar_track = REACH_LIGHT_MIDTONE(1.0f),
+    .quick_settings_scrollbar_thumb = REACH_LIGHT_MID_CONTRAST_GRAY(1.0f),
     .quick_settings_app_volume_track = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.26f),
     .quick_settings_app_volume_muted_fill = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.38f),
     .quick_settings_section_label = REACH_LIGHT_MID_CONTRAST_GRAY(1.0f),

@@ -7,6 +7,7 @@
 #include "reach/core/blink.h"
 #include "reach/core/bluetooth.h"
 #include "reach/features/common/keyed_rows.h"
+#include "reach/features/common/scroll_view.h"
 #include "reach/features/common/text_edit.h"
 #include "reach/features/feature_capsule.h"
 #include "reach/ports/audio_volume.h"
@@ -44,8 +45,8 @@ extern "C"
         REACH_QUICK_SETTINGS_TOGGLE_COUNT
     } reach_quick_settings_toggle;
 
-#define REACH_QUICK_SETTINGS_WIFI_ROWS 9
-#define REACH_QUICK_SETTINGS_BLUETOOTH_ROWS 10
+#define REACH_QUICK_SETTINGS_WIFI_ROWS 32
+#define REACH_QUICK_SETTINGS_BLUETOOTH_ROWS 32
 
     typedef struct reach_quick_settings_model
     {
@@ -116,6 +117,8 @@ extern "C"
         reach_rect_f32 content_bounds;
         reach_rect_f32 interior;
         reach_rect_f32 page_bounds;
+        float list_top[REACH_QUICK_SETTINGS_PAGE_COUNT];
+        reach_rect_f32 list_viewport;
 
         reach_rect_f32 header;
         reach_rect_f32 settings_button;
@@ -207,7 +210,7 @@ extern "C"
         reach_motion page_shift[REACH_QUICK_SETTINGS_PAGE_COUNT];
         reach_motion rail_marker;
         reach_rect_motion surface_motion;
-        reach_motion scroll_motion;
+        reach_scroll_view scroll;
         reach_rect_f32 render_bounds;
         reach_rect_f32 viewport;
         int32_t has_background;
@@ -279,10 +282,8 @@ extern "C"
         reach_motion output_devices_span;
         reach_motion app_volumes_span;
         reach_rect_motion surface_motion;
-        reach_motion scroll_motion;
+        reach_scroll_view scroll;
         reach_rect_f32 render_bounds;
-        float scroll_offset;
-        float scroll_max;
         float notch_anchor_x;
         int32_t drop_direction;
         reach_quick_settings_drag_state drag;

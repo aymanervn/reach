@@ -1515,7 +1515,7 @@ static int32_t reach_clipboard_surface_arrange(void *capsule,
 {
     return reach_clipboard_feature_relayout(static_cast<reach_clipboard_feature *>(capsule),
                                             ctx->theme, ctx->monitor_bounds, ctx->anchor_bounds,
-                                            ctx->dpi_scale, nullptr);
+                                            ctx->dpi_scale);
 }
 
 static reach_result reach_clipboard_surface_render(void *capsule,

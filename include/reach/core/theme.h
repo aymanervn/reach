@@ -70,6 +70,8 @@ extern "C"
         REACH_MOTION_PRESET_CARD_FADE_IN,
         REACH_MOTION_PRESET_CARD_FADE_OUT,
         REACH_MOTION_PRESET_BAR_REVEAL,
+        REACH_MOTION_PRESET_POPUP_RISE,
+        REACH_MOTION_PRESET_POPUP_FADE_IN,
         REACH_MOTION_PRESET_COUNT,
     } reach_motion_preset;
 
@@ -126,6 +128,8 @@ extern "C"
         reach_color quick_settings_button_background;
         reach_color quick_settings_secondary_text;
         reach_color quick_settings_toggle_track_off;
+        reach_color quick_settings_scrollbar_track;
+        reach_color quick_settings_scrollbar_thumb;
         reach_color quick_settings_app_volume_track;
         reach_color quick_settings_app_volume_muted_fill;
         reach_color quick_settings_section_label;
@@ -221,6 +225,8 @@ extern "C"
         float now_playing_play_button_width;
         float now_playing_prev_next_button_width;
         float stage_animation_seconds;
+        float popup_rise_distance;
+        float popup_rise_scale;
         reach_motion_spec motion_presets[REACH_MOTION_PRESET_COUNT];
         float stage_motion_reference_seconds;
     } reach_theme;

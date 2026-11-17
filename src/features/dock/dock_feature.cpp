@@ -484,11 +484,18 @@ static void reach_dock_notify_item_hovered(reach_dock *dock, size_t item_index)
     dock->routes.item_hovered(dock->routes.user, &dock->hover_request);
 }
 
+static int32_t reach_dock_item_has_windows(reach_dock *dock, size_t item_index)
+{
+    return reach_dock_build_menu_request(dock, item_index, 0.0f, 0.0f, &dock->hover_request) &&
+           dock->hover_request.window_count > 0;
+}
+
 static void reach_dock_hover_item(reach_dock *dock, size_t item_index)
 {
     dock->state.hovered_item = item_index;
     dock->hover_deadline = 0.0;
-    if (item_index == REACH_MAX_DOCK_ITEMS || dock->hover_warm)
+    if (item_index == REACH_MAX_DOCK_ITEMS ||
+        (dock->hover_warm && !reach_dock_item_has_windows(dock, item_index)))
     {
         reach_dock_notify_item_hovered(dock, item_index);
         return;

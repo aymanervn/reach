@@ -35,6 +35,7 @@ extern "C"
         int32_t has_bar_offset;
         int32_t alignment;
         float edge_gap;
+        int32_t overflow_scrolls;
     } reach_popup_anchor;
 
     typedef struct reach_popup_placement
@@ -46,6 +47,7 @@ extern "C"
 
     int32_t reach_popup_notch_side(int32_t direction);
 
+    float reach_popup_anchored_height_limit(const reach_popup_anchor *anchor, float margin);
     reach_popup_placement reach_popup_place(const reach_popup_anchor *anchor, float width,
                                             float height, float margin);
     reach_rect_f32 reach_popup_constrain_bounds(reach_rect_f32 bounds, reach_rect_f32 monitor,
