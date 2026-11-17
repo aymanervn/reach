@@ -183,6 +183,7 @@ static int32_t reach_window_management_focus_target(HWND target, int32_t bring_t
     DWORD foreground_thread = GetWindowThreadProcessId(GetForegroundWindow(), nullptr);
     DWORD current_thread = GetCurrentThreadId();
 
+    // Workaround: attaching to the target and foreground threads bypasses the foreground lock.
     BOOL attached_target = FALSE;
     BOOL attached_foreground = FALSE;
     if (target_thread != 0 && target_thread != current_thread)

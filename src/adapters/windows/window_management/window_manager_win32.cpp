@@ -291,6 +291,7 @@ static void reach_window_manager_prepare_prompt_owner(HWND owner)
     DWORD foreground_thread =
         foreground != nullptr ? GetWindowThreadProcessId(foreground, nullptr) : 0;
     DWORD current_thread = GetCurrentThreadId();
+    // Workaround: attaching to the foreground thread bypasses the foreground lock.
     int32_t attached = foreground_thread != 0 && foreground_thread != current_thread &&
                        AttachThreadInput(current_thread, foreground_thread, TRUE);
 
