@@ -27,7 +27,8 @@ extern "C"
         REACH_WINDOW_BOUNDS_EVENTS = 1u << 6,
         REACH_WINDOW_FOCUS_LOST_EVENT = 1u << 7,
         REACH_WINDOW_CROSSHAIR_CURSOR = 1u << 8,
-        REACH_WINDOW_TEXT_INPUT = 1u << 9
+        REACH_WINDOW_TEXT_INPUT = 1u << 9,
+        REACH_WINDOW_STACK_ABOVE_DESKTOP = 1u << 10
     } reach_platform_window_flag;
 
 #define REACH_PLATFORM_WINDOW_MAX_CAPTION_EXCLUSIONS 4
@@ -93,6 +94,8 @@ extern "C"
             reach_platform_window *window,
             const reach_platform_window_input_presentation *presentation);
         reach_result (*take_keyboard_focus)(reach_platform_window *window);
+        /* Reapply the surface's platform-managed stacking while it is presented. */
+        reach_result (*restack)(reach_platform_window *window);
     } reach_platform_window_ops;
 
     typedef struct reach_platform_window_port

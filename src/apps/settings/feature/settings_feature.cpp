@@ -101,6 +101,32 @@ void reach_settings_model_init(reach_settings_model *model)
     reach_settings_model_power_mark_applied(model);
 }
 
+void reach_settings_model_set_desktop_widgets(reach_settings_model *model, uint32_t mask,
+                                              int32_t animate)
+{
+    if (model == nullptr)
+    {
+        return;
+    }
+    mask &= REACH_DESKTOP_WIDGET_MASK;
+    const uint32_t changed = model->desktop_widgets ^ mask;
+    model->desktop_widgets = mask;
+    for (size_t index = 0; index < REACH_MAX_DESKTOP_WIDGETS; ++index)
+    {
+        const uint32_t bit = 1u << index;
+        const float target = (mask & bit) != 0 ? 1.0f : 0.0f;
+        if (!animate)
+        {
+            reach_motion_set(&model->widget_toggles[index], target);
+        }
+        else if (changed & bit)
+        {
+            reach_settings_animate(&model->widget_toggles[index], target,
+                                   REACH_MOTION_PRESET_BOUNCY);
+        }
+    }
+}
+
 template <typename Model>
 static auto reach_settings_active_caret(Model *model) -> decltype(&model->power_caret)
 {
@@ -211,6 +237,7 @@ const reach_settings_nav_item *reach_settings_nav_items(size_t *out_count)
         {REACH_SETTINGS_PAGE_POWER_SLEEP, REACH_VECTOR_ICON_SLEEP, (const uint16_t *)L"Energy"},
         {REACH_SETTINGS_PAGE_THEME, REACH_VECTOR_ICON_BRIGHTNESS, (const uint16_t *)L"Theme"},
         {REACH_SETTINGS_PAGE_DISPLAY, REACH_VECTOR_ICON_RESIZE, (const uint16_t *)L"Display"},
+        {REACH_SETTINGS_PAGE_WIDGETS, REACH_VECTOR_ICON_WIDGETS, (const uint16_t *)u"Widgets"},
         {REACH_SETTINGS_PAGE_UPDATE, REACH_VECTOR_ICON_RESTART, (const uint16_t *)L"Updates"},
     };
 
@@ -239,6 +266,8 @@ const uint16_t *reach_settings_page_title(reach_settings_page page)
         return reach_settings_power_sleep_page_title();
     case REACH_SETTINGS_PAGE_THEME:
         return reach_settings_theme_page_title();
+    case REACH_SETTINGS_PAGE_WIDGETS:
+        return (const uint16_t *)u"Widgets";
     case REACH_SETTINGS_PAGE_DISPLAY:
         return reach_settings_display_page_title();
     case REACH_SETTINGS_PAGE_UPDATE:
@@ -437,11 +466,13 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
                                                  control_y, control_size, control_size);
 
     float nav_padding_x = 16.0f * scale;
-    float item_height = 42.0f * scale;
-    float item_gap = 8.0f * scale;
+    const float nav_row_space =
+        fminf(50.0f * scale, (bounds.height - 58.0f * scale) / REACH_SETTINGS_NAV_ITEM_COUNT);
+    const float item_gap = nav_row_space * 0.16f;
+    const float item_height = nav_row_space - item_gap;
     float item_y = layout.nav.y + 20.0f * scale;
-    float icon_bg = 28.0f * scale;
-    float icon_size = 16.0f * scale;
+    float icon_bg = fminf(28.0f * scale, item_height);
+    float icon_size = fminf(16.0f * scale, icon_bg);
 
     layout.nav_item_count = REACH_SETTINGS_NAV_ITEM_COUNT;
     for (size_t index = 0; index < layout.nav_item_count; ++index)
@@ -471,6 +502,30 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
     layout.content_placeholder =
         reach_settings_rect(layout.content_title.x, layout.content_title.y + 56.0f * scale,
                             layout.content_title.width, 34.0f * scale);
+
+    if (model != nullptr && model->selected_page == REACH_SETTINGS_PAGE_WIDGETS)
+    {
+        const float x = layout.content_title.x;
+        const float top = layout.content_title.y + layout.content_title.height + 12.0f * scale;
+        const float width = layout.content.width - 56.0f * scale;
+        const float reset_height = 34.0f * scale;
+        const float row_gap = 7.0f * scale;
+        const float rows_top = top + reset_height + 10.0f * scale;
+        const float rows_height = bounds.height - rows_top - 16.0f * scale;
+        const float row_height =
+            fminf(56.0f * scale, (rows_height - row_gap * (REACH_MAX_DESKTOP_WIDGETS - 1)) /
+                                     REACH_MAX_DESKTOP_WIDGETS);
+        layout.widget_reset = reach_settings_rect(x, top, 144.0f * scale, reset_height);
+        for (size_t index = 0; index < REACH_MAX_DESKTOP_WIDGETS; ++index)
+        {
+            const float y = rows_top + index * (row_height + row_gap);
+            layout.widget_rows[index] = reach_settings_rect(x, y, width, row_height);
+            layout.widget_toggles[index] = reach_settings_rect(
+                x + width - 56.0f * scale, y + (row_height - 22.0f * scale) * 0.5f, 40.0f * scale,
+                22.0f * scale);
+        }
+        return layout;
+    }
 
     if (model != nullptr && model->selected_page == REACH_SETTINGS_PAGE_POWER_SLEEP)
     {
@@ -1009,6 +1064,23 @@ reach_settings_hit_result reach_settings_hit_test(const reach_settings_layout *l
         return result;
     }
 
+    if (layout->widget_reset.width > 0.0f)
+    {
+        if (reach_settings_rect_contains(layout->widget_reset, x, y))
+        {
+            result.type = REACH_SETTINGS_HIT_WIDGET_RESET;
+            return result;
+        }
+        for (size_t index = 0; index < REACH_MAX_DESKTOP_WIDGETS; ++index)
+        {
+            if (reach_settings_rect_contains(layout->widget_rows[index], x, y))
+            {
+                result.type = REACH_SETTINGS_HIT_WIDGET_TOGGLE;
+                result.widget_index = index;
+                return result;
+            }
+        }
+    }
     if (reach_settings_rect_contains(layout->close_button, x, y))
     {
         result.type = REACH_SETTINGS_HIT_CLOSE;

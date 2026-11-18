@@ -78,6 +78,13 @@ extern "C"
                                                   const reach_config_display_settings *settings);
     reach_result reach_config_service_set_top_bar(reach_config_service *service,
                                                   const reach_config_top_bar_settings *settings);
+    reach_result reach_config_service_reset_widget_positions(reach_config_service *service);
+    reach_result reach_config_service_set_widget_placement(reach_config_service *service,
+                                                           size_t index,
+                                                           reach_config_widget_placement placement);
+    reach_result reach_config_service_set_desktop_widget(reach_config_service *service,
+                                                         size_t index, int32_t enabled);
+
     reach_result reach_config_service_set_dock_size(reach_config_service *service, int32_t size);
     reach_result reach_config_service_set_wallpapers(reach_config_service *service,
                                                      const uint16_t *wallpaper_path,
