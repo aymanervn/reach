@@ -59,7 +59,7 @@ extern "C"
     void reach_launcher_cancel_search(reach_launcher *launcher);
 
     const reach_ui_event_type *reach_launcher_activation_events(size_t *out_count);
-    const reach_ui_event_type *reach_launcher_routed_events(size_t *out_count);
+    const reach_ui_event_type *reach_launcher_window_events(size_t *out_count);
 
     int32_t reach_launcher_is_open(reach_launcher *launcher);
 

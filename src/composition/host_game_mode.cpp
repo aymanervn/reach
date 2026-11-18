@@ -20,7 +20,6 @@ static void reach_host_close_transient_ui_for_game_mode(reach_host *host)
     cancel.type = REACH_UI_EVENT_POINTER_CANCEL;
     (void)reach_host_handle_event(host, &cancel);
     reach_host_close_transient_surfaces(host, 1);
-    reach_host_set_registered_surface_open(host, REACH_SURFACE_ID_CLIPBOARD, 0);
 
     reach_host_mark_all_surfaces_dirty(host);
     host->dirty.render = 1;
@@ -32,7 +31,7 @@ static void reach_host_disable_bar_pointer_observations(reach_host *host)
     {
         return;
     }
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    for (size_t index = 0; index < host->surface_count; ++index)
     {
         if (host->feature_runtimes[index].definition->surface.bar_reveal.ops != nullptr)
         {
@@ -66,7 +65,7 @@ reach_result reach_host_update_game_mode(reach_host *host)
                                next_active);
     reach_system_stats_set_enabled(host->system_stats, !next_active);
 
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    for (size_t index = 0; index < host->surface_count; ++index)
     {
         reach_feature_runtime *desc = &host->feature_runtimes[index];
         if (next_active && (desc->definition->surface.behavior_flags &

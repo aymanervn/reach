@@ -987,11 +987,11 @@ const reach_ui_event_type *reach_launcher_activation_events(size_t *out_count)
     return events;
 }
 
-const reach_ui_event_type *reach_launcher_routed_events(size_t *out_count)
+const reach_ui_event_type *reach_launcher_window_events(size_t *out_count)
 {
     static const reach_ui_event_type events[] = {
-        REACH_UI_EVENT_ESCAPE,     REACH_UI_EVENT_ENTER,     REACH_UI_EVENT_ARROW_UP,
-        REACH_UI_EVENT_ARROW_DOWN, REACH_UI_EVENT_TEXT_CHAR, REACH_UI_EVENT_TEXT_EDIT};
+        REACH_UI_EVENT_ENTER, REACH_UI_EVENT_ARROW_UP, REACH_UI_EVENT_ARROW_DOWN,
+        REACH_UI_EVENT_TEXT_CHAR, REACH_UI_EVENT_TEXT_EDIT};
     if (out_count != nullptr)
     {
         *out_count = sizeof(events) / sizeof(events[0]);
