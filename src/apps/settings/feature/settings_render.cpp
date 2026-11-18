@@ -710,6 +710,18 @@ static void render_theme_page(const reach_settings_render_input *input,
                        (float)(dock_size - REACH_CONFIG_DOCK_SIZE_MIN) /
                            (float)(REACH_CONFIG_DOCK_SIZE_MAX - REACH_CONFIG_DOCK_SIZE_MIN),
                        dock_size);
+    theme_toggle_card dock_auto_hide = {layout->dock_auto_hide_card,
+                                        {},
+                                        layout->dock_auto_hide_title,
+                                        layout->dock_auto_hide_subtitle,
+                                        layout->dock_auto_hide_toggle,
+                                        REACH_VECTOR_ICON_NONE,
+                                        nullptr,
+                                        L"Auto hide dock",
+                                        L"Hide it when a window enters its screen region",
+                                        &model->dock_auto_hide_toggle,
+                                        REACH_SETTINGS_HIT_DOCK_AUTO_HIDE_TOGGLE};
+    render_theme_toggle_card(input, commands, &toggle_style, &dock_auto_hide);
     reach_render_command_buffer_clear_scissor(commands);
     if (layout->theme_scrollbar_thumb.height > 0.0f)
     {

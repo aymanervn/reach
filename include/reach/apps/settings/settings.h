@@ -101,6 +101,7 @@ extern "C"
         REACH_SETTINGS_HIT_WIDGET_TOGGLE,
         REACH_SETTINGS_HIT_WIDGET_RESET,
         REACH_SETTINGS_HIT_DOCK_SIZE,
+        REACH_SETTINGS_HIT_DOCK_AUTO_HIDE_TOGGLE,
         REACH_SETTINGS_HIT_ACCOUNT_PASSWORD,
         REACH_SETTINGS_HIT_ACCOUNT_PASSWORD_FIELD,
         REACH_SETTINGS_HIT_STARTUP_TOGGLE,
@@ -280,6 +281,8 @@ extern "C"
         uint32_t desktop_widgets;
         reach_motion widget_toggles[REACH_MAX_DESKTOP_WIDGETS];
         int32_t dock_size;
+        int32_t dock_auto_hide;
+        reach_motion dock_auto_hide_toggle;
         int32_t dragging_slider;
         int32_t hovered_button;
         reach_motion button_press_feedback;
@@ -430,6 +433,10 @@ extern "C"
         reach_rect_f32 widget_toggles[REACH_MAX_DESKTOP_WIDGETS];
         reach_rect_f32 widget_reset;
         reach_settings_slider_card_layout dock_size;
+        reach_rect_f32 dock_auto_hide_card;
+        reach_rect_f32 dock_auto_hide_title;
+        reach_rect_f32 dock_auto_hide_subtitle;
+        reach_rect_f32 dock_auto_hide_toggle;
         reach_rect_f32 top_bar_auto_hide_card;
         reach_rect_f32 top_bar_auto_hide_title;
         reach_rect_f32 top_bar_auto_hide_subtitle;
@@ -668,6 +675,9 @@ extern "C"
     int32_t reach_settings_model_toggle_top_bar_overlay(reach_settings_model *model);
     int32_t reach_settings_model_set_dock_size(reach_settings_model *model, int32_t size);
     int32_t reach_settings_model_dock_size(const reach_settings_model *model);
+    void reach_settings_model_set_dock_auto_hide(reach_settings_model *model, int32_t auto_hide);
+    int32_t reach_settings_model_dock_auto_hide(const reach_settings_model *model);
+    int32_t reach_settings_model_toggle_dock_auto_hide(reach_settings_model *model);
     float reach_settings_slider_ratio_at(const reach_settings_slider_card_layout *slider, float x);
     int32_t reach_settings_model_power_dirty(const reach_settings_model *model);
     void reach_settings_model_power_mark_applied(reach_settings_model *model);

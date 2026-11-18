@@ -209,6 +209,7 @@ extern "C"
     int32_t reach_dock_slots_animating(const reach_dock *dock);
 
     void reach_dock_apply_config(reach_dock *dock, float height, int32_t size);
+    void reach_dock_set_auto_hide(reach_dock *dock, int32_t auto_hide);
     int32_t reach_dock_arrange(reach_dock *dock, const reach_dock_arrange_context *ctx);
     const reach_dock_layout *reach_dock_arranged_layout(const reach_dock *dock);
 

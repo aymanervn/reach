@@ -37,6 +37,7 @@ int main()
     failed += expect(snapshot->top_bar_style == REACH_CONFIG_TOP_BAR_STYLE_TRANSPARENT);
     failed += expect(snapshot->top_bar_mode == REACH_CONFIG_TOP_BAR_MODE_STATIC);
     failed += expect(snapshot->top_bar_overlay == 0);
+    failed += expect(snapshot->dock_auto_hide == 1);
 
     std::memset(snapshot.get(), 0, sizeof(*snapshot));
     snapshot->dock_height = 58.0f;
@@ -70,6 +71,7 @@ int main()
 
     failed += expect(store.ops.load(store.store, loaded.get()) == REACH_OK);
     failed += expect(loaded->dock_height == 58.0f);
+    failed += expect(loaded->dock_auto_hide == 0);
     failed += expect(loaded->top_bar_style == REACH_CONFIG_TOP_BAR_STYLE_TRANSPARENT);
     failed += expect(loaded->top_bar_mode == REACH_CONFIG_TOP_BAR_MODE_STATIC);
     failed += expect(loaded->top_bar_overlay == 1);

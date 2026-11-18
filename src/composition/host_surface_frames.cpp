@@ -60,8 +60,40 @@ static reach_rect_i32 reach_host_monitor_rect(reach_rect_f32 bounds)
             (int32_t)ceilf(bounds.x + bounds.width), (int32_t)ceilf(bounds.y + bounds.height)};
 }
 
+static void reach_host_apply_work_area_claim(reach_rect_i32 *work_area, reach_rect_i32 monitor,
+                                             const reach_host_work_area_claim *claim)
+{
+    if (!claim->active || claim->monitor.left != monitor.left ||
+        claim->monitor.top != monitor.top || claim->monitor.right != monitor.right ||
+        claim->monitor.bottom != monitor.bottom)
+    {
+        return;
+    }
+    if (claim->edge == REACH_LAYOUT_RESERVATION_TOP)
+    {
+        int32_t top = (int32_t)ceilf(claim->edge_value);
+        work_area->top = top > work_area->top ? top : work_area->top;
+    }
+    else if (claim->edge == REACH_LAYOUT_RESERVATION_BOTTOM)
+    {
+        int32_t bottom = (int32_t)floorf(claim->edge_value);
+        work_area->bottom = bottom < work_area->bottom ? bottom : work_area->bottom;
+    }
+}
+
+reach_rect_i32 reach_host_merge_work_area(reach_rect_i32 monitor,
+                                          const reach_host_work_area_claim *claims, size_t count)
+{
+    reach_rect_i32 work_area = monitor;
+    for (size_t index = 0; claims != nullptr && index < count; ++index)
+    {
+        reach_host_apply_work_area_claim(&work_area, monitor, &claims[index]);
+    }
+    return work_area;
+}
+
 static void reach_host_sync_work_area_reservation(const reach_host *host,
-                                                  const reach_feature_runtime *desc,
+                                                  reach_feature_runtime *desc,
                                                   const reach_feature_surface_geometry *geometry,
                                                   reach_rect_f32 monitor_bounds)
 {
@@ -73,21 +105,28 @@ static void reach_host_sync_work_area_reservation(const reach_host *host,
     }
 
     reach_rect_i32 monitor = reach_host_monitor_rect(monitor_bounds);
-    reach_rect_i32 work_area = monitor;
-    if (geometry->reserve_monitor_work_area)
+    reach_host_work_area_claim claim = {};
+    claim.edge = desc->definition->layout.reservation_edge;
+    claim.monitor = monitor;
+    if (geometry->reserve_monitor_work_area && claim.edge != REACH_LAYOUT_RESERVATION_NONE)
     {
         float clearance =
             geometry->work_area_clearance > 0.0f ? geometry->work_area_clearance : 0.0f;
-        if (desc->definition->layout.reservation_edge == REACH_LAYOUT_RESERVATION_TOP)
-        {
-            work_area.top = (int32_t)ceilf(
-                reach_bar_reserved_edge(REACH_BAR_EDGE_TOP, geometry->visible_bounds, clearance));
-        }
-        else if (desc->definition->layout.reservation_edge == REACH_LAYOUT_RESERVATION_BOTTOM)
-        {
-            work_area.bottom = (int32_t)floorf(reach_bar_reserved_edge(
-                REACH_BAR_EDGE_BOTTOM, geometry->visible_bounds, clearance));
-        }
+        reach_bar_edge edge =
+            claim.edge == REACH_LAYOUT_RESERVATION_TOP ? REACH_BAR_EDGE_TOP : REACH_BAR_EDGE_BOTTOM;
+        claim.active = 1;
+        reach_rect_f32 reserved_bounds = geometry->work_area_bounds.height > 0.0f
+                                             ? geometry->work_area_bounds
+                                             : geometry->visible_bounds;
+        claim.edge_value = reach_bar_reserved_edge(edge, reserved_bounds, clearance);
+    }
+    desc->work_area_claim = claim;
+
+    reach_rect_i32 work_area = monitor;
+    for (size_t index = 0; index < host->surface_count; ++index)
+    {
+        reach_host_apply_work_area_claim(&work_area, monitor,
+                                         &host->feature_runtimes[index].work_area_claim);
     }
     if (work_area.right > work_area.left && work_area.bottom > work_area.top)
     {
@@ -640,10 +679,11 @@ static int32_t reach_host_surface_geometry_equal(const reach_feature_surface_geo
            a->synchronize_presentation == b->synchronize_presentation &&
            a->manage_monitor_work_area == b->manage_monitor_work_area &&
            a->reserve_monitor_work_area == b->reserve_monitor_work_area &&
-           a->work_area_clearance == b->work_area_clearance && a->shadowless == b->shadowless &&
-           a->bar_reveal_policy == b->bar_reveal_policy && a->force_topmost == b->force_topmost &&
-           a->notch_anchor_x == b->notch_anchor_x && a->notch_side == b->notch_side &&
-           a->deadline_seconds == b->deadline_seconds &&
+           a->work_area_clearance == b->work_area_clearance &&
+           reach_rect_equal(a->work_area_bounds, b->work_area_bounds) &&
+           a->shadowless == b->shadowless && a->bar_reveal_policy == b->bar_reveal_policy &&
+           a->force_topmost == b->force_topmost && a->notch_anchor_x == b->notch_anchor_x &&
+           a->notch_side == b->notch_side && a->deadline_seconds == b->deadline_seconds &&
            a->wait_for_presentation == b->wait_for_presentation &&
            a->presentation.max_scale == b->presentation.max_scale &&
            reach_rect_equal(a->presentation.translation_bounds,
