@@ -4,7 +4,7 @@
 
 static int32_t reach_host_bar_forced_shown(const reach_host *host)
 {
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    for (size_t index = 0; index < host->surface_count; ++index)
     {
         const reach_feature_runtime *desc = &host->feature_runtimes[index];
         if (desc->definition->surface.bar_shown_while_open &&
@@ -45,7 +45,7 @@ void reach_host_invalidate_bar_coverage(reach_host *host)
 {
     if (host != nullptr)
     {
-        for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+        for (size_t index = 0; index < host->surface_count; ++index)
         {
             const reach_feature_runtime *desc = &host->feature_runtimes[index];
             if (desc->definition->surface.bar_reveal.ops != nullptr &&
@@ -128,7 +128,7 @@ static void reach_host_apply_pointer_move_subscriptions(reach_host *host, int32_
 
     int32_t force = !host->pointer_move.subscriptions_initialized;
 
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    for (size_t index = 0; index < host->surface_count; ++index)
     {
         reach_feature_runtime *desc = &host->feature_runtimes[index];
         if (desc->surface == nullptr)
@@ -417,7 +417,7 @@ int32_t reach_host_can_move_bars_without_redraw(const reach_host *host)
         return 0;
     }
     int32_t position_animating = 0;
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    for (size_t index = 0; index < host->surface_count; ++index)
     {
         const reach_feature_runtime *desc = &host->feature_runtimes[index];
         if (!reach_host_bar_reveal_enabled(desc) ||
@@ -436,7 +436,7 @@ int32_t reach_host_can_move_bars_without_redraw(const reach_host *host)
                               desc->surface->last_bounds.y != animation.animated_y);
     }
 
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    for (size_t index = 0; index < host->surface_count; ++index)
     {
         const reach_feature_runtime *runtime = &host->feature_runtimes[index];
         const reach_feature_control_ops *control = runtime->definition->control_ops;
@@ -458,7 +458,7 @@ reach_result reach_host_move_bar_animation_frame(reach_host *host)
         return REACH_INVALID_ARGUMENT;
     }
 
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    for (size_t index = 0; index < host->surface_count; ++index)
     {
         reach_feature_runtime *desc = &host->feature_runtimes[index];
         if (!reach_host_bar_reveal_enabled(desc) ||

@@ -21,7 +21,10 @@ struct reach_widget_snap
 
 struct reach_widgets
 {
-    reach_clock *clock;
+    reach_widget_placement_writer placement_writer;
+    reach_widget_placement_intent pending_placement;
+    reach_rect_f32 previous_placement_bounds;
+    bool placement_pending;
     reach_system_stats *stats;
     reach_now_playing_service *now_playing;
     reach_clock_snapshot clock_snapshot;
@@ -67,6 +70,7 @@ static void reach_widgets_reset(void *capsule)
         return;
     }
     reach_pressable_reset(&widgets->control_pressable, nullptr);
+    widgets->placement_pending = false;
     (void)reach_widgets_set_enabled(widgets, 0);
     widgets->drag_index = -1;
     widgets->drag_preview_deadline = 0;
@@ -473,22 +477,12 @@ static void reach_widgets_desktop_pointer(void *capsule, const reach_pointer_eve
             reach_pressable_update(&widgets->control_pressable,
                                    reach_widgets_control_target(widgets, x, y), &press);
         }
-        const bool continuing_move = widgets->moved && !widgets->resizing;
-        const bool preview_was_visible =
-            reach_widgets_preview_visible(widgets, widgets->cards[index]);
         if (!reach_widgets_update_drag(widgets, x, y, scale))
             return;
 
         widgets->drag_preview_deadline =
             reach_motion_now_seconds() + reach_widgets_drag_preview_delay;
-        const auto &card = widgets->cards[index];
-        if (!continuing_move || preview_was_visible != reach_widgets_preview_visible(widgets, card))
-        {
-            out->redraw = 1;
-            return;
-        }
-        out->translation = {reach_widgets_card_group_base + static_cast<uint64_t>(index),
-                            {std::round(card.x), std::round(card.y)}};
+        out->redraw = 1;
         return;
     }
     if (event->kind == REACH_POINTER_EVENT_UP || event->kind == REACH_POINTER_EVENT_CANCEL)
@@ -563,11 +557,25 @@ static void reach_widgets_desktop_pointer(void *capsule, const reach_pointer_eve
         }
         if (widgets->moved)
         {
-            const bool placed =
-                event->kind == REACH_POINTER_EVENT_UP && widgets->drag_has_destination;
             auto &card = widgets->cards[index];
             const auto from = card;
-            card = placed ? widgets->drag_destination : widgets->drag_restore;
+            card = widgets->drag_restore;
+            if (event->kind == REACH_POINTER_EVENT_UP && widgets->drag_has_destination &&
+                !reach_rect_equal(widgets->drag_destination, card))
+            {
+                const auto &destination = widgets->drag_destination;
+                const reach_widget_placement_intent intent = {
+                    static_cast<size_t>(index),
+                    {static_cast<int32_t>(std::lround(destination.x / scale)),
+                     static_cast<int32_t>(std::lround(destination.y / scale)),
+                     static_cast<int32_t>(std::lround(destination.width / scale)),
+                     static_cast<int32_t>(std::lround(destination.height / scale))}};
+                widgets->pending_placement = intent;
+                widgets->previous_placement_bounds = card;
+                widgets->placement_pending = true;
+                card = destination;
+                out->action.kind = REACH_FEATURE_ACTION_COMMIT_CONFIG;
+            }
             if (event->kind == REACH_POINTER_EVENT_UP && !widgets->resizing &&
                 (from.x != card.x || from.y != card.y) &&
                 std::any_of(widgets->drag_occupied.begin(), widgets->drag_occupied.end(),
@@ -576,17 +584,6 @@ static void reach_widgets_desktop_pointer(void *capsule, const reach_pointer_eve
             {
                 widgets->snaps[index] =
                     reach_widgets_start_snap(from, card, widgets->placement_bounds);
-            }
-            if (placed && !reach_rect_equal(card, widgets->drag_restore))
-            {
-                const reach_config_widget_placement placement = {
-                    (int32_t)std::lround(card.x / scale), (int32_t)std::lround(card.y / scale),
-                    (int32_t)std::lround(card.width / scale),
-                    (int32_t)std::lround(card.height / scale)};
-                widgets->placements[index] = placement;
-                out->action.kind = REACH_FEATURE_ACTION_SAVE_WIDGET_PLACEMENT;
-                out->action.index = (size_t)index;
-                out->action.widget_placement = placement;
             }
         }
         else if (!widgets->drag_interrupted)
@@ -641,12 +638,11 @@ reach_result reach_widgets_create(reach_widgets **out_widgets)
 
 void reach_widgets_destroy(reach_widgets *widgets)
 {
-    reach_widgets_attach_services(widgets, nullptr, nullptr, nullptr);
+    reach_widgets_attach_services(widgets, nullptr, nullptr);
     delete widgets;
 }
 
-void reach_widgets_attach_services(reach_widgets *widgets, reach_clock *clock,
-                                   reach_system_stats *stats,
+void reach_widgets_attach_services(reach_widgets *widgets, reach_system_stats *stats,
                                    reach_now_playing_service *now_playing)
 {
     if (widgets == nullptr)
@@ -659,12 +655,6 @@ void reach_widgets_attach_services(reach_widgets *widgets, reach_clock *clock,
         reach_system_stats_acquire_monitor(stats);
         reach_system_stats_snapshot_take(stats, &widgets->stats_snapshot);
     }
-    if (widgets->clock != clock &&
-        (widgets->enabled_mask & ((1u << REACH_WIDGET_CLOCK) | (1u << REACH_WIDGET_CALENDAR))))
-    {
-        reach_clock_snapshot_take(clock, &widgets->clock_snapshot);
-    }
-    widgets->clock = clock;
     widgets->stats = stats;
     if (widgets->now_playing != now_playing)
     {
@@ -674,14 +664,48 @@ void reach_widgets_attach_services(reach_widgets *widgets, reach_clock *clock,
     }
 }
 
+void reach_widgets_bind_placement_writer(reach_widgets *widgets,
+                                         reach_widget_placement_writer writer)
+{
+    if (widgets != nullptr)
+    {
+        widgets->placement_writer = writer;
+    }
+}
+
+reach_result reach_widgets_commit_placement(reach_widgets *widgets)
+{
+    if (widgets == nullptr || !widgets->placement_pending)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    widgets->placement_pending = false;
+
+    const auto &intent = widgets->pending_placement;
+    const auto &writer = widgets->placement_writer;
+    const reach_result result =
+        writer.submit != nullptr ? writer.submit(writer.context, &intent) : REACH_NOT_IMPLEMENTED;
+    if (result == REACH_OK)
+    {
+        widgets->placements[intent.index] = intent.placement;
+    }
+    else
+    {
+        widgets->cards[intent.index] = widgets->previous_placement_bounds;
+        widgets->snaps[intent.index] = {};
+    }
+    return result;
+}
+
 int32_t reach_widgets_set_clock(reach_widgets *widgets, const reach_clock_snapshot *clock)
 {
-    if (!(widgets->enabled_mask & ((1u << REACH_WIDGET_CLOCK) | (1u << REACH_WIDGET_CALENDAR))))
+    if (widgets == nullptr || clock == nullptr)
     {
         return 0;
     }
     widgets->clock_snapshot = *clock;
-    return 1;
+    return (widgets->enabled_mask & ((1u << REACH_WIDGET_CLOCK) | (1u << REACH_WIDGET_CALENDAR))) !=
+           0;
 }
 
 int32_t reach_widgets_set_stats(reach_widgets *widgets, const reach_system_stats_snapshot *stats)
@@ -765,11 +789,6 @@ int32_t reach_widgets_set_enabled(reach_widgets *widgets, uint32_t mask)
         }
     }
 
-    const uint32_t newly_enabled = widgets->enabled_mask & ~previous;
-    if (newly_enabled & ((1u << REACH_WIDGET_CLOCK) | (1u << REACH_WIDGET_CALENDAR)))
-    {
-        reach_clock_snapshot_take(widgets->clock, &widgets->clock_snapshot);
-    }
     if (changed & (1u << REACH_WIDGET_NOW_PLAYING))
     {
         widgets->media_snapshot = {};

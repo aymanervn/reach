@@ -168,10 +168,10 @@ extern "C"
     reach_result reach_top_bar_create(reach_top_bar **out_top_bar);
     void reach_top_bar_destroy(reach_top_bar *top_bar);
 
+    int32_t reach_top_bar_set_clock(reach_top_bar *top_bar, const reach_clock_snapshot *clock);
     void reach_top_bar_attach_services(reach_top_bar *top_bar,
                                        reach_now_playing_service *now_playing,
                                        reach_icon_service *icons, reach_window_tracking *windows,
-                                       reach_clock *clock,
                                        reach_input_language_service *input_language,
                                        reach_tray_service *tray);
 

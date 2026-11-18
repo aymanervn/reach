@@ -2778,7 +2778,11 @@ reach_result reach_settings_app_create(reach_settings_app **out_app,
     reach_windows_render_device_port(app->render_device, &app->render_device_port);
     if (result == REACH_OK)
     {
-        result = reach_windows_create_platform_window(REACH_SURFACE_SETTINGS, &app->window);
+        result = reach_windows_create_settings_window(
+            REACH_WINDOW_ACTIVATE | REACH_WINDOW_COMPOSITION_BACKED | REACH_WINDOW_APPLICATION |
+                REACH_WINDOW_SESSION_EVENTS | REACH_WINDOW_CLOSE_REQUEST_EVENT |
+                REACH_WINDOW_BOUNDS_EVENTS | REACH_WINDOW_TEXT_INPUT,
+            &app->window);
     }
     if (result == REACH_OK)
     {

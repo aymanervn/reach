@@ -120,6 +120,48 @@ static int32_t reach_host_layout_visibility_invalidated(const reach_host_layout_
            target->runtime->surface->native_visibility_invalidated;
 }
 
+static void reach_host_layout_apply_desktop(reach_host_layout_target *target,
+                                            const reach_layout_entry *entry,
+                                            const reach_layout_entry *applied)
+{
+    auto *runtime = target->runtime;
+    if (runtime == nullptr)
+    {
+        return;
+    }
+    auto *surface = runtime->surface;
+    const bool visibility_changed = applied == nullptr || applied->visible != entry->visible ||
+                                    surface->native_visibility_invalidated;
+    surface->native_visibility_invalidated = 0;
+
+    if (!entry->visible)
+    {
+        if (visibility_changed)
+        {
+            reach_host_layout_apply_visibility(target, 0);
+        }
+        runtime->desktop_placement_pending = 0;
+        return;
+    }
+
+    const auto &window = surface->window;
+    bool placed = window.ops.place_above_desktop != nullptr &&
+                  window.ops.place_above_desktop(window.window) == REACH_OK;
+    if (placed && (visibility_changed || runtime->desktop_placement_pending))
+    {
+        reach_host_layout_apply_visibility(target, 1);
+        // ShowWindow can move the HWND. Verify the placement again before committing visibility.
+        placed = window.ops.place_above_desktop(window.window) == REACH_OK;
+    }
+    if (!placed && window.ops.hide != nullptr)
+    {
+        // Keep the prepared frame and input regions available for the next Z-order invalidation.
+        (void)window.ops.hide(window.window);
+        surface->activated = 0;
+    }
+    runtime->desktop_placement_pending = !placed;
+}
+
 void reach_host_apply_layout(reach_host *host)
 {
     if (host == nullptr)
@@ -147,6 +189,10 @@ void reach_host_apply_layout(reach_host *host)
         for (size_t index = 0; index < plan.count; ++index)
         {
             const reach_layout_entry *entry = &plan.entries[index];
+            if (entry->layer == REACH_LAYOUT_LAYER_DESKTOP)
+            {
+                continue;
+            }
             const reach_layout_entry *applied =
                 reach_host_layout_applied_entry(host, entry->participant);
             reach_host_layout_target *target = &host->layout_targets[entry->participant];
@@ -168,18 +214,12 @@ void reach_host_apply_layout(reach_host *host)
     for (size_t index = 0; index < plan.count; ++index)
     {
         const reach_layout_entry *entry = &plan.entries[index];
-        const reach_host_layout_target *target = &host->layout_targets[entry->participant];
+        reach_host_layout_target *target = &host->layout_targets[entry->participant];
 
         if (entry->layer == REACH_LAYOUT_LAYER_DESKTOP)
         {
-            if (entry->visible && target->runtime != nullptr)
-            {
-                const auto &window = target->runtime->surface->window;
-                if (window.ops.place_above_desktop != nullptr)
-                {
-                    (void)window.ops.place_above_desktop(window.window);
-                }
-            }
+            reach_host_layout_apply_desktop(
+                target, entry, reach_host_layout_applied_entry(host, entry->participant));
             continue;
         }
         if (entry->layer == 0)
@@ -221,7 +261,7 @@ void reach_host_apply_layout(reach_host *host)
 
 void reach_host_invalidate_surface_z_order(reach_host *host, reach_surface_id id)
 {
-    if (host == nullptr || id >= REACH_HOST_SURFACE_COUNT || !host->has_applied_layout_plan)
+    if (host == nullptr || id >= host->surface_count || !host->has_applied_layout_plan)
     {
         return;
     }

@@ -100,7 +100,7 @@ static reach_rect_f32 reach_host_available_bounds(const reach_host *host,
 {
     reach_rect_f32 available = monitor_bounds;
     float bottom = monitor_bounds.y + monitor_bounds.height;
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    for (size_t index = 0; index < host->surface_count; ++index)
     {
         const reach_feature_runtime *runtime = &host->feature_runtimes[index];
         if (!runtime->resolved_bounds_valid || runtime->definition == nullptr)
@@ -571,7 +571,7 @@ static reach_result reach_host_sync_native_overlay(reach_host *host, reach_featu
 
 reach_result reach_host_redraw_registered_surface(reach_host *host, reach_surface_id id)
 {
-    if (host == nullptr || id >= REACH_HOST_SURFACE_COUNT)
+    if (host == nullptr || id >= host->surface_count)
     {
         return REACH_INVALID_ARGUMENT;
     }
@@ -628,8 +628,7 @@ static int32_t reach_host_surface_layout_context_equal(const reach_feature_surfa
 }
 
 static int32_t reach_host_surface_geometry_equal(const reach_feature_surface_geometry *a,
-                                                 const reach_feature_surface_geometry *b,
-                                                 bool compare_deadline)
+                                                 const reach_feature_surface_geometry *b)
 {
     return reach_rect_equal(a->visible_bounds, b->visible_bounds) &&
            reach_rect_equal(a->envelope_bounds, b->envelope_bounds) &&
@@ -644,7 +643,7 @@ static int32_t reach_host_surface_geometry_equal(const reach_feature_surface_geo
            a->work_area_clearance == b->work_area_clearance && a->shadowless == b->shadowless &&
            a->bar_reveal_policy == b->bar_reveal_policy && a->force_topmost == b->force_topmost &&
            a->notch_anchor_x == b->notch_anchor_x && a->notch_side == b->notch_side &&
-           (!compare_deadline || a->deadline_seconds == b->deadline_seconds) &&
+           a->deadline_seconds == b->deadline_seconds &&
            a->wait_for_presentation == b->wait_for_presentation &&
            a->presentation.max_scale == b->presentation.max_scale &&
            reach_rect_equal(a->presentation.translation_bounds,
@@ -698,8 +697,6 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
         return REACH_ERROR;
     }
 
-    const auto translation = desc->pending_translation;
-    desc->pending_translation = {};
     int32_t capsule_needs_frame = reach_host_surface_needs_frame(desc);
     int32_t needs_frame = capsule_needs_frame || desc->surface->fallback_animation_active;
     int32_t active = reach_host_surface_presented(desc);
@@ -739,7 +736,7 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
     reach_surface_id anchor_id = layout_anchor.surface;
     if (!reach_host_layout_anchor_equal(&layout_anchor, &desc->resolved_anchor_owner))
         desc->resolved_anchor_valid = 0;
-    if (anchor_id < REACH_HOST_SURFACE_COUNT)
+    if (anchor_id < host->surface_count)
     {
         const reach_feature_runtime *anchor = &host->feature_runtimes[anchor_id];
         if (anchor->resolved_bounds_valid)
@@ -787,8 +784,7 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
         desc->frame_native_target != native_target ||
         desc->frame_retained_supported != retained_supported ||
         !reach_host_surface_layout_context_equal(&surface_ctx, &desc->layout_context) ||
-        !reach_host_surface_geometry_equal(&current_geometry, &desc->frame_geometry,
-                                           translation.group_id == 0);
+        !reach_host_surface_geometry_equal(&current_geometry, &desc->frame_geometry);
     int32_t frame_context_changed =
         render_context_changed ||
         !reach_rect_equal(surface_ctx.last_bounds, desc->layout_context.last_bounds);
@@ -804,25 +800,7 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
                                    !desc->surface->dirty_flags &&
                                    !current_geometry.synchronize_presentation &&
                                    !frame_context_changed && !bar_visibility_pending;
-    if (translation.group_id != 0)
-    {
-        if (retained_supported && renderer.ops.translate_group != nullptr && !needs_frame &&
-            !renderer_sampling && surface_unchanged &&
-            desc->definition->surface_ops->native_overlay == nullptr)
-        {
-            const auto result = renderer.ops.translate_group(renderer.backend, translation.group_id,
-                                                             translation.offset);
-            if (result == REACH_OK)
-            {
-                desc->frame_geometry.deadline_seconds = current_geometry.deadline_seconds;
-                return REACH_OK;
-            }
-            if (result == REACH_DEVICE_LOST)
-                return result;
-        }
-        desc->surface->dirty_flags = 1;
-    }
-    else if (surface_unchanged && (!needs_frame || renderer_sampling))
+    if (surface_unchanged && (!needs_frame || renderer_sampling))
     {
         reach_result sampling_result = REACH_OK;
         if (renderer_sampling)

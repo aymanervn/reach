@@ -17,10 +17,24 @@ extern "C"
 
     typedef struct reach_widgets reach_widgets;
 
+    typedef struct reach_widget_placement_intent
+    {
+        size_t index;
+        reach_config_widget_placement placement;
+    } reach_widget_placement_intent;
+
+    typedef struct reach_widget_placement_writer
+    {
+        void *context;
+        reach_result (*submit)(void *context, const reach_widget_placement_intent *intent);
+    } reach_widget_placement_writer;
+
+    void reach_widgets_bind_placement_writer(reach_widgets *widgets,
+                                             reach_widget_placement_writer writer);
+    reach_result reach_widgets_commit_placement(reach_widgets *widgets);
     reach_result reach_widgets_create(reach_widgets **out_widgets);
     void reach_widgets_destroy(reach_widgets *widgets);
-    void reach_widgets_attach_services(reach_widgets *widgets, reach_clock *clock,
-                                       reach_system_stats *stats,
+    void reach_widgets_attach_services(reach_widgets *widgets, reach_system_stats *stats,
                                        reach_now_playing_service *now_playing);
     int32_t reach_widgets_set_clock(reach_widgets *widgets, const reach_clock_snapshot *clock);
     int32_t reach_widgets_set_stats(reach_widgets *widgets,

@@ -58,7 +58,7 @@ static int32_t reach_host_press_holds_surface_open(reach_host *host,
     reach_feature_layout_anchor anchor = {};
     int32_t match_index = 0;
 
-    if (spec->dismiss_guard_surface < REACH_HOST_SURFACE_COUNT)
+    if (spec->dismiss_guard_surface < host->surface_count)
     {
         anchor.surface = spec->dismiss_guard_surface;
         anchor.slot = spec->dismiss_guard_slot;
@@ -78,7 +78,7 @@ static int32_t reach_host_press_holds_surface_open(reach_host *host,
         }
     }
 
-    if (anchor.surface >= REACH_HOST_SURFACE_COUNT)
+    if (anchor.surface >= host->surface_count)
     {
         return 0;
     }
@@ -121,7 +121,7 @@ static void reach_host_handle_global_mouse_down(reach_host *host, reach_point_i3
     }
 
     int32_t closed_any = 0;
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    for (size_t index = 0; index < host->surface_count; ++index)
     {
         const reach_feature_runtime *desc = &host->feature_runtimes[index];
         if (desc->definition->surface.cls != REACH_SURFACE_CLASS_TRANSIENT &&
@@ -182,7 +182,7 @@ void reach_host_close_surface_classes(reach_host *host, uint32_t class_mask, int
         return;
     }
 
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    for (size_t index = 0; index < host->surface_count; ++index)
     {
         const reach_feature_runtime *desc = &host->feature_runtimes[index];
         if ((class_mask & reach_surface_class_bit(desc->definition->surface.cls)) == 0)

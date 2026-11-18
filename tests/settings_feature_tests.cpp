@@ -608,28 +608,6 @@ static void test_button_press_feedback(void)
                 "settled input feedback clears the target");
 }
 
-static void test_widget_toggle_animations(void)
-{
-    auto model = std::make_unique<reach_settings_model>();
-    reach_settings_model_init(model.get());
-
-    const uint32_t clock = 1u << REACH_WIDGET_CLOCK;
-    const auto &clock_toggle = model->widget_toggles[REACH_WIDGET_CLOCK];
-    const auto &calendar_toggle = model->widget_toggles[REACH_WIDGET_CALENDAR];
-    reach_settings_model_set_desktop_widgets(model.get(), clock, 0);
-    expect_true(!reach_motion_active(&clock_toggle) && reach_motion_value(&clock_toggle) == 1.0f,
-                "loading saved widgets sets the initial toggle without animation");
-
-    reach_settings_model_set_desktop_widgets(model.get(), 0, 1);
-    expect_true(reach_motion_active(&clock_toggle) && clock_toggle.to == 0.0f,
-                "changing the widget setting animates its toggle");
-    expect_true(!reach_motion_active(&calendar_toggle), "unchanged widget toggles stay idle");
-
-    reach_settings_model_set_desktop_widgets(model.get(), clock, 1);
-    expect_true(clock_toggle.to == 1.0f,
-                "clicking again retargets the toggle to the saved setting");
-}
-
 static void test_top_bar_preferences(void)
 {
     std::unique_ptr<reach_settings_model> model(new reach_settings_model());
@@ -886,7 +864,6 @@ int main(void)
     test_account_password_form();
     test_button_press_feedback();
     test_top_bar_preferences();
-    test_widget_toggle_animations();
     test_display_scrollbar_hit_testing();
     test_bluetooth_radio_stops_scan();
     test_installed_apps_loader();

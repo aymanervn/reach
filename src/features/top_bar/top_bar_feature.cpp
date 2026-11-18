@@ -113,7 +113,7 @@ void reach_top_bar_destroy(reach_top_bar *top_bar)
 
 void reach_top_bar_attach_services(reach_top_bar *top_bar, reach_now_playing_service *now_playing,
                                    reach_icon_service *icons, reach_window_tracking *windows,
-                                   reach_clock *clock, reach_input_language_service *input_language,
+                                   reach_input_language_service *input_language,
                                    reach_tray_service *tray)
 {
     if (top_bar != nullptr)
@@ -121,7 +121,6 @@ void reach_top_bar_attach_services(reach_top_bar *top_bar, reach_now_playing_ser
         top_bar->now_playing = now_playing;
         top_bar->icons = icons;
         top_bar->windows = windows;
-        top_bar->clock = clock;
         top_bar->input_language = input_language;
         top_bar->tray = tray;
         reach_top_bar_window_push_attach(top_bar->window_push, top_bar->apps, top_bar->windows);
@@ -180,7 +179,6 @@ void reach_top_bar_set_routes(reach_top_bar *top_bar, const reach_top_bar_routes
     }
 }
 
-static int32_t reach_top_bar_update_clock(reach_top_bar *top_bar);
 static void reach_top_bar_update_language(reach_top_bar *top_bar);
 
 static void reach_top_bar_format_percent(uint16_t *dst, size_t dst_count, const char *label,
@@ -1035,11 +1033,14 @@ reach_top_bar_pointer_region reach_top_bar_pointer_region_at(const reach_top_bar
     return reach_top_bar_hit_test(&top_bar->state.layout, local_x, local_y);
 }
 
-static int32_t reach_top_bar_update_clock(reach_top_bar *top_bar)
+int32_t reach_top_bar_set_clock(reach_top_bar *top_bar, const reach_clock_snapshot *clock)
 {
+    if (top_bar == nullptr || clock == nullptr)
+    {
+        return 0;
+    }
     reach_top_bar_state *state = &top_bar->state;
-    reach_clock_snapshot now = {};
-    reach_clock_snapshot_take(top_bar->clock, &now);
+    const auto &now = *clock;
     if (!now.valid || now.month < 1 || now.month > 12 || now.weekday < 0 || now.weekday > 6)
     {
         return 0;
@@ -1324,12 +1325,6 @@ static void reach_top_bar_capsule_tick(void *capsule, double delta_seconds,
         out->redraw = 1;
         out->relayout = 1;
         out->request_update = 1;
-    }
-
-    if (reach_top_bar_update_clock(top_bar) && out != nullptr)
-    {
-        out->redraw = 1;
-        out->relayout = 1;
     }
 
     double now_seconds = reach_motion_now_seconds();

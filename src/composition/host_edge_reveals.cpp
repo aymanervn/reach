@@ -107,7 +107,7 @@ static int32_t reach_host_resolve_edge_reveal_bounds(const reach_edge_reveal_geo
 reach_host_edge_reveal_runtime *reach_host_edge_reveal_for_surface(reach_host *host,
                                                                    reach_surface_id id)
 {
-    if (host == nullptr || (size_t)id >= REACH_HOST_SURFACE_COUNT)
+    if (host == nullptr || (size_t)id >= host->surface_count)
     {
         return nullptr;
     }
@@ -123,7 +123,7 @@ reach_result reach_host_create_edge_reveals(reach_host *host)
         return REACH_INVALID_ARGUMENT;
     }
 
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    for (size_t index = 0; index < host->surface_count; ++index)
     {
         reach_host_edge_reveal_runtime *runtime = &host->edge_reveals[index];
         *runtime = {};
@@ -158,7 +158,7 @@ reach_result reach_host_start_edge_reveals(reach_host *host)
         return REACH_INVALID_ARGUMENT;
     }
 
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    for (size_t index = 0; index < host->surface_count; ++index)
     {
         reach_host_edge_reveal_runtime *runtime = &host->edge_reveals[index];
         if (runtime->port.hotspot == nullptr || runtime->port.ops.set_callback == nullptr)
@@ -182,7 +182,7 @@ void reach_host_destroy_edge_reveals(reach_host *host)
         return;
     }
 
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    for (size_t index = 0; index < host->surface_count; ++index)
     {
         reach_host_edge_reveal_runtime *runtime = &host->edge_reveals[index];
         if (runtime->port.hotspot != nullptr && runtime->port.ops.hide != nullptr)
@@ -205,7 +205,7 @@ void reach_host_sync_edge_reveals(reach_host *host, reach_rect_f32 monitor_bound
     }
 
     float dpi_scale = reach_host_layout_dpi_scale(host);
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    for (size_t index = 0; index < host->surface_count; ++index)
     {
         reach_host_edge_reveal_runtime *runtime = &host->edge_reveals[index];
         const reach_edge_reveal_geometry *geometry =
@@ -260,7 +260,7 @@ void reach_host_on_surface_edge_reveal(reach_host *host, reach_screen_hotspot_ev
     {
         return;
     }
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    for (size_t index = 0; index < host->surface_count; ++index)
     {
         const reach_feature_runtime *runtime = &host->feature_runtimes[index];
         if (runtime->definition->surface.edge_reveal.handle_event ==

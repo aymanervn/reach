@@ -382,7 +382,7 @@ GENERIC_SURFACE_LOOPS = (
 )
 
 SURFACE_TABLE_LOOP_RE = re.compile(
-    r"for\s*\([^;]*;[^;]*<\s*REACH_HOST_SURFACE_COUNT\s*;[^)]*\)"
+    r"for\s*\([^;]*;[^;]*<\s*host\s*->\s*surface_count\s*;[^)]*\)"
 )
 
 MIGRATED_SURFACE_FRAME_RE = re.compile(
@@ -569,7 +569,9 @@ def concrete_feature_symbols(headers: dict[str, str]) -> dict[str, str]:
     symbols: dict[str, str] = {}
     for include, feature in headers.items():
         header = ROOT / "include" / include
-        for symbol in re.findall(r"\b(reach_[a-z0-9_]+)\s*\(", strip_comments(read(header))):
+        for symbol in re.findall(
+            r"\b(reach_[a-z0-9_]+)\s*\((?!\s*\*)", strip_comments(read(header))
+        ):
             symbols[symbol] = feature
     return symbols
 

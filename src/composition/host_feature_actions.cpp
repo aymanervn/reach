@@ -55,12 +55,13 @@ reach_result reach_host_apply_feature_action(reach_host *host, reach_feature_run
         reach_host_take_keyboard_focus(host, desc);
         return REACH_OK;
 
+    case REACH_FEATURE_ACTION_COMMIT_CONFIG:
+        return desc->definition != nullptr && desc->definition->commit_config != nullptr
+                   ? desc->definition->commit_config(desc->capsule)
+                   : REACH_NOT_IMPLEMENTED;
+
     case REACH_FEATURE_ACTION_MOVE_PIN:
         return reach_host_move_pin(host, (uint32_t)action->id, action->index);
-
-    case REACH_FEATURE_ACTION_SAVE_WIDGET_PLACEMENT:
-        return reach_config_service_set_widget_placement(host->config_service, action->index,
-                                                         action->widget_placement);
 
     case REACH_FEATURE_ACTION_FOCUS_WINDOW:
         reach_host_close_surface(host, desc);

@@ -332,8 +332,6 @@ ID2D1RenderTarget *reach_d2d_target(reach_render_backend *backend);
 int32_t reach_d2d_retained_supported(const reach_render_backend *backend);
 int32_t reach_d2d_content_sampling_required(const reach_render_backend *backend);
 reach_result reach_d2d_sample_content(reach_render_backend *backend);
-reach_result reach_d2d_translate_group(reach_render_backend *backend, uint64_t group_id,
-                                       reach_point_f32 offset);
 reach_result reach_d2d_text_fit_bounds(reach_render_backend *backend,
                                        const reach_render_command *command,
                                        reach_rect_f32 *out_bounds);

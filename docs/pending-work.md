@@ -34,7 +34,6 @@ Open items only.
 
 ## Architecture debt (cleanup phase)
 
-- Adding a surface still edits `reach_host_dependencies`, `composition_root.cpp`, `reach_surface_role`, `window_win32.cpp` role lists and `check_architecture.py` name lists.
 - The registry is 154 field assignments, not one row per feature.
 - `reach_feature_capsule_ops` is bound positionally with five identical signatures.
 - `interfeature_routes.cpp` holds the window-list orchestration, not just slot assignment.

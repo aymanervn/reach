@@ -448,8 +448,20 @@ static int32_t has_call(fake_window_call_kind kind, reach_window_id window, reac
     return 0;
 }
 
-static void attach_window(reach_host *host, reach_surface_id id, reach_surface_role role,
-                          reach_window_id window_id, int32_t layer)
+static reach_surface_id desktop_surface_id(const reach_host *host)
+{
+    for (size_t index = 0; index < host->surface_count; ++index)
+    {
+        if (host->feature_definitions[index].surface.layer == REACH_LAYOUT_LAYER_DESKTOP)
+        {
+            return static_cast<reach_surface_id>(index);
+        }
+    }
+    return REACH_SURFACE_ID_INVALID;
+}
+
+static void attach_window(reach_host *host, reach_surface_id id, reach_window_id window_id,
+                          int32_t layer)
 {
     reach_surface_runtime *surface = host->feature_runtimes[id].surface;
     surface->window.window = (reach_platform_window *)(uintptr_t)window_id;
@@ -461,8 +473,6 @@ static void attach_window(reach_host *host, reach_surface_id id, reach_surface_r
     surface->window.ops.native_id = fake_native_id;
 
     reach_feature_runtime *runtime = &host->feature_runtimes[id];
-    expect_true(runtime->definition->surface.role == role,
-                "test window role matches its registered definition");
     expect_true(runtime->definition->surface.layer == layer,
                 "test window layer matches its registered definition");
 
@@ -476,9 +486,9 @@ static void attach_window(reach_host *host, reach_surface_id id, reach_surface_r
 static void initialize_host(reach_host *host)
 {
     reach_host_init_feature_registry(host);
-    attach_window(host, REACH_SURFACE_ID_TOP_BAR, REACH_SURFACE_TOP_BAR, 101, 0);
-    attach_window(host, REACH_SURFACE_ID_DOCK, REACH_SURFACE_DOCK, 102, 110);
-    attach_window(host, REACH_SURFACE_ID_STAGE, REACH_SURFACE_STAGE, 103, 50);
+    attach_window(host, REACH_SURFACE_ID_TOP_BAR, 101, 0);
+    attach_window(host, REACH_SURFACE_ID_DOCK, 102, 110);
+    attach_window(host, REACH_SURFACE_ID_STAGE, 103, 50);
     reach_layout_register_override(&host->layout_manager,
                                    host->surface_participants[REACH_SURFACE_ID_TOP_BAR],
                                    REACH_LAYOUT_CONDITION_BARS_FORCED, 130);
@@ -489,8 +499,7 @@ static void test_order_invalidation_rechains_without_replaying_visibility(void)
 {
     reach_host *host = &order_repair_host;
     initialize_host(host);
-    attach_window(host, REACH_SURFACE_ID_WIDGET_DESKTOP, REACH_SURFACE_WIDGET_DESKTOP, 104,
-                  REACH_LAYOUT_LAYER_DESKTOP);
+    attach_window(host, desktop_surface_id(host), 104, REACH_LAYOUT_LAYER_DESKTOP);
 
     call_count = 0;
     reach_host_apply_layout(host);
@@ -523,7 +532,7 @@ static void test_order_invalidation_rechains_without_replaying_visibility(void)
                 "order repair reapplies desktop placement");
     expect_true(!host->dirty.z_order, "a completed repair clears the dirty state");
 
-    reach_host_invalidate_surface_z_order(host, REACH_SURFACE_ID_WIDGET_DESKTOP);
+    reach_host_invalidate_surface_z_order(host, desktop_surface_id(host));
     expect_true(host->dirty.z_order, "a desktop surface press invalidates native order");
 }
 
@@ -1006,7 +1015,7 @@ static void test_every_dismissable_surface_reaches_the_shared_close_path(void)
     expect_true(reach_host_create_registered_features(host) == REACH_OK,
                 "registered feature factories create every capsule");
 
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    for (size_t index = 0; index < host->surface_count; ++index)
     {
         const reach_feature_runtime *runtime = &host->feature_runtimes[index];
         reach_surface_class cls = runtime->definition->surface.cls;
@@ -1039,7 +1048,7 @@ static void test_every_popup_names_the_control_that_holds_it_open(void)
     reach_host *host = &dismiss_guard_host;
     reach_host_init_feature_registry(host);
 
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    for (size_t index = 0; index < host->surface_count; ++index)
     {
         const reach_feature_definition *definition = host->feature_runtimes[index].definition;
         const reach_surface_spec *spec = &definition->surface;
@@ -1047,8 +1056,8 @@ static void test_every_popup_names_the_control_that_holds_it_open(void)
         {
             continue;
         }
-        int32_t declares_guard = spec->dismiss_guard_surface < REACH_HOST_SURFACE_COUNT;
-        int32_t anchored = definition->layout.anchor < REACH_HOST_SURFACE_COUNT ||
+        int32_t declares_guard = spec->dismiss_guard_surface < host->surface_count;
+        int32_t anchored = definition->layout.anchor < host->surface_count ||
                            (definition->surface_ops != nullptr &&
                             definition->surface_ops->layout_anchor != nullptr);
         expect_true(declares_guard || anchored,
@@ -1070,7 +1079,7 @@ static void test_every_popup_names_the_control_that_holds_it_open(void)
 
     const reach_feature_definition *battery =
         host->feature_runtimes[REACH_SURFACE_ID_BATTERY].definition;
-    expect_true(battery->surface.dismiss_guard_surface >= REACH_HOST_SURFACE_COUNT &&
+    expect_true(battery->surface.dismiss_guard_surface >= host->surface_count &&
                     battery->layout.anchor == REACH_SURFACE_ID_TOP_BAR &&
                     battery->layout.anchor_slot == REACH_TOP_BAR_CONTROL_BATTERY,
                 "a top-bar popup is held open by the control it already anchors to");
@@ -1093,7 +1102,7 @@ static void test_registered_feature_lifecycle(void)
     reach_host *host = &registry_host;
     reach_host_init_feature_registry(host);
 
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    for (size_t index = 0; index < host->surface_count; ++index)
     {
         const reach_feature_runtime *runtime = &host->feature_runtimes[index];
         const reach_feature_definition *definition = runtime->definition;
@@ -1149,7 +1158,7 @@ static void test_registered_feature_lifecycle(void)
 
     expect_true(reach_host_create_registered_features(host) == REACH_OK,
                 "registered feature factories create every capsule");
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    for (size_t index = 0; index < host->surface_count; ++index)
     {
         expect_true(host->feature_runtimes[index].capsule != nullptr,
                     "every registered surface receives its capsule");
@@ -1159,7 +1168,7 @@ static void test_registered_feature_lifecycle(void)
                 "the tray surface reuses its registered top-bar owner");
 
     reach_host_destroy_registered_features(host);
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    for (size_t index = 0; index < host->surface_count; ++index)
     {
         expect_true(host->feature_runtimes[index].capsule == nullptr,
                     "destroying registered features clears every surface capsule");
@@ -1172,18 +1181,26 @@ static void test_registered_surface_input_passthrough(void)
     reach_host_init_feature_registry(host);
 
     reach_host_dependencies dependencies = {};
-    dependencies.launcher_window.window = reinterpret_cast<reach_platform_window *>(1);
-    dependencies.launcher_window.ops.set_input_passthrough = fake_set_input_passthrough;
-    dependencies.system_hud_window.window = reinterpret_cast<reach_platform_window *>(2);
-    dependencies.system_hud_window.ops.set_input_passthrough = fake_set_input_passthrough;
+    // The factory is called in registry order.
+    size_t created_count = 0;
+    dependencies.surface_factory_user = &created_count;
+    dependencies.create_surface_ports =
+        [](void *user, uint32_t, reach_platform_window_port *window, reach_render_backend_port *)
+    {
+        const size_t index = (*static_cast<size_t *>(user))++;
+        window->window = reinterpret_cast<reach_platform_window *>(index + 1);
+        window->ops.set_input_passthrough = fake_set_input_passthrough;
+        return REACH_OK;
+    };
 
     call_count = 0;
     reach_host_bind_registered_surface_ports(host, &dependencies);
 
-    expect_true(has_call(FAKE_WINDOW_CALL_SET_INPUT_PASSTHROUGH, 1, 0),
+    expect_true(has_call(FAKE_WINDOW_CALL_SET_INPUT_PASSTHROUGH, REACH_SURFACE_ID_LAUNCHER + 1, 0),
                 "ordinary surfaces keep native input enabled");
-    expect_true(has_call(FAKE_WINDOW_CALL_SET_INPUT_PASSTHROUGH, 2, 1),
-                "System HUD enables native input passthrough");
+    expect_true(
+        has_call(FAKE_WINDOW_CALL_SET_INPUT_PASSTHROUGH, REACH_SURFACE_ID_SYSTEM_HUD + 1, 1),
+        "System HUD enables native input passthrough");
 }
 
 static void test_frame_scheduling_does_not_present_a_closed_surface(void)
@@ -1533,7 +1550,7 @@ static void test_forced_bars_hold_through_a_closing_stage(void)
 
 static reach_screen_hotspot_callback bar_hotspot_callback;
 static void *bar_hotspot_user;
-static int bar_hotspot_tokens[REACH_HOST_SURFACE_COUNT];
+static int bar_hotspot_tokens[REACH_HOST_SURFACE_CAPACITY];
 static size_t bar_hotspot_created;
 
 static reach_result fake_hotspot_noop(reach_screen_hotspot *hotspot)
@@ -1638,7 +1655,7 @@ static void bar_enter_setup(bar_enter_fixture *fixture)
 
     fixture->top_bar = reach_host_feature_capsule<reach_top_bar>(host, REACH_SURFACE_ID_TOP_BAR);
     reach_top_bar_attach_services(fixture->top_bar, nullptr, nullptr, fixture->windows, nullptr,
-                                  nullptr, nullptr);
+                                  nullptr);
     reach_top_bar_attach_app_control(fixture->top_bar, fixture->apps);
     host->feature_runtimes[REACH_SURFACE_ID_TOP_BAR].bar_auto_hide_active = 1;
 
@@ -1933,7 +1950,7 @@ static void test_system_stats_change_repaints_without_relayout(void)
     expect_true(runtime->surface->dirty_flags == 0 && !host->dirty.layout && !host->dirty.render,
                 "an invalid sample leaves the top bar clean");
 
-    const reach_surface_id widget_id = REACH_SURFACE_ID_WIDGET_DESKTOP;
+    const reach_surface_id widget_id = desktop_surface_id(host);
     auto *widgets = reach_host_feature_capsule<reach_widgets>(host, widget_id);
     auto *widget_surface = host->feature_runtimes[widget_id].surface;
     reach_widgets_set_enabled(widgets, 1u << REACH_WIDGET_SYSTEM);
@@ -1994,7 +2011,7 @@ static void test_feature_tick_redraw_marks_only_its_own_surface(void)
     reach_feature_runtime *quick_settings =
         &host->feature_runtimes[REACH_SURFACE_ID_QUICK_SETTINGS];
     host->dirty = {};
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    for (size_t index = 0; index < host->surface_count; ++index)
         host->feature_runtimes[index].surface->dirty_flags = 0;
 
     reach_feature_tick_result tick = {};
@@ -2006,7 +2023,7 @@ static void test_feature_tick_redraw_marks_only_its_own_surface(void)
     expect_true(!host->dirty.render && !host->dirty.layout,
                 "a tick redraw sets no host-wide dirty state");
 
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    for (size_t index = 0; index < host->surface_count; ++index)
         host->feature_runtimes[index].surface->dirty_flags = 0;
     reach_feature_runtime *tray = &host->feature_runtimes[REACH_SURFACE_ID_TRAY];
     reach_host_apply_feature_tick_result(host, tray, &tick);
@@ -2641,8 +2658,7 @@ static void test_max_items_and_pressed_states_render_worst_case(void)
     expect_true(reach_tray_service_create(fake_full_tray_port(), &tray_service) == REACH_OK,
                 "the maximum tray is available");
     reach_top_bar *top_bar = reach_host_feature_capsule<reach_top_bar>(host, REACH_SURFACE_ID_TRAY);
-    reach_top_bar_attach_services(top_bar, nullptr, nullptr, nullptr, nullptr, nullptr,
-                                  tray_service);
+    reach_top_bar_attach_services(top_bar, nullptr, nullptr, nullptr, nullptr, tray_service);
     expect_true(reach_top_bar_refresh_tray(top_bar) == REACH_OK &&
                     reach_top_bar_tray_item_count(top_bar) == REACH_MAX_TRAY_ITEMS,
                 "the tray holds its maximum item count");
@@ -3535,74 +3551,6 @@ static reach_result fake_widgets_clock_sample(reach_clock_source *source,
 
 static reach_host widgets_render_host;
 
-static void test_widget_drag_renderer_updates(reach_host *host, reach_feature_runtime *runtime)
-{
-    struct translation_calls
-    {
-        int count;
-        reach_retained_translation latest;
-        reach_result result;
-    } calls = {0, {}, REACH_OK};
-
-    auto &surface = *runtime->surface;
-    surface.window.ops.set_bounds = fake_set_bounds;
-    surface.renderer.backend = reinterpret_cast<reach_render_backend *>(&calls);
-    surface.renderer.ops.begin_frame = fake_begin_frame;
-    surface.renderer.ops.execute = fake_execute;
-    surface.renderer.ops.end_frame = fake_end_frame;
-    surface.renderer.ops.retained_supported = [](const reach_render_backend *) -> int32_t
-    { return 1; };
-    surface.renderer.ops.translate_group =
-        [](reach_render_backend *backend, uint64_t group_id, reach_point_f32 offset)
-    {
-        auto &calls = *reinterpret_cast<translation_calls *>(backend);
-        ++calls.count;
-        calls.latest = {group_id, offset};
-        return calls.result;
-    };
-
-    host->has_layout = 1;
-    host->layout_dpi_scale = 1;
-    reach_host_frame_context frame = {};
-    frame.monitor_bounds = {0, 0, 1920, 1080};
-    auto present = [&]
-    {
-        expect_true(reach_host_frame_registered_surface(host, runtime, &frame) == REACH_OK,
-                    "widget frame succeeds");
-        surface.dirty_flags = 0;
-    };
-    present();
-
-    reach_host_surface_event_binding binding = {host, runtime};
-    reach_ui_event pointer = {};
-    pointer.button = REACH_POINTER_BUTTON_PRIMARY;
-    pointer.y = 30;
-    auto send = [&](reach_ui_event_type type, int32_t x)
-    {
-        pointer.type = type;
-        pointer.x = x;
-        reach_host_on_registered_surface_event(&binding, &pointer);
-    };
-    send(REACH_UI_EVENT_POINTER_DOWN, 30);
-    send(REACH_UI_EVENT_POINTER_MOVE, 60);
-    present();
-    const int builds = render_count;
-    send(REACH_UI_EVENT_POINTER_MOVE, 90);
-    send(REACH_UI_EVENT_POINTER_MOVE, 120);
-    expect_true(reach_host_any_surface_dirty(host), "a queued translation schedules a frame");
-    present();
-    expect_true(calls.count == 1 && calls.latest.group_id == 1 && calls.latest.offset.x == 90 &&
-                    render_count == builds,
-                "a drag frame submits only the latest card offset");
-
-    calls.result = REACH_NOT_IMPLEMENTED;
-    send(REACH_UI_EVENT_POINTER_MOVE, 150);
-    present();
-    expect_true(calls.count == 2 && render_count == builds + 1,
-                "a refused translation falls back to the render command buffer");
-    surface.renderer = {};
-}
-
 static void test_desktop_widgets_render_worst_case(void)
 {
     reach_host *host = &widgets_render_host;
@@ -3619,11 +3567,14 @@ static void test_desktop_widgets_render_worst_case(void)
                 "a fixed clock is available for desktop widgets");
     (void)reach_clock_tick(clock);
 
-    const reach_surface_id id = REACH_SURFACE_ID_WIDGET_DESKTOP;
+    const reach_surface_id id = desktop_surface_id(host);
     reach_feature_runtime *runtime = &host->feature_runtimes[id];
     const reach_feature_definition *definition = runtime->definition;
     reach_widgets *widgets = reach_host_feature_capsule<reach_widgets>(host, id);
-    reach_widgets_attach_services(widgets, clock, nullptr, nullptr);
+    reach_feature_notification notification = {};
+    notification.kind = REACH_FEATURE_NOTIFICATION_CLOCK_CHANGED;
+    reach_clock_snapshot_take(clock, &notification.clock);
+    reach_host_notify_registered_features(host, &notification);
 
     const int32_t columns[] = {0, 460, 920};
     const int32_t rows[] = {0, 420};
@@ -3642,6 +3593,7 @@ static void test_desktop_widgets_render_worst_case(void)
     auto storage = std::make_unique<reach_render_command_buffer>();
     reach_render_command_buffer *commands = storage.get();
     size_t max_commands = 0;
+    size_t max_groups = 0;
     auto render = [&](const reach_feature_surface_context &ctx)
     {
         reach_render_command_buffer_clear(commands);
@@ -3653,6 +3605,8 @@ static void test_desktop_widgets_render_worst_case(void)
                     label);
         if (commands->count > max_commands)
             max_commands = commands->count;
+        if (commands->group_count > max_groups)
+            max_groups = commands->group_count;
     };
 
     const float dpis[] = {1.0f, 1.25f, 1.5f, 2.0f};
@@ -3681,16 +3635,23 @@ static void test_desktop_widgets_render_worst_case(void)
                                             REACH_POINTER_COORDINATE_SCREEN, x, y));
             send_pointer(ops, runtime->capsule,
                          make_pointer_event(REACH_POINTER_EVENT_MOVE,
-                                            REACH_POINTER_COORDINATE_SCREEN, x + 220.0f * dpi,
-                                            y + 140.0f * dpi));
+                                            REACH_POINTER_COORDINATE_SCREEN, x + 460.0f * dpi, y));
+            reach_test_motion_clock_advance(0.1);
+            definition->capsule_ops->tick(runtime->capsule, 0.1, &tick);
             render(contexts.base);
             send_pointer(ops, runtime->capsule,
-                         make_pointer_event(REACH_POINTER_EVENT_CANCEL,
-                                            REACH_POINTER_COORDINATE_SCREEN, x, y));
+                         make_pointer_event(REACH_POINTER_EVENT_UP, REACH_POINTER_COORDINATE_SCREEN,
+                                            x + 460.0f * dpi, y));
+            render(contexts.base);
+            // Reject the test placement and restore the arranged card before the next case.
+            if (const auto commit = definition->commit_config; commit != nullptr)
+            {
+                (void)commit(runtime->capsule);
+            }
         }
     }
-    expect_true(max_commands > 0, "desktop widgets rendered their cards");
-    test_widget_drag_renderer_updates(host, runtime);
+    expect_true(max_commands > 0 && max_groups == REACH_MAX_DESKTOP_WIDGETS + 1,
+                "the worst case includes every card and the drop preview");
     reach_host_destroy_registered_features(host);
     reach_clock_destroy(clock);
 }

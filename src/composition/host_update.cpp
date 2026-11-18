@@ -77,13 +77,13 @@ void reach_host_finish_surface_presentations(reach_host *host)
         return;
     }
 
-    int32_t was_visible[REACH_HOST_SURFACE_COUNT] = {};
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    int32_t was_visible[REACH_HOST_SURFACE_CAPACITY] = {};
+    for (size_t index = 0; index < host->surface_count; ++index)
     {
         reach_feature_runtime *runtime = &host->feature_runtimes[index];
         was_visible[index] = runtime->presentation_visible;
     }
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    for (size_t index = 0; index < host->surface_count; ++index)
     {
         reach_feature_runtime *runtime = &host->feature_runtimes[index];
         int32_t visible = 0;
@@ -139,7 +139,7 @@ static int32_t reach_host_presentation_ready(reach_feature_runtime *runtime)
 
 static void reach_host_tick_features(reach_host *host, double delta_seconds)
 {
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    for (size_t index = 0; index < host->surface_count; ++index)
     {
         reach_feature_runtime *desc = &host->feature_runtimes[index];
         if (desc->definition->capsule_ops == nullptr ||
@@ -163,7 +163,7 @@ static reach_result reach_host_finish_update(reach_host *host)
     host->dirty.render = 0;
     host->dirty.update_requested = 0;
     host->dirty.bar_visibility = 0;
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    for (size_t index = 0; index < host->surface_count; ++index)
     {
         reach_surface_runtime *surface = host->feature_runtimes[index].surface;
         if (surface != nullptr)
@@ -177,7 +177,7 @@ static reach_result reach_host_finish_update(reach_host *host)
 
 static reach_result reach_host_update_game_mode_surfaces(reach_host *host, double delta_seconds)
 {
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    for (size_t index = 0; index < host->surface_count; ++index)
     {
         reach_feature_runtime *desc = &host->feature_runtimes[index];
         if ((desc->definition->surface.behavior_flags & REACH_SURFACE_BEHAVIOR_GAME_MODE_VISIBLE) ==
@@ -221,7 +221,7 @@ static reach_result reach_host_update_game_mode_surfaces(reach_host *host, doubl
             }
             reach_host_frame_context frame = {};
             frame.monitor_bounds = bounds;
-            for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+            for (size_t index = 0; index < host->surface_count; ++index)
             {
                 reach_feature_runtime *desc = &host->feature_runtimes[index];
                 if ((desc->definition->surface.behavior_flags &
@@ -304,7 +304,6 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
     reach_host_drain_icon_evictions(host);
     if (reach_clock_tick(host->clock))
     {
-        host->surfaces[REACH_SURFACE_ID_TOP_BAR].dirty_flags = 1;
         reach_feature_notification notification = {};
         notification.kind = REACH_FEATURE_NOTIFICATION_CLOCK_CHANGED;
         reach_clock_snapshot_take(host->clock, &notification.clock);
@@ -353,9 +352,9 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
                 reach_host_frame_context frame_ctx = {};
                 frame_ctx.monitor_bounds = bounds;
                 reach_host_sync_edge_reveals(host, bounds);
-                reach_surface_id frame_order[REACH_HOST_SURFACE_COUNT];
+                reach_surface_id frame_order[REACH_HOST_SURFACE_CAPACITY];
                 size_t frame_count = 0;
-                for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+                for (size_t index = 0; index < host->surface_count; ++index)
                 {
                     const reach_feature_runtime *desc = &host->feature_runtimes[index];
                     size_t at = frame_count;
@@ -441,7 +440,7 @@ int32_t reach_host_needs_frame(const reach_host *host)
         return 0;
     }
 
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    for (size_t index = 0; index < host->surface_count; ++index)
     {
         const reach_feature_runtime *runtime = &host->feature_runtimes[index];
         if (runtime->definition == nullptr || runtime->definition->capsule_ops == nullptr ||
@@ -483,7 +482,7 @@ int32_t reach_host_needs_frame(const reach_host *host)
 
     if (reach_host_game_mode_enabled(host))
     {
-        for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+        for (size_t index = 0; index < host->surface_count; ++index)
         {
             const reach_feature_runtime *desc = &host->feature_runtimes[index];
             if ((desc->definition->surface.behavior_flags &
@@ -507,7 +506,7 @@ int32_t reach_host_needs_frame(const reach_host *host)
         return 1;
     }
 
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    for (size_t index = 0; index < host->surface_count; ++index)
     {
         const reach_feature_runtime *desc = &host->feature_runtimes[index];
         if (desc->definition->capsule_ops != nullptr &&
@@ -529,7 +528,7 @@ uint32_t reach_host_idle_wait_ms(const reach_host *host)
     }
 
     uint32_t feature_wait = REACH_CLOCK_WAIT_FOREVER;
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    for (size_t index = 0; index < host->surface_count; ++index)
     {
         const reach_feature_runtime *runtime = &host->feature_runtimes[index];
         if (runtime->definition == nullptr || runtime->definition->capsule_ops == nullptr ||

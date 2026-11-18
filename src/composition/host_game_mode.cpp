@@ -32,7 +32,7 @@ static void reach_host_disable_bar_pointer_observations(reach_host *host)
     {
         return;
     }
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    for (size_t index = 0; index < host->surface_count; ++index)
     {
         if (host->feature_runtimes[index].definition->surface.bar_reveal.ops != nullptr)
         {
@@ -66,7 +66,7 @@ reach_result reach_host_update_game_mode(reach_host *host)
                                next_active);
     reach_system_stats_set_enabled(host->system_stats, !next_active);
 
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    for (size_t index = 0; index < host->surface_count; ++index)
     {
         reach_feature_runtime *desc = &host->feature_runtimes[index];
         if (next_active && (desc->definition->surface.behavior_flags &

@@ -6,7 +6,6 @@
 #include "reach/features/quick_settings.h"
 #include "reach/features/screenshot.h"
 #include "reach/features/system_hud.h"
-#include "reach/features/widgets.h"
 #include "reach/features/top_bar.h"
 
 static reach_rect_f32 reach_host_menu_monitor(reach_host *host, reach_rect_f32 fallback)

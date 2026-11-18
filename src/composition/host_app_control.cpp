@@ -217,7 +217,7 @@ static void reach_host_complete_close_handoff(reach_host *host, uint64_t request
     {
         return;
     }
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    for (size_t index = 0; index < host->surface_count; ++index)
     {
         reach_surface_runtime *surface = host->feature_runtimes[index].surface;
         if (surface == nullptr || !surface->close_handoff_pending ||
@@ -251,7 +251,7 @@ void reach_host_settle_close_handoffs(reach_host *host)
     {
         return;
     }
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    for (size_t index = 0; index < host->surface_count; ++index)
     {
         reach_feature_runtime *runtime = &host->feature_runtimes[index];
         if (runtime->surface == nullptr || !runtime->surface->close_handoff_pending)
@@ -312,7 +312,7 @@ reach_result reach_host_defer_launch_until_surface_closed(reach_host *host, reac
 {
     if (host == nullptr || request == nullptr ||
         (request->path[0] == 0 && request->app_user_model_id[0] == 0) ||
-        source >= REACH_HOST_SURFACE_COUNT)
+        source >= host->surface_count)
     {
         return REACH_INVALID_ARGUMENT;
     }

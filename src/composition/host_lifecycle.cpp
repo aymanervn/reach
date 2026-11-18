@@ -289,12 +289,12 @@ static void reach_host_cleanup(reach_host *host)
 }
 
 reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
-                                                 const reach_host_dependencies *dependencies,
+                                                 reach_host_dependencies *owned_dependencies,
                                                  reach_host **out_shell)
 {
     (void)desc;
-    REACH_ASSERT(dependencies != nullptr);
-    if (out_shell == nullptr || dependencies == nullptr)
+    REACH_ASSERT(owned_dependencies != nullptr);
+    if (out_shell == nullptr || owned_dependencies == nullptr)
     {
         return REACH_INVALID_ARGUMENT;
     }
@@ -306,16 +306,18 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
         return REACH_ERROR;
     }
 
-    reach_result result = REACH_OK;
+    const reach_host_dependencies moved_dependencies = *owned_dependencies;
+    *owned_dependencies = {};
+    const auto *dependencies = &moved_dependencies;
 
-    reach_host_init_feature_registry(host);
+    reach_result result = reach_host_init_feature_registry(host);
     reach_host_init_registered_surfaces(host);
-    if (reach_host_create_registered_features(host) != REACH_OK)
+    if (result == REACH_OK)
     {
-        result = REACH_ERROR;
+        result = reach_host_create_registered_features(host);
     }
 
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    for (size_t index = 0; index < host->surface_count; ++index)
     {
         reach_feature_runtime *desc = &host->feature_runtimes[index];
         if (desc->definition->capsule_ops != nullptr &&
@@ -328,10 +330,9 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
     host->quick_settings_system_change_flags.store(0);
     host->audio_volume_changed.store(0);
 
-    reach_result bind_result = reach_host_bind_registered_surface_ports(host, dependencies);
     if (result == REACH_OK)
     {
-        result = bind_result;
+        result = reach_host_bind_registered_surface_ports(host, dependencies);
     }
     host->screen_hotspots = dependencies->screen_hotspots;
     host->image_loader = dependencies->image_loader;
@@ -342,7 +343,7 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
     }
     if (result == REACH_OK)
     {
-        reach_host_init_layout(host);
+        result = reach_host_init_layout(host);
     }
     host->input_source = dependencies->input_source;
     host->monitors = dependencies->monitors;
@@ -368,6 +369,10 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
     host->tray_service = nullptr;
     if (reach_tray_service_create(dependencies->tray_provider, &host->tray_service) != REACH_OK)
     {
+        if (dependencies->tray_provider.ops.destroy != nullptr)
+        {
+            dependencies->tray_provider.ops.destroy(dependencies->tray_provider.provider);
+        }
         result = REACH_ERROR;
     }
     host->search_provider = dependencies->search_provider;
@@ -391,6 +396,10 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
     host->icon_service = nullptr;
     if (reach_icon_service_create(dependencies->icon_provider, &host->icon_service) != REACH_OK)
     {
+        if (dependencies->icon_provider.ops.destroy != nullptr)
+        {
+            dependencies->icon_provider.ops.destroy(dependencies->icon_provider.provider);
+        }
         result = REACH_ERROR;
     }
     reach_icon_service_set_notify(host->icon_service, reach_host_on_icon_service_ready, host);
@@ -423,36 +432,60 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
     if (reach_wifi_service_create(dependencies->wifi, reach_host_on_system_status_ready, host,
                                   &host->wifi_service) != REACH_OK)
     {
+        if (dependencies->wifi.destroy != nullptr)
+        {
+            dependencies->wifi.destroy(dependencies->wifi.userdata);
+        }
         result = REACH_ERROR;
     }
     host->bluetooth_service = nullptr;
     if (reach_bluetooth_service_create(dependencies->bluetooth, reach_host_on_system_status_ready,
                                        host, &host->bluetooth_service) != REACH_OK)
     {
+        if (dependencies->bluetooth.destroy != nullptr)
+        {
+            dependencies->bluetooth.destroy(dependencies->bluetooth.userdata);
+        }
         result = REACH_ERROR;
     }
     host->profile_service = nullptr;
     if (reach_profile_service_create(dependencies->user_account, reach_host_on_system_status_ready,
                                      host, &host->profile_service) != REACH_OK)
     {
+        if (dependencies->user_account.ops.destroy != nullptr)
+        {
+            dependencies->user_account.ops.destroy(dependencies->user_account.account);
+        }
         result = REACH_ERROR;
     }
     host->system_stats = nullptr;
     if (reach_system_stats_create(dependencies->system_stats, reach_host_on_system_stats_ready,
                                   host, &host->system_stats) != REACH_OK)
     {
+        if (dependencies->system_stats.ops.destroy != nullptr)
+        {
+            dependencies->system_stats.ops.destroy(dependencies->system_stats.source);
+        }
         result = REACH_ERROR;
     }
     reach_system_stats_set_enabled(host->system_stats, 1);
     host->clock = nullptr;
     if (reach_clock_create(dependencies->clock, &host->clock) != REACH_OK)
     {
+        if (dependencies->clock.ops.destroy != nullptr)
+        {
+            dependencies->clock.ops.destroy(dependencies->clock.source);
+        }
         result = REACH_ERROR;
     }
     host->input_language = nullptr;
     if (reach_input_language_service_create(dependencies->input_language, &host->input_language) !=
         REACH_OK)
     {
+        if (dependencies->input_language.ops.destroy != nullptr)
+        {
+            dependencies->input_language.ops.destroy(dependencies->input_language.language);
+        }
         result = REACH_ERROR;
     }
     host->media_controls = dependencies->media_controls;
@@ -475,7 +508,7 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
                                                        host->window_tracking,
                                                        host->now_playing_service,
                                                        host->system_stats,
-                                                       host->clock,
+                                                       host->config_service,
                                                        host->input_language,
                                                        host->tray_service,
                                                        host->app_control,
@@ -537,6 +570,10 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
     if (result != REACH_OK)
     {
         reach_host_cleanup(host);
+        if (dependencies->explorer_service.ops.destroy != nullptr)
+        {
+            dependencies->explorer_service.ops.destroy(dependencies->explorer_service.service);
+        }
         delete host;
         *out_shell = nullptr;
         return result;
@@ -544,7 +581,7 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
     host->dirty.layout = 1;
     host->dirty.render = 1;
     host->dirty.monitors = 1;
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    for (size_t index = 0; index < host->surface_count; ++index)
     {
         host->feature_runtimes[index].surface->dirty_flags = 1;
     }
@@ -596,7 +633,7 @@ reach_result reach_host_start(reach_host *host)
                                                  reach_host_on_foreground_changed, host);
     }
 
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    for (size_t index = 0; index < host->surface_count; ++index)
     {
         reach_feature_runtime *runtime = &host->feature_runtimes[index];
         reach_surface_runtime *surface = runtime->surface;
@@ -667,7 +704,7 @@ reach_result reach_host_start(reach_host *host)
     host->dirty.layout = 1;
     host->dirty.render = 1;
     host->dirty.monitors = 1;
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    for (size_t index = 0; index < host->surface_count; ++index)
     {
         host->feature_runtimes[index].surface->dirty_flags = 1;
     }
