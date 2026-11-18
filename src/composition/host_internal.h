@@ -61,27 +61,23 @@ typedef enum reach_surface_class
     REACH_SURFACE_CLASS_OVERLAY = 3
 } reach_surface_class;
 
-typedef uint32_t reach_surface_id;
-
-enum
-{
-    REACH_SURFACE_ID_DOCK = 0,
-    REACH_SURFACE_ID_TOP_BAR,
-    REACH_SURFACE_ID_LAUNCHER,
-    REACH_SURFACE_ID_CLIPBOARD,
-    REACH_SURFACE_ID_TRAY,
-    REACH_SURFACE_ID_QUICK_SETTINGS,
-    REACH_SURFACE_ID_CONTEXT_MENU,
-    REACH_SURFACE_ID_SWITCHER,
-    REACH_SURFACE_ID_STAGE,
-    REACH_SURFACE_ID_BATTERY,
-    REACH_SURFACE_ID_SYSTEM_HUD,
-    REACH_SURFACE_ID_SCREENSHOT,
-    REACH_HOST_LEGACY_SURFACE_COUNT
-};
+using reach_surface_id = uint32_t;
 
 constexpr reach_surface_id REACH_SURFACE_ID_INVALID = UINT32_MAX;
 constexpr size_t REACH_HOST_SURFACE_CAPACITY = 24;
+
+// A definition and its references use the address of the same static key object.
+struct reach_surface_key
+{
+};
+
+// A route can share a key with the registry using the feature type or a feature-owned tag.
+template <typename Tag> const reach_surface_key &reach_surface_key_for()
+{
+    // Writable storage keeps distinct keys from being folded together by the linker.
+    static reach_surface_key key;
+    return key;
+}
 
 typedef enum reach_surface_shadow
 {
@@ -104,19 +100,29 @@ typedef enum reach_surface_pointer_flags
 
     REACH_SURFACE_POINTER_CAPTURE_CONSUMES_RELEASE = 1u << 5,
 
-    REACH_SURFACE_POINTER_CAPTURE_OWNS_MOVE = 1u << 6
+    REACH_SURFACE_POINTER_CAPTURE_OWNS_MOVE = 1u << 6,
+    REACH_SURFACE_POINTER_CANCEL_BEFORE_DOWN = 1u << 7
 } reach_surface_pointer_flags;
 
 typedef enum reach_surface_behavior_flags
 {
     REACH_SURFACE_BEHAVIOR_NONE = 0,
 
-    REACH_SURFACE_BEHAVIOR_ACTIVATES = 1u << 0,
-
-    REACH_SURFACE_BEHAVIOR_EXCLUSIVE = 1u << 1,
-    REACH_SURFACE_BEHAVIOR_GAME_MODE_VISIBLE = 1u << 2,
-    REACH_SURFACE_BEHAVIOR_INPUT_PASSTHROUGH = 1u << 3
+    REACH_SURFACE_BEHAVIOR_EXCLUSIVE = 1u << 0,
+    REACH_SURFACE_BEHAVIOR_GAME_MODE_VISIBLE = 1u << 1,
+    REACH_SURFACE_BEHAVIOR_INPUT_PASSTHROUGH = 1u << 2,
+    REACH_SURFACE_BEHAVIOR_DISMISS_ON_ESCAPE = 1u << 3
 } reach_surface_behavior_flags;
+
+enum reach_surface_redraw_reason
+{
+    REACH_SURFACE_REDRAW_OPEN_WINDOWS = 1u << 0,
+    REACH_SURFACE_REDRAW_FOREGROUND = 1u << 1,
+    REACH_SURFACE_REDRAW_ACTIVATION_REQUESTED = 1u << 2,
+    REACH_SURFACE_REDRAW_ACTIVATION_COMPLETED = 1u << 3,
+    REACH_SURFACE_REDRAW_CLOCK = 1u << 4,
+    REACH_SURFACE_REDRAW_INPUT_LANGUAGE = 1u << 5
+};
 
 typedef enum reach_edge_reveal_anchor
 {
@@ -144,7 +150,7 @@ typedef struct reach_surface_edge_reveal_spec
     int32_t enabled;
     int32_t layer;
     reach_edge_reveal_geometry geometry;
-    void (*handle_event)(reach_host *host, reach_screen_hotspot_event event);
+    int32_t open_on_enter;
 } reach_surface_edge_reveal_spec;
 
 typedef struct reach_surface_bar_reveal_spec
@@ -168,7 +174,7 @@ typedef struct reach_feature_dependencies
     reach_window_tracking *windows;
     reach_now_playing_service *now_playing;
     reach_system_stats *system_stats;
-    reach_config_service *config;
+    reach_clock *clock;
     reach_input_language_service *input_language;
     reach_tray_service *tray;
     reach_app_control *app_control;
@@ -186,8 +192,11 @@ typedef struct reach_feature_dependencies
 
 typedef struct reach_feature_lifecycle_ops
 {
-    void (*attach)(void *capsule, const reach_feature_dependencies *dependencies);
+    // Each successful attach or start is paired with cleanup. A failing hook unwinds its own work.
+    reach_result (*attach)(void *capsule, const reach_feature_dependencies *dependencies);
+    void (*detach)(void *capsule);
     reach_result (*start)(void *capsule);
+    // Without a start hook, the entry is ready to stop once its start phase is reached.
     void (*stop)(void *capsule);
 } reach_feature_lifecycle_ops;
 
@@ -204,8 +213,7 @@ typedef enum reach_feature_notification_kind
     REACH_FEATURE_NOTIFICATION_DISPLAY_CHANGED = 9,
     REACH_FEATURE_NOTIFICATION_CONFIG_CHANGED = 10,
     REACH_FEATURE_NOTIFICATION_POPUPS_CLOSED = 11,
-    REACH_FEATURE_NOTIFICATION_APP_LAUNCH_FAILED = 12,
-    REACH_FEATURE_NOTIFICATION_CLOCK_CHANGED = 13
+    REACH_FEATURE_NOTIFICATION_APP_LAUNCH_FAILED = 12
 } reach_feature_notification_kind;
 
 typedef struct reach_feature_notification
@@ -214,7 +222,6 @@ typedef struct reach_feature_notification
     reach_text_measure_port text_measure;
     float dpi_scale;
     reach_system_stats_snapshot system_stats;
-    reach_clock_snapshot clock;
     reach_now_playing_action media_action;
     reach_audio_volume_state volume;
     reach_brightness_state brightness;
@@ -290,7 +297,7 @@ typedef enum reach_layout_reservation_edge
 
 typedef struct reach_feature_layout_anchor
 {
-    reach_surface_id surface;
+    reach_surface_id surface = REACH_SURFACE_ID_INVALID;
     uint32_t slot;
     size_t index;
     uint64_t identity;
@@ -332,7 +339,6 @@ typedef struct reach_feature_surface_ops
     int32_t (*arrange)(void *capsule, const reach_feature_surface_context *ctx);
     reach_result (*append_render_commands)(void *capsule, const reach_feature_surface_context *ctx,
                                            reach_render_command_buffer *out_commands);
-    int32_t (*layout_anchor)(const void *capsule, reach_feature_layout_anchor *out);
     const reach_feature_native_overlay_ops *native_overlay;
     int32_t (*pointer_observation)(const void *capsule, reach_rect_union *out);
 } reach_feature_surface_ops;
@@ -343,8 +349,9 @@ typedef struct reach_surface_spec
     uint32_t pointer_flags;
     reach_surface_shadow shadow;
     uint32_t behavior_flags;
+    uint32_t redraw_on;
     int32_t layer;
-    uint32_t window_flags;
+    uint32_t window_flags = REACH_WINDOW_COMPOSITION_BACKED;
     int32_t pointer_priority;
     int32_t popup_chrome;
     int32_t bar_shown_while_open;
@@ -354,17 +361,17 @@ typedef struct reach_surface_spec
 
     /* A press on the control this surface hangs off must not dismiss it. By default that is its
        layout anchor; a surface with no anchor names the control explicitly. */
-    reach_surface_id dismiss_guard_surface = REACH_SURFACE_ID_INVALID;
+    const reach_surface_key *dismiss_guard_surface;
     uint32_t dismiss_guard_slot;
     int32_t dismiss_guard_any_control;
-    reach_surface_id opening_origin = REACH_SURFACE_ID_INVALID;
+    const reach_surface_key *opening_origin;
     reach_surface_edge_reveal_spec edge_reveal;
     reach_surface_bar_reveal_spec bar_reveal;
 } reach_surface_spec;
 
 typedef struct reach_layout_spec
 {
-    reach_surface_id anchor = REACH_SURFACE_ID_INVALID;
+    const reach_surface_key *anchor;
     uint32_t anchor_slot;
     int32_t priority;
     reach_layout_reservation_edge reservation_edge;
@@ -381,7 +388,9 @@ typedef struct reach_feature_anchor
 
 typedef struct reach_feature_definition
 {
-    reach_surface_id id;
+    reach_surface_id id = REACH_SURFACE_ID_INVALID;
+    const reach_surface_key *key;
+    const reach_surface_key *capsule_owner;
     reach_feature_factory factory;
     reach_feature_lifecycle_ops lifecycle;
     const reach_feature_capsule_ops *capsule_ops;
@@ -392,18 +401,34 @@ typedef struct reach_feature_definition
     reach_surface_spec surface;
     reach_layout_spec layout;
 
-    reach_result (*commit_config)(void *capsule);
-    void (*force_close)(reach_host *host);
     const reach_ui_event_type *toggle_events;
     size_t toggle_event_count;
+    // Routed events and toggles are shell-wide regardless of which window emitted the event.
     const reach_ui_event_type *routed_events;
     size_t routed_event_count;
+    // Window events reach only the entry bound to the originating platform window.
+    // Events managed by the host, such as pointer input and focus loss, use its own dispatch.
+    const reach_ui_event_type *window_events;
+    size_t window_event_count;
+    reach_ui_event_type refresh_world_before_event;
 } reach_feature_definition;
+
+// Registry-resolved IDs stay separate from the declarative keys.
+struct reach_feature_links
+{
+    reach_surface_id capsule_owner = REACH_SURFACE_ID_INVALID;
+    reach_surface_id layout_anchor = REACH_SURFACE_ID_INVALID;
+    reach_surface_id dismiss_guard_surface = REACH_SURFACE_ID_INVALID;
+    reach_surface_id opening_origin = REACH_SURFACE_ID_INVALID;
+};
 
 typedef struct reach_feature_runtime
 {
     reach_surface_runtime *surface;
     void *capsule;
+    const reach_feature_links *links;
+    bool attached;
+    bool started;
     reach_rect_f32 resolved_bounds;
     int32_t resolved_bounds_valid;
     int32_t bar_auto_hide_active;
@@ -416,7 +441,6 @@ typedef struct reach_feature_runtime
     reach_window_id native_overlay_front_source;
     reach_window_thumbnail_id native_overlay_front_id;
     int32_t presentation_visible;
-    int32_t desktop_placement_pending;
     int32_t frame_context_valid;
     int32_t native_overlay_motion_pending;
     int32_t frame_retained_supported;
@@ -424,6 +448,7 @@ typedef struct reach_feature_runtime
     reach_window_id frame_native_target;
     reach_feature_surface_context layout_context;
     reach_feature_surface_context native_overlay_context;
+    reach_feature_layout_anchor popup_owner;
     reach_feature_layout_anchor resolved_anchor_owner;
     reach_feature_anchor resolved_anchor;
     reach_rect_f32 resolved_anchor_bounds;
@@ -439,6 +464,16 @@ typedef struct reach_host_surface_event_binding
     reach_feature_runtime *runtime;
 } reach_host_surface_event_binding;
 
+struct reach_host_started_ports
+{
+    bool window_manager;
+    bool foreground_watcher;
+    bool system_controls;
+    bool audio_volume;
+    bool now_playing;
+    bool wallpaper;
+};
+
 typedef struct reach_host_edge_reveal_runtime
 {
     reach_host *host;
@@ -448,6 +483,7 @@ typedef struct reach_host_edge_reveal_runtime
     int32_t bounds_valid;
     int32_t enter_suppressed;
     reach_rect_f32 bounds;
+    bool callback_bound;
 } reach_host_edge_reveal_runtime;
 
 typedef struct reach_host_window_manipulation_state
@@ -462,25 +498,26 @@ typedef struct reach_host_window_manipulation_state
 
 typedef struct reach_host_layout_target
 {
-    reach_feature_runtime *runtime;
+    const reach_feature_runtime *runtime;
     reach_screen_hotspot_port *edge_reveal;
 } reach_host_layout_target;
 
 reach_result reach_host_init_feature_registry(reach_host *host);
+reach_result reach_host_set_feature_registry(reach_host *host,
+                                             const reach_feature_definition *definitions,
+                                             size_t count);
+reach_surface_id reach_host_find_surface(const reach_host *host, const reach_surface_key &key);
 reach_result reach_host_apply_feature_action(reach_host *host, reach_feature_runtime *runtime,
                                              const reach_capsule_action *action);
 void reach_host_bind_interfeature_routes(reach_host *host);
 void reach_host_clear_interfeature_routes(reach_host *host);
 reach_result reach_host_create_registered_features(reach_host *host);
-reach_result reach_host_bind_registered_surface_ports(reach_host *host,
-                                                      const reach_host_dependencies *dependencies);
-void reach_host_init_registered_surfaces(reach_host *host);
+reach_result
+reach_host_create_registered_surface_ports(reach_host *host,
+                                           const reach_host_dependencies *dependencies);
 void reach_host_destroy_registered_surface_ports(reach_host *host);
-void reach_host_attach_registered_features(reach_host *host,
-                                           const reach_feature_dependencies *dependencies);
-reach_result reach_host_start_registered_features(reach_host *host);
-void reach_host_stop_registered_features(reach_host *host);
 void reach_host_destroy_registered_features(reach_host *host);
+void reach_host_stop_runtime(reach_host *host, bool stop_workers);
 void reach_host_apply_feature_tick_result(reach_host *host, reach_feature_runtime *runtime,
                                           const reach_feature_tick_result *result);
 typedef enum reach_surface_close_intent
@@ -522,6 +559,8 @@ void reach_host_flush_focus_restore(reach_host *host, reach_surface_id id);
 void reach_host_toggle_registered_surface(reach_host *host, reach_surface_id id);
 reach_result reach_host_execute_menu_command(reach_host *host, uint32_t command);
 void reach_host_post_feature_work_ready(reach_host *host);
+void reach_host_post_event(reach_host *host, reach_ui_event_type event);
+void reach_host_invalidate_surface_content(reach_host *host, reach_surface_redraw_reason reason);
 void reach_host_notify_windows_changed(reach_host *host);
 void reach_host_notify_display_changed(reach_host *host);
 void reach_host_notify_config_changed(reach_host *host, const reach_config_snapshot *snapshot);
@@ -542,11 +581,11 @@ reach_host_edge_reveal_runtime *reach_host_edge_reveal_for_surface(reach_host *h
                                                                    reach_surface_id id);
 reach_result reach_host_create_edge_reveals(reach_host *host);
 reach_result reach_host_start_edge_reveals(reach_host *host);
+void reach_host_stop_edge_reveals(reach_host *host);
 void reach_host_destroy_edge_reveals(reach_host *host);
 void reach_host_sync_edge_reveals(reach_host *host, reach_rect_f32 monitor_bounds);
 void reach_host_set_edge_reveal_bounds(reach_host_edge_reveal_runtime *runtime,
                                        reach_rect_f32 bounds);
-void reach_host_on_surface_edge_reveal(reach_host *host, reach_screen_hotspot_event event);
 void reach_host_set_edge_reveal_visible(reach_host *host, reach_host_edge_reveal_runtime *runtime,
                                         int32_t visible);
 
@@ -639,7 +678,10 @@ struct reach_host
     int32_t keyboard_focus_taken[REACH_HOST_SURFACE_CAPACITY];
 
     reach_feature_definition feature_definitions[REACH_HOST_SURFACE_CAPACITY];
+    reach_feature_links feature_links[REACH_HOST_SURFACE_CAPACITY];
     reach_feature_runtime feature_runtimes[REACH_HOST_SURFACE_CAPACITY];
+    reach_surface_id feature_lifecycle_order[REACH_HOST_SURFACE_CAPACITY];
+    reach_surface_id feature_layout_order[REACH_HOST_SURFACE_CAPACITY];
     reach_host_surface_event_binding surface_event_bindings[REACH_HOST_SURFACE_CAPACITY];
     reach_host_edge_reveal_runtime edge_reveals[REACH_HOST_SURFACE_CAPACITY];
     reach_layout layout_manager;
@@ -688,6 +730,7 @@ struct reach_host
     std::deque<reach_host_app_launch_context> app_launch_contexts;
     std::deque<reach_host_pending_unpin> pending_unpins;
     int32_t running;
+    reach_host_started_ports started_ports;
     reach_runtime_policy_state runtime_policy;
     reach_audio_volume_port audio_volume;
     reach_system_controls_port system_controls;
@@ -697,7 +740,7 @@ struct reach_host
     double popup_hook_reassert_seconds;
     int32_t high_refresh_rate;
     int32_t bundled_font;
-    std::atomic<uint32_t> quick_settings_system_change_flags;
+    std::atomic<uint32_t> system_change_flags;
     std::atomic<uint32_t> audio_volume_changed;
     reach_system_status *system_status;
     reach_wifi_service *wifi_service;
@@ -706,6 +749,16 @@ struct reach_host
     reach_system_stats *system_stats;
     reach_popup_capture_port popup_capture;
 };
+
+template <typename Tag> reach_surface_id reach_host_find_surface(const reach_host *host)
+{
+    return reach_host_find_surface(host, reach_surface_key_for<Tag>());
+}
+
+inline reach_feature_runtime *reach_host_surface_runtime(reach_host *host, reach_surface_id id)
+{
+    return host != nullptr && id < host->surface_count ? &host->feature_runtimes[id] : nullptr;
+}
 
 template <typename Feature>
 static inline Feature *reach_host_feature_capsule(reach_host *host, reach_surface_id id)
@@ -909,6 +962,8 @@ void reach_host_suspend_pointer_move_subscriptions(reach_host *host);
 void reach_host_request_bar_visibility_update(reach_host *host);
 void reach_host_sync_bar_layout_conditions(reach_host *host);
 int32_t reach_host_bar_reveal_enabled(const reach_feature_runtime *runtime);
+float reach_host_bar_parking_offset(const reach_feature_runtime *runtime,
+                                    reach_rect_f32 shown_bounds);
 float reach_host_bar_protected_clearance(const reach_host *host,
                                          const reach_feature_runtime *runtime);
 

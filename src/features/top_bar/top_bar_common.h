@@ -44,6 +44,7 @@ struct reach_top_bar
     reach_icon_service *icons;
     reach_window_tracking *windows;
     reach_app_control *apps;
+    reach_clock *clock;
     reach_input_language_service *input_language;
     reach_system_status *status;
     reach_tray_service *tray;

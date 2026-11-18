@@ -161,8 +161,7 @@ extern "C"
         REACH_VECTOR_ICON_BRACES = 47,
         REACH_VECTOR_ICON_LAYERS = 48,
         REACH_VECTOR_ICON_ACCENT = 49,
-        REACH_VECTOR_ICON_ARROW_RIGHT = 50,
-        REACH_VECTOR_ICON_WIDGETS = 51
+        REACH_VECTOR_ICON_ARROW_RIGHT = 50
     } reach_vector_icon_id;
 
     typedef enum reach_text_weight

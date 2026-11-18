@@ -54,6 +54,7 @@ extern "C"
     typedef struct reach_host_dependencies
     {
         void *surface_factory_user;
+        // The host owns any ports returned by this callback, including on failure.
         reach_result (*create_surface_ports)(void *user, uint32_t window_flags,
                                              reach_platform_window_port *window,
                                              reach_render_backend_port *renderer);
@@ -90,7 +91,7 @@ extern "C"
         reach_screen_capture_port screen_capture;
     } reach_host_dependencies;
 
-    // Transfers the dependencies and clears the input once host storage is allocated.
+    // Transfers the dependencies and clears the input after successfully creating the surfaces.
     reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
                                                      reach_host_dependencies *dependencies,
                                                      reach_host **out_shell);

@@ -19,18 +19,10 @@ static reach_result reach_app_create_surface_ports(void *user, uint32_t window_f
                                                    reach_render_backend_port *renderer)
 {
     auto *app = static_cast<reach_app *>(user);
-    reach_result result = reach_windows_create_platform_window(window_flags, window);
-    if (result == REACH_OK)
-    {
-        result =
-            reach_windows_create_dcomp_render_backend(app->render_device, window->window, renderer);
-        if (result != REACH_OK)
-        {
-            window->ops.destroy(window->window);
-            *window = {};
-        }
-    }
-    return result;
+    const reach_result result = reach_windows_create_platform_window(window_flags, window);
+    return result == REACH_OK ? reach_windows_create_dcomp_render_backend(app->render_device,
+                                                                          window->window, renderer)
+                              : result;
 }
 
 reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
@@ -346,23 +338,39 @@ reach_result reach_app_start(reach_app *app)
         return REACH_INVALID_ARGUMENT;
     }
 
-    reach_result result = reach_host_start(app->host);
-    if (result == REACH_OK)
+    if (app->host->running)
     {
-
-        reach_app_launch_request startup_requests[32] = {};
-        size_t startup_count = reach_windows_collect_startup_apps(startup_requests, 32);
-        for (size_t index = 0; index < startup_count; ++index)
-        {
-            (void)reach_host_schedule_app_launch(app->host, &startup_requests[index]);
-        }
+        return REACH_OK;
     }
+
+    reach_result result = reach_host_start(app->host);
+    if (result != REACH_OK)
+    {
+        return result;
+    }
+
     const auto &input = app->host->input_source;
-    if (result == REACH_OK && input.ops.start != nullptr)
+    if (input.ops.start != nullptr)
     {
         result = input.ops.start(input.source, reach_app_on_input, app);
+        if (result != REACH_OK)
+        {
+            if (input.ops.stop != nullptr)
+            {
+                (void)input.ops.stop(input.source);
+            }
+            reach_host_stop_runtime(app->host, false);
+            return result;
+        }
     }
-    return result;
+
+    reach_app_launch_request startup_requests[32] = {};
+    size_t startup_count = reach_windows_collect_startup_apps(startup_requests, 32);
+    for (size_t index = 0; index < startup_count; ++index)
+    {
+        (void)reach_host_schedule_app_launch(app->host, &startup_requests[index]);
+    }
+    return REACH_OK;
 }
 
 reach_result reach_app_stop(reach_app *app)
@@ -371,6 +379,10 @@ reach_result reach_app_stop(reach_app *app)
     if (app == nullptr || app->host == nullptr)
     {
         return REACH_INVALID_ARGUMENT;
+    }
+    if (!app->host->running)
+    {
+        return REACH_OK;
     }
 
     const auto &input = app->host->input_source;
@@ -459,6 +471,10 @@ void reach_app_destroy(reach_app *app)
         return;
     }
 
+    if (app->host != nullptr && app->host->running)
+    {
+        (void)reach_app_stop(app);
+    }
     reach_host_destroy(app->host);
     reach_windows_destroy_explorer_desktop_compat_host();
     reach_windows_destroy_render_device(app->render_device);

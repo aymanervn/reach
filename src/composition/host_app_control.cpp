@@ -301,7 +301,7 @@ void reach_host_apply_window_control_result(reach_host *host)
 
         if (completion.result == REACH_OK)
         {
-            host->surfaces[REACH_SURFACE_ID_DOCK].dirty_flags = 1;
+            reach_host_invalidate_surface_content(host, REACH_SURFACE_REDRAW_ACTIVATION_COMPLETED);
         }
     }
 }
@@ -526,8 +526,7 @@ reach_result reach_host_focus_window(reach_host *host, uintptr_t window_id,
                                                     nullptr);
     }
 
-    host->surfaces[REACH_SURFACE_ID_DOCK].dirty_flags = 1;
-    host->surfaces[REACH_SURFACE_ID_SWITCHER].dirty_flags = 1;
+    reach_host_invalidate_surface_content(host, REACH_SURFACE_REDRAW_ACTIVATION_REQUESTED);
     return result;
 }
 

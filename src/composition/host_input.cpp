@@ -332,7 +332,7 @@ reach_result reach_host_dispatch_capsule_event(reach_host *host, reach_feature_r
         if (open)
         {
             reach_host_surface_opening(host, runtime->definition->id,
-                                       runtime->definition->surface.opening_origin);
+                                       runtime->links->opening_origin);
         }
         else
         {
@@ -394,15 +394,15 @@ int32_t reach_host_resolve_popup_owner(const reach_feature_runtime *popup,
     {
         return 0;
     }
-    *out = {};
-    out->surface = popup->definition->layout.anchor;
-    out->slot = popup->definition->layout.anchor_slot;
-    if (popup->definition->surface_ops != nullptr &&
-        popup->definition->surface_ops->layout_anchor != nullptr)
+    if (popup->popup_owner.surface != REACH_SURFACE_ID_INVALID && reach_host_surface_is_open(popup))
     {
-        (void)popup->definition->surface_ops->layout_anchor(popup->capsule, out);
+        *out = popup->popup_owner;
     }
-    return out->surface < REACH_HOST_SURFACE_CAPACITY;
+    else
+    {
+        *out = {popup->links->layout_anchor, popup->definition->layout.anchor_slot, 0, 0};
+    }
+    return out->surface != REACH_SURFACE_ID_INVALID;
 }
 
 int32_t reach_host_popup_owner_trigger(const reach_feature_runtime *popup,
@@ -627,9 +627,18 @@ static reach_result reach_host_handle_pointer_down(reach_host *host, const reach
         return REACH_OK;
     }
 
-    reach_capsule_pointer_result clipboard_cancel = reach_host_dispatch_pointer(
-        host, REACH_SURFACE_ID_CLIPBOARD, nullptr, REACH_POINTER_EVENT_CANCEL);
-    (void)reach_host_apply_surface_action(host, REACH_SURFACE_ID_CLIPBOARD, &clipboard_cancel);
+    for (size_t index = 0; index < host->surface_count; ++index)
+    {
+        const auto &runtime = host->feature_runtimes[index];
+        if ((runtime.definition->surface.pointer_flags &
+             REACH_SURFACE_POINTER_CANCEL_BEFORE_DOWN) != 0)
+        {
+            const reach_surface_id id = runtime.definition->id;
+            const auto cancel =
+                reach_host_dispatch_pointer(host, id, nullptr, REACH_POINTER_EVENT_CANCEL);
+            (void)reach_host_apply_surface_action(host, id, &cancel);
+        }
+    }
 
     reach_host_notify_popups_closed(host);
 
@@ -786,6 +795,75 @@ static reach_result reach_host_handle_pointer_cancel(reach_host *host)
     return REACH_OK;
 }
 
+static bool reach_host_event_matches(reach_ui_event_type type, const reach_ui_event_type *events,
+                                     size_t count)
+{
+    for (size_t index = 0; index < count; ++index)
+    {
+        if (events[index] == type)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+static reach_result reach_host_dispatch_registered_events(reach_host *host,
+                                                          const reach_ui_event *event,
+                                                          reach_surface_id source,
+                                                          int32_t game_mode)
+{
+    for (size_t index = 0; index < host->surface_count; ++index)
+    {
+        auto *runtime = &host->feature_runtimes[index];
+        const auto &definition = *runtime->definition;
+        if (game_mode &&
+            (definition.surface.behavior_flags & REACH_SURFACE_BEHAVIOR_GAME_MODE_VISIBLE) == 0)
+        {
+            continue;
+        }
+        const bool routed = reach_host_event_matches(event->type, definition.routed_events,
+                                                     definition.routed_event_count);
+        const bool local = source == definition.id &&
+                           reach_host_event_matches(event->type, definition.window_events,
+                                                    definition.window_event_count);
+        if (!routed && !local)
+        {
+            continue;
+        }
+        if (definition.refresh_world_before_event == event->type)
+        {
+            reach_host_close_transient_surfaces(host, 0);
+            reach_host_refresh_window_world(host);
+            reach_host_apply_foreground_change(host);
+        }
+        const reach_result result =
+            reach_host_dispatch_capsule_event(host, runtime, event, nullptr);
+        if (result != REACH_OK)
+        {
+            return result;
+        }
+    }
+    for (size_t index = 0; index < host->surface_count; ++index)
+    {
+        const auto &definition = *host->feature_runtimes[index].definition;
+        if (game_mode &&
+            (definition.surface.behavior_flags & REACH_SURFACE_BEHAVIOR_GAME_MODE_VISIBLE) == 0)
+        {
+            continue;
+        }
+        for (size_t entry = 0; entry < definition.toggle_event_count; ++entry)
+        {
+            if (definition.toggle_events[entry] == event->type)
+            {
+                reach_host_toggle_registered_surface(host, definition.id);
+                break;
+            }
+        }
+    }
+    return REACH_OK;
+}
+
 static reach_result reach_host_handle_surface_event(reach_host *host, const reach_ui_event *event,
                                                     reach_surface_id source);
 
@@ -827,7 +905,8 @@ static reach_result reach_host_handle_surface_event(reach_host *host, const reac
         return REACH_OK;
     }
 
-    if (reach_host_game_mode_enabled(host) && !reach_host_game_mode_allows_event(event->type))
+    const int32_t game_mode = reach_host_game_mode_enabled(host);
+    if (game_mode && !reach_host_game_mode_allows_event(event->type))
     {
         return REACH_OK;
     }
@@ -1025,49 +1104,24 @@ static reach_result reach_host_handle_surface_event(reach_host *host, const reac
         return reach_host_step_brightness(host, -0.02f);
     }
 
-    if (event->type == REACH_UI_EVENT_APP_SWITCH_BEGIN)
+    const reach_result result =
+        reach_host_dispatch_registered_events(host, event, source, game_mode);
+    if (result != REACH_OK)
     {
-        reach_host_close_transient_surfaces(host, 0);
-        reach_host_refresh_window_world(host);
-        reach_host_apply_foreground_change(host);
-    }
-
-    for (size_t index = 0; index < host->surface_count; ++index)
-    {
-        reach_feature_runtime *desc = &host->feature_runtimes[index];
-        for (size_t entry = 0; entry < desc->definition->routed_event_count; ++entry)
-        {
-            if (desc->definition->routed_events[entry] != event->type)
-            {
-                continue;
-            }
-            reach_result routed = reach_host_dispatch_capsule_event(host, desc, event, nullptr);
-            if (routed != REACH_OK)
-            {
-                return routed;
-            }
-            break;
-        }
-    }
-
-    for (size_t index = 0; index < host->surface_count; ++index)
-    {
-        const reach_feature_runtime *desc = &host->feature_runtimes[index];
-        for (size_t entry = 0; entry < desc->definition->toggle_event_count; ++entry)
-        {
-            if (desc->definition->toggle_events[entry] == event->type)
-            {
-                reach_host_toggle_registered_surface(host, desc->definition->id);
-                break;
-            }
-        }
+        return result;
     }
 
     if (event->type == REACH_UI_EVENT_ESCAPE)
     {
-        reach_host_set_registered_surface_open(host, REACH_SURFACE_ID_CLIPBOARD, 0);
-        reach_host_close_registered_surface(host, REACH_SURFACE_ID_STAGE,
-                                            REACH_SURFACE_CLOSE_DISMISS);
+        for (size_t index = 0; index < host->surface_count; ++index)
+        {
+            const auto &definition = *host->feature_runtimes[index].definition;
+            if ((definition.surface.behavior_flags & REACH_SURFACE_BEHAVIOR_DISMISS_ON_ESCAPE) != 0)
+            {
+                reach_host_close_registered_surface(host, definition.id,
+                                                    REACH_SURFACE_CLOSE_DISMISS);
+            }
+        }
     }
 
     return REACH_OK;

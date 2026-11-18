@@ -725,26 +725,35 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
     reach_feature_surface_context surface_ctx = {};
     reach_host_fill_surface_context(host, desc, ctx, &surface_ctx);
     surface_ctx.transition_visible = visible;
-    const reach_feature_definition *definition = desc->definition;
     reach_feature_layout_anchor layout_anchor = {};
-    layout_anchor.surface = definition->layout.anchor;
-    layout_anchor.slot = definition->layout.anchor_slot;
-    if (desc->definition->surface_ops->layout_anchor != nullptr)
-    {
-        (void)desc->definition->surface_ops->layout_anchor(desc->capsule, &layout_anchor);
-    }
+    (void)reach_host_resolve_popup_owner(desc, &layout_anchor);
     reach_surface_id anchor_id = layout_anchor.surface;
     if (!reach_host_layout_anchor_equal(&layout_anchor, &desc->resolved_anchor_owner))
         desc->resolved_anchor_valid = 0;
     if (anchor_id < host->surface_count)
     {
-        const reach_feature_runtime *anchor = &host->feature_runtimes[anchor_id];
+        reach_feature_runtime *anchor = &host->feature_runtimes[anchor_id];
+        if (reach_host_game_mode_enabled(host) && !anchor->resolved_bounds_valid &&
+            (anchor->definition->surface.behavior_flags &
+             REACH_SURFACE_BEHAVIOR_GAME_MODE_VISIBLE) == 0)
+        {
+            // A suppressed anchor still supplies geometry without presenting a native window.
+            reach_feature_surface_context arrange = {};
+            arrange.theme = surface_ctx.theme;
+            arrange.monitor_bounds = surface_ctx.monitor_bounds;
+            arrange.dpi_scale = surface_ctx.dpi_scale;
+            reach_workload_add(REACH_WORKLOAD_LAYOUTS, 1);
+            (void)anchor->definition->surface_ops->arrange(anchor->capsule, &arrange);
+            reach_feature_surface_geometry geometry = {};
+            anchor->definition->capsule_ops->surface_geometry(anchor->capsule, &geometry);
+            anchor->resolved_bounds = geometry.visible_bounds;
+            anchor->resolved_bounds_valid = 1;
+        }
         if (anchor->resolved_bounds_valid)
         {
             surface_ctx.anchor_bounds = anchor->resolved_bounds;
         }
-        if (anchor->definition != nullptr && anchor->definition->resolve_anchor != nullptr &&
-            definition != nullptr)
+        if (anchor->definition->resolve_anchor != nullptr)
         {
             reach_feature_anchor resolved = {};
             if (anchor->definition->resolve_anchor(anchor->capsule, layout_anchor.slot,
@@ -794,13 +803,11 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
                                 renderer.ops.sample_content != nullptr &&
                                 renderer.ops.content_sampling_required != nullptr &&
                                 renderer.ops.content_sampling_required(renderer.backend);
-    const bool bar_visibility_pending =
+    int32_t bar_visibility_pending =
         host->dirty.bar_visibility && desc->definition->surface.bar_reveal.ops != nullptr;
-    const bool surface_unchanged = !host->dirty.layout && !host->dirty.render &&
-                                   !desc->surface->dirty_flags &&
-                                   !current_geometry.synchronize_presentation &&
-                                   !frame_context_changed && !bar_visibility_pending;
-    if (surface_unchanged && (!needs_frame || renderer_sampling))
+    if ((!needs_frame || renderer_sampling) && !host->dirty.layout && !host->dirty.render &&
+        !desc->surface->dirty_flags && !current_geometry.synchronize_presentation &&
+        !frame_context_changed && !bar_visibility_pending)
     {
         reach_result sampling_result = REACH_OK;
         if (renderer_sampling)
@@ -847,7 +854,15 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
     {
         bounds = reach_host_reconcile_bar_visibility(
             host, desc->definition->id, geometry.visible_bounds, ctx->monitor_bounds, &geometry);
+        desc->definition->capsule_ops->surface_geometry(desc->capsule, &geometry);
     }
+    int32_t presentation_changed =
+        geometry.presentation.retained &&
+        (!desc->frame_geometry.presentation.retained ||
+         !reach_rect_equal(geometry.presentation.translation_bounds,
+                           desc->frame_geometry.presentation.translation_bounds) ||
+         !reach_render_group_equal(&geometry.presentation.group,
+                                   &desc->frame_geometry.presentation.group));
     if (desc->surface->window.ops.set_input_passthrough != nullptr)
         (void)desc->surface->window.ops.set_input_passthrough(
             desc->surface->window.window, (desc->definition->surface.behavior_flags &
@@ -868,6 +883,7 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
             geometry.visible_bounds, geometry.envelope_bounds, shadow_pad, translation,
             maximum_scale);
         bounds = frame.window_bounds;
+        bounds.y += reach_host_bar_parking_offset(desc, geometry.visible_bounds);
         surface_ctx.content_rect = frame.content_rect;
         surface_ctx.render_transform = frame.render_transform;
         surface_ctx.content_transform_active = 1;
@@ -949,7 +965,7 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
         &desc->surface->bounds_valid, &window_changed);
     int32_t position_only = reach_host_bar_position_only(desc);
     int32_t render_needed = host->dirty.render || desc->surface->dirty_flags || layout_changed ||
-                            geometry_changed || render_context_changed ||
+                            geometry_changed || render_context_changed || presentation_changed ||
                             (window_changed && !position_only);
     reach_result native_overlay_result = REACH_OK;
     if (result == REACH_OK && active && desc->definition->surface_ops->native_overlay != nullptr)

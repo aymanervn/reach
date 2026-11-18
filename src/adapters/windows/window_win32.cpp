@@ -787,51 +787,6 @@ static reach_result reach_platform_window_place_behind(reach_platform_window *wi
     return ok ? REACH_OK : REACH_ERROR;
 }
 
-static reach_result reach_platform_window_place_above_desktop(reach_platform_window *window)
-{
-    if (window == nullptr || window->hwnd == nullptr)
-    {
-        return REACH_INVALID_ARGUMENT;
-    }
-
-    HWND desktop = reinterpret_cast<HWND>(reach_windows_desktop_compat_window());
-    if (desktop == nullptr)
-    {
-        desktop = GetShellWindow();
-    }
-    if (desktop == nullptr)
-    {
-        return REACH_ERROR;
-    }
-
-    const auto is_topmost = [](HWND hwnd)
-    { return (GetWindowLongPtrW(hwnd, GWL_EXSTYLE) & WS_EX_TOPMOST) != 0; };
-    constexpr UINT flags = SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER;
-    if (is_topmost(desktop))
-    {
-        return REACH_ERROR;
-    }
-    if (is_topmost(window->hwnd) && !SetWindowPos(window->hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, flags))
-    {
-        return REACH_ERROR;
-    }
-
-    HWND position = GetWindow(desktop, GW_HWNDPREV);
-    if (position != window->hwnd)
-    {
-        // At the top of the normal band, use HWND_TOP to place a normal window without
-        // making it topmost. HWND_NOTOPMOST alone does not move an already normal window.
-        HWND insert_after = position == nullptr || is_topmost(position) ? HWND_TOP : position;
-        if (!SetWindowPos(window->hwnd, insert_after, 0, 0, 0, 0, flags))
-        {
-            return REACH_ERROR;
-        }
-    }
-    return GetWindow(desktop, GW_HWNDPREV) == window->hwnd && !is_topmost(window->hwnd)
-               ? REACH_OK
-               : REACH_ERROR;
-}
-
 static reach_result reach_platform_window_show(reach_platform_window *window)
 {
     if (window == nullptr || window->hwnd == nullptr)
@@ -1344,7 +1299,6 @@ static reach_result reach_windows_create_window(uint32_t window_flags, const wch
     out_port->ops.is_active = reach_platform_window_is_active;
     out_port->ops.native_id = reach_platform_window_native_id;
     out_port->ops.place_behind = reach_platform_window_place_behind;
-    out_port->ops.place_above_desktop = reach_platform_window_place_above_desktop;
     out_port->ops.post_event = reach_platform_window_post_event;
     out_port->ops.set_input_passthrough = reach_platform_window_set_input_passthrough;
     out_port->ops.set_input_regions = reach_platform_window_set_input_regions;

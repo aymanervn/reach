@@ -353,48 +353,31 @@ PUBLIC_INNER_FORBIDDEN_INCLUDE_PATTERNS = [
     r"(^|/)(qt|gtk|wx|imgui|sdl)(/|\.|$)",
 ]
 
-REGISTERED_FEATURE_LIFECYCLE_RE = re.compile(
-    r"\breach_(dock|top_bar|launcher|clipboard_feature|quick_settings|battery|"
-    r"system_hud|context_menu|switcher|stage|screenshot)_(create|destroy)\s*\("
-)
-
 INTERFEATURE_ROUTES_SEAM = "src/composition/interfeature_routes.cpp"
 
-INTERFEATURE_ROUTE_TARGETS: dict[str, str] = {
-    "reach_host_show_dock_app_context_menu": (
-        "src/composition/host_context_menu_orchestration.cpp"
-    ),
-    "reach_host_show_power_context_menu": "src/composition/host_context_menu_orchestration.cpp",
-    "reach_host_dock_item_hovered": "src/composition/host_window_list_orchestration.cpp",
-    "reach_host_toggle_stage": "src/composition/host_stage_orchestration.cpp",
-}
 
 FEATURE_ACTION_ENUM_RE = re.compile(r"REACH_[A-Z_]+_POINTER_ACTION_[A-Z_]+")
 
 FEATURE_ACTION_POLICY_ALLOWED: set[str] = set()
 
 GENERIC_SURFACE_LOOPS = (
-    ("src/composition/host_lifecycle.cpp", "reach_host_create_with_dependencies", "lifecycle"),
+    ("src/composition/host_lifecycle.cpp", "reach_host_create_registered_features", "lifecycle"),
+    (
+        "src/composition/host_surfaces.cpp",
+        "reach_host_create_registered_surface_ports",
+        "surface creation",
+    ),
     ("src/composition/host_surfaces.cpp", "reach_host_init_layout", "layout"),
     ("src/composition/host_update.cpp", "reach_host_finish_surface_presentations", "presentation"),
     ("src/composition/host_input.cpp", "reach_host_pointer_order", "input"),
-    ("src/composition/host_update.cpp", "reach_host_update", "frame"),
+    ("src/composition/host_update.cpp", "reach_host_frame_surfaces", "frame"),
 )
 
 SURFACE_TABLE_LOOP_RE = re.compile(
     r"for\s*\([^;]*;[^;]*<\s*host\s*->\s*surface_count\s*;[^)]*\)"
 )
 
-MIGRATED_SURFACE_FRAME_RE = re.compile(
-    r"\breach_host_(frame|render)_(dock|top_bar|launcher|context_menu|stage|"
-    r"system_hud|switcher|clipboard|screenshot)(?:_surface)?\b"
-)
-
 FEATURE_REGISTRY_SEAM = "src/composition/feature_registry.cpp"
-
-SHARED_CLOSE_PATH_OWNER = "src/composition/host_surfaces.cpp"
-
-DEFINITION_CLOSE_CALL_RE = re.compile(r"definition->force_close\s*\(")
 
 COMPOSITION_FEATURE_SEAMS = {
     FEATURE_REGISTRY_SEAM,
@@ -403,26 +386,6 @@ COMPOSITION_FEATURE_SEAMS = {
 
 
 
-
-REGISTERED_SURFACE_IDS = (
-    "REACH_SURFACE_ID_DOCK",
-    "REACH_SURFACE_ID_TOP_BAR",
-    "REACH_SURFACE_ID_LAUNCHER",
-    "REACH_SURFACE_ID_CLIPBOARD",
-    "REACH_SURFACE_ID_TRAY",
-    "REACH_SURFACE_ID_QUICK_SETTINGS",
-    "REACH_SURFACE_ID_BATTERY",
-    "REACH_SURFACE_ID_SYSTEM_HUD",
-    "REACH_SURFACE_ID_CONTEXT_MENU",
-    "REACH_SURFACE_ID_SWITCHER",
-    "REACH_SURFACE_ID_STAGE",
-    "REACH_SURFACE_ID_SCREENSHOT",
-)
-
-REGISTERED_CAPSULE_OPS_RE = re.compile(
-    r"\breach_(dock|top_bar|launcher|clipboard_feature|quick_settings|battery|"
-    r"system_hud|context_menu|switcher|stage|screenshot)_(?:tray_)?capsule_ops\s*\("
-)
 
 LEGACY_FEATURE_RUNTIME_RE = re.compile(
     r"\b(reach_surface_desc|surface_descs|frame_priority)\b"
@@ -434,27 +397,31 @@ FEATURE_RUNTIME_STRUCT_RE = re.compile(
     re.DOTALL,
 )
 
-TYPED_CAPSULE_ALIAS_RE = re.compile(
-    r"\b(dock|top_bar|launcher|clipboard|quick_settings|battery|system_hud|"
-    r"context_menu|switcher|stage|screenshot)_capsule\s*;"
-)
+TYPED_CAPSULE_ALIAS_RE = re.compile(r"\b\w+_capsule\s*;")
 
 IMMUTABLE_RUNTIME_FIELDS = (
     "id",
+    "key",
+    "capsule_owner",
+    "lifecycle",
     "capsule_ops",
     "surface_ops",
-    "force_close",
     "pointer_flags",
     "shadow",
     "behavior_flags",
+    "redraw_on",
     "layer",
-    "role",
+    "window_flags",
     "pointer_priority",
     "dismiss",
+    "dismiss_guard_surface",
+    "opening_origin",
     "layout_anchor",
     "frame_priority",
     "toggle_events",
     "routed_events",
+    "window_events",
+    "refresh_world_before_event",
     "frame",
 )
 
@@ -569,9 +536,7 @@ def concrete_feature_symbols(headers: dict[str, str]) -> dict[str, str]:
     symbols: dict[str, str] = {}
     for include, feature in headers.items():
         header = ROOT / "include" / include
-        for symbol in re.findall(
-            r"\b(reach_[a-z0-9_]+)\s*\((?!\s*\*)", strip_comments(read(header))
-        ):
+        for symbol in re.findall(r"\b(reach_[a-z0-9_]+)\s*\(", strip_comments(read(header))):
             symbols[symbol] = feature
     return symbols
 
@@ -795,25 +760,6 @@ def validate_composition_feature_helpers(
     return violations
 
 
-def validate_shared_close_path(path: Path, text: str) -> list[str]:
-    """Closing a surface runs one shared path so intent, focus restore and the capsule's own
-    control operation always apply. A definition's force_close is the fallback inside that
-    path, so calling it anywhere else silently skips every surface that has already migrated
-    to control operations."""
-    relative = rel(path).replace("\\", "/")
-    if not relative.startswith("src/composition/") or relative in (
-        SHARED_CLOSE_PATH_OWNER,
-        FEATURE_REGISTRY_SEAM,
-    ):
-        return []
-    if DEFINITION_CLOSE_CALL_RE.search(strip_comments(text)) is None:
-        return []
-    return [
-        f"{relative}: close surfaces through reach_host_close_registered_surface; calling "
-        "definition->force_close directly skips every capsule-controlled surface"
-    ]
-
-
 def validate_feature_config_ownership(path: Path, text: str) -> list[str]:
     relative = rel(path).replace("\\", "/")
     if not relative.startswith("src/features/") and not relative.startswith(
@@ -825,44 +771,6 @@ def validate_feature_config_ownership(path: Path, text: str) -> list[str]:
     return [
         f"{relative}: features must consume reach_config_service snapshots, not config_store"
     ]
-
-
-def validate_registered_feature_lifecycle(path: Path, text: str) -> list[str]:
-    relative = rel(path).replace("\\", "/")
-    if not relative.startswith("src/composition/") or relative == (
-        "src/composition/feature_registry.cpp"
-    ):
-        return []
-    if REGISTERED_FEATURE_LIFECYCLE_RE.search(strip_comments(text)) is None:
-        return []
-    return [
-        f"{relative}: registered feature create/destroy calls belong only in "
-        "feature_registry.cpp"
-    ]
-
-
-def validate_interfeature_routes(path: Path, text: str) -> list[str]:
-    """An effect that opens or changes another feature may only be reached from the
-    interfeature routing seam, from the file that defines it, or from the shared
-    composition declarations."""
-    relative = rel(path).replace("\\", "/")
-    if not relative.startswith("src/composition/") or relative in (
-        INTERFEATURE_ROUTES_SEAM,
-        "src/composition/host_internal.h",
-    ):
-        return []
-
-    scan_text = strip_comments(text)
-    violations: list[str] = []
-    for symbol, owner in INTERFEATURE_ROUTE_TARGETS.items():
-        if relative == owner:
-            continue
-        if re.search(rf"\b{symbol}\s*\(", scan_text) is not None:
-            violations.append(
-                f"{relative}: {symbol} is an interfeature effect; route it from "
-                f"{INTERFEATURE_ROUTES_SEAM}"
-            )
-    return violations
 
 
 def validate_feature_action_vocabulary(path: Path, text: str) -> list[str]:
@@ -885,7 +793,7 @@ def validate_feature_action_vocabulary(path: Path, text: str) -> list[str]:
 
 
 def function_body(text: str, name: str) -> str | None:
-    match = re.search(rf"^[A-Za-z_][A-Za-z0-9_ *]*\b{name}\s*\(", text, re.MULTILINE)
+    match = re.search(rf"^[A-Za-z_][A-Za-z0-9_ *]*\s+{name}\s*\(", text, re.MULTILINE)
     if match is None:
         return None
     open_brace = text.find("{", match.end())
@@ -921,17 +829,6 @@ def validate_generic_surface_loops() -> list[str]:
     return violations
 
 
-def validate_migrated_surface_frames(path: Path, text: str) -> list[str]:
-    relative = rel(path).replace("\\", "/")
-    if not relative.startswith("src/composition/"):
-        return []
-    if MIGRATED_SURFACE_FRAME_RE.search(strip_comments(text)) is None:
-        return []
-    return [
-        f"{relative}: migrated features must use the registered generic surface frame operations"
-    ]
-
-
 def validate_uniform_feature_runtime(path: Path, text: str) -> list[str]:
     relative = rel(path).replace("\\", "/")
     if not relative.startswith("src/composition/"):
@@ -945,20 +842,26 @@ def validate_uniform_feature_runtime(path: Path, text: str) -> list[str]:
             f"{relative}: {legacy.group(0)} is obsolete; use the canonical feature "
             "definition and runtime"
         )
-    if (
-        relative != FEATURE_REGISTRY_SEAM
-        and REGISTERED_CAPSULE_OPS_RE.search(scan_text) is not None
-    ):
+    surface_id = re.search(r"\bREACH_SURFACE_ID_(?!INVALID\b)[A-Z0-9_]+\b", scan_text)
+    if surface_id is not None:
         violations.append(
-            f"{relative}: registered capsule operations belong only in "
-            f"{FEATURE_REGISTRY_SEAM}"
+            f"{relative}: {surface_id.group(0)} names a numeric surface ID; use a surface key"
         )
+    if relative not in COMPOSITION_FEATURE_SEAMS:
+        surface_key = re.search(
+            r"\b(?:reach_surface_key_for|reach_host_find_surface)\s*<\s*reach_\w+",
+            scan_text,
+        )
+        if surface_key is not None:
+            violations.append(
+                f"{relative}: concrete surface keys belong in {FEATURE_REGISTRY_SEAM} "
+                f"and {INTERFEATURE_ROUTES_SEAM}"
+            )
     return violations
 
 
 def validate_feature_registry_contract() -> list[str]:
     violations: list[str] = []
-    registry_text = strip_comments(read(ROOT / FEATURE_REGISTRY_SEAM))
     host_internal_text = strip_comments(
         read(ROOT / "src" / "composition" / "host_internal.h")
     )
@@ -971,7 +874,7 @@ def validate_feature_registry_contract() -> list[str]:
     else:
         runtime_body = runtime_match.group("body")
         for field in IMMUTABLE_RUNTIME_FIELDS:
-            if re.search(rf"\b{field}\s*(?:\[|;)", runtime_body) is not None:
+            if re.search(rf"\b{field}\s*(?:=|\[|;)", runtime_body) is not None:
                 violations.append(
                     "src/composition/host_internal.h: immutable feature policy field "
                     f"{field} belongs in reach_feature_definition"
@@ -984,32 +887,6 @@ def validate_feature_registry_contract() -> list[str]:
             f"{capsule_alias.group(0)[:-1]} duplicates reach_feature_runtime"
         )
 
-    for surface_id in REGISTERED_SURFACE_IDS:
-        definition_count = len(
-            re.findall(
-                rf"\breach_host_define_feature\s*\(\s*host\s*,\s*{surface_id}\b",
-                registry_text,
-            )
-        )
-        if definition_count != 1:
-            violations.append(
-                f"{FEATURE_REGISTRY_SEAM}: {surface_id} must have exactly one runtime binding"
-            )
-        if (
-            re.search(rf"\[\s*{surface_id}\s*\]\.surface_ops\s*=", registry_text)
-            is None
-        ):
-            violations.append(
-                f"{FEATURE_REGISTRY_SEAM}: {surface_id} must declare uniform surface_ops"
-            )
-
-    host_update_text = strip_comments(
-        read(ROOT / "src" / "composition" / "host_update.cpp")
-    )
-    if re.search(r"(?:->|\.)frame\s*\(", host_update_text) is not None:
-        violations.append(
-            "src/composition/host_update.cpp: registered surfaces must not use a named frame fallback"
-        )
     return violations
 
 
@@ -1114,12 +991,8 @@ def main() -> int:
         violations.extend(
             validate_composition_feature_helpers(path, text, feature_helper_pattern)
         )
-        violations.extend(validate_shared_close_path(path, text))
         violations.extend(validate_feature_config_ownership(path, text))
-        violations.extend(validate_registered_feature_lifecycle(path, text))
-        violations.extend(validate_migrated_surface_frames(path, text))
         violations.extend(validate_uniform_feature_runtime(path, text))
-        violations.extend(validate_interfeature_routes(path, text))
         violations.extend(validate_feature_action_vocabulary(path, text))
         warnings.extend(validate_public_inner_api_warnings(path, text))
 

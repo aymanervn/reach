@@ -156,7 +156,6 @@ add_library(reach_core STATIC
     src/core/startup_apps.c
     src/core/theme.c
     src/core/wifi.c
-    src/core/widget_definition.c
 )
 
 reach_configure_common(reach_core)
@@ -204,7 +203,6 @@ add_library(reach_features STATIC
     src/features/dock/dock_feature.cpp
     src/features/dock/dock_interaction.cpp
     src/features/dock/dock_model.cpp
-    src/features/widgets/widgets_feature.cpp
     src/features/dock/dock_render.cpp
     src/features/launcher/launcher_feature.cpp
     src/features/launcher/launcher_interaction.cpp

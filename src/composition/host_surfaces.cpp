@@ -2,6 +2,57 @@
 
 #include <math.h>
 
+reach_result reach_host_create_registered_surface_ports(reach_host *host,
+                                                        const reach_host_dependencies *dependencies)
+{
+    if (host == nullptr || dependencies == nullptr || dependencies->create_surface_ports == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    for (size_t index = 0; index < host->surface_count; ++index)
+    {
+        auto &runtime = host->feature_runtimes[index];
+        auto &window = runtime.surface->window;
+        auto &renderer = runtime.surface->renderer;
+        const auto &spec = runtime.definition->surface;
+        const reach_result result = dependencies->create_surface_ports(
+            dependencies->surface_factory_user, spec.window_flags, &window, &renderer);
+        if (result != REACH_OK)
+        {
+            return result;
+        }
+        if (window.window == nullptr || renderer.backend == nullptr)
+        {
+            return REACH_INVALID_ARGUMENT;
+        }
+        if (window.ops.set_input_passthrough != nullptr)
+        {
+            const int32_t enabled =
+                (spec.behavior_flags & REACH_SURFACE_BEHAVIOR_INPUT_PASSTHROUGH) != 0;
+            (void)window.ops.set_input_passthrough(window.window, enabled);
+        }
+    }
+    return REACH_OK;
+}
+
+void reach_host_destroy_registered_surface_ports(reach_host *host)
+{
+    for (size_t index = host->surface_count; index > 0; --index)
+    {
+        auto *surface = host->feature_runtimes[index - 1].surface;
+        if (surface->renderer.ops.destroy != nullptr)
+        {
+            surface->renderer.ops.destroy(surface->renderer.backend);
+        }
+        if (surface->window.ops.destroy != nullptr)
+        {
+            surface->window.ops.destroy(surface->window.window);
+        }
+        reach_surface_runtime_init(surface);
+    }
+}
+
 int32_t reach_host_scalar_equal(float a, float b)
 {
     return fabsf(a - b) < 0.001f;
@@ -193,16 +244,6 @@ reach_result reach_host_init_layout(reach_host *host)
         return REACH_INVALID_ARGUMENT;
     }
 
-    size_t participant_count = host->surface_count;
-    for (size_t index = 0; index < host->surface_count; ++index)
-    {
-        participant_count += host->feature_definitions[index].surface.edge_reveal.enabled != 0;
-    }
-    if (participant_count > REACH_LAYOUT_MAX_PARTICIPANTS)
-    {
-        return REACH_ERROR;
-    }
-
     host->layout_manager = {};
     host->applied_layout_plan = {};
     host->has_applied_layout_plan = 0;
@@ -361,6 +402,7 @@ void reach_host_apply_surface_open_change(reach_host *host, reach_feature_runtim
     reach_host_sync_popup_mouse_hook(host);
     if (!next)
     {
+        runtime->popup_owner = {};
         reach_host_request_bar_visibility_update(host);
     }
 }
@@ -372,8 +414,7 @@ int32_t reach_host_surface_closable(const reach_feature_runtime *runtime)
         return 0;
     }
     const reach_feature_control_ops *control = runtime->definition->control_ops;
-    return (runtime->capsule != nullptr && control != nullptr && control->set_open != nullptr) ||
-           runtime->definition->force_close != nullptr;
+    return runtime->capsule != nullptr && control != nullptr && control->set_open != nullptr;
 }
 
 void reach_host_set_registered_surface_open(reach_host *host, reach_surface_id id, int32_t open)
@@ -400,7 +441,7 @@ void reach_host_set_registered_surface_open(reach_host *host, reach_surface_id i
             reach_host_refresh_window_world(host);
             reach_host_notify_display_changed(host);
         }
-        reach_host_surface_opening(host, id, runtime->definition->surface.opening_origin);
+        reach_host_surface_opening(host, id, runtime->links->opening_origin);
     }
     reach_feature_tick_result result = {};
     if (!control->set_open(runtime->capsule, next, &result))
@@ -441,7 +482,7 @@ reach_host_popup_activation_decide(int32_t open, const reach_feature_layout_anch
                                    const reach_feature_layout_anchor *requested,
                                    reach_popup_activation_mode mode)
 {
-    if (requested == nullptr || requested->surface >= REACH_HOST_SURFACE_CAPACITY)
+    if (requested == nullptr || requested->surface == REACH_SURFACE_ID_INVALID)
     {
         return REACH_POPUP_ACTIVATION_NONE;
     }
@@ -573,19 +614,15 @@ void reach_host_close_registered_surface(reach_host *host, reach_surface_id id,
         reach_host_cancel_focus_restore(host, id);
     }
 
-    const reach_feature_control_ops *control = runtime->definition->control_ops;
-    if (runtime->capsule != nullptr && control != nullptr && control->set_open != nullptr)
-    {
-        reach_host_set_registered_surface_open(host, id, 0);
-        return;
-    }
-    if (runtime->definition->force_close != nullptr)
-    {
-        runtime->definition->force_close(host);
-    }
+    reach_host_set_registered_surface_open(host, id, 0);
 }
 
 void reach_host_post_feature_work_ready(reach_host *host)
+{
+    reach_host_post_event(host, REACH_UI_EVENT_FEATURE_WORK_READY);
+}
+
+void reach_host_post_event(reach_host *host, reach_ui_event_type event)
 {
     if (host == nullptr)
     {
@@ -594,14 +631,25 @@ void reach_host_post_feature_work_ready(reach_host *host)
     for (size_t index = 0; index < host->surface_count; ++index)
     {
         const reach_surface_runtime *surface = host->feature_runtimes[index].surface;
-        if (surface != nullptr && surface->window.ops.post_event != nullptr)
+        if (surface != nullptr && surface->window.ops.post_event != nullptr &&
+            surface->window.ops.post_event(surface->window.window, event) == REACH_OK)
         {
-            (void)surface->window.ops.post_event(surface->window.window,
-                                                 REACH_UI_EVENT_FEATURE_WORK_READY);
             return;
         }
     }
     reach_host_request_update(host);
+}
+
+void reach_host_invalidate_surface_content(reach_host *host, reach_surface_redraw_reason reason)
+{
+    for (size_t index = 0; index < host->surface_count; ++index)
+    {
+        auto &runtime = host->feature_runtimes[index];
+        if ((runtime.definition->surface.redraw_on & reason) != 0)
+        {
+            runtime.surface->dirty_flags = 1;
+        }
+    }
 }
 
 void reach_host_toggle_registered_surface(reach_host *host, reach_surface_id id)
@@ -687,7 +735,7 @@ void reach_host_close_activating_surfaces_on_focus_loss(reach_host *host)
     for (size_t index = 0; index < host->surface_count; ++index)
     {
         const reach_feature_runtime *desc = &host->feature_runtimes[index];
-        if ((desc->definition->surface.behavior_flags & REACH_SURFACE_BEHAVIOR_ACTIVATES) == 0 ||
+        if ((desc->definition->surface.window_flags & REACH_WINDOW_ACTIVATE) == 0 ||
             !reach_host_surface_closable(desc) || !reach_host_surface_is_open(desc))
         {
             continue;

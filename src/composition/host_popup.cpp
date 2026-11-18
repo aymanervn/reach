@@ -58,24 +58,18 @@ static int32_t reach_host_press_holds_surface_open(reach_host *host,
     reach_feature_layout_anchor anchor = {};
     int32_t match_index = 0;
 
-    if (spec->dismiss_guard_surface < host->surface_count)
+    if (desc->links->dismiss_guard_surface < host->surface_count)
     {
-        anchor.surface = spec->dismiss_guard_surface;
+        anchor.surface = desc->links->dismiss_guard_surface;
         anchor.slot = spec->dismiss_guard_slot;
     }
     else
     {
-        anchor.surface = desc->definition->layout.anchor;
-        anchor.slot = desc->definition->layout.anchor_slot;
-        if (desc->definition->surface_ops != nullptr &&
-            desc->definition->surface_ops->layout_anchor != nullptr)
+        if (!reach_host_resolve_popup_owner(desc, &anchor))
         {
-            if (!desc->definition->surface_ops->layout_anchor(desc->capsule, &anchor))
-            {
-                return 0;
-            }
-            match_index = 1;
+            return 0;
         }
+        match_index = desc->popup_owner.surface != REACH_SURFACE_ID_INVALID;
     }
 
     if (anchor.surface >= host->surface_count)

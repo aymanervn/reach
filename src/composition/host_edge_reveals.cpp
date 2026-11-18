@@ -3,7 +3,7 @@
 static void reach_host_on_edge_reveal_event(void *user, reach_screen_hotspot_event event)
 {
     reach_host_edge_reveal_runtime *runtime = static_cast<reach_host_edge_reveal_runtime *>(user);
-    if (runtime == nullptr || runtime->host == nullptr || runtime->owner == nullptr)
+    if (runtime == nullptr || !runtime->callback_bound)
     {
         return;
     }
@@ -43,9 +43,9 @@ static void reach_host_on_edge_reveal_event(void *user, reach_screen_hotspot_eve
         return;
     }
 
-    if (owner->definition->surface.edge_reveal.handle_event != nullptr)
+    if (event == REACH_SCREEN_HOTSPOT_ENTER && owner->definition->surface.edge_reveal.open_on_enter)
     {
-        owner->definition->surface.edge_reveal.handle_event(runtime->host, event);
+        reach_host_set_registered_surface_open(runtime->host, owner->definition->id, 1);
     }
 }
 
@@ -171,8 +171,22 @@ reach_result reach_host_start_edge_reveals(reach_host *host)
         {
             return result;
         }
+        runtime->callback_bound = true;
     }
     return REACH_OK;
+}
+
+void reach_host_stop_edge_reveals(reach_host *host)
+{
+    for (size_t index = host->surface_count; index > 0; --index)
+    {
+        auto &runtime = host->edge_reveals[index - 1];
+        if (runtime.callback_bound)
+        {
+            runtime.callback_bound = false;
+            (void)runtime.port.ops.set_callback(runtime.port.hotspot, nullptr, nullptr);
+        }
+    }
 }
 
 void reach_host_destroy_edge_reveals(reach_host *host)
@@ -182,9 +196,10 @@ void reach_host_destroy_edge_reveals(reach_host *host)
         return;
     }
 
-    for (size_t index = 0; index < host->surface_count; ++index)
+    reach_host_stop_edge_reveals(host);
+    for (size_t index = host->surface_count; index > 0; --index)
     {
-        reach_host_edge_reveal_runtime *runtime = &host->edge_reveals[index];
+        reach_host_edge_reveal_runtime *runtime = &host->edge_reveals[index - 1];
         if (runtime->port.hotspot != nullptr && runtime->port.ops.hide != nullptr)
         {
             (void)runtime->port.ops.hide(runtime->port.hotspot);
@@ -252,21 +267,4 @@ void reach_host_set_edge_reveal_visible(reach_host *host, reach_host_edge_reveal
     }
     reach_layout_set_visible(&host->layout_manager, runtime->participant,
                              visible && !host->window_manipulation.relevant);
-}
-
-void reach_host_on_surface_edge_reveal(reach_host *host, reach_screen_hotspot_event event)
-{
-    if (host == nullptr || event != REACH_SCREEN_HOTSPOT_ENTER)
-    {
-        return;
-    }
-    for (size_t index = 0; index < host->surface_count; ++index)
-    {
-        const reach_feature_runtime *runtime = &host->feature_runtimes[index];
-        if (runtime->definition->surface.edge_reveal.handle_event ==
-            reach_host_on_surface_edge_reveal)
-        {
-            reach_host_set_registered_surface_open(host, runtime->definition->id, 1);
-        }
-    }
 }

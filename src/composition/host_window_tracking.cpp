@@ -166,8 +166,7 @@ void reach_host_refresh_window_world(reach_host *host)
     if (open_windows_changed)
     {
         reach_host_notify_windows_changed(host);
-        host->surfaces[REACH_SURFACE_ID_DOCK].dirty_flags = 1;
-        host->surfaces[REACH_SURFACE_ID_TOP_BAR].dirty_flags = 1;
+        reach_host_invalidate_surface_content(host, REACH_SURFACE_REDRAW_OPEN_WINDOWS);
     }
     reach_host_settle_close_handoffs(host);
     reach_host_request_update(host);
@@ -341,12 +340,10 @@ void reach_host_apply_foreground_change(reach_host *host)
     reach_host_notify_windows_changed(host);
     if (reach_input_language_service_refresh(host->input_language, foreground))
     {
-        host->surfaces[REACH_SURFACE_ID_TOP_BAR].dirty_flags = 1;
+        reach_host_invalidate_surface_content(host, REACH_SURFACE_REDRAW_INPUT_LANGUAGE);
         host->dirty.layout = 1;
     }
-    host->surfaces[REACH_SURFACE_ID_DOCK].dirty_flags = 1;
-    host->surfaces[REACH_SURFACE_ID_TOP_BAR].dirty_flags = 1;
-    host->surfaces[REACH_SURFACE_ID_SWITCHER].dirty_flags = 1;
+    reach_host_invalidate_surface_content(host, REACH_SURFACE_REDRAW_FOREGROUND);
 
     reach_host_close_activating_surfaces_on_focus_loss(host);
     reach_host_request_update(host);

@@ -21,16 +21,6 @@ extern "C"
         uint64_t memory_total_bytes;
         uint64_t network_received_bytes;
         uint64_t network_sent_bytes;
-        float gpu_percent;
-        float gpu_temperature_c;
-        int32_t gpu_available;
-        int32_t gpu_temperature_available;
-        uint32_t cpu_clock_mhz;
-        uint32_t memory_speed_mt_s;
-        uint32_t gpu_clock_mhz;
-        uint32_t gpu_clock_max_mhz;
-        uint64_t vram_used_bytes;
-        uint64_t vram_total_bytes;
     } reach_system_stats_sample;
 
     typedef struct reach_system_stats_ops
@@ -38,8 +28,6 @@ extern "C"
         reach_result (*sample)(reach_system_stats_source *source,
                                reach_system_stats_sample *out_sample);
         void (*destroy)(reach_system_stats_source *source);
-        void (*sample_monitor)(reach_system_stats_source *source,
-                               reach_system_stats_sample *out_sample);
     } reach_system_stats_ops;
 
     typedef struct reach_system_stats_port
