@@ -525,6 +525,10 @@ static void reach_dock_capsule_surface_geometry(const void *capsule,
     if (dock != nullptr && dock->pointer_layout_valid)
     {
         out->visible_bounds = dock->pointer_layout.bounds;
+        /* The cursor region is the exact band the hit test resizes from. */
+        out->resize_cursor_region = reach_dock_resize_edge_rect(&dock->pointer_layout);
+        out->has_resize_cursor_region =
+            out->resize_cursor_region.width > 0.0f && out->resize_cursor_region.height > 0.0f;
     }
     if (dock == nullptr)
     {
