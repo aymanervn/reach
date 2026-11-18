@@ -1,10 +1,12 @@
 #include "reach/support/util.h"
+#include "reach/core/config.h"
 #include "reach/features/dock.h"
 #include "test_utf16.h"
 #include "../src/features/dock/dock_interaction.h"
 
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 static int failures;
 
@@ -536,7 +538,7 @@ static void test_dock_metrics_are_spaced_before_any_configuration_arrives(void)
 
 static const reach_dock_layout *arrange_one_pin_dock(reach_dock *dock, float size)
 {
-    reach_pinned_app_model pin = make_pin(7, "C:\apps\a.exe");
+    reach_pinned_app_model pin = make_pin(7, "C:\\apps\\a.exe");
     reach_dock_apply_pinned_apps(dock, &pin, 1);
     if (size > 0.0f)
     {
@@ -596,6 +598,7 @@ static void test_resize_edge_never_overlaps_icons(void)
         if (layout != nullptr)
         {
             reach_rect_f32 edge = reach_dock_resize_edge_rect(layout);
+            expect_true(edge.height > 0.0f, "the band is not empty at this size");
             const reach_rect_f32 *slot = &layout->app_slots[0];
             expect_true(edge.y + edge.height <= slot->y, "the band ends above the app slot");
             expect_true(edge.y + edge.height <= layout->trigger_button.y,
@@ -634,6 +637,356 @@ static void test_resize_edge_skips_rounded_ends(void)
         expect_true(edge.x + edge.width <= layout->bounds.width - radius + 0.5f,
                     "the band stops before the right rounded end");
     }
+    reach_dock_destroy(dock);
+}
+
+struct resize_route_log
+{
+    int32_t calls;
+    int32_t last_percent;
+};
+
+static void record_size_committed(void *user, int32_t size_percent)
+{
+    resize_route_log *log = static_cast<resize_route_log *>(user);
+    ++log->calls;
+    log->last_percent = size_percent;
+}
+
+static reach_dock_arrange_context resize_arrange_context(float monitor_width)
+{
+    reach_dock_arrange_context arrange = {};
+    arrange.theme = reach_theme_default();
+    arrange.monitor_bounds = {0.0f, 0.0f, monitor_width, 1080.0f};
+    arrange.dpi_scale = 1.0f;
+    return arrange;
+}
+
+static reach_dock *make_resize_dock(resize_route_log *log, int32_t size, float monitor_width,
+                                    size_t pin_count)
+{
+    reach_dock *dock = nullptr;
+    if (reach_dock_create(&dock) != REACH_OK)
+        return nullptr;
+    reach_pinned_app_model pins[16] = {};
+    for (size_t index = 0; index < pin_count; ++index)
+    {
+        char path[32];
+        snprintf(path, sizeof(path), "C:\\apps\\app%zu.exe", index);
+        pins[index] = make_pin((uint32_t)(index + 1), path);
+    }
+    reach_dock_apply_pinned_apps(dock, pins, pin_count);
+    reach_dock_apply_config(dock, 0.0f, size);
+    reach_dock_routes routes = {};
+    routes.user = log;
+    routes.size_committed = record_size_committed;
+    reach_dock_set_routes(dock, &routes);
+
+    reach_dock_arrange_context arrange = resize_arrange_context(monitor_width);
+    (void)reach_dock_arrange(dock, &arrange);
+    reach_feature_tick_result tick = {};
+    reach_dock_capsule_ops()->tick(dock, 1.0, &tick);
+    return dock;
+}
+
+static float resize_scale_now(const reach_dock *dock)
+{
+    return reach_dock_arranged_layout(dock)->content_scale;
+}
+
+static void resize_event(reach_dock *dock, reach_pointer_event_kind kind, int32_t x, int32_t y,
+                         reach_capsule_pointer_result *result)
+{
+    reach_pointer_event pointer = {};
+    pointer.kind = kind;
+    pointer.button = REACH_POINTER_BUTTON_PRIMARY;
+    pointer.x = x;
+    pointer.y = y;
+    reach_dock_capsule_ops()->handle_pointer(dock, &pointer, result);
+}
+
+struct resize_edge_point
+{
+    int32_t x;
+    int32_t y;
+    float native_height;
+};
+
+static resize_edge_point resize_edge_point_of(const reach_dock *dock)
+{
+    const reach_dock_layout *layout = reach_dock_arranged_layout(dock);
+    reach_rect_f32 edge = reach_dock_resize_edge_rect(layout);
+    resize_edge_point point = {};
+    point.x = (int32_t)(layout->bounds.x + edge.x + edge.width * 0.5f);
+    point.y = (int32_t)(layout->bounds.y + edge.y + edge.height * 0.5f);
+    point.native_height = layout->native_height;
+    return point;
+}
+
+/* Press the edge, drag to each dy (positive is upward) in turn, then release where the last
+   move ended. */
+static reach_capsule_pointer_result press_edge(reach_dock *dock, const float *dy_list, size_t count,
+                                               int32_t dx = 0)
+{
+    resize_edge_point start = resize_edge_point_of(dock);
+    reach_capsule_pointer_result result = {};
+    resize_event(dock, REACH_POINTER_EVENT_DOWN, start.x, start.y, &result);
+    int32_t y = start.y;
+    for (size_t index = 0; index < count; ++index)
+    {
+        y = start.y - (int32_t)lroundf(dy_list[index]);
+        resize_event(dock, REACH_POINTER_EVENT_MOVE, start.x + dx, y, &result);
+    }
+    resize_event(dock, REACH_POINTER_EVENT_UP, start.x + dx, y, &result);
+    return result;
+}
+
+static void test_resize_drag_up_and_down_scales_proportionally(void)
+{
+    resize_route_log log = {};
+    reach_dock *dock = make_resize_dock(&log, 80, 1920.0f, 1);
+    expect_true(dock != nullptr, "resize drag test creates a dock");
+    if (dock == nullptr)
+        return;
+    resize_edge_point start = resize_edge_point_of(dock);
+    int32_t down_y = start.y + (int32_t)lroundf(0.10f * start.native_height);
+    reach_capsule_pointer_result result = {};
+    resize_event(dock, REACH_POINTER_EVENT_DOWN, start.x, start.y, &result);
+    expect_true(result.handled && result.capture == 1 && result.sync_pointer_subscriptions,
+                "pressing the edge is handled and captures the pointer");
+    resize_event(dock, REACH_POINTER_EVENT_MOVE, start.x, down_y, &result);
+    expect_true(result.relayout && result.redraw, "a resize move asks for relayout and redraw");
+    reach_dock_arrange_context arrange = resize_arrange_context(1920.0f);
+    (void)reach_dock_arrange(dock, &arrange);
+    expect_near(resize_scale_now(dock), 0.70f, 0.011f, "dragging down by 10% shrinks to 70%");
+    resize_event(dock, REACH_POINTER_EVENT_UP, start.x, down_y, &result);
+    expect_true(result.capture == -1, "release lets go of the pointer");
+    /* The pointer moves in whole pixels, so the percent is the 10% drag rounded to one. */
+    expect_true(log.calls == 1 && abs(log.last_percent - 70) <= 1, "release commits about 70");
+    reach_dock_destroy(dock);
+}
+
+static void test_resize_clamps_to_min_and_max(void)
+{
+    resize_route_log log = {};
+    reach_dock *dock = make_resize_dock(&log, 80, 1920.0f, 1);
+    expect_true(dock != nullptr, "resize clamp test creates a dock");
+    if (dock == nullptr)
+        return;
+    float height = resize_edge_point_of(dock).native_height;
+    float down[1] = {-10.0f * height};
+    (void)press_edge(dock, down, 1);
+    expect_true(log.calls == 1 && log.last_percent == 50, "dragging far down clamps to 50");
+    reach_dock_destroy(dock);
+
+    log = {};
+    dock = make_resize_dock(&log, 80, 1920.0f, 1);
+    if (dock == nullptr)
+        return;
+    float up[1] = {10.0f * height};
+    (void)press_edge(dock, up, 1);
+    expect_true(log.calls == 1 && log.last_percent == 100, "dragging far up clamps to 100");
+    reach_dock_destroy(dock);
+}
+
+static void test_resize_click_without_move_saves_nothing(void)
+{
+    resize_route_log log = {};
+    reach_dock *dock = make_resize_dock(&log, 80, 1920.0f, 1);
+    expect_true(dock != nullptr, "resize click test creates a dock");
+    if (dock == nullptr)
+        return;
+    float before = resize_scale_now(dock);
+    reach_capsule_pointer_result result = press_edge(dock, nullptr, 0);
+    expect_true(log.calls == 0, "a click on the edge saves nothing");
+    reach_dock_arrange_context arrange = resize_arrange_context(1920.0f);
+    (void)reach_dock_arrange(dock, &arrange);
+    expect_near(resize_scale_now(dock), before, 0.0001f, "a click on the edge keeps the size");
+    expect_true(result.action.kind == REACH_FEATURE_ACTION_NONE,
+                "a click on the edge does nothing");
+    expect_true(!reach_draggable_tracking(&reach_dock_state_ptr(dock)->drag.gesture),
+                "a click on the edge does not start a reorder");
+    reach_dock_destroy(dock);
+}
+
+static void test_resize_press_never_activates_or_reorders(void)
+{
+    resize_route_log log = {};
+    reach_dock *dock = make_resize_dock(&log, 80, 1920.0f, 2);
+    expect_true(dock != nullptr, "resize isolation test creates a dock");
+    if (dock == nullptr)
+        return;
+    resize_edge_point start = resize_edge_point_of(dock);
+    reach_capsule_pointer_result result = {};
+    int32_t unexpected_actions = 0;
+    resize_event(dock, REACH_POINTER_EVENT_DOWN, start.x, start.y, &result);
+    unexpected_actions += result.action.kind != REACH_FEATURE_ACTION_NONE;
+    resize_event(dock, REACH_POINTER_EVENT_MOVE, start.x + 200, start.y, &result);
+    unexpected_actions += result.action.kind != REACH_FEATURE_ACTION_NONE;
+    expect_true(!reach_draggable_tracking(&reach_dock_state_ptr(dock)->drag.gesture),
+                "a horizontal drag on the edge never starts a reorder");
+    resize_event(dock, REACH_POINTER_EVENT_UP, start.x + 200, start.y, &result);
+    unexpected_actions += result.action.kind != REACH_FEATURE_ACTION_NONE;
+    expect_true(unexpected_actions == 0, "pressing the edge never opens a target or moves a pin");
+    expect_true(log.calls == 0, "a horizontal drag changes no size");
+    reach_dock_destroy(dock);
+}
+
+static void test_resize_cancel_restores_start_size(void)
+{
+    for (int32_t by_game_mode = 0; by_game_mode < 2; ++by_game_mode)
+    {
+        resize_route_log log = {};
+        reach_dock *dock = make_resize_dock(&log, 80, 1920.0f, 1);
+        expect_true(dock != nullptr, "resize cancel test creates a dock");
+        if (dock == nullptr)
+            return;
+        const reach_feature_capsule_ops *ops = reach_dock_capsule_ops();
+        resize_edge_point start = resize_edge_point_of(dock);
+        reach_capsule_pointer_result result = {};
+        resize_event(dock, REACH_POINTER_EVENT_DOWN, start.x, start.y, &result);
+        resize_event(dock, REACH_POINTER_EVENT_MOVE, start.x,
+                     start.y + (int32_t)lroundf(0.20f * start.native_height), &result);
+        reach_dock_arrange_context arrange = resize_arrange_context(1920.0f);
+        (void)reach_dock_arrange(dock, &arrange);
+        expect_near(resize_scale_now(dock), 0.60f, 0.011f, "the drag changed the live size");
+        if (by_game_mode)
+            ops->on_game_mode(dock, 1);
+        else
+            resize_event(dock, REACH_POINTER_EVENT_CANCEL, start.x, start.y, &result);
+        (void)reach_dock_arrange(dock, &arrange);
+        expect_near(resize_scale_now(dock), 0.80f, 0.011f, "cancelling restores the start size");
+        expect_true(log.calls == 0, "cancelling commits nothing");
+        expect_true(!ops->pointer_sequence_active(dock), "cancelling ends the resize");
+        reach_dock_destroy(dock);
+    }
+}
+
+static void test_resize_width_capped_never_shrinks_setting(void)
+{
+    resize_route_log log = {};
+    reach_dock *dock = make_resize_dock(&log, 100, 400.0f, 8);
+    expect_true(dock != nullptr, "resize cap test creates a dock");
+    if (dock == nullptr)
+        return;
+    float capped = resize_scale_now(dock);
+    expect_true(capped < 0.99f, "the narrow monitor caps the dock below 100%");
+    float height = resize_edge_point_of(dock).native_height;
+    float up[1] = {2.0f * height};
+    (void)press_edge(dock, up, 1);
+    expect_true(log.calls == 0, "dragging up at the width cap saves nothing");
+    expect_near(resize_scale_now(dock), capped, 0.011f, "the width cap holds the scale");
+
+    float down[1] = {-0.5f * height};
+    (void)press_edge(dock, down, 1);
+    expect_true(log.calls == 1 && log.last_percent < 100 && log.last_percent >= 50,
+                "dragging below the cap saves the lower percent");
+    reach_dock_destroy(dock);
+}
+
+static void test_resize_below_minimum_cap_never_saves_out_of_range(void)
+{
+    resize_route_log log = {};
+    reach_dock *dock = make_resize_dock(&log, 100, 400.0f, 12);
+    expect_true(dock != nullptr, "resize low cap test creates a dock");
+    if (dock == nullptr)
+        return;
+    expect_true(resize_scale_now(dock) < 0.5f, "the narrow monitor caps the dock below 50%");
+    float height = resize_edge_point_of(dock).native_height;
+    resize_edge_point click = resize_edge_point_of(dock);
+    reach_capsule_pointer_result pressed = {};
+    resize_event(dock, REACH_POINTER_EVENT_DOWN, click.x, click.y, &pressed);
+    expect_true(pressed.capture == 1, "the click lands on the resize edge");
+    resize_event(dock, REACH_POINTER_EVENT_UP, click.x, click.y, &pressed);
+    expect_true(log.calls == 0, "a click at a sub-minimum cap saves nothing");
+    reach_dock_arrange_context wide = resize_arrange_context(1920.0f);
+    (void)reach_dock_arrange(dock, &wide);
+    expect_near(resize_scale_now(dock), 1.0f, 0.0001f,
+                "a click leaves the configured size, so the dock grows back on a wider monitor");
+    reach_dock_arrange_context narrow = resize_arrange_context(400.0f);
+    (void)reach_dock_arrange(dock, &narrow);
+
+    float moves[3] = {3.0f, -3.0f, -0.5f * height};
+    for (float dy : moves)
+    {
+        (void)press_edge(dock, &dy, 1);
+        expect_true(log.calls == 0 || (log.last_percent >= REACH_CONFIG_DOCK_SIZE_MIN &&
+                                       log.last_percent <= REACH_CONFIG_DOCK_SIZE_MAX),
+                    "a sub-minimum cap never commits an out-of-range size");
+    }
+    reach_dock_destroy(dock);
+}
+
+static void test_resize_commit_then_config_echo_is_silent(void)
+{
+    resize_route_log log = {};
+    reach_dock *dock = make_resize_dock(&log, 80, 1920.0f, 1);
+    expect_true(dock != nullptr, "resize echo test creates a dock");
+    if (dock == nullptr)
+        return;
+    float height = resize_edge_point_of(dock).native_height;
+    float up[1] = {0.10f * height};
+    (void)press_edge(dock, up, 1);
+    expect_true(log.calls == 1 && abs(log.last_percent - 90) <= 1, "the drag commits about 90");
+    reach_dock_apply_config(dock, 0.0f, log.last_percent);
+    reach_dock_arrange_context arrange = resize_arrange_context(1920.0f);
+    (void)reach_dock_arrange(dock, &arrange);
+    reach_feature_tick_result tick = {};
+    reach_dock_capsule_ops()->tick(dock, 1.0, &tick);
+    expect_true(!reach_dock_capsule_ops()->needs_frame(dock),
+                "echoing the committed size starts no animation");
+    expect_near(resize_scale_now(dock), (float)log.last_percent / 100.0f, 0.001f,
+                "the echoed size matches the live size");
+    reach_dock_destroy(dock);
+}
+
+static void test_resize_config_echo_mid_drag_leaves_live_scale_alone(void)
+{
+    resize_route_log log = {};
+    reach_dock *dock = make_resize_dock(&log, 80, 1920.0f, 1);
+    expect_true(dock != nullptr, "mid-drag config test creates a dock");
+    if (dock == nullptr)
+        return;
+    resize_edge_point start = resize_edge_point_of(dock);
+    int32_t down_y = start.y + (int32_t)lroundf(0.10f * start.native_height);
+    reach_capsule_pointer_result result = {};
+    resize_event(dock, REACH_POINTER_EVENT_DOWN, start.x, start.y, &result);
+    resize_event(dock, REACH_POINTER_EVENT_MOVE, start.x, down_y, &result);
+    reach_dock_arrange_context arrange = resize_arrange_context(1920.0f);
+    (void)reach_dock_arrange(dock, &arrange);
+    const float live = resize_scale_now(dock);
+    reach_dock_apply_config(dock, 0.0f, 60);
+    reach_feature_tick_result tick = {};
+    reach_dock_capsule_ops()->tick(dock, 1.0, &tick);
+    (void)reach_dock_arrange(dock, &arrange);
+    expect_near(resize_scale_now(dock), live, 0.001f,
+                "a config change mid-drag does not move the live scale");
+    /* Releasing at 60 equals the configured 60, so nothing is reported. */
+    int32_t end_y = start.y + (int32_t)lroundf(0.20f * start.native_height);
+    resize_event(dock, REACH_POINTER_EVENT_MOVE, start.x, end_y, &result);
+    resize_event(dock, REACH_POINTER_EVENT_UP, start.x, end_y, &result);
+    expect_true(log.calls == 0, "the release compares against the size configured mid-drag");
+    reach_dock_destroy(dock);
+}
+
+static void test_resize_keeps_dock_revealed(void)
+{
+    resize_route_log log = {};
+    reach_dock *dock = make_resize_dock(&log, 80, 1920.0f, 1);
+    expect_true(dock != nullptr, "resize reveal test creates a dock");
+    if (dock == nullptr)
+        return;
+    const reach_feature_capsule_ops *ops = reach_dock_capsule_ops();
+    resize_edge_point start = resize_edge_point_of(dock);
+    reach_capsule_pointer_result result = {};
+    resize_event(dock, REACH_POINTER_EVENT_DOWN, start.x, start.y, &result);
+    expect_true(ops->pointer_sequence_active(dock) && ops->wants_pointer_move(dock) &&
+                    ops->pointer_capture_active(dock),
+                "an active resize holds the pointer sequence, moves and capture");
+    resize_event(dock, REACH_POINTER_EVENT_UP, start.x, start.y, &result);
+    expect_true(!ops->pointer_sequence_active(dock) && !ops->wants_pointer_move(dock) &&
+                    !ops->pointer_capture_active(dock),
+                "releasing ends the resize sequence");
     reach_dock_destroy(dock);
 }
 
@@ -811,6 +1164,16 @@ int main(void)
     test_resize_edge_hits_the_top_rim();
     test_resize_edge_never_overlaps_icons();
     test_resize_edge_skips_rounded_ends();
+    test_resize_drag_up_and_down_scales_proportionally();
+    test_resize_clamps_to_min_and_max();
+    test_resize_click_without_move_saves_nothing();
+    test_resize_press_never_activates_or_reorders();
+    test_resize_cancel_restores_start_size();
+    test_resize_width_capped_never_shrinks_setting();
+    test_resize_below_minimum_cap_never_saves_out_of_range();
+    test_resize_commit_then_config_echo_is_silent();
+    test_resize_config_echo_mid_drag_leaves_live_scale_alone();
+    test_resize_keeps_dock_revealed();
     test_pinned_reorder_survives_the_config_round_trip();
     test_unpinned_windows_group_into_one_item();
     test_item_keeps_every_open_window_as_an_instance();
