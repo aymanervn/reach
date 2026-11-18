@@ -13,6 +13,9 @@
 #include "reach/features/system_hud.h"
 #include "reach/features/top_bar.h"
 #include "reach/features/widgets.h"
+#include "reach/services/config.h"
+
+#include "../src/features/dock/dock_interaction.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -3825,6 +3828,113 @@ static void test_desktop_widgets_render_worst_case(void)
     reach_clock_destroy(clock);
 }
 
+static reach_result dock_size_store_load(reach_config_store *store,
+                                         reach_config_snapshot *out_snapshot)
+{
+    *out_snapshot = *reinterpret_cast<reach_config_snapshot *>(store);
+    return REACH_OK;
+}
+
+static reach_result dock_size_store_save(reach_config_store *store,
+                                         const reach_config_snapshot *snapshot)
+{
+    *reinterpret_cast<reach_config_snapshot *>(store) = *snapshot;
+    return REACH_OK;
+}
+
+static reach_result dock_size_store_begin(reach_config_store *)
+{
+    return REACH_OK;
+}
+
+static void dock_size_store_end(reach_config_store *)
+{
+}
+
+static void dock_size_store_notify(void *, reach_config_service_event)
+{
+}
+
+static void test_dock_rim_drag_release_saves_dock_size_through_the_bound_route(void)
+{
+    static reach_config_snapshot store = {};
+    store.dock_size = 80;
+    reach_config_store_port port = {};
+    port.store = reinterpret_cast<reach_config_store *>(&store);
+    port.ops.begin_transaction = dock_size_store_begin;
+    port.ops.end_transaction = dock_size_store_end;
+    port.ops.load = dock_size_store_load;
+    port.ops.save = dock_size_store_save;
+    reach_config_service *service = nullptr;
+    expect_true(reach_config_service_create(port, dock_size_store_notify, nullptr, &service) ==
+                    REACH_OK,
+                "the dock drag test config service is created");
+    if (service == nullptr)
+    {
+        return;
+    }
+
+    static reach_host host;
+    reach_host *h = &host;
+    reach_host_init_feature_registry(h);
+    const auto dock_id = reach_host_find_surface<reach_dock>(h);
+    const auto created = reach_host_create_registered_features(h);
+    expect_true(created == REACH_OK, "feature capsules are available for the dock size route");
+    if (created != REACH_OK)
+    {
+        reach_config_service_destroy(service);
+        return;
+    }
+    h->config_service = service;
+    reach_host_bind_interfeature_routes(h);
+
+    auto *dock = reach_host_feature_capsule<reach_dock>(h, dock_id);
+    reach_dock_apply_config(dock, 0.0f, 80);
+    reach_dock_arrange_context arrange = {};
+    arrange.theme = reach_theme_default();
+    arrange.monitor_bounds = {0.0f, 0.0f, 1920.0f, 1080.0f};
+    arrange.dpi_scale = 1.0f;
+    (void)reach_dock_arrange(dock, &arrange);
+    reach_feature_tick_result tick = {};
+    const auto *ops = reach_dock_capsule_ops();
+    ops->tick(dock, 1.0, &tick);
+
+    const reach_dock_layout *layout = reach_dock_arranged_layout(dock);
+    expect_true(layout != nullptr, "the dock is arranged for the rim drag");
+    if (layout != nullptr)
+    {
+        reach_rect_f32 edge = reach_dock_resize_edge_rect(layout);
+        int32_t x = (int32_t)(layout->bounds.x + edge.x + edge.width * 0.5f);
+        int32_t y = (int32_t)(layout->bounds.y + edge.y + edge.height * 0.5f);
+        int32_t down_y = y + (int32_t)(0.10f * layout->native_height + 0.5f);
+        reach_pointer_event pointer = {};
+        pointer.button = REACH_POINTER_BUTTON_PRIMARY;
+        reach_capsule_pointer_result result = {};
+        pointer.kind = REACH_POINTER_EVENT_DOWN;
+        pointer.x = x;
+        pointer.y = y;
+        ops->handle_pointer(dock, &pointer, &result);
+        pointer.kind = REACH_POINTER_EVENT_MOVE;
+        pointer.y = down_y;
+        ops->handle_pointer(dock, &pointer, &result);
+        (void)reach_dock_arrange(dock, &arrange);
+        h->dirty.update_requested = 0;
+        pointer.kind = REACH_POINTER_EVENT_UP;
+        ops->handle_pointer(dock, &pointer, &result);
+
+        static reach_config_snapshot live;
+        expect_true(reach_config_service_snapshot(service, &live) == REACH_OK &&
+                        live.dock_size != 80 && live.dock_size >= 50 && live.dock_size < 80,
+                    "releasing a dock rim drag saves the new size through the bound route");
+        expect_true(h->dirty.update_requested != 0, "a saved dock size requests a host update");
+    }
+
+    reach_host_clear_interfeature_routes(h);
+    h->config_service = nullptr;
+    reach_host_destroy_registered_features(h);
+    reach_config_service_destroy(service);
+}
+
 int main(void)
 {
     test_close_handoff_readiness_waits_for_observed_restore();
@@ -3869,6 +3979,7 @@ int main(void)
     test_launcher_result_motion_renders_worst_case();
     test_clipboard_card_motion_renders_worst_case();
     test_desktop_widgets_render_worst_case();
+    test_dock_rim_drag_release_saves_dock_size_through_the_bound_route();
 
     if (failures != 0)
     {

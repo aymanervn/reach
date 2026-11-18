@@ -313,6 +313,19 @@ static void reach_host_route_quick_settings_light_theme(void *user, int32_t ligh
     reach_host_set_light_theme(static_cast<reach_host *>(user), light_theme);
 }
 
+static void reach_host_route_dock_size_committed(void *user, int32_t size_percent)
+{
+    reach_host *host = static_cast<reach_host *>(user);
+    if (host == nullptr || host->config_service == nullptr)
+    {
+        return;
+    }
+    if (reach_config_service_set_dock_size(host->config_service, size_percent) == REACH_OK)
+    {
+        reach_host_request_update(host);
+    }
+}
+
 static void reach_host_route_screenshot_copied(void *user)
 {
     reach_host *host = static_cast<reach_host *>(user);
@@ -351,6 +364,7 @@ void reach_host_bind_interfeature_routes(reach_host *host)
     dock.item_hovered = reach_host_route_dock_item_hovered;
     dock.item_windows_changed = reach_host_route_dock_windows_changed;
     dock.trigger_activated = reach_host_route_dock_trigger_activated;
+    dock.size_committed = reach_host_route_dock_size_committed;
     reach_dock_set_routes(
         reach_host_feature_capsule<reach_dock>(host, reach_host_find_surface<reach_dock>(host)),
         &dock);
