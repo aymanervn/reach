@@ -17,19 +17,15 @@ extern "C"
 
     typedef struct reach_widgets reach_widgets;
 
-    typedef struct reach_widgets_routes
-    {
-        void *user;
-        void (*placement_changed)(void *user, size_t index,
-                                  reach_config_widget_placement placement);
-    } reach_widgets_routes;
-
     reach_result reach_widgets_create(reach_widgets **out_widgets);
     void reach_widgets_destroy(reach_widgets *widgets);
     void reach_widgets_attach_services(reach_widgets *widgets, reach_clock *clock,
                                        reach_system_stats *stats,
                                        reach_now_playing_service *now_playing);
-    void reach_widgets_set_routes(reach_widgets *widgets, const reach_widgets_routes *routes);
+    int32_t reach_widgets_set_clock(reach_widgets *widgets, const reach_clock_snapshot *clock);
+    int32_t reach_widgets_set_stats(reach_widgets *widgets,
+                                    const reach_system_stats_snapshot *stats);
+    int32_t reach_widgets_refresh_media(reach_widgets *widgets);
     int32_t reach_widgets_set_placement(reach_widgets *widgets, size_t index,
                                         reach_config_widget_placement placement);
     int32_t reach_widgets_set_enabled(reach_widgets *widgets, uint32_t mask);

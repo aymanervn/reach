@@ -24,7 +24,6 @@ struct reach_widgets
     reach_clock *clock;
     reach_system_stats *stats;
     reach_now_playing_service *now_playing;
-    reach_widgets_routes routes;
     reach_clock_snapshot clock_snapshot;
     reach_system_stats_snapshot stats_snapshot;
     reach_now_playing_snapshot media_snapshot;
@@ -75,10 +74,17 @@ static void reach_widgets_reset(void *capsule)
         snap = {};
 }
 
+static constexpr float widget_control_radius_dp = 8.0f;
 static constexpr double reach_widgets_stopwatch_interval = 0.1;
 static constexpr double reach_widgets_pomodoro_interval = 1.0;
 static constexpr double reach_widgets_drag_preview_delay = 0.08;
 static constexpr double reach_widgets_snap_duration = 0.742;
+static constexpr uint64_t reach_widgets_card_group_base = 1;
+
+static bool reach_widgets_preview_visible(const reach_widgets *widgets, reach_rect_f32 card)
+{
+    return widgets->drag_preview_ready && !reach_rect_equal(card, widgets->drag_destination);
+}
 
 static reach_rect_f32 reach_widgets_card_at(const reach_widgets *widgets, size_t index, double now)
 {
@@ -180,48 +186,6 @@ static void reach_widgets_tick(void *capsule, double, reach_feature_tick_result 
             widgets->*(timer.deadline) = now + timer.interval;
             out->redraw = 1;
         }
-    }
-    reach_clock_snapshot clock = {};
-    reach_system_stats_snapshot stats = {};
-    reach_now_playing_snapshot media = {};
-    if (widgets->clock != nullptr &&
-        (widgets->enabled_mask & ((1u << REACH_WIDGET_CLOCK) | (1u << REACH_WIDGET_CALENDAR))))
-    {
-        reach_clock_snapshot_take(widgets->clock, &clock);
-    }
-    if (widgets->stats != nullptr && (widgets->enabled_mask & (1u << REACH_WIDGET_SYSTEM)))
-    {
-        reach_system_stats_snapshot_take(widgets->stats, &stats);
-    }
-    if (widgets->now_playing != nullptr &&
-        (widgets->enabled_mask & (1u << REACH_WIDGET_NOW_PLAYING)))
-    {
-        reach_now_playing_service_snapshot(widgets->now_playing, &media);
-    }
-    if (clock.valid != widgets->clock_snapshot.valid ||
-        clock.minute != widgets->clock_snapshot.minute ||
-        clock.hour != widgets->clock_snapshot.hour || clock.day != widgets->clock_snapshot.day ||
-        clock.month != widgets->clock_snapshot.month ||
-        clock.year != widgets->clock_snapshot.year ||
-        stats.valid != widgets->stats_snapshot.valid ||
-        stats.cpu_percent != widgets->stats_snapshot.cpu_percent ||
-        stats.memory_percent != widgets->stats_snapshot.memory_percent ||
-        stats.gpu_percent != widgets->stats_snapshot.gpu_percent ||
-        stats.cpu_clock_mhz != widgets->stats_snapshot.cpu_clock_mhz ||
-        stats.memory_speed_mt_s != widgets->stats_snapshot.memory_speed_mt_s ||
-        stats.gpu_clock_mhz != widgets->stats_snapshot.gpu_clock_mhz ||
-        stats.gpu_clock_max_mhz != widgets->stats_snapshot.gpu_clock_max_mhz ||
-        stats.vram_available != widgets->stats_snapshot.vram_available ||
-        stats.vram_percent != widgets->stats_snapshot.vram_percent ||
-        stats.gpu_available != widgets->stats_snapshot.gpu_available ||
-        stats.gpu_temperature_available != widgets->stats_snapshot.gpu_temperature_available ||
-        stats.gpu_temperature_c != widgets->stats_snapshot.gpu_temperature_c ||
-        media.generation != widgets->media_snapshot.generation)
-    {
-        widgets->clock_snapshot = clock;
-        widgets->stats_snapshot = stats;
-        widgets->media_snapshot = media;
-        out->redraw = 1;
     }
 }
 
@@ -509,12 +473,22 @@ static void reach_widgets_desktop_pointer(void *capsule, const reach_pointer_eve
             reach_pressable_update(&widgets->control_pressable,
                                    reach_widgets_control_target(widgets, x, y), &press);
         }
-        out->redraw = reach_widgets_update_drag(widgets, x, y, scale);
-        if (out->redraw)
+        const bool continuing_move = widgets->moved && !widgets->resizing;
+        const bool preview_was_visible =
+            reach_widgets_preview_visible(widgets, widgets->cards[index]);
+        if (!reach_widgets_update_drag(widgets, x, y, scale))
+            return;
+
+        widgets->drag_preview_deadline =
+            reach_motion_now_seconds() + reach_widgets_drag_preview_delay;
+        const auto &card = widgets->cards[index];
+        if (!continuing_move || preview_was_visible != reach_widgets_preview_visible(widgets, card))
         {
-            widgets->drag_preview_deadline =
-                reach_motion_now_seconds() + reach_widgets_drag_preview_delay;
+            out->redraw = 1;
+            return;
         }
+        out->translation = {reach_widgets_card_group_base + static_cast<uint64_t>(index),
+                            {std::round(card.x), std::round(card.y)}};
         return;
     }
     if (event->kind == REACH_POINTER_EVENT_UP || event->kind == REACH_POINTER_EVENT_CANCEL)
@@ -610,11 +584,9 @@ static void reach_widgets_desktop_pointer(void *capsule, const reach_pointer_eve
                     (int32_t)std::lround(card.width / scale),
                     (int32_t)std::lround(card.height / scale)};
                 widgets->placements[index] = placement;
-                if (widgets->routes.placement_changed != nullptr)
-                {
-                    widgets->routes.placement_changed(widgets->routes.user, (size_t)index,
-                                                      placement);
-                }
+                out->action.kind = REACH_FEATURE_ACTION_SAVE_WIDGET_PLACEMENT;
+                out->action.index = (size_t)index;
+                out->action.widget_placement = placement;
             }
         }
         else if (!widgets->drag_interrupted)
@@ -669,6 +641,7 @@ reach_result reach_widgets_create(reach_widgets **out_widgets)
 
 void reach_widgets_destroy(reach_widgets *widgets)
 {
+    reach_widgets_attach_services(widgets, nullptr, nullptr, nullptr);
     delete widgets;
 }
 
@@ -676,20 +649,82 @@ void reach_widgets_attach_services(reach_widgets *widgets, reach_clock *clock,
                                    reach_system_stats *stats,
                                    reach_now_playing_service *now_playing)
 {
-    if (widgets != nullptr)
+    if (widgets == nullptr)
     {
-        widgets->clock = clock;
-        widgets->stats = stats;
+        return;
+    }
+    if (widgets->stats != stats && (widgets->enabled_mask & (1u << REACH_WIDGET_SYSTEM)))
+    {
+        reach_system_stats_release_monitor(widgets->stats);
+        reach_system_stats_acquire_monitor(stats);
+        reach_system_stats_snapshot_take(stats, &widgets->stats_snapshot);
+    }
+    if (widgets->clock != clock &&
+        (widgets->enabled_mask & ((1u << REACH_WIDGET_CLOCK) | (1u << REACH_WIDGET_CALENDAR))))
+    {
+        reach_clock_snapshot_take(clock, &widgets->clock_snapshot);
+    }
+    widgets->clock = clock;
+    widgets->stats = stats;
+    if (widgets->now_playing != now_playing)
+    {
         widgets->now_playing = now_playing;
+        widgets->media_snapshot = {};
+        (void)reach_widgets_refresh_media(widgets);
     }
 }
 
-void reach_widgets_set_routes(reach_widgets *widgets, const reach_widgets_routes *routes)
+int32_t reach_widgets_set_clock(reach_widgets *widgets, const reach_clock_snapshot *clock)
 {
-    if (widgets != nullptr)
+    if (!(widgets->enabled_mask & ((1u << REACH_WIDGET_CLOCK) | (1u << REACH_WIDGET_CALENDAR))))
     {
-        widgets->routes = routes != nullptr ? *routes : reach_widgets_routes{};
+        return 0;
     }
+    widgets->clock_snapshot = *clock;
+    return 1;
+}
+
+int32_t reach_widgets_set_stats(reach_widgets *widgets, const reach_system_stats_snapshot *stats)
+{
+    if (!(widgets->enabled_mask & (1u << REACH_WIDGET_SYSTEM)))
+    {
+        return 0;
+    }
+    const auto &previous = widgets->stats_snapshot;
+    const bool changed = previous.valid != stats->valid ||
+                         previous.cpu_percent != stats->cpu_percent ||
+                         previous.memory_percent != stats->memory_percent ||
+                         previous.cpu_clock_mhz != stats->cpu_clock_mhz ||
+                         previous.memory_speed_mt_s != stats->memory_speed_mt_s ||
+                         previous.gpu_available != stats->gpu_available ||
+                         previous.gpu_percent != stats->gpu_percent ||
+                         previous.gpu_clock_mhz != stats->gpu_clock_mhz ||
+                         previous.gpu_clock_max_mhz != stats->gpu_clock_max_mhz ||
+                         previous.gpu_temperature_available != stats->gpu_temperature_available ||
+                         previous.gpu_temperature_c != stats->gpu_temperature_c ||
+                         previous.vram_available != stats->vram_available ||
+                         previous.vram_percent != stats->vram_percent;
+    if (changed)
+    {
+        widgets->stats_snapshot = *stats;
+    }
+    return changed;
+}
+
+int32_t reach_widgets_refresh_media(reach_widgets *widgets)
+{
+    if (!(widgets->enabled_mask & (1u << REACH_WIDGET_NOW_PLAYING)))
+    {
+        return 0;
+    }
+    reach_now_playing_snapshot snapshot = {};
+    reach_now_playing_service_snapshot(widgets->now_playing, &snapshot);
+    if (widgets->media_snapshot.generation == snapshot.generation)
+    {
+        return 0;
+    }
+    widgets->media_snapshot = snapshot;
+    return 1;
 }
 
 int32_t reach_widgets_set_placement(reach_widgets *widgets, size_t index,
@@ -711,10 +746,35 @@ int32_t reach_widgets_set_enabled(reach_widgets *widgets, uint32_t mask)
     {
         return 0;
     }
+    const uint32_t previous = widgets->enabled_mask;
     widgets->enabled_mask = mask & REACH_DESKTOP_WIDGET_MASK;
     widgets->layout_dirty = true;
-    reach_system_stats_set_monitor_enabled(
-        widgets->stats, (widgets->enabled_mask & (1u << REACH_WIDGET_SYSTEM)) != 0);
+
+    const uint32_t changed = previous ^ widgets->enabled_mask;
+    if (changed & (1u << REACH_WIDGET_SYSTEM))
+    {
+        if (widgets->enabled_mask & (1u << REACH_WIDGET_SYSTEM))
+        {
+            reach_system_stats_acquire_monitor(widgets->stats);
+            reach_system_stats_snapshot_take(widgets->stats, &widgets->stats_snapshot);
+        }
+        else
+        {
+            reach_system_stats_release_monitor(widgets->stats);
+            widgets->stats_snapshot = {};
+        }
+    }
+
+    const uint32_t newly_enabled = widgets->enabled_mask & ~previous;
+    if (newly_enabled & ((1u << REACH_WIDGET_CLOCK) | (1u << REACH_WIDGET_CALENDAR)))
+    {
+        reach_clock_snapshot_take(widgets->clock, &widgets->clock_snapshot);
+    }
+    if (changed & (1u << REACH_WIDGET_NOW_PLAYING))
+    {
+        widgets->media_snapshot = {};
+        (void)reach_widgets_refresh_media(widgets);
+    }
     return 1;
 }
 
@@ -726,7 +786,6 @@ int32_t reach_widgets_arrange_desktop(reach_widgets *widgets, reach_rect_f32 mon
         return 0;
     }
     const float scale = dpi_scale > 0.0f ? dpi_scale : 1.0f;
-    // The host supplies screen coordinates. Cards and saved positions are monitor-relative.
     available.x -= monitor.x;
     available.y -= monitor.y;
     const bool bounds_changed = !reach_rect_equal(widgets->desktop_bounds, monitor) ||
@@ -738,7 +797,6 @@ int32_t reach_widgets_arrange_desktop(reach_widgets *widgets, reach_rect_f32 mon
     widgets->layout_dirty |= bounds_changed;
     if (widgets->drag_index >= 0 && bounds_changed)
     {
-        // Repack stale positions now. Release capture through the normal pointer-up/cancel path.
         widgets->drag_interrupted = true;
         widgets->moved = 0;
         widgets->drag_preview_ready = false;
@@ -767,12 +825,11 @@ int32_t reach_widgets_arrange_desktop(reach_widgets *widgets, reach_rect_f32 mon
         item.minimum = {limits.min_width * scale, limits.min_height * scale};
     }
     reach_rect_f32 arranged[REACH_MAX_DESKTOP_WIDGETS] = {};
-    const float left = std::max(available.x, 24.0f * scale);
-    const float top = std::max(available.y, 84.0f * scale);
-    const float right = std::min(available.x + available.width, monitor.width - 24.0f * scale);
-    const float bottom = std::min(available.y + available.height, monitor.height - 24.0f * scale);
-    const reach_rect_f32 automatic = {left, top, std::max(0.0f, right - left),
-                                      std::max(0.0f, bottom - top)};
+    constexpr float automatic_margin_dp = 24.0f;
+    const float margin = automatic_margin_dp * scale;
+    const reach_rect_f32 automatic = {available.x + margin, available.y + margin,
+                                      std::max(0.0f, available.width - 2 * margin),
+                                      std::max(0.0f, available.height - 2 * margin)};
     (void)reach_widgets_pack(available, automatic, items, REACH_MAX_DESKTOP_WIDGETS, 14.0f * scale,
                              arranged);
     bool changed = std::memcmp(arranged, widgets->cards, sizeof(arranged)) != 0;
@@ -813,16 +870,16 @@ static void reach_widgets_text(reach_render_command_buffer *commands, reach_rect
 }
 
 static void reach_widgets_card(reach_render_command_buffer *commands, const reach_theme *theme,
-                               reach_rect_f32 rect, float scale, reach_color accent)
+                               reach_rect_f32 rect, float radius, float scale)
 {
     float border = reach_theme_border_thickness(theme, scale);
     reach_render_command shape = {};
     shape.type = REACH_RENDER_COMMAND_RECT;
     shape.rect = rect;
-    shape.radius = theme->radius_large * scale;
-    const auto background = reach_theme_color_mix(theme->popup_background, accent, 0.12f);
-    (void)reach_render_push_bordered_background(commands, &shape, background, theme->popup_border,
-                                                border, &theme->popup_shadow, scale);
+    shape.radius = radius;
+    const auto background = reach_theme_color_mix(theme->widget_background, theme->accent, 0.12f);
+    (void)reach_render_push_bordered_background(commands, &shape, background, theme->widget_border,
+                                                border, &theme->widget_shadow, scale);
 }
 
 static void reach_widgets_decorate(reach_render_command_buffer *commands, reach_rect_f32 inner,
@@ -1105,7 +1162,7 @@ static void reach_widgets_footer_button(reach_render_command_buffer *commands,
                                         const reach_theme *theme, reach_rect_f32 bounds,
                                         const wchar_t *label, float scale)
 {
-    reach_widgets_rect(commands, bounds, 8.0f * scale, theme->accent_tint);
+    reach_widgets_rect(commands, bounds, widget_control_radius_dp * scale, theme->accent_tint);
     reach_widgets_title(commands, theme, bounds, reinterpret_cast<const uint16_t *>(label), scale,
                         REACH_TEXT_ALIGNMENT_CENTER);
 }
@@ -1278,7 +1335,8 @@ static void reach_widgets_render_body(const reach_widgets *widgets, size_t index
                 widgets->calendar_month_offset == 0 && day == widgets->clock_snapshot.day;
             if (today)
             {
-                reach_widgets_rect(commands, cell, 8.0f * scale, actual->accent);
+                reach_widgets_rect(commands, cell, widget_control_radius_dp * scale,
+                                   actual->accent);
             }
             swprintf_s(buffer, L"%d", day);
             reach_widgets_text(commands,
@@ -1301,7 +1359,7 @@ static void reach_widgets_render_body(const reach_widgets *widgets, size_t index
             cover.rect = {body.x, body.y + 4.0f * scale, 62.0f * scale, 62.0f * scale};
             cover.icon_id = widgets->media_snapshot.cover_image_id;
             cover.icon_crop_to_fill = 1;
-            cover.radius = 12.0f * scale;
+            cover.radius = actual->radius_small * scale;
             cover.corner_mask = REACH_RENDER_CORNER_ALL;
             cover.color.a = 1.0f;
             (void)reach_render_command_buffer_push(commands, &cover);
@@ -1332,7 +1390,7 @@ static void reach_widgets_render_body(const reach_widgets *widgets, size_t index
                     reach_widgets_control_bounds(chrome, (int32_t)index, control, scale);
                 reach_color wash = actual->accent;
                 wash.a = control == 1 ? 0.22f : 0.08f;
-                reach_widgets_rect(commands, button, 15.0f * scale, wash);
+                reach_widgets_rect(commands, button, button.height * 0.5f, wash);
                 reach_render_command icon = {};
                 icon.type = REACH_RENDER_COMMAND_VECTOR_ICON;
                 icon.icon_id = controls[control];
@@ -1375,7 +1433,6 @@ static reach_result reach_widgets_begin_group(reach_render_command_buffer *comma
     }
     else
     {
-        // Keep the raster origin pixel-aligned as the compositor moves the card.
         reach_motion_set(&group.x, std::round(rect.x));
         reach_motion_set(&group.y, std::round(rect.y));
     }
@@ -1393,9 +1450,9 @@ reach_result reach_widgets_render_desktop(const reach_widgets *widgets, const re
     }
     const reach_theme *actual = theme != nullptr ? theme : reach_theme_default();
     float scale = dpi_scale > 0.0f ? dpi_scale : 1.0f;
-    const auto shadow_pad = reach_theme_shadow_pad(&actual->popup_shadow, scale);
-    constexpr uint64_t card_group_base = 1;
-    constexpr uint64_t preview_group = card_group_base + REACH_MAX_DESKTOP_WIDGETS;
+    const float card_radius = actual->radius_large * scale;
+    const auto shadow_pad = reach_theme_shadow_pad(&actual->widget_shadow, scale);
+    constexpr uint64_t preview_group = reach_widgets_card_group_base + REACH_MAX_DESKTOP_WIDGETS;
     for (size_t draw = 0; draw < REACH_MAX_DESKTOP_WIDGETS; ++draw)
     {
         size_t index = draw;
@@ -1410,8 +1467,7 @@ reach_result reach_widgets_render_desktop(const reach_widgets *widgets, const re
         reach_rect_f32 rect = widgets->cards[index];
         if (rect.width <= 0 || rect.height <= 0)
             continue;
-        if ((int32_t)index == widgets->drag_index && widgets->drag_preview_ready &&
-            !reach_rect_equal(rect, widgets->drag_destination))
+        if ((int32_t)index == widgets->drag_index && reach_widgets_preview_visible(widgets, rect))
         {
             const auto &target = widgets->drag_destination;
             reach_result result = reach_widgets_begin_group(commands, preview_group, target, {});
@@ -1421,22 +1477,22 @@ reach_result reach_widgets_render_desktop(const reach_widgets *widgets, const re
             }
             auto marker = actual->accent;
             marker.a = 0.28f;
-            reach_widgets_rect(commands, {0, 0, target.width, target.height},
-                               actual->radius_large * scale, marker);
+            reach_widgets_rect(commands, {0, 0, target.width, target.height}, card_radius, marker);
             reach_render_command_buffer_end_group(commands);
         }
-        reach_result result = reach_widgets_begin_group(commands, card_group_base + index, rect,
-                                                        shadow_pad, &widgets->snaps[index]);
+        reach_result result =
+            reach_widgets_begin_group(commands, reach_widgets_card_group_base + index, rect,
+                                      shadow_pad, &widgets->snaps[index]);
         if (result != REACH_OK)
         {
             return result;
         }
         rect.x = 0;
         rect.y = 0;
-        reach_widgets_card(commands, actual, rect, scale, actual->accent);
+        reach_widgets_card(commands, actual, rect, card_radius, scale);
         const auto inner = reach_theme_border_content_rect(actual, scale, rect);
-        const float inner_radius = std::max(0.0f, actual->radius_large * scale -
-                                                      reach_theme_border_thickness(actual, scale));
+        const float inner_radius =
+            reach_nested_radius(card_radius, reach_theme_border_thickness(actual, scale));
         const bool has_artwork =
             index == REACH_WIDGET_NOW_PLAYING && widgets->media_snapshot.cover_image_id != 0;
         if (has_artwork)
@@ -1446,7 +1502,7 @@ reach_result reach_widgets_render_desktop(const reach_widgets *widgets, const re
             artwork.radius = inner_radius;
             artwork.blur = REACH_NOW_PLAYING_ARTWORK_BLUR;
             artwork.cover_image_id = widgets->media_snapshot.cover_image_id;
-            artwork.overlay = actual->popup_background;
+            artwork.overlay = actual->widget_background;
             artwork.overlay.a = 0.48f;
             (void)reach_now_playing_artwork_build_render_commands(&artwork, commands);
         }

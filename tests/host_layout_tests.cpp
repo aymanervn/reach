@@ -24,7 +24,8 @@ enum fake_window_call_kind
     FAKE_WINDOW_CALL_HIDE = 2,
     FAKE_WINDOW_CALL_SET_TOPMOST = 3,
     FAKE_WINDOW_CALL_PLACE_BEHIND = 4,
-    FAKE_WINDOW_CALL_SET_INPUT_PASSTHROUGH = 5
+    FAKE_WINDOW_CALL_SET_INPUT_PASSTHROUGH = 5,
+    FAKE_WINDOW_CALL_PLACE_ABOVE_DESKTOP = 6
 };
 
 typedef struct fake_window_call
@@ -395,6 +396,12 @@ static reach_result fake_place_behind(reach_platform_window *window, reach_windo
     return REACH_OK;
 }
 
+static reach_result fake_place_above_desktop(reach_platform_window *window)
+{
+    record_call(FAKE_WINDOW_CALL_PLACE_ABOVE_DESKTOP, window, 0);
+    return REACH_OK;
+}
+
 static reach_result fake_set_input_passthrough(reach_platform_window *window, int32_t enabled)
 {
     record_call(FAKE_WINDOW_CALL_SET_INPUT_PASSTHROUGH, window, (reach_window_id)enabled);
@@ -450,6 +457,7 @@ static void attach_window(reach_host *host, reach_surface_id id, reach_surface_r
     surface->window.ops.hide = fake_hide;
     surface->window.ops.set_topmost = fake_set_topmost;
     surface->window.ops.place_behind = fake_place_behind;
+    surface->window.ops.place_above_desktop = fake_place_above_desktop;
     surface->window.ops.native_id = fake_native_id;
 
     reach_feature_runtime *runtime = &host->feature_runtimes[id];
@@ -481,15 +489,19 @@ static void test_order_invalidation_rechains_without_replaying_visibility(void)
 {
     reach_host *host = &order_repair_host;
     initialize_host(host);
+    attach_window(host, REACH_SURFACE_ID_WIDGET_DESKTOP, REACH_SURFACE_WIDGET_DESKTOP, 104,
+                  REACH_LAYOUT_LAYER_DESKTOP);
 
     call_count = 0;
     reach_host_apply_layout(host);
-    expect_true(count_calls(FAKE_WINDOW_CALL_SHOW) == 3,
+    expect_true(count_calls(FAKE_WINDOW_CALL_SHOW) == 4,
                 "the first apply shows every visible surface");
     expect_true(count_calls(FAKE_WINDOW_CALL_SET_TOPMOST) == 1,
                 "the first apply seeds the topmost chain once");
     expect_true(count_calls(FAKE_WINDOW_CALL_PLACE_BEHIND) == 2,
-                "the first apply orders the remaining surfaces");
+                "the first apply orders the remaining topmost surfaces");
+    expect_true(has_call(FAKE_WINDOW_CALL_PLACE_ABOVE_DESKTOP, 104, 0),
+                "the desktop layer places widgets above the desktop");
 
     call_count = 0;
     reach_host_apply_layout(host);
@@ -506,8 +518,13 @@ static void test_order_invalidation_rechains_without_replaying_visibility(void)
     expect_true(count_calls(FAKE_WINDOW_CALL_SET_TOPMOST) == 1,
                 "order repair reseeds the topmost chain");
     expect_true(count_calls(FAKE_WINDOW_CALL_PLACE_BEHIND) == 2,
-                "order repair restores every relative layer");
+                "order repair restores every relative topmost layer");
+    expect_true(has_call(FAKE_WINDOW_CALL_PLACE_ABOVE_DESKTOP, 104, 0),
+                "order repair reapplies desktop placement");
     expect_true(!host->dirty.z_order, "a completed repair clears the dirty state");
+
+    reach_host_invalidate_surface_z_order(host, REACH_SURFACE_ID_WIDGET_DESKTOP);
+    expect_true(host->dirty.z_order, "a desktop surface press invalidates native order");
 }
 
 static void test_app_band_surface_does_not_invalidate_topmost_order(void)
@@ -1916,14 +1933,24 @@ static void test_system_stats_change_repaints_without_relayout(void)
     expect_true(runtime->surface->dirty_flags == 0 && !host->dirty.layout && !host->dirty.render,
                 "an invalid sample leaves the top bar clean");
 
+    const reach_surface_id widget_id = REACH_SURFACE_ID_WIDGET_DESKTOP;
+    auto *widgets = reach_host_feature_capsule<reach_widgets>(host, widget_id);
+    auto *widget_surface = host->feature_runtimes[widget_id].surface;
+    reach_widgets_set_enabled(widgets, 1u << REACH_WIDGET_SYSTEM);
+    widget_surface->dirty_flags = 0;
+
     stats_notify(host, 50.0f, 0, 1);
     expect_true(runtime->surface->dirty_flags == 1 && host->dirty.layout,
                 "the first valid sample relayouts because the stats appear");
+    expect_true(widget_surface->dirty_flags == 1, "the stats notification repaints the widget");
+    widget_surface->dirty_flags = 0;
     stats_settle(host, top_bar);
 
     stats_notify(host, 50.0f, 1200, 1);
     expect_true(runtime->surface->dirty_flags == 1 && !host->dirty.layout && !host->dirty.render,
                 "a text change inside its slot repaints only the top bar");
+    expect_true(widget_surface->dirty_flags == 0,
+                "a network-only stats change leaves the system widget clean");
     stats_settle(host, top_bar);
 
     stats_notify(host, 50.0f, 1300, 1);
@@ -1933,7 +1960,8 @@ static void test_system_stats_change_repaints_without_relayout(void)
 
     stats_notify(host, 60.0f, 1300, 1);
     expect_true(runtime->surface->dirty_flags == 1 && !host->dirty.layout && !host->dirty.render,
-                "another text change inside its slot repaints only the top bar");
+                "another text change inside its slot repaints the top bar without relayout");
+    expect_true(widget_surface->dirty_flags == 1, "a CPU change repaints the system widget");
     stats_settle(host, top_bar);
 
     stats_notify(host, 60.0f, UINT64_C(500) * 1024 * 1024, 1);
@@ -3507,6 +3535,74 @@ static reach_result fake_widgets_clock_sample(reach_clock_source *source,
 
 static reach_host widgets_render_host;
 
+static void test_widget_drag_renderer_updates(reach_host *host, reach_feature_runtime *runtime)
+{
+    struct translation_calls
+    {
+        int count;
+        reach_retained_translation latest;
+        reach_result result;
+    } calls = {0, {}, REACH_OK};
+
+    auto &surface = *runtime->surface;
+    surface.window.ops.set_bounds = fake_set_bounds;
+    surface.renderer.backend = reinterpret_cast<reach_render_backend *>(&calls);
+    surface.renderer.ops.begin_frame = fake_begin_frame;
+    surface.renderer.ops.execute = fake_execute;
+    surface.renderer.ops.end_frame = fake_end_frame;
+    surface.renderer.ops.retained_supported = [](const reach_render_backend *) -> int32_t
+    { return 1; };
+    surface.renderer.ops.translate_group =
+        [](reach_render_backend *backend, uint64_t group_id, reach_point_f32 offset)
+    {
+        auto &calls = *reinterpret_cast<translation_calls *>(backend);
+        ++calls.count;
+        calls.latest = {group_id, offset};
+        return calls.result;
+    };
+
+    host->has_layout = 1;
+    host->layout_dpi_scale = 1;
+    reach_host_frame_context frame = {};
+    frame.monitor_bounds = {0, 0, 1920, 1080};
+    auto present = [&]
+    {
+        expect_true(reach_host_frame_registered_surface(host, runtime, &frame) == REACH_OK,
+                    "widget frame succeeds");
+        surface.dirty_flags = 0;
+    };
+    present();
+
+    reach_host_surface_event_binding binding = {host, runtime};
+    reach_ui_event pointer = {};
+    pointer.button = REACH_POINTER_BUTTON_PRIMARY;
+    pointer.y = 30;
+    auto send = [&](reach_ui_event_type type, int32_t x)
+    {
+        pointer.type = type;
+        pointer.x = x;
+        reach_host_on_registered_surface_event(&binding, &pointer);
+    };
+    send(REACH_UI_EVENT_POINTER_DOWN, 30);
+    send(REACH_UI_EVENT_POINTER_MOVE, 60);
+    present();
+    const int builds = render_count;
+    send(REACH_UI_EVENT_POINTER_MOVE, 90);
+    send(REACH_UI_EVENT_POINTER_MOVE, 120);
+    expect_true(reach_host_any_surface_dirty(host), "a queued translation schedules a frame");
+    present();
+    expect_true(calls.count == 1 && calls.latest.group_id == 1 && calls.latest.offset.x == 90 &&
+                    render_count == builds,
+                "a drag frame submits only the latest card offset");
+
+    calls.result = REACH_NOT_IMPLEMENTED;
+    send(REACH_UI_EVENT_POINTER_MOVE, 150);
+    present();
+    expect_true(calls.count == 2 && render_count == builds + 1,
+                "a refused translation falls back to the render command buffer");
+    surface.renderer = {};
+}
+
 static void test_desktop_widgets_render_worst_case(void)
 {
     reach_host *host = &widgets_render_host;
@@ -3594,6 +3690,7 @@ static void test_desktop_widgets_render_worst_case(void)
         }
     }
     expect_true(max_commands > 0, "desktop widgets rendered their cards");
+    test_widget_drag_renderer_updates(host, runtime);
     reach_host_destroy_registered_features(host);
     reach_clock_destroy(clock);
 }

@@ -101,6 +101,32 @@ void reach_settings_model_init(reach_settings_model *model)
     reach_settings_model_power_mark_applied(model);
 }
 
+void reach_settings_model_set_desktop_widgets(reach_settings_model *model, uint32_t mask,
+                                              int32_t animate)
+{
+    if (model == nullptr)
+    {
+        return;
+    }
+    mask &= REACH_DESKTOP_WIDGET_MASK;
+    const uint32_t changed = model->desktop_widgets ^ mask;
+    model->desktop_widgets = mask;
+    for (size_t index = 0; index < REACH_MAX_DESKTOP_WIDGETS; ++index)
+    {
+        const uint32_t bit = 1u << index;
+        const float target = (mask & bit) != 0 ? 1.0f : 0.0f;
+        if (!animate)
+        {
+            reach_motion_set(&model->widget_toggles[index], target);
+        }
+        else if (changed & bit)
+        {
+            reach_settings_animate(&model->widget_toggles[index], target,
+                                   REACH_MOTION_PRESET_BOUNCY);
+        }
+    }
+}
+
 template <typename Model>
 static auto reach_settings_active_caret(Model *model) -> decltype(&model->power_caret)
 {

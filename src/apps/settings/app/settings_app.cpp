@@ -650,14 +650,14 @@ static void reach_settings_save_theme_config(reach_settings_app *app)
     (void)reach_config_service_set_display(app->config_service, &settings);
 }
 
-static void reach_settings_load_widget_config(reach_settings_app *app)
+static void reach_settings_load_widget_config(reach_settings_app *app, int32_t animate)
 {
     auto snapshot =
         std::unique_ptr<reach_config_snapshot>(new (std::nothrow) reach_config_snapshot());
     if (snapshot != nullptr &&
         reach_config_service_snapshot(app->config_service, snapshot.get()) == REACH_OK)
     {
-        app->model.desktop_widgets = snapshot->desktop_widgets;
+        reach_settings_model_set_desktop_widgets(&app->model, snapshot->desktop_widgets, animate);
     }
 }
 
@@ -2287,7 +2287,7 @@ static void reach_settings_handle_pointer_up(reach_settings_app *app, const reac
             const int32_t enabled = (app->model.desktop_widgets & (1u << hit.widget_index)) == 0;
             (void)reach_config_service_set_desktop_widget(app->config_service, hit.widget_index,
                                                           enabled);
-            reach_settings_load_widget_config(app);
+            reach_settings_load_widget_config(app, 1);
             app->dirty = 1;
         }
         else if (hit.type == REACH_SETTINGS_HIT_WIDGET_RESET)
@@ -2878,7 +2878,7 @@ reach_result reach_settings_app_create(reach_settings_app **out_app,
     {
         reach_settings_load_power_config(app);
         reach_settings_load_theme_config(app);
-        reach_settings_load_widget_config(app);
+        reach_settings_load_widget_config(app, 0);
         reach_settings_load_top_bar_config(app);
     }
 

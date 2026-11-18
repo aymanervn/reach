@@ -38,7 +38,8 @@ extern "C"
 
     void reach_system_stats_stop(reach_system_stats *service);
 
-    void reach_system_stats_set_monitor_enabled(reach_system_stats *service, int32_t enabled);
+    void reach_system_stats_acquire_monitor(reach_system_stats *service);
+    void reach_system_stats_release_monitor(reach_system_stats *service);
     void reach_system_stats_set_enabled(reach_system_stats *service, int32_t enabled);
 
     void reach_system_stats_snapshot_take(const reach_system_stats *service,

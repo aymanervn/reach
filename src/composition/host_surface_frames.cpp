@@ -628,7 +628,8 @@ static int32_t reach_host_surface_layout_context_equal(const reach_feature_surfa
 }
 
 static int32_t reach_host_surface_geometry_equal(const reach_feature_surface_geometry *a,
-                                                 const reach_feature_surface_geometry *b)
+                                                 const reach_feature_surface_geometry *b,
+                                                 bool compare_deadline)
 {
     return reach_rect_equal(a->visible_bounds, b->visible_bounds) &&
            reach_rect_equal(a->envelope_bounds, b->envelope_bounds) &&
@@ -643,7 +644,7 @@ static int32_t reach_host_surface_geometry_equal(const reach_feature_surface_geo
            a->work_area_clearance == b->work_area_clearance && a->shadowless == b->shadowless &&
            a->bar_reveal_policy == b->bar_reveal_policy && a->force_topmost == b->force_topmost &&
            a->notch_anchor_x == b->notch_anchor_x && a->notch_side == b->notch_side &&
-           a->deadline_seconds == b->deadline_seconds &&
+           (!compare_deadline || a->deadline_seconds == b->deadline_seconds) &&
            a->wait_for_presentation == b->wait_for_presentation &&
            a->presentation.max_scale == b->presentation.max_scale &&
            reach_rect_equal(a->presentation.translation_bounds,
@@ -697,6 +698,8 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
         return REACH_ERROR;
     }
 
+    const auto translation = desc->pending_translation;
+    desc->pending_translation = {};
     int32_t capsule_needs_frame = reach_host_surface_needs_frame(desc);
     int32_t needs_frame = capsule_needs_frame || desc->surface->fallback_animation_active;
     int32_t active = reach_host_surface_presented(desc);
@@ -784,7 +787,8 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
         desc->frame_native_target != native_target ||
         desc->frame_retained_supported != retained_supported ||
         !reach_host_surface_layout_context_equal(&surface_ctx, &desc->layout_context) ||
-        !reach_host_surface_geometry_equal(&current_geometry, &desc->frame_geometry);
+        !reach_host_surface_geometry_equal(&current_geometry, &desc->frame_geometry,
+                                           translation.group_id == 0);
     int32_t frame_context_changed =
         render_context_changed ||
         !reach_rect_equal(surface_ctx.last_bounds, desc->layout_context.last_bounds);
@@ -794,11 +798,31 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
                                 renderer.ops.sample_content != nullptr &&
                                 renderer.ops.content_sampling_required != nullptr &&
                                 renderer.ops.content_sampling_required(renderer.backend);
-    int32_t bar_visibility_pending =
+    const bool bar_visibility_pending =
         host->dirty.bar_visibility && desc->definition->surface.bar_reveal.ops != nullptr;
-    if ((!needs_frame || renderer_sampling) && !host->dirty.layout && !host->dirty.render &&
-        !desc->surface->dirty_flags && !current_geometry.synchronize_presentation &&
-        !frame_context_changed && !bar_visibility_pending)
+    const bool surface_unchanged = !host->dirty.layout && !host->dirty.render &&
+                                   !desc->surface->dirty_flags &&
+                                   !current_geometry.synchronize_presentation &&
+                                   !frame_context_changed && !bar_visibility_pending;
+    if (translation.group_id != 0)
+    {
+        if (retained_supported && renderer.ops.translate_group != nullptr && !needs_frame &&
+            !renderer_sampling && surface_unchanged &&
+            desc->definition->surface_ops->native_overlay == nullptr)
+        {
+            const auto result = renderer.ops.translate_group(renderer.backend, translation.group_id,
+                                                             translation.offset);
+            if (result == REACH_OK)
+            {
+                desc->frame_geometry.deadline_seconds = current_geometry.deadline_seconds;
+                return REACH_OK;
+            }
+            if (result == REACH_DEVICE_LOST)
+                return result;
+        }
+        desc->surface->dirty_flags = 1;
+    }
+    else if (surface_unchanged && (!needs_frame || renderer_sampling))
     {
         reach_result sampling_result = REACH_OK;
         if (renderer_sampling)

@@ -64,7 +64,8 @@
     {.offset_x = 0.0f, .offset_y = 0.0f, .blur = (blur_px), .color = REACH_RGB8(0, 0, 0, 0.3f)}
 
 #define REACH_THEME_SHADOWS                                                                        \
-    .bar_shadow = REACH_SHADOW_AMBIENT(5.0f), .popup_shadow = REACH_SHADOW_AMBIENT(5.0f)
+    .bar_shadow = REACH_SHADOW_AMBIENT(5.0f), .popup_shadow = REACH_SHADOW_AMBIENT(5.0f),          \
+    .widget_shadow = REACH_SHADOW_AMBIENT(5.0f)
 
 #define REACH_THEME_METRICS                                                                        \
     .radius_small = 12.0f, .radius_large = 20.0f, .button_pressed_darken = 0.65f,                  \
@@ -95,7 +96,7 @@
             [REACH_MOTION_PRESET_BAR_REVEAL] = REACH_THEME_SPRING(0.28f, 1.0f),                    \
             [REACH_MOTION_PRESET_POPUP_RISE] = REACH_THEME_SPRING(0.30f, 1.0f),                    \
             [REACH_MOTION_PRESET_POPUP_FADE_IN] = REACH_THEME_FADE(0.10),                          \
-        },                                                                                         \
+    },                                                                                             \
     .stage_motion_reference_seconds = 0.38f
 
 static const reach_theme reach_theme_dark = {
@@ -109,6 +110,8 @@ static const reach_theme reach_theme_dark = {
     .popup_background = REACH_DARK_BASE(1.0f),
     .top_bar_dropdown_background = REACH_DARK_DEEP(1.0f),
     .popup_border = REACH_DARK_EDGE_ON_BASE(1.0f),
+    .widget_background = REACH_DARK_BASE(1.0f),
+    .widget_border = REACH_DARK_EDGE_ON_BASE(1.0f),
     .popup_separator = REACH_DARK_STRUCTURE(1.0f),
     .system_hud_background = REACH_DARK_BASE(1.0f),
     .system_hud_border = REACH_DARK_EDGE_ON_BASE(1.0f),
@@ -241,6 +244,8 @@ static const reach_theme reach_theme_light = {
     .popup_background = REACH_LIGHT_BASE(1.0f),
     .top_bar_dropdown_background = REACH_LIGHT_BASE(1.0f),
     .popup_border = REACH_LIGHT_EDGE_ON_BASE(1.0f),
+    .widget_background = REACH_LIGHT_BASE(1.0f),
+    .widget_border = REACH_LIGHT_EDGE_ON_BASE(1.0f),
     .popup_separator = REACH_LIGHT_STRUCTURE(1.0f),
     .system_hud_background = REACH_LIGHT_BASE(1.0f),
     .system_hud_border = REACH_LIGHT_EDGE_ON_BASE(1.0f),

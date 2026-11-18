@@ -1687,6 +1687,55 @@ reach_result reach_d2d_sample_content(reach_render_backend *backend)
                                    L"sample_content");
 }
 
+reach_result reach_d2d_translate_group(reach_render_backend *backend, uint64_t group_id,
+                                       reach_point_f32 offset)
+{
+    if (!reach_d2d_retained_supported(backend) || group_id == 0 || !isfinite(offset.x) ||
+        !isfinite(offset.y))
+        return REACH_NOT_IMPLEMENTED;
+
+    const reach_result device = reach_d2d_backend_sync_device(backend);
+    if (device != REACH_OK)
+        return device;
+
+    const auto layer =
+        std::find_if(backend->retained_layers.begin(), backend->retained_layers.end(),
+                     [group_id](const auto &entry) { return entry.id == group_id; });
+    if (layer == backend->retained_layers.end() || !layer->initialized || layer->commands.empty() ||
+        layer->has_children || layer->group.parent_id != 0 || layer->group.has_clip ||
+        layer->group.has_shadow || layer->group.x.duration_seconds != 0 ||
+        layer->group.y.duration_seconds != 0)
+        return REACH_NOT_IMPLEMENTED;
+
+    const float dx = offset.x - reach_motion_value_at(&layer->group.x, 0);
+    const float dy = offset.y - reach_motion_value_at(&layer->group.y, 0);
+    if (dx != roundf(dx) || dy != roundf(dy))
+        return REACH_NOT_IMPLEMENTED;
+    if (dx == 0 && dy == 0)
+        return REACH_OK;
+
+    reach_render_group group = layer->group;
+    group.x = {};
+    group.y = {};
+    reach_motion_set(&group.x, offset.x);
+    reach_motion_set(&group.y, offset.y);
+    const float base_y = layer->text_presentation_phase_y;
+    const HRESULT hr = backend->compositor != nullptr
+                           ? wuc_properties(backend, layer->visual.Get(), group, 0, base_y, 3)
+                           : dcomp_properties(backend, layer->dcomp_visual.Get(),
+                                              layer->dcomp_scale.Get(), group, 0, base_y, 3);
+    if (FAILED(hr))
+        return reach_d2d_device_check(backend->device, hr, L"translate_group");
+
+    const reach_result result = reach_d2d_end_frame(backend);
+    if (result == REACH_OK)
+    {
+        layer->group.x = group.x;
+        layer->group.y = group.y;
+    }
+    return result;
+}
+
 void reach_d2d_clear_retained_layers(reach_render_backend *backend)
 {
     backend->requires_content_sampling = false;

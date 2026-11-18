@@ -21,7 +21,7 @@ struct reach_system_stats
     int32_t thread_started = 0;
     int32_t stop = 0;
     int32_t enabled = 0;
-    int32_t monitor_enabled = 0;
+    size_t monitor_claims = 0;
     int32_t rebaseline = 0;
 
     reach_system_stats_snapshot snapshot = {};
@@ -94,7 +94,7 @@ static void reach_system_stats_thread_main(reach_system_stats *service)
             {
                 continue;
             }
-            sample_monitor = service->monitor_enabled != 0;
+            sample_monitor = service->monitor_claims != 0;
             if (service->rebaseline)
             {
                 service->rebaseline = 0;
@@ -236,12 +236,24 @@ void reach_system_stats_destroy(reach_system_stats *service)
     delete service;
 }
 
-void reach_system_stats_set_monitor_enabled(reach_system_stats *service, int32_t enabled)
+void reach_system_stats_acquire_monitor(reach_system_stats *service)
 {
     if (service != nullptr)
     {
         std::lock_guard<std::mutex> lock(service->mutex);
-        service->monitor_enabled = enabled != 0;
+        ++service->monitor_claims;
+    }
+}
+
+void reach_system_stats_release_monitor(reach_system_stats *service)
+{
+    if (service != nullptr)
+    {
+        std::lock_guard<std::mutex> lock(service->mutex);
+        if (service->monitor_claims > 0)
+        {
+            --service->monitor_claims;
+        }
     }
 }
 

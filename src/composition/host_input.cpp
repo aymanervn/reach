@@ -177,7 +177,7 @@ reach_host_dispatch_pointer_with_owner(reach_host *host, reach_surface_id surfac
     {
         return result;
     }
-    const reach_feature_runtime *desc = &host->feature_runtimes[surface_id];
+    reach_feature_runtime *desc = &host->feature_runtimes[surface_id];
     const reach_feature_capsule_ops *ops = desc->definition->capsule_ops;
     if (ops == nullptr || ops->handle_pointer == nullptr)
     {
@@ -190,6 +190,11 @@ reach_host_dispatch_pointer_with_owner(reach_host *host, reach_surface_id surfac
     if (result.redraw && desc->surface != nullptr)
     {
         desc->surface->dirty_flags = 1;
+        desc->pending_translation = {};
+    }
+    else if (result.translation.group_id != 0 && desc->surface != nullptr)
+    {
+        desc->pending_translation = result.translation;
     }
     if (result.relayout)
     {
@@ -211,7 +216,8 @@ reach_host_dispatch_pointer_with_owner(reach_host *host, reach_surface_id surfac
     {
         reach_host_sync_pointer_move_subscriptions(host);
     }
-    if (result.handled || result.redraw || result.relayout || result.capture != 0)
+    if (result.handled || result.redraw || result.relayout || result.capture != 0 ||
+        result.translation.group_id != 0)
     {
         reach_host_request_update(host);
     }

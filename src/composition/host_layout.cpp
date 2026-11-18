@@ -170,6 +170,18 @@ void reach_host_apply_layout(reach_host *host)
         const reach_layout_entry *entry = &plan.entries[index];
         const reach_host_layout_target *target = &host->layout_targets[entry->participant];
 
+        if (entry->layer == REACH_LAYOUT_LAYER_DESKTOP)
+        {
+            if (entry->visible && target->runtime != nullptr)
+            {
+                const auto &window = target->runtime->surface->window;
+                if (window.ops.place_above_desktop != nullptr)
+                {
+                    (void)window.ops.place_above_desktop(window.window);
+                }
+            }
+            continue;
+        }
         if (entry->layer == 0)
         {
             const reach_layout_entry *applied =
@@ -216,7 +228,7 @@ void reach_host_invalidate_surface_z_order(reach_host *host, reach_surface_id id
 
     reach_layout_participant participant = host->surface_participants[id];
     const reach_layout_entry *entry = reach_host_layout_applied_entry(host, participant);
-    if (entry == nullptr || !entry->visible || entry->layer <= 0)
+    if (entry == nullptr || !entry->visible || entry->layer == 0)
     {
         return;
     }

@@ -839,6 +839,39 @@ static reach_result reach_platform_window_place_behind(reach_platform_window *wi
     return ok ? REACH_OK : REACH_ERROR;
 }
 
+static reach_result reach_platform_window_place_above_desktop(reach_platform_window *window)
+{
+    if (window == nullptr || window->hwnd == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    HWND desktop = reinterpret_cast<HWND>(reach_windows_desktop_compat_window());
+    if (desktop == nullptr)
+    {
+        desktop = GetShellWindow();
+    }
+    if (desktop == nullptr)
+    {
+        return REACH_ERROR;
+    }
+
+    HWND position = GetWindow(desktop, GW_HWNDPREV);
+    if (position == window->hwnd &&
+        (GetWindowLongPtrW(window->hwnd, GWL_EXSTYLE) & WS_EX_TOPMOST) == 0)
+    {
+        return REACH_OK;
+    }
+    if (position == nullptr || (GetWindowLongPtrW(position, GWL_EXSTYLE) & WS_EX_TOPMOST) != 0)
+    {
+        position = HWND_NOTOPMOST;
+    }
+    return SetWindowPos(window->hwnd, position, 0, 0, 0, 0,
+                        SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER)
+               ? REACH_OK
+               : REACH_ERROR;
+}
+
 static reach_result reach_platform_window_show(reach_platform_window *window)
 {
     if (window == nullptr || window->hwnd == nullptr)
@@ -855,29 +888,6 @@ static reach_result reach_platform_window_show(reach_platform_window *window)
     int show_command =
         no_activate ? SW_SHOWNOACTIVATE : (IsIconic(window->hwnd) ? SW_RESTORE : SW_SHOW);
     ShowWindow(window->hwnd, show_command);
-    if (window->role == REACH_SURFACE_WIDGET_DESKTOP)
-    {
-        HWND desktop = reinterpret_cast<HWND>(reach_windows_desktop_compat_window());
-        if (desktop == nullptr)
-        {
-            desktop = GetShellWindow();
-        }
-        if (desktop != nullptr)
-        {
-            HWND previous = GetWindow(desktop, GW_HWNDPREV);
-            if (previous != window->hwnd)
-            {
-                HWND position = previous;
-                if (position == nullptr ||
-                    (GetWindowLongPtrW(position, GWL_EXSTYLE) & WS_EX_TOPMOST) != 0)
-                {
-                    position = HWND_NOTOPMOST;
-                }
-                SetWindowPos(window->hwnd, position, 0, 0, 0, 0,
-                             SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
-            }
-        }
-    }
     if (no_activate)
     {
         SetWindowPos(window->hwnd, nullptr, 0, 0, 0, 0,
@@ -1375,6 +1385,7 @@ reach_result reach_windows_create_platform_window(reach_surface_role role,
     out_port->ops.is_active = reach_platform_window_is_active;
     out_port->ops.native_id = reach_platform_window_native_id;
     out_port->ops.place_behind = reach_platform_window_place_behind;
+    out_port->ops.place_above_desktop = reach_platform_window_place_above_desktop;
     out_port->ops.post_event = reach_platform_window_post_event;
     out_port->ops.set_input_passthrough = reach_platform_window_set_input_passthrough;
     out_port->ops.set_input_regions = reach_platform_window_set_input_regions;

@@ -225,23 +225,38 @@ static void reach_feature_notify_widgets(void *capsule,
                                          const reach_feature_notification *notification,
                                          reach_feature_tick_result *out)
 {
-    if (capsule == nullptr || notification == nullptr || out == nullptr ||
-        notification->kind != REACH_FEATURE_NOTIFICATION_CONFIG_CHANGED ||
-        notification->config == nullptr)
+    if (capsule == nullptr || notification == nullptr || out == nullptr)
     {
         return;
     }
-    int32_t changed = reach_widgets_set_enabled(static_cast<reach_widgets *>(capsule),
-                                                notification->config->desktop_widgets);
-    for (size_t index = 0; index < REACH_MAX_DESKTOP_WIDGETS; ++index)
+    auto *widgets = static_cast<reach_widgets *>(capsule);
+    switch (notification->kind)
     {
-        changed |= reach_widgets_set_placement(static_cast<reach_widgets *>(capsule), index,
-                                               notification->config->widget_placements[index]);
-    }
-    if (changed)
-    {
-        out->relayout = 1;
-        out->redraw = 1;
+    case REACH_FEATURE_NOTIFICATION_CLOCK_CHANGED:
+        out->redraw = reach_widgets_set_clock(widgets, &notification->clock);
+        break;
+    case REACH_FEATURE_NOTIFICATION_SYSTEM_STATS_CHANGED:
+        out->redraw = reach_widgets_set_stats(widgets, &notification->system_stats);
+        break;
+    case REACH_FEATURE_NOTIFICATION_NOW_PLAYING_CHANGED:
+        out->redraw = reach_widgets_refresh_media(widgets);
+        break;
+    case REACH_FEATURE_NOTIFICATION_CONFIG_CHANGED:
+        if (notification->config != nullptr)
+        {
+            int32_t changed =
+                reach_widgets_set_enabled(widgets, notification->config->desktop_widgets);
+            for (size_t index = 0; index < REACH_MAX_DESKTOP_WIDGETS; ++index)
+            {
+                changed |= reach_widgets_set_placement(
+                    widgets, index, notification->config->widget_placements[index]);
+            }
+            out->relayout = changed;
+            out->redraw = changed;
+        }
+        break;
+    default:
+        break;
     }
 }
 
@@ -955,6 +970,7 @@ static void reach_host_init_feature_definitions(reach_host *host)
     widgets.lifecycle.attach = reach_feature_attach_widgets;
     widgets.control_ops = &reach_widgets_control_ops;
     widgets.surface.role = REACH_SURFACE_WIDGET_DESKTOP;
+    widgets.surface.layer = REACH_LAYOUT_LAYER_DESKTOP;
     widgets.surface.pointer_priority = 5;
 
     definitions[REACH_SURFACE_ID_SYSTEM_HUD].lifecycle.attach = reach_feature_attach_system_hud;

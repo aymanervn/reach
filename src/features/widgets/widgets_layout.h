@@ -103,7 +103,6 @@ static inline bool reach_widgets_find_drop(reach_rect_f32 desktop, reach_rect_f3
     }
     wanted.x = std::max(std::round(wanted.x / grid), std::ceil(desktop.x / grid)) * grid;
     wanted.y = std::max(std::round(wanted.y / grid), std::ceil(desktop.y / grid)) * grid;
-    // Fit the snapped size inside the bars, whose edges can fall between DP grid lines.
     const float right = desktop.x + desktop.width;
     const float bottom = desktop.y + desktop.height;
     wanted.width = std::min(wanted.width, std::floor((right - wanted.x) / grid) * grid);

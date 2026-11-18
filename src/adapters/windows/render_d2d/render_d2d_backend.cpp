@@ -246,6 +246,7 @@ reach_result reach_windows_create_dcomp_render_backend(reach_render_device *devi
     out_port->ops.suspend = reach_d2d_suspend;
     out_port->ops.content_sampling_required = reach_d2d_content_sampling_required;
     out_port->ops.sample_content = reach_d2d_sample_content;
+    out_port->ops.translate_group = reach_d2d_translate_group;
     out_port->ops.execute = reach_d2d_execute;
     out_port->ops.release_icon = reach_d2d_release_icon_cache_entry;
     out_port->ops.set_ui_font = reach_d2d_set_ui_font;

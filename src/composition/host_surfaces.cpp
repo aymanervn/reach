@@ -774,7 +774,8 @@ int32_t reach_host_any_surface_dirty(const reach_host *host)
     for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
     {
         const reach_feature_runtime *desc = &host->feature_runtimes[index];
-        if (desc->surface != nullptr && desc->surface->dirty_flags)
+        if (desc->surface != nullptr &&
+            (desc->surface->dirty_flags || desc->pending_translation.group_id != 0))
         {
             return 1;
         }

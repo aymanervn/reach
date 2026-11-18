@@ -1323,8 +1323,10 @@ static void render_widgets_page(const reach_settings_render_input *input,
                                  reach_settings_scale(input, REACH_TEXT_SIZE_MEDIUM),
                                  REACH_TEXT_WEIGHT_SEMIBOLD, input->text_alignment_leading,
                                  theme->settings_text, 1);
-        reach_ui_toggle_render(commands, layout->widget_toggles[index], &style,
-                               (input->model->desktop_widgets & (1u << index)) != 0 ? 1.0f : 0.0f);
+        reach_ui_toggle_motion_render(
+            commands, layout->widget_toggles[index], &style,
+            reach_settings_control_group_id(REACH_SETTINGS_HIT_WIDGET_TOGGLE, index),
+            &input->model->widget_toggles[index]);
     }
 }
 

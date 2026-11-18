@@ -275,6 +275,7 @@ extern "C"
         int32_t top_bar_icon_only;
         reach_motion top_bar_icon_only_toggle;
         uint32_t desktop_widgets;
+        reach_motion widget_toggles[REACH_MAX_DESKTOP_WIDGETS];
         int32_t dock_size;
         int32_t dragging_slider;
         int32_t hovered_button;
@@ -534,6 +535,8 @@ extern "C"
     } reach_settings_render_input;
 
     void reach_settings_model_init(reach_settings_model *model);
+    void reach_settings_model_set_desktop_widgets(reach_settings_model *model, uint32_t mask,
+                                                  int32_t animate);
     void reach_settings_model_select_page(reach_settings_model *model, reach_settings_page page);
     double reach_settings_model_caret_deadline(const reach_settings_model *model);
     int32_t reach_settings_model_update_caret(reach_settings_model *model, double now_seconds);

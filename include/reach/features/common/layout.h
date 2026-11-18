@@ -12,6 +12,7 @@ extern "C"
 #endif
 
 #define REACH_LAYOUT_MAX_PARTICIPANTS 16
+#define REACH_LAYOUT_LAYER_DESKTOP (-1)
 
     typedef enum reach_layout_condition
     {

@@ -28,6 +28,8 @@ extern "C"
         void (*suspend)(reach_render_backend *backend);
         int32_t (*content_sampling_required)(const reach_render_backend *backend);
         reach_result (*sample_content)(reach_render_backend *backend);
+        reach_result (*translate_group)(reach_render_backend *backend, uint64_t group_id,
+                                        reach_point_f32 offset);
     } reach_render_backend_ops;
 
     typedef struct reach_render_backend_port

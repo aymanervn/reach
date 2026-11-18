@@ -305,6 +305,10 @@ reach_result reach_host_update(reach_host *host, double delta_seconds)
     if (reach_clock_tick(host->clock))
     {
         host->surfaces[REACH_SURFACE_ID_TOP_BAR].dirty_flags = 1;
+        reach_feature_notification notification = {};
+        notification.kind = REACH_FEATURE_NOTIFICATION_CLOCK_CHANGED;
+        reach_clock_snapshot_take(host->clock, &notification.clock);
+        reach_host_notify_registered_features(host, &notification);
     }
     if (reach_input_language_service_tick_settle(host->input_language, delta_seconds,
                                                  reach_host_foreground_window(host)))

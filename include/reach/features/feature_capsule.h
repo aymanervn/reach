@@ -6,6 +6,7 @@
 
 #include "reach/core/animated_rect.h"
 
+#include "reach/core/config.h"
 #include "reach/core/geometry.h"
 #include "reach/core/render_commands.h"
 #include "reach/support/util.h"
@@ -82,6 +83,7 @@ extern "C"
         reach_feature_target target;
         const uintptr_t *windows;
         size_t window_count;
+        reach_config_widget_placement widget_placement;
     } reach_capsule_action;
 
     typedef struct reach_capsule_event_result
@@ -92,6 +94,12 @@ extern "C"
         int32_t request_update;
         reach_capsule_action action;
     } reach_capsule_event_result;
+
+    typedef struct reach_retained_translation
+    {
+        uint64_t group_id;
+        reach_point_f32 offset;
+    } reach_retained_translation;
 
     typedef struct reach_capsule_pointer_result
     {
@@ -104,6 +112,7 @@ extern "C"
         int32_t cancel_source_sequence;
         reach_feature_control control;
         reach_capsule_action action;
+        reach_retained_translation translation;
     } reach_capsule_pointer_result;
 
     typedef enum reach_feature_bar_reveal_policy

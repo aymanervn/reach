@@ -200,7 +200,8 @@ typedef enum reach_feature_notification_kind
     REACH_FEATURE_NOTIFICATION_DISPLAY_CHANGED = 9,
     REACH_FEATURE_NOTIFICATION_CONFIG_CHANGED = 10,
     REACH_FEATURE_NOTIFICATION_POPUPS_CLOSED = 11,
-    REACH_FEATURE_NOTIFICATION_APP_LAUNCH_FAILED = 12
+    REACH_FEATURE_NOTIFICATION_APP_LAUNCH_FAILED = 12,
+    REACH_FEATURE_NOTIFICATION_CLOCK_CHANGED = 13
 } reach_feature_notification_kind;
 
 typedef struct reach_feature_notification
@@ -209,6 +210,7 @@ typedef struct reach_feature_notification
     reach_text_measure_port text_measure;
     float dpi_scale;
     reach_system_stats_snapshot system_stats;
+    reach_clock_snapshot clock;
     reach_now_playing_action media_action;
     reach_audio_volume_state volume;
     reach_brightness_state brightness;
@@ -421,6 +423,7 @@ typedef struct reach_feature_runtime
     reach_rect_f32 resolved_anchor_bounds;
     int32_t resolved_anchor_valid;
     reach_feature_surface_geometry frame_geometry;
+    reach_retained_translation pending_translation;
     reach_shadow_pad native_overlay_shadow_pad;
     const reach_feature_definition *definition;
 } reach_feature_runtime;
