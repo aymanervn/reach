@@ -96,7 +96,7 @@
             [REACH_MOTION_PRESET_BAR_REVEAL] = REACH_THEME_SPRING(0.28f, 1.0f),                    \
             [REACH_MOTION_PRESET_POPUP_RISE] = REACH_THEME_SPRING(0.30f, 1.0f),                    \
             [REACH_MOTION_PRESET_POPUP_FADE_IN] = REACH_THEME_FADE(0.10),                          \
-    },                                                                                             \
+        },                                                                                         \
     .stage_motion_reference_seconds = 0.38f
 
 static const reach_theme reach_theme_dark = {
