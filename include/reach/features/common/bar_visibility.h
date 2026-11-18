@@ -57,6 +57,7 @@ extern "C"
         int32_t pointer_observation_active;
         int32_t visible;
         int32_t redraw;
+        int32_t keep_above_windows;
     } reach_bar_visibility_result;
 
     typedef struct reach_bar_reveal_animation
@@ -87,6 +88,8 @@ extern "C"
     reach_rect_f32 reach_bar_protected_band(reach_bar_edge edge, reach_rect_f32 shown_bounds,
                                             reach_rect_f32 monitor_bounds,
                                             float protected_clearance);
+    int32_t reach_bar_keep_above_windows(int32_t overlay, int32_t auto_hide_active,
+                                         float reveal_progress);
 
     reach_bar_visibility_result
     reach_bar_update_visibility(reach_bar_visibility_state *state, reach_motion *y,

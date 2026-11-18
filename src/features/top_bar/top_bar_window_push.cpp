@@ -270,6 +270,12 @@ void reach_top_bar_window_push_apply(reach_top_bar_window_push *push,
         push->recovered = reach_top_bar_push_recover(push, request->monitor_bounds);
     }
 
+    if (request->overlay)
+    {
+        reach_top_bar_window_push_release(push);
+        return;
+    }
+
     if (!request->bar_can_hide || request->push_depth <= 0.0f || request->fully_hidden)
     {
         reach_top_bar_window_push_release(push);

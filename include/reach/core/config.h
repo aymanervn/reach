@@ -47,6 +47,7 @@ extern "C"
         reach_config_top_bar_style top_bar_style;
         reach_config_top_bar_mode top_bar_mode;
         int32_t top_bar_icon_only;
+        int32_t top_bar_overlay;
         int32_t power_screen_off_minutes;
         int32_t power_sleep_minutes;
         int32_t power_lock_minutes;

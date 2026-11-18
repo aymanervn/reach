@@ -46,6 +46,7 @@ extern "C"
         reach_config_top_bar_style style;
         reach_config_top_bar_mode mode;
         int32_t icon_only;
+        int32_t overlay;
     } reach_config_top_bar_settings;
 
     typedef void (*reach_config_service_notify)(void *user, reach_config_service_event event);

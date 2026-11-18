@@ -36,11 +36,13 @@ int main()
     failed += expect(snapshot->windows_app_theme == REACH_CONFIG_THEME_FOLLOW_REACH);
     failed += expect(snapshot->top_bar_style == REACH_CONFIG_TOP_BAR_STYLE_TRANSPARENT);
     failed += expect(snapshot->top_bar_mode == REACH_CONFIG_TOP_BAR_MODE_STATIC);
+    failed += expect(snapshot->top_bar_overlay == 0);
 
     std::memset(snapshot.get(), 0, sizeof(*snapshot));
     snapshot->dock_height = 58.0f;
     snapshot->top_bar_style = REACH_CONFIG_TOP_BAR_STYLE_TRANSPARENT;
     snapshot->top_bar_mode = REACH_CONFIG_TOP_BAR_MODE_STATIC;
+    snapshot->top_bar_overlay = 1;
     snapshot->power_screen_off_minutes = 9;
     snapshot->power_sleep_minutes = 21;
     snapshot->power_lock_minutes = 7;
@@ -70,6 +72,11 @@ int main()
     failed += expect(loaded->dock_height == 58.0f);
     failed += expect(loaded->top_bar_style == REACH_CONFIG_TOP_BAR_STYLE_TRANSPARENT);
     failed += expect(loaded->top_bar_mode == REACH_CONFIG_TOP_BAR_MODE_STATIC);
+    failed += expect(loaded->top_bar_overlay == 1);
+    failed += expect(WritePrivateProfileStringW(L"top_bar", L"overlay", L"7", path) != 0);
+    std::memset(loaded.get(), 0, sizeof(*loaded));
+    failed += expect(store.ops.load(store.store, loaded.get()) == REACH_OK);
+    failed += expect(loaded->top_bar_overlay == 1);
     failed += expect(loaded->power_sleep_minutes == 21);
     failed += expect(loaded->stage_animation_ms == 345);
     failed += expect(loaded->windows_system_theme == REACH_CONFIG_THEME_LIGHT);
