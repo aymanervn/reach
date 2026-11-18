@@ -583,6 +583,33 @@ static void test_resize_edge_hits_the_top_rim(void)
     reach_dock_destroy(dock);
 }
 
+static void test_dock_geometry_exposes_resize_cursor_region(void)
+{
+    const reach_feature_capsule_ops *ops = reach_dock_capsule_ops();
+    reach_dock *dock = nullptr;
+    expect_true(reach_dock_create(&dock) == REACH_OK, "cursor region test creates a dock");
+    if (dock == nullptr)
+        return;
+    reach_feature_surface_geometry geometry = {};
+    ops->surface_geometry(dock, &geometry);
+    expect_true(geometry.has_resize_cursor_region == 0,
+                "an unarranged dock offers no resize cursor region");
+
+    const reach_dock_layout *layout = arrange_one_pin_dock(dock, 0.0f);
+    expect_true(layout != nullptr, "cursor region test arranges one pinned item");
+    if (layout != nullptr)
+    {
+        geometry = {};
+        ops->surface_geometry(dock, &geometry);
+        expect_true(geometry.has_resize_cursor_region == 1,
+                    "an arranged dock offers a resize cursor region");
+        expect_true(
+            reach_rect_equal(geometry.resize_cursor_region, reach_dock_resize_edge_rect(layout)),
+            "the resize cursor region is exactly the rim the hit test resizes from");
+    }
+    reach_dock_destroy(dock);
+}
+
 static void test_resize_edge_never_overlaps_icons(void)
 {
     const float sizes[2] = {100.0f, 50.0f};
@@ -1279,6 +1306,7 @@ int main(void)
     test_dock_metrics_are_spaced_before_any_configuration_arrives();
     test_pinned_item_pressable_release_opens_its_target();
     test_resize_edge_hits_the_top_rim();
+    test_dock_geometry_exposes_resize_cursor_region();
     test_resize_edge_never_overlaps_icons();
     test_resize_edge_skips_rounded_ends();
     test_resize_drag_up_and_down_scales_proportionally();

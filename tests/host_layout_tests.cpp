@@ -1280,6 +1280,95 @@ static void test_popup_surface_retains_presentation(void)
                 "popup opacity belongs to retained presentation instead of raster content");
 }
 
+static reach_host cursor_region_host;
+static int32_t cursor_region_calls;
+static int32_t cursor_region_present;
+static reach_rect_f32 cursor_region_last;
+static int32_t cursor_region_suppressed;
+static reach_feature_capsule_ops cursor_region_ops;
+
+static reach_result fake_set_cursor_region(reach_platform_window *window,
+                                           const reach_rect_f32 *region)
+{
+    (void)window;
+    ++cursor_region_calls;
+    cursor_region_present = region != nullptr;
+    cursor_region_last = region != nullptr ? *region : reach_rect_f32{};
+    return REACH_OK;
+}
+
+static void cursor_region_geometry(const void *capsule, reach_feature_surface_geometry *out)
+{
+    reach_dock_capsule_ops()->surface_geometry(capsule, out);
+    if (cursor_region_suppressed)
+    {
+        out->has_resize_cursor_region = 0;
+        out->resize_cursor_region = {};
+    }
+}
+
+static void test_host_pushes_dock_cursor_region_to_window(void)
+{
+    reach_host *host = &cursor_region_host;
+    reach_host_init_feature_registry(host);
+    expect_true(reach_host_create_registered_features(host) == REACH_OK,
+                "cursor region test creates the registered features");
+    reach_host_init_layout(host);
+    host->layout_dpi_scale = 1.0f;
+
+    const auto dock_id = reach_host_find_surface<reach_dock>(host);
+    cursor_region_ops = *reach_dock_capsule_ops();
+    cursor_region_ops.surface_geometry = cursor_region_geometry;
+    host->feature_definitions[dock_id].capsule_ops = &cursor_region_ops;
+    cursor_region_suppressed = 0;
+
+    reach_feature_runtime *dock = &host->feature_runtimes[dock_id];
+    dock->surface->window.window = reinterpret_cast<reach_platform_window *>(1);
+    dock->surface->window.ops.set_bounds = fake_set_bounds;
+    dock->surface->window.ops.set_cursor_region = fake_set_cursor_region;
+    dock->surface->renderer.backend = reinterpret_cast<reach_render_backend *>(1);
+    dock->surface->renderer.ops.begin_frame = fake_begin_frame;
+    dock->surface->renderer.ops.end_frame = fake_end_frame;
+    dock->surface->renderer.ops.execute = fake_execute;
+
+    cursor_region_calls = 0;
+    reach_host_frame_context frame = {};
+    frame.monitor_bounds = {0.0f, 0.0f, 1920.0f, 1080.0f};
+    dock->surface->dirty_flags = 1;
+    expect_true(reach_host_frame_registered_surface(host, dock, &frame) == REACH_OK,
+                "the dock frame succeeds");
+
+    reach_feature_surface_geometry geometry = {};
+    reach_dock_capsule_ops()->surface_geometry(dock->capsule, &geometry);
+    reach_shadow_pad pad = reach_host_surface_shadow_pad(host, dock_id);
+    reach_rect_f32 expected = geometry.resize_cursor_region;
+    expected.x += pad.left;
+    expected.y += pad.top;
+    expect_true(geometry.has_resize_cursor_region, "the framed dock reports a rim region");
+    expect_true(cursor_region_calls == 1 && cursor_region_present &&
+                    reach_rect_equal(cursor_region_last, expected),
+                "the dock frame pushes its rim, offset by the shadow pad, to the window");
+
+    dock->surface->dirty_flags = 1;
+    expect_true(reach_host_frame_registered_surface(host, dock, &frame) == REACH_OK,
+                "an unchanged dock frame succeeds");
+    expect_true(cursor_region_calls == 1, "an unchanged rim is not pushed again");
+
+    cursor_region_suppressed = 1;
+    dock->surface->dirty_flags = 1;
+    expect_true(reach_host_frame_registered_surface(host, dock, &frame) == REACH_OK,
+                "a dock frame without a rim succeeds");
+    expect_true(cursor_region_calls == 2 && !cursor_region_present,
+                "a surface without a rim clears the window cursor region");
+
+    dock->surface->dirty_flags = 1;
+    expect_true(reach_host_frame_registered_surface(host, dock, &frame) == REACH_OK,
+                "a second dock frame without a rim succeeds");
+    expect_true(cursor_region_calls == 2, "an already cleared cursor region is not cleared again");
+
+    host->feature_definitions[dock_id].capsule_ops = reach_dock_capsule_ops();
+}
+
 static void test_registered_surface_frame_uses_declared_anchor(void)
 {
     reach_host *host = &generic_frame_host;
@@ -3994,6 +4083,7 @@ int main(void)
     test_frame_scheduling_does_not_present_a_closed_surface();
     test_popup_surface_retains_presentation();
     test_registered_surface_frame_uses_declared_anchor();
+    test_host_pushes_dock_cursor_region_to_window();
     test_registered_surface_frame_syncs_native_overlay();
     test_forced_bars_hold_through_a_closing_stage();
     test_bar_conditions_sync_once_from_host_state();
