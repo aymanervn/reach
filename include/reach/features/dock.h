@@ -116,7 +116,8 @@ extern "C"
     {
         REACH_DOCK_POINTER_REGION_NONE = 0,
         REACH_DOCK_POINTER_REGION_ITEM = 1,
-        REACH_DOCK_POINTER_REGION_TRIGGER = 5
+        REACH_DOCK_POINTER_REGION_TRIGGER = 5,
+        REACH_DOCK_POINTER_REGION_RESIZE_EDGE = 6
     } reach_dock_pointer_region;
 
     typedef enum reach_dock_control_slot

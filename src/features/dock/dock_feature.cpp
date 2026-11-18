@@ -271,6 +271,8 @@ reach_dock_pointer_region reach_dock_pointer_region_at(const reach_dock *dock, i
         return REACH_DOCK_POINTER_REGION_ITEM;
     case REACH_DOCK_HIT_TRIGGER:
         return REACH_DOCK_POINTER_REGION_TRIGGER;
+    case REACH_DOCK_HIT_RESIZE_EDGE:
+        return REACH_DOCK_POINTER_REGION_RESIZE_EDGE;
     case REACH_DOCK_HIT_NONE:
     default:
         return REACH_DOCK_POINTER_REGION_NONE;
