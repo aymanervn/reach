@@ -359,7 +359,7 @@ reach_result reach_app_start(reach_app *app)
             {
                 (void)input.ops.stop(input.source);
             }
-            reach_host_stop_runtime(app->host);
+            reach_host_stop_runtime(app->host, false);
             return result;
         }
     }

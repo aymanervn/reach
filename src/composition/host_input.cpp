@@ -20,7 +20,10 @@ static int32_t reach_host_game_mode_allows_event(reach_ui_event_type type)
            type == REACH_UI_EVENT_BRIGHTNESS_UP || type == REACH_UI_EVENT_BRIGHTNESS_DOWN ||
            type == REACH_UI_EVENT_NOW_PLAYING_CHANGED ||
            type == REACH_UI_EVENT_FEATURE_WORK_READY ||
-           type == REACH_UI_EVENT_WINDOW_MANIPULATION_CHANGED;
+           type == REACH_UI_EVENT_WINDOW_MANIPULATION_CHANGED ||
+           type == REACH_UI_EVENT_APP_SWITCH_BEGIN || type == REACH_UI_EVENT_APP_SWITCH_NEXT ||
+           type == REACH_UI_EVENT_APP_SWITCH_PREVIOUS || type == REACH_UI_EVENT_APP_SWITCH_COMMIT ||
+           type == REACH_UI_EVENT_APP_SWITCH_CANCEL;
 }
 
 static int32_t reach_rect_contains(reach_rect_f32 rect, int32_t x, int32_t y)
@@ -391,13 +394,13 @@ int32_t reach_host_resolve_popup_owner(const reach_feature_runtime *popup,
     {
         return 0;
     }
-    *out = {};
-    out->surface = popup->links->layout_anchor;
-    out->slot = popup->definition->layout.anchor_slot;
-    if (popup->definition->surface_ops != nullptr &&
-        popup->definition->surface_ops->layout_anchor != nullptr)
+    if (popup->popup_owner.surface != REACH_SURFACE_ID_INVALID && reach_host_surface_is_open(popup))
     {
-        (void)popup->definition->surface_ops->layout_anchor(popup->capsule, out);
+        *out = popup->popup_owner;
+    }
+    else
+    {
+        *out = {popup->links->layout_anchor, popup->definition->layout.anchor_slot, 0, 0};
     }
     return out->surface != REACH_SURFACE_ID_INVALID;
 }
@@ -905,7 +908,7 @@ static reach_result reach_host_handle_surface_event(reach_host *host, const reac
     const int32_t game_mode = reach_host_game_mode_enabled(host);
     if (game_mode && !reach_host_game_mode_allows_event(event->type))
     {
-        return reach_host_dispatch_registered_events(host, event, source, game_mode);
+        return REACH_OK;
     }
 
     if (event->type == REACH_UI_EVENT_POINTER_DOWN)

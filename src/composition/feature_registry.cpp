@@ -945,27 +945,7 @@ static reach_result reach_launcher_surface_render(void *capsule,
 static const reach_feature_surface_ops reach_launcher_surface_ops = {
     reach_launcher_surface_arrange,
     reach_launcher_surface_render,
-    nullptr,
 };
-
-static int32_t reach_context_menu_surface_layout_anchor(const void *capsule,
-                                                        reach_feature_layout_anchor *out)
-{
-    const reach_context_menu_state *state =
-        reach_context_menu_state_ptr(static_cast<const reach_context_menu *>(capsule));
-    if (state == nullptr || out == nullptr || !state->open || !state->anchored)
-    {
-        return 0;
-    }
-    out->surface = state->power_open ? REACH_SURFACE_ID_TOP_BAR : REACH_SURFACE_ID_DOCK;
-    out->slot = state->power_open ? REACH_TOP_BAR_CONTROL_POWER : REACH_DOCK_CONTROL_ITEM;
-    out->index = state->power_open ? 0 : state->target_index;
-    out->identity =
-        state->power_open
-            ? 0
-            : reach_context_menu_owner_identity(static_cast<const reach_context_menu *>(capsule));
-    return 1;
-}
 
 static int32_t reach_context_menu_surface_arrange(void *capsule,
                                                   const reach_feature_surface_context *ctx)
@@ -1042,8 +1022,9 @@ static const reach_feature_native_overlay_ops reach_context_menu_native_overlay_
 };
 
 static const reach_feature_surface_ops reach_context_menu_surface_ops = {
-    reach_context_menu_surface_arrange,       reach_context_menu_surface_render,
-    reach_context_menu_surface_layout_anchor, &reach_context_menu_native_overlay_ops,
+    reach_context_menu_surface_arrange,
+    reach_context_menu_surface_render,
+    &reach_context_menu_native_overlay_ops,
     reach_context_menu_pointer_observation,
 };
 
@@ -1114,7 +1095,6 @@ static const reach_feature_native_overlay_ops reach_stage_native_overlay_ops = {
 static const reach_feature_surface_ops reach_stage_surface_ops = {
     reach_stage_surface_arrange,
     reach_stage_surface_render,
-    nullptr,
     &reach_stage_native_overlay_ops,
 };
 
@@ -1209,7 +1189,6 @@ static const reach_feature_native_overlay_ops reach_switcher_native_overlay_ops 
 static const reach_feature_surface_ops reach_switcher_surface_ops = {
     reach_switcher_surface_arrange,
     reach_switcher_surface_render,
-    nullptr,
     &reach_switcher_native_overlay_ops,
 };
 
@@ -1485,39 +1464,13 @@ reach_result reach_host_set_feature_registry(reach_host *host,
     }
     host->surface_count = 0;
 
-    // Reserve legacy IDs before assigning slots to entries without an explicit numeric ID.
-    const reach_feature_definition *slots[REACH_HOST_SURFACE_CAPACITY] = {};
-    for (size_t index = 0; index < count; ++index)
-    {
-        const auto &entry = definitions[index];
-        if (entry.id != REACH_SURFACE_ID_INVALID)
-        {
-            if (entry.id >= count || slots[entry.id] != nullptr)
-            {
-                return REACH_INVALID_ARGUMENT;
-            }
-            slots[entry.id] = &entry;
-        }
-    }
-    size_t available = 0;
-    for (size_t index = 0; index < count; ++index)
-    {
-        const auto &entry = definitions[index];
-        if (entry.id == REACH_SURFACE_ID_INVALID)
-        {
-            while (slots[available] != nullptr)
-            {
-                ++available;
-            }
-            slots[available++] = &entry;
-        }
-    }
     for (reach_surface_id id = 0; id < count; ++id)
     {
-        const auto &entry = *slots[id];
+        const auto &entry = definitions[id];
         const bool owns_capsule = entry.capsule_owner == nullptr;
         const auto &lifecycle = entry.lifecycle;
-        if (reach_find_registered_surface(host->feature_definitions, id, entry.key) !=
+        if (entry.key == nullptr ||
+            reach_find_registered_surface(host->feature_definitions, id, entry.key) !=
                 REACH_SURFACE_ID_INVALID ||
             entry.capsule_ops == nullptr || entry.capsule_ops->surface_geometry == nullptr ||
             entry.surface_ops == nullptr || entry.surface_ops->arrange == nullptr ||
@@ -1575,16 +1528,12 @@ reach_result reach_host_set_feature_registry(reach_host *host,
 
 reach_result reach_host_init_feature_registry(reach_host *host)
 {
-    static reach_surface_key dock_key;
-    static const auto &top_bar_key = reach_surface_key_for<reach_top_bar>();
-    static reach_surface_key launcher_key;
     static constexpr reach_ui_event_type escape_events[] = {REACH_UI_EVENT_ESCAPE};
     static const reach_feature_definition definitions[] = {
         []
         {
             reach_feature_definition definition = {};
-            definition.id = REACH_SURFACE_ID_DOCK;
-            definition.key = &dock_key;
+            definition.key = &reach_surface_key_for<reach_dock>();
             definition.factory = {reach_feature_create<reach_dock, reach_dock_create>,
                                   reach_feature_destroy<reach_dock, reach_dock_destroy>};
             definition.lifecycle.attach = reach_feature_attach_dock;
@@ -1614,8 +1563,7 @@ reach_result reach_host_init_feature_registry(reach_host *host)
         []
         {
             reach_feature_definition definition = {};
-            definition.id = REACH_SURFACE_ID_TOP_BAR;
-            definition.key = &top_bar_key;
+            definition.key = &reach_surface_key_for<reach_top_bar>();
             definition.factory = {reach_feature_create<reach_top_bar, reach_top_bar_create>,
                                   reach_feature_destroy<reach_top_bar, reach_top_bar_destroy>};
             definition.lifecycle.attach = reach_feature_attach_top_bar;
@@ -1640,8 +1588,7 @@ reach_result reach_host_init_feature_registry(reach_host *host)
         []
         {
             reach_feature_definition definition = {};
-            definition.id = REACH_SURFACE_ID_LAUNCHER;
-            definition.key = &launcher_key;
+            definition.key = &reach_surface_key_for<reach_launcher>();
             definition.factory = {reach_feature_create<reach_launcher, reach_launcher_create>,
                                   reach_feature_destroy<reach_launcher, reach_launcher_destroy>};
             definition.lifecycle.attach = reach_feature_attach_launcher;
@@ -1653,7 +1600,7 @@ reach_result reach_host_init_feature_registry(reach_host *host)
             definition.surface.shadow = REACH_SURFACE_SHADOW_POPUP;
             definition.surface.layer = 100;
             definition.surface.pointer_priority = 30;
-            definition.surface.dismiss_guard_surface = &dock_key;
+            definition.surface.dismiss_guard_surface = &reach_surface_key_for<reach_dock>();
             definition.surface.dismiss_guard_any_control = 1;
             definition.surface.restores_focus_on_close = 1;
             definition.surface.close_on_persistent_press = 1;
@@ -1675,7 +1622,7 @@ reach_result reach_host_init_feature_registry(reach_host *host)
         []
         {
             reach_feature_definition definition = {};
-            definition.id = REACH_SURFACE_ID_CLIPBOARD;
+            definition.key = &reach_surface_key_for<reach_clipboard_feature>();
             definition.factory = {
                 reach_feature_create<reach_clipboard_feature, reach_clipboard_feature_create>,
                 reach_feature_destroy<reach_clipboard_feature, reach_clipboard_feature_destroy>};
@@ -1694,7 +1641,7 @@ reach_result reach_host_init_feature_registry(reach_host *host)
                 REACH_SURFACE_POINTER_SOURCE_GATED | REACH_SURFACE_POINTER_CANCEL_BEFORE_DOWN;
             definition.surface.behavior_flags = REACH_SURFACE_BEHAVIOR_DISMISS_ON_ESCAPE;
             definition.layout.priority = 20;
-            definition.layout.anchor = &launcher_key;
+            definition.layout.anchor = &reach_surface_key_for<reach_launcher>();
             definition.toggle_events =
                 reach_clipboard_activation_events(&definition.toggle_event_count);
             return definition;
@@ -1702,8 +1649,8 @@ reach_result reach_host_init_feature_registry(reach_host *host)
         []
         {
             reach_feature_definition definition = {};
-            definition.id = REACH_SURFACE_ID_TRAY;
-            definition.capsule_owner = &top_bar_key;
+            definition.key = &reach_surface_key_for<reach_top_bar_tray_popup>();
+            definition.capsule_owner = &reach_surface_key_for<reach_top_bar>();
             definition.lifecycle.stop = reach_feature_stop_tray;
             definition.capsule_ops = reach_top_bar_tray_capsule_ops();
             definition.surface_ops = &reach_tray_surface_ops;
@@ -1711,10 +1658,10 @@ reach_result reach_host_init_feature_registry(reach_host *host)
             definition.surface.shadow = REACH_SURFACE_SHADOW_POPUP;
             definition.surface.layer = 180;
             definition.surface.pointer_priority = 40;
-            definition.surface.opening_origin = &top_bar_key;
+            definition.surface.opening_origin = &reach_surface_key_for<reach_top_bar>();
             definition.surface.cls = REACH_SURFACE_CLASS_POPUP;
             definition.surface.pointer_flags = REACH_SURFACE_POINTER_DOWN_APPLIES_UNHANDLED;
-            definition.layout.anchor = &top_bar_key;
+            definition.layout.anchor = &reach_surface_key_for<reach_top_bar>();
             definition.layout.anchor_slot = REACH_TOP_BAR_CONTROL_TRAY;
             definition.layout.priority = 40;
             return definition;
@@ -1722,7 +1669,7 @@ reach_result reach_host_init_feature_registry(reach_host *host)
         []
         {
             reach_feature_definition definition = {};
-            definition.id = REACH_SURFACE_ID_QUICK_SETTINGS;
+            definition.key = &reach_surface_key_for<reach_quick_settings>();
             definition.factory = {
                 reach_feature_create<reach_quick_settings, reach_quick_settings_create>,
                 reach_feature_destroy<reach_quick_settings, reach_quick_settings_destroy>};
@@ -1736,13 +1683,13 @@ reach_result reach_host_init_feature_registry(reach_host *host)
             definition.surface.shadow = REACH_SURFACE_SHADOW_POPUP;
             definition.surface.layer = 170;
             definition.surface.pointer_priority = 50;
-            definition.surface.opening_origin = &top_bar_key;
+            definition.surface.opening_origin = &reach_surface_key_for<reach_top_bar>();
             definition.surface.cls = REACH_SURFACE_CLASS_POPUP;
             definition.surface.pointer_flags = REACH_SURFACE_POINTER_CAPTURE_CONSUMES_RELEASE |
                                                REACH_SURFACE_POINTER_CAPTURE_OWNS_MOVE;
             definition.surface.window_flags =
                 REACH_WINDOW_COMPOSITION_BACKED | REACH_WINDOW_TEXT_INPUT;
-            definition.layout.anchor = &top_bar_key;
+            definition.layout.anchor = &reach_surface_key_for<reach_top_bar>();
             definition.layout.anchor_slot = REACH_TOP_BAR_CONTROL_QUICK_SETTINGS;
             definition.layout.priority = 50;
             definition.routed_events = escape_events;
@@ -1754,7 +1701,7 @@ reach_result reach_host_init_feature_registry(reach_host *host)
         []
         {
             reach_feature_definition definition = {};
-            definition.id = REACH_SURFACE_ID_CONTEXT_MENU;
+            definition.key = &reach_surface_key_for<reach_context_menu>();
             definition.factory = {
                 reach_feature_create<reach_context_menu, reach_context_menu_create>,
                 reach_feature_destroy<reach_context_menu, reach_context_menu_destroy>};
@@ -1776,7 +1723,7 @@ reach_result reach_host_init_feature_registry(reach_host *host)
         []
         {
             reach_feature_definition definition = {};
-            definition.id = REACH_SURFACE_ID_SWITCHER;
+            definition.key = &reach_surface_key_for<reach_switcher>();
             definition.factory = {reach_feature_create<reach_switcher, reach_switcher_create>,
                                   reach_feature_destroy<reach_switcher, reach_switcher_destroy>};
             definition.lifecycle.attach = reach_feature_attach_switcher;
@@ -1801,7 +1748,7 @@ reach_result reach_host_init_feature_registry(reach_host *host)
         []
         {
             reach_feature_definition definition = {};
-            definition.id = REACH_SURFACE_ID_STAGE;
+            definition.key = &reach_surface_key_for<reach_stage>();
             definition.factory = {reach_feature_create<reach_stage, reach_stage_create>,
                                   reach_feature_destroy<reach_stage, reach_stage_destroy>};
             definition.lifecycle.attach = reach_feature_attach_stage;
@@ -1811,7 +1758,7 @@ reach_result reach_host_init_feature_registry(reach_host *host)
             definition.surface_ops = &reach_stage_surface_ops;
             definition.control_ops = &reach_stage_control_ops;
             definition.surface.refresh_world_on_open = 1;
-            definition.surface.dismiss_guard_surface = &dock_key;
+            definition.surface.dismiss_guard_surface = &reach_surface_key_for<reach_dock>();
             definition.surface.dismiss_guard_slot = REACH_DOCK_CONTROL_TRIGGER;
             definition.surface.layer = 50;
             definition.surface.pointer_priority = 60;
@@ -1830,7 +1777,7 @@ reach_result reach_host_init_feature_registry(reach_host *host)
         []
         {
             reach_feature_definition definition = {};
-            definition.id = REACH_SURFACE_ID_BATTERY;
+            definition.key = &reach_surface_key_for<reach_battery>();
             definition.factory = {reach_feature_create<reach_battery, reach_battery_create>,
                                   reach_feature_destroy<reach_battery, reach_battery_destroy>};
             definition.lifecycle.attach = reach_feature_attach_battery;
@@ -1842,10 +1789,10 @@ reach_result reach_host_init_feature_registry(reach_host *host)
             definition.surface.shadow = REACH_SURFACE_SHADOW_POPUP;
             definition.surface.layer = 175;
             definition.surface.pointer_priority = 55;
-            definition.surface.opening_origin = &top_bar_key;
+            definition.surface.opening_origin = &reach_surface_key_for<reach_top_bar>();
             definition.surface.popup_chrome = 1;
             definition.surface.cls = REACH_SURFACE_CLASS_POPUP;
-            definition.layout.anchor = &top_bar_key;
+            definition.layout.anchor = &reach_surface_key_for<reach_top_bar>();
             definition.layout.anchor_slot = REACH_TOP_BAR_CONTROL_BATTERY;
             definition.layout.priority = 55;
             return definition;
@@ -1853,7 +1800,7 @@ reach_result reach_host_init_feature_registry(reach_host *host)
         []
         {
             reach_feature_definition definition = {};
-            definition.id = REACH_SURFACE_ID_SYSTEM_HUD;
+            definition.key = &reach_surface_key_for<reach_system_hud>();
             definition.factory = {
                 reach_feature_create<reach_system_hud, reach_system_hud_create>,
                 reach_feature_destroy<reach_system_hud, reach_system_hud_destroy>};
@@ -1869,13 +1816,13 @@ reach_result reach_host_init_feature_registry(reach_host *host)
                 REACH_SURFACE_BEHAVIOR_GAME_MODE_VISIBLE | REACH_SURFACE_BEHAVIOR_INPUT_PASSTHROUGH;
             definition.surface.pointer_flags = REACH_SURFACE_POINTER_SOURCE_GATED;
             definition.layout.priority = 80;
-            definition.layout.anchor = &dock_key;
+            definition.layout.anchor = &reach_surface_key_for<reach_dock>();
             return definition;
         }(),
         []
         {
             reach_feature_definition definition = {};
-            definition.id = REACH_SURFACE_ID_SCREENSHOT;
+            definition.key = &reach_surface_key_for<reach_screenshot>();
             definition.factory = {
                 reach_feature_create<reach_screenshot, reach_screenshot_create>,
                 reach_feature_destroy<reach_screenshot, reach_screenshot_destroy>};

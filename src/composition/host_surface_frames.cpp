@@ -725,14 +725,8 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
     reach_feature_surface_context surface_ctx = {};
     reach_host_fill_surface_context(host, desc, ctx, &surface_ctx);
     surface_ctx.transition_visible = visible;
-    const reach_feature_definition *definition = desc->definition;
     reach_feature_layout_anchor layout_anchor = {};
-    layout_anchor.surface = desc->links->layout_anchor;
-    layout_anchor.slot = definition->layout.anchor_slot;
-    if (desc->definition->surface_ops->layout_anchor != nullptr)
-    {
-        (void)desc->definition->surface_ops->layout_anchor(desc->capsule, &layout_anchor);
-    }
+    (void)reach_host_resolve_popup_owner(desc, &layout_anchor);
     reach_surface_id anchor_id = layout_anchor.surface;
     if (!reach_host_layout_anchor_equal(&layout_anchor, &desc->resolved_anchor_owner))
         desc->resolved_anchor_valid = 0;
@@ -759,8 +753,7 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
         {
             surface_ctx.anchor_bounds = anchor->resolved_bounds;
         }
-        if (anchor->definition != nullptr && anchor->definition->resolve_anchor != nullptr &&
-            definition != nullptr)
+        if (anchor->definition->resolve_anchor != nullptr)
         {
             reach_feature_anchor resolved = {};
             if (anchor->definition->resolve_anchor(anchor->capsule, layout_anchor.slot,

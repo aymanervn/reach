@@ -63,23 +63,6 @@ typedef enum reach_surface_class
 
 using reach_surface_id = uint32_t;
 
-// Stable slots for existing routes. New entries can leave their numeric ID unset.
-enum
-{
-    REACH_SURFACE_ID_DOCK = 0,
-    REACH_SURFACE_ID_TOP_BAR,
-    REACH_SURFACE_ID_LAUNCHER,
-    REACH_SURFACE_ID_CLIPBOARD,
-    REACH_SURFACE_ID_TRAY,
-    REACH_SURFACE_ID_QUICK_SETTINGS,
-    REACH_SURFACE_ID_CONTEXT_MENU,
-    REACH_SURFACE_ID_SWITCHER,
-    REACH_SURFACE_ID_STAGE,
-    REACH_SURFACE_ID_BATTERY,
-    REACH_SURFACE_ID_SYSTEM_HUD,
-    REACH_SURFACE_ID_SCREENSHOT
-};
-
 constexpr reach_surface_id REACH_SURFACE_ID_INVALID = UINT32_MAX;
 constexpr size_t REACH_HOST_SURFACE_CAPACITY = 24;
 
@@ -314,7 +297,7 @@ typedef enum reach_layout_reservation_edge
 
 typedef struct reach_feature_layout_anchor
 {
-    reach_surface_id surface;
+    reach_surface_id surface = REACH_SURFACE_ID_INVALID;
     uint32_t slot;
     size_t index;
     uint64_t identity;
@@ -356,7 +339,6 @@ typedef struct reach_feature_surface_ops
     int32_t (*arrange)(void *capsule, const reach_feature_surface_context *ctx);
     reach_result (*append_render_commands)(void *capsule, const reach_feature_surface_context *ctx,
                                            reach_render_command_buffer *out_commands);
-    int32_t (*layout_anchor)(const void *capsule, reach_feature_layout_anchor *out);
     const reach_feature_native_overlay_ops *native_overlay;
     int32_t (*pointer_observation)(const void *capsule, reach_rect_union *out);
 } reach_feature_surface_ops;
@@ -466,6 +448,7 @@ typedef struct reach_feature_runtime
     reach_window_id frame_native_target;
     reach_feature_surface_context layout_context;
     reach_feature_surface_context native_overlay_context;
+    reach_feature_layout_anchor popup_owner;
     reach_feature_layout_anchor resolved_anchor_owner;
     reach_feature_anchor resolved_anchor;
     reach_rect_f32 resolved_anchor_bounds;
@@ -534,7 +517,7 @@ reach_host_create_registered_surface_ports(reach_host *host,
                                            const reach_host_dependencies *dependencies);
 void reach_host_destroy_registered_surface_ports(reach_host *host);
 void reach_host_destroy_registered_features(reach_host *host);
-void reach_host_stop_runtime(reach_host *host);
+void reach_host_stop_runtime(reach_host *host, bool stop_workers);
 void reach_host_apply_feature_tick_result(reach_host *host, reach_feature_runtime *runtime,
                                           const reach_feature_tick_result *result);
 typedef enum reach_surface_close_intent
@@ -766,6 +749,16 @@ struct reach_host
     reach_system_stats *system_stats;
     reach_popup_capture_port popup_capture;
 };
+
+template <typename Tag> reach_surface_id reach_host_find_surface(const reach_host *host)
+{
+    return reach_host_find_surface(host, reach_surface_key_for<Tag>());
+}
+
+inline reach_feature_runtime *reach_host_surface_runtime(reach_host *host, reach_surface_id id)
+{
+    return host != nullptr && id < host->surface_count ? &host->feature_runtimes[id] : nullptr;
+}
 
 template <typename Feature>
 static inline Feature *reach_host_feature_capsule(reach_host *host, reach_surface_id id)

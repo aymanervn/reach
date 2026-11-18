@@ -189,30 +189,35 @@ static void reach_host_stop_registered_features(reach_host *host)
     }
 }
 
-void reach_host_stop_runtime(reach_host *host)
+void reach_host_stop_runtime(reach_host *host, bool stop_workers)
 {
     host->running = 0;
     reach_runtime_policy_init(&host->runtime_policy);
     const auto started = host->started_ports;
     host->started_ports = {};
-    if (started.wallpaper && host->wallpaper_surface.ops.hide != nullptr)
+
+    reach_host_stop_registered_features(host);
+    reach_host_stop_edge_reveals(host);
+    if (stop_workers)
     {
-        (void)host->wallpaper_surface.ops.hide(host->wallpaper_surface.surface);
+        reach_host_stop_config_service(host);
+        reach_host_stop_search_service(host);
+        reach_icon_service_stop(host->icon_service);
+        reach_host_stop_app_control(host);
+        reach_idle_watch_stop(host->idle_watch);
     }
     if (started.now_playing)
     {
         reach_now_playing_service_stop(host->now_playing_service);
     }
-    if (started.audio_volume && host->audio_volume.stop_watching != nullptr)
-    {
-        host->audio_volume.stop_watching(host->audio_volume.userdata);
-    }
     if (started.system_controls && host->system_controls.stop_watching != nullptr)
     {
         host->system_controls.stop_watching(host->system_controls.userdata);
     }
-    reach_host_stop_edge_reveals(host);
-    reach_host_stop_registered_features(host);
+    if (started.audio_volume && host->audio_volume.stop_watching != nullptr)
+    {
+        host->audio_volume.stop_watching(host->audio_volume.userdata);
+    }
     for (size_t index = host->surface_count; index > 0; --index)
     {
         auto &binding = host->surface_event_bindings[index - 1];
@@ -232,6 +237,10 @@ void reach_host_stop_runtime(reach_host *host)
         (void)host->window_manager.ops.stop(host->window_manager.manager);
     }
     reach_host_hide_all_surfaces(host);
+    if (started.wallpaper && host->wallpaper_surface.ops.hide != nullptr)
+    {
+        (void)host->wallpaper_surface.ops.hide(host->wallpaper_surface.surface);
+    }
 }
 
 static void reach_host_cleanup(reach_host *host)
@@ -241,14 +250,9 @@ static void reach_host_cleanup(reach_host *host)
         return;
     }
 
-    reach_host_stop_runtime(host);
-    reach_host_stop_config_service(host);
-    reach_host_stop_search_service(host);
-    reach_icon_service_stop(host->icon_service);
-    reach_host_stop_app_control(host);
+    reach_host_stop_runtime(host, true);
     reach_host_sync_popup_mouse_hook(host);
     reach_host_release_registered_render_resources(host);
-    reach_idle_watch_stop(host->idle_watch);
     reach_system_status_stop(host->system_status);
     reach_wifi_service_stop(host->wifi_service);
     reach_bluetooth_service_stop(host->bluetooth_service);
@@ -846,7 +850,8 @@ reach_result reach_host_start(reach_host *host)
     const reach_result result = reach_host_start_runtime(host);
     if (result != REACH_OK)
     {
-        reach_host_stop_runtime(host);
+        // Creation-owned workers stay available for a retry.
+        reach_host_stop_runtime(host, false);
     }
     return result;
 }
@@ -862,11 +867,6 @@ reach_result reach_host_stop(reach_host *host)
     {
         return REACH_OK;
     }
-    reach_host_stop_runtime(host);
-    reach_host_stop_config_service(host);
-    reach_host_stop_search_service(host);
-    reach_icon_service_stop(host->icon_service);
-    reach_host_stop_app_control(host);
-    reach_idle_watch_stop(host->idle_watch);
+    reach_host_stop_runtime(host, true);
     return REACH_OK;
 }

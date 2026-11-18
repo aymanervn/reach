@@ -355,14 +355,6 @@ PUBLIC_INNER_FORBIDDEN_INCLUDE_PATTERNS = [
 
 INTERFEATURE_ROUTES_SEAM = "src/composition/interfeature_routes.cpp"
 
-INTERFEATURE_ROUTE_TARGETS: dict[str, str] = {
-    "reach_host_show_dock_app_context_menu": (
-        "src/composition/host_context_menu_orchestration.cpp"
-    ),
-    "reach_host_show_power_context_menu": "src/composition/host_context_menu_orchestration.cpp",
-    "reach_host_dock_item_hovered": "src/composition/host_window_list_orchestration.cpp",
-    "reach_host_toggle_stage": "src/composition/host_stage_orchestration.cpp",
-}
 
 FEATURE_ACTION_ENUM_RE = re.compile(r"REACH_[A-Z_]+_POINTER_ACTION_[A-Z_]+")
 
@@ -781,30 +773,6 @@ def validate_feature_config_ownership(path: Path, text: str) -> list[str]:
     ]
 
 
-def validate_interfeature_routes(path: Path, text: str) -> list[str]:
-    """An effect that opens or changes another feature may only be reached from the
-    interfeature routing seam, from the file that defines it, or from the shared
-    composition declarations."""
-    relative = rel(path).replace("\\", "/")
-    if not relative.startswith("src/composition/") or relative in (
-        INTERFEATURE_ROUTES_SEAM,
-        "src/composition/host_internal.h",
-    ):
-        return []
-
-    scan_text = strip_comments(text)
-    violations: list[str] = []
-    for symbol, owner in INTERFEATURE_ROUTE_TARGETS.items():
-        if relative == owner:
-            continue
-        if re.search(rf"\b{symbol}\s*\(", scan_text) is not None:
-            violations.append(
-                f"{relative}: {symbol} is an interfeature effect; route it from "
-                f"{INTERFEATURE_ROUTES_SEAM}"
-            )
-    return violations
-
-
 def validate_feature_action_vocabulary(path: Path, text: str) -> list[str]:
     """Composition dispatches the shared reach_feature_action_kind vocabulary. A
     feature-private action enum outside the input-policy file means a translator
@@ -874,12 +842,20 @@ def validate_uniform_feature_runtime(path: Path, text: str) -> list[str]:
             f"{relative}: {legacy.group(0)} is obsolete; use the canonical feature "
             "definition and runtime"
         )
-    if relative not in COMPOSITION_FEATURE_SEAMS and relative != "src/composition/host_internal.h":
-        surface_id = re.search(r"\bREACH_SURFACE_ID_(?!INVALID\b)[A-Z0-9_]+\b", scan_text)
-        if surface_id is not None:
+    surface_id = re.search(r"\bREACH_SURFACE_ID_(?!INVALID\b)[A-Z0-9_]+\b", scan_text)
+    if surface_id is not None:
+        violations.append(
+            f"{relative}: {surface_id.group(0)} names a numeric surface ID; use a surface key"
+        )
+    if relative not in COMPOSITION_FEATURE_SEAMS:
+        surface_key = re.search(
+            r"\b(?:reach_surface_key_for|reach_host_find_surface)\s*<\s*reach_\w+",
+            scan_text,
+        )
+        if surface_key is not None:
             violations.append(
-                f"{relative}: {surface_id.group(0)} names a concrete surface; use a "
-                "registry declaration or an interfeature route"
+                f"{relative}: concrete surface keys belong in {FEATURE_REGISTRY_SEAM} "
+                f"and {INTERFEATURE_ROUTES_SEAM}"
             )
     return violations
 
@@ -1017,7 +993,6 @@ def main() -> int:
         )
         violations.extend(validate_feature_config_ownership(path, text))
         violations.extend(validate_uniform_feature_runtime(path, text))
-        violations.extend(validate_interfeature_routes(path, text))
         violations.extend(validate_feature_action_vocabulary(path, text))
         warnings.extend(validate_public_inner_api_warnings(path, text))
 

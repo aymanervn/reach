@@ -402,6 +402,7 @@ void reach_host_apply_surface_open_change(reach_host *host, reach_feature_runtim
     reach_host_sync_popup_mouse_hook(host);
     if (!next)
     {
+        runtime->popup_owner = {};
         reach_host_request_bar_visibility_update(host);
     }
 }
