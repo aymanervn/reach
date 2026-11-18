@@ -1,6 +1,7 @@
 #include "reach/support/util.h"
 #include "reach/features/dock.h"
 #include "test_utf16.h"
+#include "../src/features/dock/dock_interaction.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -533,6 +534,109 @@ static void test_dock_metrics_are_spaced_before_any_configuration_arrives(void)
     reach_dock_destroy(dock);
 }
 
+static const reach_dock_layout *arrange_one_pin_dock(reach_dock *dock, float size)
+{
+    reach_pinned_app_model pin = make_pin(7, "C:\apps\a.exe");
+    reach_dock_apply_pinned_apps(dock, &pin, 1);
+    if (size > 0.0f)
+    {
+        reach_dock_apply_config(dock, 0.0f, (int32_t)size);
+    }
+
+    reach_dock_arrange_context arrange = {};
+    arrange.theme = reach_theme_default();
+    arrange.monitor_bounds = {0.0f, 0.0f, 1920.0f, 1080.0f};
+    arrange.dpi_scale = 1.0f;
+    (void)reach_dock_arrange(dock, &arrange);
+
+    reach_feature_tick_result tick = {};
+    reach_dock_capsule_ops()->tick(dock, 1.0, &tick);
+    const reach_dock_layout *layout = reach_dock_arranged_layout(dock);
+    return layout != nullptr && layout->app_slot_count == 1 ? layout : nullptr;
+}
+
+static void test_resize_edge_hits_the_top_rim(void)
+{
+    reach_dock *dock = nullptr;
+    expect_true(reach_dock_create(&dock) == REACH_OK, "resize edge test creates a dock");
+    if (dock == nullptr)
+    {
+        return;
+    }
+    const reach_dock_layout *layout = arrange_one_pin_dock(dock, 0.0f);
+    expect_true(layout != nullptr, "resize edge test arranges one pinned item");
+    if (layout != nullptr)
+    {
+        reach_rect_f32 edge = reach_dock_resize_edge_rect(layout);
+        expect_true(edge.height > 0.0f, "the dock has a resize band along its top rim");
+        reach_dock_hit_result hit = reach_dock_hit_test(
+            layout, (int32_t)(edge.x + edge.width * 0.5f), (int32_t)(edge.y + edge.height * 0.5f));
+        expect_true(hit.type == REACH_DOCK_HIT_RESIZE_EDGE, "the band center is a resize edge hit");
+        hit = reach_dock_hit_test(layout, (int32_t)(edge.x + edge.width * 0.5f),
+                                  (int32_t)(edge.y + edge.height) + 1);
+        expect_true(hit.type != REACH_DOCK_HIT_RESIZE_EDGE,
+                    "a point just below the band is not a resize edge hit");
+    }
+    reach_dock_destroy(dock);
+}
+
+static void test_resize_edge_never_overlaps_icons(void)
+{
+    const float sizes[2] = {100.0f, 50.0f};
+    for (size_t index = 0; index < 2; ++index)
+    {
+        reach_dock *dock = nullptr;
+        expect_true(reach_dock_create(&dock) == REACH_OK, "resize overlap test creates a dock");
+        if (dock == nullptr)
+        {
+            return;
+        }
+        const reach_dock_layout *layout = arrange_one_pin_dock(dock, sizes[index]);
+        expect_true(layout != nullptr, "resize overlap test arranges one pinned item");
+        if (layout != nullptr)
+        {
+            reach_rect_f32 edge = reach_dock_resize_edge_rect(layout);
+            const reach_rect_f32 *slot = &layout->app_slots[0];
+            expect_true(edge.y + edge.height <= slot->y, "the band ends above the app slot");
+            expect_true(edge.y + edge.height <= layout->trigger_button.y,
+                        "the band ends above the trigger button");
+
+            reach_dock_hit_result item = reach_dock_hit_test(
+                layout, (int32_t)(slot->x + slot->width * 0.5f), (int32_t)ceilf(slot->y));
+            expect_true(item.type == REACH_DOCK_HIT_ITEM && item.index == 0,
+                        "the top of an app slot still hits the item");
+            reach_dock_hit_result trigger = reach_dock_hit_test(
+                layout, (int32_t)(layout->trigger_button.x + layout->trigger_button.width * 0.5f),
+                (int32_t)ceilf(layout->trigger_button.y));
+            expect_true(trigger.type == REACH_DOCK_HIT_TRIGGER,
+                        "the top of the trigger button still hits the trigger");
+        }
+        reach_dock_destroy(dock);
+    }
+}
+
+static void test_resize_edge_skips_rounded_ends(void)
+{
+    reach_dock *dock = nullptr;
+    expect_true(reach_dock_create(&dock) == REACH_OK, "resize ends test creates a dock");
+    if (dock == nullptr)
+    {
+        return;
+    }
+    const reach_dock_layout *layout = arrange_one_pin_dock(dock, 0.0f);
+    expect_true(layout != nullptr, "resize ends test arranges one pinned item");
+    if (layout != nullptr)
+    {
+        reach_rect_f32 edge = reach_dock_resize_edge_rect(layout);
+        float radius = layout->bounds.height * reach_theme_default()->dock_corner_radius_ratio;
+        /* The band lives in local space, where the pill starts at x = 0. */
+        expect_true(edge.x >= radius - 0.5f, "the band starts after the left rounded end");
+        expect_true(edge.x + edge.width <= layout->bounds.width - radius + 0.5f,
+                    "the band stops before the right rounded end");
+    }
+    reach_dock_destroy(dock);
+}
+
 static void test_pinned_item_pressable_release_opens_its_target(void)
 {
     reach_dock *dock = nullptr;
@@ -704,6 +808,9 @@ int main(void)
 {
     test_dock_metrics_are_spaced_before_any_configuration_arrives();
     test_pinned_item_pressable_release_opens_its_target();
+    test_resize_edge_hits_the_top_rim();
+    test_resize_edge_never_overlaps_icons();
+    test_resize_edge_skips_rounded_ends();
     test_pinned_reorder_survives_the_config_round_trip();
     test_unpinned_windows_group_into_one_item();
     test_item_keeps_every_open_window_as_an_instance();
