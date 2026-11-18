@@ -17,7 +17,7 @@ Open items only.
 - Launcher fast scroll can leave the last page's items unloaded. Suspect: the icon prefetch range in `launcher_render.cpp`.
 - Clipboard wheel scrolling sometimes stopped. Not confirmed fixed.
 - Trails behind a shadow-casting background whose y and height both move. Worked around in Clipboard and Switcher; deferred.
-- Shadow padding swallows clicks for other apps' windows (`window_win32.cpp:293` `HTTRANSPARENT`). The Dock and Unified/Split bars still overlap a thin strip; needs OS-level passthrough.
+- Shadow padding swallows clicks for other apps' windows (`window_win32.cpp:282` `HTTRANSPARENT`). The Dock and Unified/Split bars still overlap a thin strip and need OS-level passthrough.
 - Canceled item drags keep their reordered position.
 - A hidden Dock parks its window below the primary monitor; with a monitor stacked below, that window covers a strip at its top and swallows clicks there. The retained reveal makes the strip taller by the slide distance.
 - A failed Applications refresh clears its loading state without reporting the failure.
@@ -32,14 +32,14 @@ Open items only.
 - Parallel Windows-adapter builds contend for one PDB.
 - Concurrent config INI verification failure (2026-10-12), not yet explained.
 - WUC root completion callback is missing in repeated native diagnostics.
+- Validate startup and shutdown, bar stacking and focused popup keyboard input on a deployed [surface registry build](surface-registry-migration.md).
+- Idle Watch starts during host creation. A full host stop ends its worker until the host is recreated (`host_lifecycle.cpp`, `idle_watch.cpp`).
 
 ## Architecture debt (cleanup phase)
 
-- Adding a surface still edits `reach_host_dependencies`, `composition_root.cpp`, `reach_surface_role`, `window_win32.cpp` role lists and `check_architecture.py` name lists.
-- The registry is 154 field assignments, not one row per feature.
 - `reach_feature_capsule_ops` is bound positionally with five identical signatures.
 - `interfeature_routes.cpp` holds the window-list orchestration, not just slot assignment.
-- Named-feature branches survive on generic paths, keyed on surface id. The registry hardcodes the Context Menu ↔ Top Bar ↔ Dock relationship.
+- Move feature-owned notification, control, resource and rendering adapters out of `feature_registry.cpp` during capsule cleanup. Keep the definitions and service wiring in composition.
 - Capsule state structs are public and composition reads them. A third of the public feature API is internals. Per-feature action enums remain in public headers.
 - Dock and Launcher internals live in `core`.
 - `reach_ui_layout` and its only consumer are dead.
@@ -47,7 +47,6 @@ Open items only.
 - Point-in-rect is implemented 14 times with three semantics; `reach_rect_equal` is redefined 4 times.
 - Dock and Top Bar each cache bar trespass with their own copy of the same logic.
 - Clipboard owns a port directly; there is no clipboard service.
-- Ten dependencies leak on the `reach_app_create` failure path.
 - On the UI thread: power commands, audio COM endpoint activations on every pointer move, and the clipboard lock during capture.
 - The audio adapter reinvents the `icon_provider` resource-ref path.
 - The tray capsule still exists. Move tray data into a tray service owned by the Top Bar.
@@ -55,7 +54,6 @@ Open items only.
 - Nested corners are not migrated in Battery saver rows, Clipboard, Switcher and Settings cards. `launcher_state.cpp:183` repeats the highlight inset.
 - Every scroll surface owns an identical pair of scrollbar theme tokens.
 - Consumers that read `.to` on composed motions need review.
-- `check_architecture.py` still names three deleted composition files.
 - Clipboard preview keeps its own line splitter until the render port supports wrapping (`render_d2d_text.cpp:187`).
 
 ## GPU migration (remaining)

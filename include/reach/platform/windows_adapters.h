@@ -46,7 +46,9 @@ extern "C"
 {
 #endif
 
-    reach_result reach_windows_create_platform_window(reach_surface_role role,
+    reach_result reach_windows_create_platform_window(uint32_t window_flags,
+                                                      reach_platform_window_port *out_port);
+    reach_result reach_windows_create_settings_window(uint32_t window_flags,
                                                       reach_platform_window_port *out_port);
     typedef struct reach_render_device reach_render_device;
 

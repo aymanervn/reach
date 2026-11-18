@@ -18,7 +18,6 @@ extern "C"
         reach_host *host;
         struct reach_render_device *render_device;
         reach_render_device_port render_device_port;
-        reach_input_source_port input_source;
     } reach_app;
 
     reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app);

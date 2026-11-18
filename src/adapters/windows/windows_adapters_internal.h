@@ -74,7 +74,9 @@ extern "C"
     void reach_windows_desktop_compat_set_background(const reach_desktop_background_slot *slots,
                                                      size_t count, int32_t visible);
 
-    reach_result reach_windows_create_platform_window(reach_surface_role role,
+    reach_result reach_windows_create_platform_window(uint32_t window_flags,
+                                                      reach_platform_window_port *out_port);
+    reach_result reach_windows_create_settings_window(uint32_t window_flags,
                                                       reach_platform_window_port *out_port);
     void *reach_windows_platform_window_native_handle(reach_platform_window *window);
 

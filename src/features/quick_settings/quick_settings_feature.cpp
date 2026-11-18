@@ -1628,10 +1628,9 @@ void reach_quick_settings_bluetooth_motions(
     *out_switch = quick_settings->bluetooth_switch;
 }
 
-const reach_ui_event_type *reach_quick_settings_routed_events(size_t *out_count)
+const reach_ui_event_type *reach_quick_settings_window_events(size_t *out_count)
 {
-    static const reach_ui_event_type events[] = {REACH_UI_EVENT_ESCAPE, REACH_UI_EVENT_ENTER,
-                                                 REACH_UI_EVENT_TEXT_CHAR,
+    static const reach_ui_event_type events[] = {REACH_UI_EVENT_ENTER, REACH_UI_EVENT_TEXT_CHAR,
                                                  REACH_UI_EVENT_TEXT_EDIT};
     if (out_count != nullptr)
     {
