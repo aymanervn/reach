@@ -136,6 +136,7 @@ extern "C"
         void (*item_hovered)(void *user, const reach_menu_request *request);
         void (*trigger_activated)(void *user, size_t trigger);
         void (*item_windows_changed)(void *user, const reach_menu_request *request);
+        void (*size_committed)(void *user, int32_t size_percent);
     } reach_dock_routes;
 
 #define REACH_DOCK_TRIGGER_PRIMARY 0
