@@ -213,7 +213,7 @@ void reach_host_apply_ui_font(reach_host *host, int32_t bundled_font)
     }
     host->bundled_font = enabled;
 
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    for (size_t index = 0; index < host->surface_count; ++index)
     {
         reach_surface_runtime *surface = host->feature_runtimes[index].surface;
         if (surface == nullptr || surface->renderer.ops.set_ui_font == nullptr)
@@ -268,7 +268,7 @@ void reach_host_apply_theme(reach_host *host, int32_t light_theme, int32_t accen
     {
         return;
     }
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    for (size_t index = 0; index < host->surface_count; ++index)
     {
         reach_surface_runtime *surface = host->feature_runtimes[index].surface;
         if (surface != nullptr)

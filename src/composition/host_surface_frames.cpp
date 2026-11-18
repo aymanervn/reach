@@ -100,7 +100,7 @@ static reach_rect_f32 reach_host_available_bounds(const reach_host *host,
 {
     reach_rect_f32 available = monitor_bounds;
     float bottom = monitor_bounds.y + monitor_bounds.height;
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    for (size_t index = 0; index < host->surface_count; ++index)
     {
         const reach_feature_runtime *runtime = &host->feature_runtimes[index];
         if (!runtime->resolved_bounds_valid || runtime->definition == nullptr)
@@ -571,7 +571,7 @@ static reach_result reach_host_sync_native_overlay(reach_host *host, reach_featu
 
 reach_result reach_host_redraw_registered_surface(reach_host *host, reach_surface_id id)
 {
-    if (host == nullptr || id >= REACH_HOST_SURFACE_COUNT)
+    if (host == nullptr || id >= host->surface_count)
     {
         return REACH_INVALID_ARGUMENT;
     }
@@ -727,7 +727,7 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
     surface_ctx.transition_visible = visible;
     const reach_feature_definition *definition = desc->definition;
     reach_feature_layout_anchor layout_anchor = {};
-    layout_anchor.surface = definition->layout.anchor;
+    layout_anchor.surface = desc->links->layout_anchor;
     layout_anchor.slot = definition->layout.anchor_slot;
     if (desc->definition->surface_ops->layout_anchor != nullptr)
     {
@@ -736,9 +736,25 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
     reach_surface_id anchor_id = layout_anchor.surface;
     if (!reach_host_layout_anchor_equal(&layout_anchor, &desc->resolved_anchor_owner))
         desc->resolved_anchor_valid = 0;
-    if (anchor_id < REACH_HOST_SURFACE_COUNT)
+    if (anchor_id < host->surface_count)
     {
-        const reach_feature_runtime *anchor = &host->feature_runtimes[anchor_id];
+        reach_feature_runtime *anchor = &host->feature_runtimes[anchor_id];
+        if (reach_host_game_mode_enabled(host) && !anchor->resolved_bounds_valid &&
+            (anchor->definition->surface.behavior_flags &
+             REACH_SURFACE_BEHAVIOR_GAME_MODE_VISIBLE) == 0)
+        {
+            // A suppressed anchor still supplies geometry without presenting a native window.
+            reach_feature_surface_context arrange = {};
+            arrange.theme = surface_ctx.theme;
+            arrange.monitor_bounds = surface_ctx.monitor_bounds;
+            arrange.dpi_scale = surface_ctx.dpi_scale;
+            reach_workload_add(REACH_WORKLOAD_LAYOUTS, 1);
+            (void)anchor->definition->surface_ops->arrange(anchor->capsule, &arrange);
+            reach_feature_surface_geometry geometry = {};
+            anchor->definition->capsule_ops->surface_geometry(anchor->capsule, &geometry);
+            anchor->resolved_bounds = geometry.visible_bounds;
+            anchor->resolved_bounds_valid = 1;
+        }
         if (anchor->resolved_bounds_valid)
         {
             surface_ctx.anchor_bounds = anchor->resolved_bounds;

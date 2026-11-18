@@ -16,22 +16,19 @@ extern "C"
 {
 #endif
 
-    typedef enum reach_surface_role
+    typedef enum reach_platform_window_flag
     {
-        REACH_SURFACE_DOCK = 0,
-        REACH_SURFACE_LAUNCHER = 1,
-        REACH_SURFACE_TRAY_MENU = 2,
-        REACH_SURFACE_SWITCHER = 3,
-        REACH_SURFACE_CONTEXT_MENU = 4,
-        REACH_SURFACE_QUICK_SETTINGS = 5,
-        REACH_SURFACE_SETTINGS = 6,
-        REACH_SURFACE_CLIPBOARD = 7,
-        REACH_SURFACE_STAGE = 8,
-        REACH_SURFACE_TOP_BAR = 9,
-        REACH_SURFACE_BATTERY = 10,
-        REACH_SURFACE_SYSTEM_HUD = 11,
-        REACH_SURFACE_SCREENSHOT = 12
-    } reach_surface_role;
+        REACH_WINDOW_ACTIVATE = 1u << 0,
+        REACH_WINDOW_COMPOSITION_BACKED = 1u << 1,
+        REACH_WINDOW_APPLICATION = 1u << 2,
+        REACH_WINDOW_SESSION_EVENTS = 1u << 3,
+        REACH_WINDOW_DESKTOP_MINIMIZE_SUPPORT = 1u << 4,
+        REACH_WINDOW_CLOSE_REQUEST_EVENT = 1u << 5,
+        REACH_WINDOW_BOUNDS_EVENTS = 1u << 6,
+        REACH_WINDOW_FOCUS_LOST_EVENT = 1u << 7,
+        REACH_WINDOW_CROSSHAIR_CURSOR = 1u << 8,
+        REACH_WINDOW_TEXT_INPUT = 1u << 9
+    } reach_platform_window_flag;
 
 #define REACH_PLATFORM_WINDOW_MAX_CAPTION_EXCLUSIONS 4
 #define REACH_PLATFORM_WINDOW_MAX_INPUT_REGIONS 16
@@ -102,7 +99,6 @@ extern "C"
     {
         reach_platform_window *window;
         reach_platform_window_ops ops;
-        reach_surface_role role;
     } reach_platform_window_port;
 
 #ifdef __cplusplus

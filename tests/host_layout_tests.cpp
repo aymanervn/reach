@@ -440,7 +440,7 @@ static int32_t has_call(fake_window_call_kind kind, reach_window_id window, reac
     return 0;
 }
 
-static void attach_window(reach_host *host, reach_surface_id id, reach_surface_role role,
+static void attach_window(reach_host *host, reach_surface_id id, uint32_t window_flags,
                           reach_window_id window_id, int32_t layer)
 {
     reach_surface_runtime *surface = host->feature_runtimes[id].surface;
@@ -452,8 +452,8 @@ static void attach_window(reach_host *host, reach_surface_id id, reach_surface_r
     surface->window.ops.native_id = fake_native_id;
 
     reach_feature_runtime *runtime = &host->feature_runtimes[id];
-    expect_true(runtime->definition->surface.role == role,
-                "test window role matches its registered definition");
+    expect_true(runtime->definition->surface.window_flags == window_flags,
+                "test window capabilities match its registered definition");
     expect_true(runtime->definition->surface.layer == layer,
                 "test window layer matches its registered definition");
 
@@ -467,9 +467,12 @@ static void attach_window(reach_host *host, reach_surface_id id, reach_surface_r
 static void initialize_host(reach_host *host)
 {
     reach_host_init_feature_registry(host);
-    attach_window(host, REACH_SURFACE_ID_TOP_BAR, REACH_SURFACE_TOP_BAR, 101, 0);
-    attach_window(host, REACH_SURFACE_ID_DOCK, REACH_SURFACE_DOCK, 102, 110);
-    attach_window(host, REACH_SURFACE_ID_STAGE, REACH_SURFACE_STAGE, 103, 50);
+    attach_window(host, REACH_SURFACE_ID_TOP_BAR, REACH_WINDOW_COMPOSITION_BACKED, 101, 0);
+    attach_window(host, REACH_SURFACE_ID_DOCK,
+                  REACH_WINDOW_COMPOSITION_BACKED | REACH_WINDOW_SESSION_EVENTS |
+                      REACH_WINDOW_DESKTOP_MINIMIZE_SUPPORT,
+                  102, 110);
+    attach_window(host, REACH_SURFACE_ID_STAGE, REACH_WINDOW_COMPOSITION_BACKED, 103, 50);
     reach_layout_register_override(&host->layout_manager,
                                    host->surface_participants[REACH_SURFACE_ID_TOP_BAR],
                                    REACH_LAYOUT_CONDITION_BARS_FORCED, 130);
@@ -919,8 +922,8 @@ static void test_focus_restore_follows_the_close_intent(void)
                      .definition->surface.restores_focus_on_close,
                 "the Switcher never needs focus restoration because it does not activate");
     expect_true(
-        (host->feature_runtimes[REACH_SURFACE_ID_SWITCHER].definition->surface.behavior_flags &
-         REACH_SURFACE_BEHAVIOR_ACTIVATES) == 0,
+        (host->feature_runtimes[REACH_SURFACE_ID_SWITCHER].definition->surface.window_flags &
+         REACH_WINDOW_ACTIVATE) == 0,
         "the Switcher remains non-activating while an app-switch gesture is active");
 
     host->focus_restore_window[REACH_SURFACE_ID_LAUNCHER] = 4242;
@@ -988,7 +991,7 @@ static void test_every_dismissable_surface_reaches_the_shared_close_path(void)
     expect_true(reach_host_create_registered_features(host) == REACH_OK,
                 "registered feature factories create every capsule");
 
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    for (size_t index = 0; index < host->surface_count; ++index)
     {
         const reach_feature_runtime *runtime = &host->feature_runtimes[index];
         reach_surface_class cls = runtime->definition->surface.cls;
@@ -1002,16 +1005,15 @@ static void test_every_dismissable_surface_reaches_the_shared_close_path(void)
     }
 
     reach_feature_runtime *launcher = &host->feature_runtimes[REACH_SURFACE_ID_LAUNCHER];
-    expect_true(launcher->definition->force_close == nullptr &&
-                    reach_host_surface_closable(launcher),
-                "a capsule-controlled surface is closable without a force_close callback");
+    expect_true(reach_host_surface_closable(launcher),
+                "the launcher declares its close through the capsule control");
 
     expect_true(launcher->definition->control_ops->set_open(launcher->capsule, 1, nullptr),
                 "the launcher capsule opens through its control operation");
     reach_host_close_registered_surface(host, REACH_SURFACE_ID_LAUNCHER,
                                         REACH_SURFACE_CLOSE_SUPERSEDED);
     expect_true(!reach_host_surface_is_open(launcher),
-                "the shared close path closes a surface that owns no force_close callback");
+                "the shared close path invokes the launcher control");
 
     reach_host_destroy_registered_features(host);
 }
@@ -1021,40 +1023,38 @@ static void test_every_popup_names_the_control_that_holds_it_open(void)
     reach_host *host = &dismiss_guard_host;
     reach_host_init_feature_registry(host);
 
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    for (size_t index = 0; index < host->surface_count; ++index)
     {
-        const reach_feature_definition *definition = host->feature_runtimes[index].definition;
+        const auto &runtime = host->feature_runtimes[index];
+        const reach_feature_definition *definition = runtime.definition;
         const reach_surface_spec *spec = &definition->surface;
         if (spec->cls != REACH_SURFACE_CLASS_POPUP && spec->cls != REACH_SURFACE_CLASS_TRANSIENT)
         {
             continue;
         }
-        int32_t declares_guard = spec->dismiss_guard_surface < REACH_HOST_SURFACE_COUNT;
-        int32_t anchored = definition->layout.anchor < REACH_HOST_SURFACE_COUNT ||
+        int32_t declares_guard = runtime.links->dismiss_guard_surface < host->surface_count;
+        int32_t anchored = runtime.links->layout_anchor < host->surface_count ||
                            (definition->surface_ops != nullptr &&
                             definition->surface_ops->layout_anchor != nullptr);
         expect_true(declares_guard || anchored,
                     "every dismissable surface names the control a press must not dismiss it from");
     }
 
-    const reach_surface_spec *launcher =
-        &host->feature_runtimes[REACH_SURFACE_ID_LAUNCHER].definition->surface;
-    expect_true(launcher->dismiss_guard_surface == REACH_SURFACE_ID_DOCK &&
-                    launcher->dismiss_guard_any_control,
+    const auto &launcher = host->feature_runtimes[REACH_SURFACE_ID_LAUNCHER];
+    expect_true(launcher.links->dismiss_guard_surface == REACH_SURFACE_ID_DOCK &&
+                    launcher.definition->surface.dismiss_guard_any_control,
                 "a press anywhere on the dock is the dock's to handle while the launcher is open");
 
-    const reach_surface_spec *stage =
-        &host->feature_runtimes[REACH_SURFACE_ID_STAGE].definition->surface;
-    expect_true(stage->dismiss_guard_surface == REACH_SURFACE_ID_DOCK &&
-                    stage->dismiss_guard_slot == REACH_DOCK_CONTROL_TRIGGER &&
-                    !stage->dismiss_guard_any_control,
+    const auto &stage = host->feature_runtimes[REACH_SURFACE_ID_STAGE];
+    expect_true(stage.links->dismiss_guard_surface == REACH_SURFACE_ID_DOCK &&
+                    stage.definition->surface.dismiss_guard_slot == REACH_DOCK_CONTROL_TRIGGER &&
+                    !stage.definition->surface.dismiss_guard_any_control,
                 "the stage is held open only by the dock trigger that opens it");
 
-    const reach_feature_definition *battery =
-        host->feature_runtimes[REACH_SURFACE_ID_BATTERY].definition;
-    expect_true(battery->surface.dismiss_guard_surface >= REACH_HOST_SURFACE_COUNT &&
-                    battery->layout.anchor == REACH_SURFACE_ID_TOP_BAR &&
-                    battery->layout.anchor_slot == REACH_TOP_BAR_CONTROL_BATTERY,
+    const auto &battery = host->feature_runtimes[REACH_SURFACE_ID_BATTERY];
+    expect_true(battery.links->dismiss_guard_surface >= host->surface_count &&
+                    battery.links->layout_anchor == REACH_SURFACE_ID_TOP_BAR &&
+                    battery.definition->layout.anchor_slot == REACH_TOP_BAR_CONTROL_BATTERY,
                 "a top-bar popup is held open by the control it already anchors to");
 
     expect_true(
@@ -1075,7 +1075,7 @@ static void test_registered_feature_lifecycle(void)
     reach_host *host = &registry_host;
     reach_host_init_feature_registry(host);
 
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    for (size_t index = 0; index < host->surface_count; ++index)
     {
         const reach_feature_runtime *runtime = &host->feature_runtimes[index];
         const reach_feature_definition *definition = runtime->definition;
@@ -1131,7 +1131,7 @@ static void test_registered_feature_lifecycle(void)
 
     expect_true(reach_host_create_registered_features(host) == REACH_OK,
                 "registered feature factories create every capsule");
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    for (size_t index = 0; index < host->surface_count; ++index)
     {
         expect_true(host->feature_runtimes[index].capsule != nullptr,
                     "every registered surface receives its capsule");
@@ -1141,7 +1141,7 @@ static void test_registered_feature_lifecycle(void)
                 "the tray surface reuses its registered top-bar owner");
 
     reach_host_destroy_registered_features(host);
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    for (size_t index = 0; index < host->surface_count; ++index)
     {
         expect_true(host->feature_runtimes[index].capsule == nullptr,
                     "destroying registered features clears every surface capsule");
@@ -1154,18 +1154,28 @@ static void test_registered_surface_input_passthrough(void)
     reach_host_init_feature_registry(host);
 
     reach_host_dependencies dependencies = {};
-    dependencies.launcher_window.window = reinterpret_cast<reach_platform_window *>(1);
-    dependencies.launcher_window.ops.set_input_passthrough = fake_set_input_passthrough;
-    dependencies.system_hud_window.window = reinterpret_cast<reach_platform_window *>(2);
-    dependencies.system_hud_window.ops.set_input_passthrough = fake_set_input_passthrough;
+    uintptr_t next_window = 1;
+    dependencies.surface_factory_user = &next_window;
+    dependencies.create_surface_ports = [](void *user, uint32_t, reach_platform_window_port *window,
+                                           reach_render_backend_port *renderer)
+    {
+        const auto id = (*static_cast<uintptr_t *>(user))++;
+        window->window = reinterpret_cast<reach_platform_window *>(id);
+        window->ops.set_input_passthrough = fake_set_input_passthrough;
+        renderer->backend = reinterpret_cast<reach_render_backend *>(id);
+        return REACH_OK;
+    };
 
     call_count = 0;
-    reach_host_bind_registered_surface_ports(host, &dependencies);
+    expect_true(reach_host_create_registered_surface_ports(host, &dependencies) == REACH_OK &&
+                    next_window == host->surface_count + 1,
+                "the surface factory creates one window and renderer per registry entry");
 
-    expect_true(has_call(FAKE_WINDOW_CALL_SET_INPUT_PASSTHROUGH, 1, 0),
+    expect_true(has_call(FAKE_WINDOW_CALL_SET_INPUT_PASSTHROUGH, REACH_SURFACE_ID_LAUNCHER + 1, 0),
                 "ordinary surfaces keep native input enabled");
-    expect_true(has_call(FAKE_WINDOW_CALL_SET_INPUT_PASSTHROUGH, 2, 1),
-                "System HUD enables native input passthrough");
+    expect_true(
+        has_call(FAKE_WINDOW_CALL_SET_INPUT_PASSTHROUGH, REACH_SURFACE_ID_SYSTEM_HUD + 1, 1),
+        "System HUD enables native input passthrough");
 }
 
 static void test_frame_scheduling_does_not_present_a_closed_surface(void)
@@ -1515,7 +1525,7 @@ static void test_forced_bars_hold_through_a_closing_stage(void)
 
 static reach_screen_hotspot_callback bar_hotspot_callback;
 static void *bar_hotspot_user;
-static int bar_hotspot_tokens[REACH_HOST_SURFACE_COUNT];
+static int bar_hotspot_tokens[REACH_HOST_SURFACE_CAPACITY];
 static size_t bar_hotspot_created;
 
 static reach_result fake_hotspot_noop(reach_screen_hotspot *hotspot)
@@ -1534,6 +1544,12 @@ static reach_result fake_hotspot_set_bounds(reach_screen_hotspot *hotspot, reach
 static reach_result fake_hotspot_set_callback(reach_screen_hotspot *hotspot,
                                               reach_screen_hotspot_callback callback, void *user)
 {
+    if (callback == nullptr)
+    {
+        bar_hotspot_callback = nullptr;
+        bar_hotspot_user = nullptr;
+        return REACH_OK;
+    }
     reach_host_edge_reveal_runtime *runtime = static_cast<reach_host_edge_reveal_runtime *>(user);
     if (runtime->owner->definition->id == REACH_SURFACE_ID_TOP_BAR)
     {
@@ -1965,7 +1981,7 @@ static void test_feature_tick_redraw_marks_only_its_own_surface(void)
     reach_feature_runtime *quick_settings =
         &host->feature_runtimes[REACH_SURFACE_ID_QUICK_SETTINGS];
     host->dirty = {};
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    for (size_t index = 0; index < host->surface_count; ++index)
         host->feature_runtimes[index].surface->dirty_flags = 0;
 
     reach_feature_tick_result tick = {};
@@ -1977,7 +1993,7 @@ static void test_feature_tick_redraw_marks_only_its_own_surface(void)
     expect_true(!host->dirty.render && !host->dirty.layout,
                 "a tick redraw sets no host-wide dirty state");
 
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    for (size_t index = 0; index < host->surface_count; ++index)
         host->feature_runtimes[index].surface->dirty_flags = 0;
     reach_feature_runtime *tray = &host->feature_runtimes[REACH_SURFACE_ID_TRAY];
     reach_host_apply_feature_tick_result(host, tray, &tick);

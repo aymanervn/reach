@@ -8,7 +8,7 @@ static int32_t reach_host_surface_restores_focus(const reach_feature_runtime *ru
 
 void reach_host_capture_focus_restore(reach_host *host, reach_surface_id id)
 {
-    if (host == nullptr || id >= REACH_HOST_SURFACE_COUNT ||
+    if (host == nullptr || id >= host->surface_count ||
         !reach_host_surface_restores_focus(&host->feature_runtimes[id]))
     {
         return;
@@ -20,7 +20,7 @@ void reach_host_capture_focus_restore(reach_host *host, reach_surface_id id)
 
 void reach_host_arm_focus_restore(reach_host *host, reach_surface_id id)
 {
-    if (host != nullptr && id < REACH_HOST_SURFACE_COUNT &&
+    if (host != nullptr && id < host->surface_count &&
         (reach_host_surface_restores_focus(&host->feature_runtimes[id]) ||
          host->keyboard_focus_taken[id]))
     {
@@ -46,7 +46,7 @@ void reach_host_take_keyboard_focus(reach_host *host, reach_feature_runtime *run
 
 void reach_host_cancel_focus_restore(reach_host *host, reach_surface_id id)
 {
-    if (host != nullptr && id < REACH_HOST_SURFACE_COUNT)
+    if (host != nullptr && id < host->surface_count)
     {
         host->focus_restore_pending[id] = 0;
         host->focus_restore_window[id] = 0;
@@ -56,7 +56,7 @@ void reach_host_cancel_focus_restore(reach_host *host, reach_surface_id id)
 
 void reach_host_flush_focus_restore(reach_host *host, reach_surface_id id)
 {
-    if (host == nullptr || id >= REACH_HOST_SURFACE_COUNT || !host->focus_restore_pending[id])
+    if (host == nullptr || id >= host->surface_count || !host->focus_restore_pending[id])
     {
         return;
     }

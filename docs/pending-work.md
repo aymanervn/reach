@@ -35,11 +35,9 @@ Open items only.
 
 ## Architecture debt (cleanup phase)
 
-- Adding a surface still edits `reach_host_dependencies`, `composition_root.cpp`, `reach_surface_role`, `window_win32.cpp` role lists and `check_architecture.py` name lists.
-- The registry is 154 field assignments, not one row per feature.
 - `reach_feature_capsule_ops` is bound positionally with five identical signatures.
 - `interfeature_routes.cpp` holds the window-list orchestration, not just slot assignment.
-- Named-feature branches survive on generic paths, keyed on surface id. The registry hardcodes the Context Menu ↔ Top Bar ↔ Dock relationship.
+- The registry hardcodes the Context Menu ↔ Top Bar ↔ Dock relationship.
 - Capsule state structs are public and composition reads them. A third of the public feature API is internals. Per-feature action enums remain in public headers.
 - Dock and Launcher internals live in `core`.
 - `reach_ui_layout` and its only consumer are dead.
@@ -47,7 +45,6 @@ Open items only.
 - Point-in-rect is implemented 14 times with three semantics; `reach_rect_equal` is redefined 4 times.
 - Dock and Top Bar each cache bar trespass with their own copy of the same logic.
 - Clipboard owns a port directly; there is no clipboard service.
-- Ten dependencies leak on the `reach_app_create` failure path.
 - On the UI thread: power commands, audio COM endpoint activations on every pointer move, and the clipboard lock during capture.
 - The audio adapter reinvents the `icon_provider` resource-ref path.
 - The tray capsule still exists. Move tray data into a tray service owned by the Top Bar.

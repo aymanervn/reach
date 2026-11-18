@@ -314,14 +314,15 @@ static void reach_host_route_battery_saver_pending_changed(void *user, int32_t p
                                                            int32_t pending_enabled)
 {
     reach_host *host = static_cast<reach_host *>(user);
-    if (host == nullptr)
+    const reach_surface_id top_bar =
+        reach_host_find_surface(host, reach_surface_key_for<reach_top_bar>());
+    if (top_bar == REACH_SURFACE_ID_INVALID)
     {
         return;
     }
     reach_top_bar_set_battery_saver_pending(
-        reach_host_feature_capsule<reach_top_bar>(host, REACH_SURFACE_ID_TOP_BAR), pending,
-        pending_enabled);
-    host->surfaces[REACH_SURFACE_ID_TOP_BAR].dirty_flags = 1;
+        reach_host_feature_capsule<reach_top_bar>(host, top_bar), pending, pending_enabled);
+    host->surfaces[top_bar].dirty_flags = 1;
     host->dirty.render = 1;
 }
 

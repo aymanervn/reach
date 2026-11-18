@@ -18,7 +18,7 @@
 struct reach_platform_window
 {
     HWND hwnd;
-    reach_surface_role role;
+    uint32_t window_flags;
     reach_platform_window_event_callback callback;
     void *callback_user;
     reach_ui_event pending_events[REACH_PLATFORM_WINDOW_MAX_PENDING_EVENTS];
@@ -115,7 +115,7 @@ static void reach_platform_window_unregister_taskman(reach_platform_window *wind
 static void reach_platform_window_register_session_notification(reach_platform_window *window)
 {
     if (window != nullptr && window->hwnd != nullptr &&
-        (window->role == REACH_SURFACE_DOCK || window->role == REACH_SURFACE_SETTINGS) &&
+        (window->window_flags & REACH_WINDOW_SESSION_EVENTS) != 0 &&
         WTSRegisterSessionNotification(window->hwnd, NOTIFY_FOR_THIS_SESSION))
     {
         window->session_notification_registered = 1;
@@ -144,20 +144,9 @@ static void reach_platform_window_release_capture(HWND hwnd)
     }
 }
 
-static const wchar_t *reach_window_class_name(reach_surface_role role)
-{
-    return role == REACH_SURFACE_SETTINGS ? L"ReachSettingsWindow" : L"ReachPlatformWindow";
-}
-
-static int reach_window_icon_resource_id(reach_surface_role role)
-{
-    return role == REACH_SURFACE_SETTINGS ? IDI_SETTINGS_ICON : IDI_ICON1;
-}
-
-static HICON reach_load_window_icon(reach_surface_role role, int width, int height)
+static HICON reach_load_window_icon(int resource_id, int width, int height)
 {
     HINSTANCE instance = GetModuleHandleW(nullptr);
-    int resource_id = reach_window_icon_resource_id(role);
     HICON icon = (HICON)LoadImageW(instance, MAKEINTRESOURCEW(resource_id), IMAGE_ICON, width,
                                    height, LR_DEFAULTCOLOR | LR_SHARED);
     if (icon == nullptr && resource_id != IDI_ICON1)
@@ -198,7 +187,7 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
     switch (message)
     {
     case WM_CLOSE:
-        if (window != nullptr && window->role == REACH_SURFACE_SETTINGS)
+        if (window != nullptr && (window->window_flags & REACH_WINDOW_CLOSE_REQUEST_EVENT) != 0)
         {
             reach_ui_event event = {};
             event.type = REACH_UI_EVENT_WINDOW_CLOSE_REQUESTED;
@@ -294,13 +283,14 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
         }
         return DefWindowProcW(hwnd, message, wparam, lparam);
     case WM_SETCURSOR:
-        SetCursor(LoadCursor(nullptr, window != nullptr && window->role == REACH_SURFACE_SCREENSHOT
+        SetCursor(LoadCursor(nullptr, window != nullptr && (window->window_flags &
+                                                            REACH_WINDOW_CROSSHAIR_CURSOR) != 0
                                           ? IDC_CROSS
                                           : IDC_ARROW));
         return TRUE;
     case WM_ACTIVATE:
         if (window != nullptr && LOWORD(wparam) == WA_INACTIVE &&
-            window->role == REACH_SURFACE_LAUNCHER)
+            (window->window_flags & REACH_WINDOW_FOCUS_LOST_EVENT) != 0)
         {
             reach_ui_event event = {};
             event.type = REACH_UI_EVENT_WINDOW_FOCUS_LOST;
@@ -449,9 +439,7 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
                 event.type = REACH_UI_EVENT_ARROW_DOWN;
             }
 
-            else if (window->role == REACH_SURFACE_LAUNCHER ||
-                     window->role == REACH_SURFACE_SETTINGS ||
-                     window->role == REACH_SURFACE_QUICK_SETTINGS)
+            else if ((window->window_flags & REACH_WINDOW_TEXT_INPUT) != 0)
             {
                 reach_ui_edit_key edit_key = REACH_UI_EDIT_KEY_NONE;
                 switch (wparam)
@@ -497,9 +485,7 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
         }
         return DefWindowProcW(hwnd, message, wparam, lparam);
     case WM_CHAR:
-        if (window != nullptr &&
-            (window->role == REACH_SURFACE_LAUNCHER || window->role == REACH_SURFACE_SETTINGS ||
-             window->role == REACH_SURFACE_QUICK_SETTINGS))
+        if (window != nullptr && ((window->window_flags & REACH_WINDOW_TEXT_INPUT) != 0))
         {
 
             if (wparam >= 0x20 && wparam != 0x7F)
@@ -632,7 +618,7 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
         return DefWindowProcW(hwnd, message, wparam, lparam);
     case WM_SIZE:
     case WM_MOVE:
-        if (window != nullptr && window->role == REACH_SURFACE_SETTINGS)
+        if (window != nullptr && (window->window_flags & REACH_WINDOW_BOUNDS_EVENTS) != 0)
         {
             reach_ui_event event = {};
             event.type = REACH_UI_EVENT_WINDOW_BOUNDS_CHANGED;
@@ -710,66 +696,29 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
     return DefWindowProcW(hwnd, message, wparam, lparam);
 }
 
-static reach_result reach_register_platform_class()
+static reach_result reach_register_platform_class(const wchar_t *class_name, int icon_resource)
 {
     WNDCLASSEXW wc = {};
     wc.cbSize = sizeof(wc);
     wc.lpfnWndProc = reach_window_proc;
     wc.hInstance = GetModuleHandleW(nullptr);
     wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
-    wc.hIcon = reach_load_window_icon(REACH_SURFACE_DOCK, GetSystemMetrics(SM_CXICON),
+    wc.hIcon = reach_load_window_icon(icon_resource, GetSystemMetrics(SM_CXICON),
                                       GetSystemMetrics(SM_CYICON));
-    wc.hIconSm = reach_load_window_icon(REACH_SURFACE_DOCK, GetSystemMetrics(SM_CXSMICON),
+    wc.hIconSm = reach_load_window_icon(icon_resource, GetSystemMetrics(SM_CXSMICON),
                                         GetSystemMetrics(SM_CYSMICON));
-    wc.lpszClassName = reach_window_class_name(REACH_SURFACE_DOCK);
-
-    ATOM atom = RegisterClassExW(&wc);
-    if (atom == 0 && GetLastError() != ERROR_CLASS_ALREADY_EXISTS)
-    {
-        return REACH_ERROR;
-    }
-
-    wc.lpszClassName = reach_window_class_name(REACH_SURFACE_SETTINGS);
-    wc.hIcon = reach_load_window_icon(REACH_SURFACE_SETTINGS, GetSystemMetrics(SM_CXICON),
-                                      GetSystemMetrics(SM_CYICON));
-    wc.hIconSm = reach_load_window_icon(REACH_SURFACE_SETTINGS, GetSystemMetrics(SM_CXSMICON),
-                                        GetSystemMetrics(SM_CYSMICON));
-    atom = RegisterClassExW(&wc);
-    if (atom == 0 && GetLastError() != ERROR_CLASS_ALREADY_EXISTS)
-    {
-        return REACH_ERROR;
-    }
-
-    return REACH_OK;
+    wc.lpszClassName = class_name;
+    return RegisterClassExW(&wc) != 0 || GetLastError() == ERROR_CLASS_ALREADY_EXISTS ? REACH_OK
+                                                                                      : REACH_ERROR;
 }
 
-static int32_t reach_window_no_activate_surface(reach_surface_role role)
+static DWORD reach_window_ex_style(uint32_t window_flags)
 {
-    return role == REACH_SURFACE_DOCK || role == REACH_SURFACE_TOP_BAR ||
-           role == REACH_SURFACE_TRAY_MENU || role == REACH_SURFACE_SWITCHER ||
-           role == REACH_SURFACE_CONTEXT_MENU || role == REACH_SURFACE_QUICK_SETTINGS ||
-           role == REACH_SURFACE_BATTERY || role == REACH_SURFACE_CLIPBOARD ||
-           role == REACH_SURFACE_STAGE || role == REACH_SURFACE_SYSTEM_HUD;
-}
-
-static DWORD reach_window_ex_style(reach_surface_role role)
-{
-    DWORD style = role == REACH_SURFACE_SETTINGS ? WS_EX_APPWINDOW : WS_EX_TOOLWINDOW;
-    if (role == REACH_SURFACE_DOCK || role == REACH_SURFACE_TOP_BAR ||
-        role == REACH_SURFACE_LAUNCHER || role == REACH_SURFACE_TRAY_MENU ||
-        role == REACH_SURFACE_SWITCHER || role == REACH_SURFACE_CONTEXT_MENU ||
-        role == REACH_SURFACE_QUICK_SETTINGS || role == REACH_SURFACE_BATTERY ||
-        role == REACH_SURFACE_CLIPBOARD || role == REACH_SURFACE_SETTINGS ||
-        role == REACH_SURFACE_STAGE || role == REACH_SURFACE_SYSTEM_HUD ||
-        role == REACH_SURFACE_SCREENSHOT)
-    {
-        style |= WS_EX_NOREDIRECTIONBITMAP;
-    }
-    else
-    {
-        style |= WS_EX_LAYERED;
-    }
-    if (reach_window_no_activate_surface(role))
+    DWORD style =
+        (window_flags & REACH_WINDOW_APPLICATION) != 0 ? WS_EX_APPWINDOW : WS_EX_TOOLWINDOW;
+    style |= (window_flags & REACH_WINDOW_COMPOSITION_BACKED) != 0 ? WS_EX_NOREDIRECTIONBITMAP
+                                                                   : WS_EX_LAYERED;
+    if ((window_flags & REACH_WINDOW_ACTIVATE) == 0)
     {
         style |= WS_EX_NOACTIVATE;
     }
@@ -845,7 +794,7 @@ static reach_result reach_platform_window_show(reach_platform_window *window)
         return REACH_INVALID_ARGUMENT;
     }
 
-    int32_t no_activate = reach_window_no_activate_surface(window->role);
+    int32_t no_activate = (window->window_flags & REACH_WINDOW_ACTIVATE) == 0;
     if (no_activate && IsWindowVisible(window->hwnd))
     {
         return REACH_OK;
@@ -1135,7 +1084,7 @@ static reach_result reach_platform_window_raise(reach_platform_window *window)
         return REACH_ERROR;
     }
 
-    if (reach_window_no_activate_surface(window->role))
+    if ((window->window_flags & REACH_WINDOW_ACTIVATE) == 0)
     {
         ShowWindow(window->hwnd, SW_SHOWNOACTIVATE);
         return REACH_OK;
@@ -1281,8 +1230,9 @@ static void reach_platform_window_destroy(reach_platform_window *window)
     delete window;
 }
 
-reach_result reach_windows_create_platform_window(reach_surface_role role,
-                                                  reach_platform_window_port *out_port)
+static reach_result reach_windows_create_window(uint32_t window_flags, const wchar_t *class_name,
+                                                const wchar_t *title, int icon_resource,
+                                                reach_platform_window_port *out_port)
 {
     if (out_port == nullptr)
     {
@@ -1290,7 +1240,7 @@ reach_result reach_windows_create_platform_window(reach_surface_role role,
     }
 
     *out_port = {};
-    reach_result result = reach_register_platform_class();
+    reach_result result = reach_register_platform_class(class_name, icon_resource);
     if (result != REACH_OK)
     {
         return result;
@@ -1301,21 +1251,20 @@ reach_result reach_windows_create_platform_window(reach_surface_role role,
     {
         return REACH_ERROR;
     }
-    window->role = role;
+    window->window_flags = window_flags;
     window->pointer_move_enabled = 1;
-    const wchar_t *title = role == REACH_SURFACE_SETTINGS ? L"Reach Settings" : L"Reach";
     window->hwnd =
-        CreateWindowExW(reach_window_ex_style(role), reach_window_class_name(role), title, WS_POPUP,
-                        0, 0, 1, 1, nullptr, nullptr, GetModuleHandleW(nullptr), nullptr);
+        CreateWindowExW(reach_window_ex_style(window_flags), class_name, title, WS_POPUP, 0, 0, 1,
+                        1, nullptr, nullptr, GetModuleHandleW(nullptr), nullptr);
     if (window->hwnd == nullptr)
     {
         delete window;
         return REACH_ERROR;
     }
-    HICON large_icon =
-        reach_load_window_icon(role, GetSystemMetrics(SM_CXICON), GetSystemMetrics(SM_CYICON));
-    HICON small_icon =
-        reach_load_window_icon(role, GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON));
+    HICON large_icon = reach_load_window_icon(icon_resource, GetSystemMetrics(SM_CXICON),
+                                              GetSystemMetrics(SM_CYICON));
+    HICON small_icon = reach_load_window_icon(icon_resource, GetSystemMetrics(SM_CXSMICON),
+                                              GetSystemMetrics(SM_CYSMICON));
     if (large_icon != nullptr)
     {
         SendMessageW(window->hwnd, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(large_icon));
@@ -1326,12 +1275,11 @@ reach_result reach_windows_create_platform_window(reach_surface_role role,
     }
     SetWindowLongPtrW(window->hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(window));
     reach_platform_window_register_session_notification(window);
-    if (role == REACH_SURFACE_DOCK)
+    if ((window_flags & REACH_WINDOW_DESKTOP_MINIMIZE_SUPPORT) != 0)
     {
         reach_platform_window_register_taskman(window);
     }
     out_port->window = window;
-    out_port->role = role;
     out_port->ops.show = reach_platform_window_show;
     out_port->ops.hide = reach_platform_window_hide;
     out_port->ops.set_bounds = reach_platform_window_set_bounds;
@@ -1358,4 +1306,18 @@ reach_result reach_windows_create_platform_window(reach_surface_role role,
     out_port->ops.take_keyboard_focus = reach_platform_window_take_keyboard_focus;
     out_port->ops.destroy = reach_platform_window_destroy;
     return REACH_OK;
+}
+
+reach_result reach_windows_create_platform_window(uint32_t window_flags,
+                                                  reach_platform_window_port *out_port)
+{
+    return reach_windows_create_window(window_flags, L"ReachPlatformWindow", L"Reach", IDI_ICON1,
+                                       out_port);
+}
+
+reach_result reach_windows_create_settings_window(uint32_t window_flags,
+                                                  reach_platform_window_port *out_port)
+{
+    return reach_windows_create_window(window_flags, L"ReachSettingsWindow", L"Reach Settings",
+                                       IDI_SETTINGS_ICON, out_port);
 }

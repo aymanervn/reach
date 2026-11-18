@@ -14,6 +14,17 @@ static void reach_app_on_input(void *user, const reach_ui_event *event)
     }
 }
 
+static reach_result reach_app_create_surface_ports(void *user, uint32_t window_flags,
+                                                   reach_platform_window_port *window,
+                                                   reach_render_backend_port *renderer)
+{
+    auto *app = static_cast<reach_app *>(user);
+    const reach_result result = reach_windows_create_platform_window(window_flags, window);
+    return result == REACH_OK ? reach_windows_create_dcomp_render_backend(app->render_device,
+                                                                          window->window, renderer)
+                              : result;
+}
+
 reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
 {
     REACH_ASSERT(out_app != nullptr);
@@ -30,6 +41,8 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
     }
 
     reach_host_dependencies dependencies = {};
+    dependencies.surface_factory_user = app;
+    dependencies.create_surface_ports = reach_app_create_surface_ports;
     reach_result result = reach_windows_create_render_device(&app->render_device);
     reach_windows_render_device_port(app->render_device, &app->render_device_port);
 
@@ -55,68 +68,6 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
 
     if (result == REACH_OK)
     {
-        result = reach_windows_create_platform_window(REACH_SURFACE_LAUNCHER,
-                                                      &dependencies.launcher_window);
-    }
-    if (result == REACH_OK)
-    {
-        result = reach_windows_create_dcomp_render_backend(app->render_device,
-                                                           dependencies.launcher_window.window,
-                                                           &dependencies.launcher_renderer);
-    }
-    if (result == REACH_OK)
-    {
-        result =
-            reach_windows_create_platform_window(REACH_SURFACE_DOCK, &dependencies.dock_window);
-    }
-    if (result == REACH_OK)
-    {
-        result = reach_windows_create_dcomp_render_backend(
-            app->render_device, dependencies.dock_window.window, &dependencies.dock_renderer);
-    }
-    if (result == REACH_OK)
-    {
-        result = reach_windows_create_platform_window(REACH_SURFACE_TOP_BAR,
-                                                      &dependencies.top_bar_window);
-    }
-    if (result == REACH_OK)
-    {
-        result = reach_windows_create_dcomp_render_backend(
-            app->render_device, dependencies.top_bar_window.window, &dependencies.top_bar_renderer);
-    }
-    if (result == REACH_OK)
-    {
-        result = reach_windows_create_platform_window(REACH_SURFACE_TRAY_MENU,
-                                                      &dependencies.tray_window);
-    }
-    if (result == REACH_OK)
-    {
-        result = reach_windows_create_dcomp_render_backend(
-            app->render_device, dependencies.tray_window.window, &dependencies.tray_renderer);
-    }
-    if (result == REACH_OK)
-    {
-        result = reach_windows_create_platform_window(REACH_SURFACE_SWITCHER,
-                                                      &dependencies.switcher_window);
-    }
-    if (result == REACH_OK)
-    {
-        result = reach_windows_create_dcomp_render_backend(app->render_device,
-                                                           dependencies.switcher_window.window,
-                                                           &dependencies.switcher_renderer);
-    }
-    if (result == REACH_OK)
-    {
-        result =
-            reach_windows_create_platform_window(REACH_SURFACE_STAGE, &dependencies.stage_window);
-    }
-    if (result == REACH_OK)
-    {
-        result = reach_windows_create_dcomp_render_backend(
-            app->render_device, dependencies.stage_window.window, &dependencies.stage_renderer);
-    }
-    if (result == REACH_OK)
-    {
         result = reach_windows_create_window_thumbnails(&dependencies.window_thumbnails);
     }
     if (result == REACH_OK)
@@ -134,71 +85,6 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
     if (result == REACH_OK)
     {
         result = reach_windows_create_system_stats(&dependencies.system_stats);
-    }
-    if (result == REACH_OK)
-    {
-        result = reach_windows_create_platform_window(REACH_SURFACE_CONTEXT_MENU,
-                                                      &dependencies.context_menu_window);
-    }
-    if (result == REACH_OK)
-    {
-        result = reach_windows_create_dcomp_render_backend(app->render_device,
-                                                           dependencies.context_menu_window.window,
-                                                           &dependencies.context_menu_renderer);
-    }
-    if (result == REACH_OK)
-    {
-        result = reach_windows_create_platform_window(REACH_SURFACE_QUICK_SETTINGS,
-                                                      &dependencies.quick_settings_window);
-    }
-    if (result == REACH_OK)
-    {
-        result = reach_windows_create_dcomp_render_backend(
-            app->render_device, dependencies.quick_settings_window.window,
-            &dependencies.quick_settings_renderer);
-    }
-    if (result == REACH_OK)
-    {
-        result = reach_windows_create_platform_window(REACH_SURFACE_BATTERY,
-                                                      &dependencies.battery_window);
-    }
-    if (result == REACH_OK)
-    {
-        result = reach_windows_create_dcomp_render_backend(
-            app->render_device, dependencies.battery_window.window, &dependencies.battery_renderer);
-    }
-    if (result == REACH_OK)
-    {
-        result = reach_windows_create_platform_window(REACH_SURFACE_SYSTEM_HUD,
-                                                      &dependencies.system_hud_window);
-    }
-    if (result == REACH_OK)
-    {
-        result = reach_windows_create_dcomp_render_backend(app->render_device,
-                                                           dependencies.system_hud_window.window,
-                                                           &dependencies.system_hud_renderer);
-    }
-    if (result == REACH_OK)
-    {
-        result = reach_windows_create_platform_window(REACH_SURFACE_CLIPBOARD,
-                                                      &dependencies.clipboard_window);
-    }
-    if (result == REACH_OK)
-    {
-        result = reach_windows_create_dcomp_render_backend(app->render_device,
-                                                           dependencies.clipboard_window.window,
-                                                           &dependencies.clipboard_renderer);
-    }
-    if (result == REACH_OK)
-    {
-        result = reach_windows_create_platform_window(REACH_SURFACE_SCREENSHOT,
-                                                      &dependencies.screenshot_window);
-    }
-    if (result == REACH_OK)
-    {
-        result = reach_windows_create_dcomp_render_backend(app->render_device,
-                                                           dependencies.screenshot_window.window,
-                                                           &dependencies.screenshot_renderer);
     }
     if (result == REACH_OK)
     {
@@ -309,121 +195,17 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
         if (result == REACH_OK)
         {
             reach_host_set_initial_foreground(app->host, reach_windows_get_current_foreground());
-            dependencies.popup_capture = {};
-            dependencies.power_session = {};
-            dependencies.audio_volume = {};
-            dependencies.system_controls = {};
-            dependencies.wifi = {};
-            dependencies.bluetooth = {};
-            dependencies.user_account = {};
-            dependencies.media_controls = {};
-            dependencies.quick_settings_window = {};
-            dependencies.quick_settings_renderer = {};
-            dependencies.battery_window = {};
-            dependencies.battery_renderer = {};
-            dependencies.system_hud_window = {};
-            dependencies.system_hud_renderer = {};
-            dependencies.clipboard_window = {};
-            dependencies.clipboard_renderer = {};
-            dependencies.clipboard = {};
-            dependencies.screenshot_window = {};
-            dependencies.screenshot_renderer = {};
-            dependencies.screen_capture = {};
-            dependencies.foreground_watcher = {};
         }
     }
     if (result != REACH_OK)
     {
-        if (dependencies.launcher_window.ops.destroy != nullptr)
-        {
-            dependencies.launcher_window.ops.destroy(dependencies.launcher_window.window);
-        }
-        if (dependencies.launcher_renderer.ops.destroy != nullptr)
-        {
-            dependencies.launcher_renderer.ops.destroy(dependencies.launcher_renderer.backend);
-        }
-        if (dependencies.dock_window.ops.destroy != nullptr)
-        {
-            dependencies.dock_window.ops.destroy(dependencies.dock_window.window);
-        }
-        if (dependencies.top_bar_window.ops.destroy != nullptr)
-        {
-            dependencies.top_bar_window.ops.destroy(dependencies.top_bar_window.window);
-        }
-        if (dependencies.clipboard_window.ops.destroy != nullptr)
-        {
-            dependencies.clipboard_window.ops.destroy(dependencies.clipboard_window.window);
-        }
-        if (dependencies.system_hud_window.ops.destroy != nullptr)
-        {
-            dependencies.system_hud_window.ops.destroy(dependencies.system_hud_window.window);
-        }
-        if (dependencies.system_hud_renderer.ops.destroy != nullptr)
-        {
-            dependencies.system_hud_renderer.ops.destroy(dependencies.system_hud_renderer.backend);
-        }
-        if (dependencies.clipboard_renderer.ops.destroy != nullptr)
-        {
-            dependencies.clipboard_renderer.ops.destroy(dependencies.clipboard_renderer.backend);
-        }
         if (dependencies.clipboard.ops.destroy != nullptr)
         {
             dependencies.clipboard.ops.destroy(dependencies.clipboard.provider);
         }
-        if (dependencies.screenshot_window.ops.destroy != nullptr)
-        {
-            dependencies.screenshot_window.ops.destroy(dependencies.screenshot_window.window);
-        }
-        if (dependencies.screenshot_renderer.ops.destroy != nullptr)
-        {
-            dependencies.screenshot_renderer.ops.destroy(dependencies.screenshot_renderer.backend);
-        }
         if (dependencies.screen_capture.ops.destroy != nullptr)
         {
             dependencies.screen_capture.ops.destroy(dependencies.screen_capture.capture);
-        }
-        if (dependencies.dock_renderer.ops.destroy != nullptr)
-        {
-            dependencies.dock_renderer.ops.destroy(dependencies.dock_renderer.backend);
-        }
-        if (dependencies.top_bar_renderer.ops.destroy != nullptr)
-        {
-            dependencies.top_bar_renderer.ops.destroy(dependencies.top_bar_renderer.backend);
-        }
-        if (dependencies.tray_window.ops.destroy != nullptr)
-        {
-            dependencies.tray_window.ops.destroy(dependencies.tray_window.window);
-        }
-        if (dependencies.tray_renderer.ops.destroy != nullptr)
-        {
-            dependencies.tray_renderer.ops.destroy(dependencies.tray_renderer.backend);
-        }
-        if (dependencies.switcher_window.ops.destroy != nullptr)
-        {
-            dependencies.switcher_window.ops.destroy(dependencies.switcher_window.window);
-        }
-        if (dependencies.switcher_renderer.ops.destroy != nullptr)
-        {
-            dependencies.switcher_renderer.ops.destroy(dependencies.switcher_renderer.backend);
-        }
-        if (dependencies.context_menu_window.ops.destroy != nullptr)
-        {
-            dependencies.context_menu_window.ops.destroy(dependencies.context_menu_window.window);
-        }
-        if (dependencies.context_menu_renderer.ops.destroy != nullptr)
-        {
-            dependencies.context_menu_renderer.ops.destroy(
-                dependencies.context_menu_renderer.backend);
-        }
-        if (dependencies.quick_settings_window.ops.destroy != nullptr)
-        {
-            dependencies.quick_settings_window.ops.destroy(
-                dependencies.quick_settings_window.window);
-        }
-        if (dependencies.quick_settings_renderer.ops.destroy != nullptr)
-        {
-            dependencies.quick_settings_renderer.ops.destroy(
-                dependencies.quick_settings_renderer.backend);
         }
         if (dependencies.input_source.ops.destroy != nullptr)
         {
@@ -513,13 +295,37 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
         {
             dependencies.media_controls.destroy(dependencies.media_controls.userdata);
         }
+        if (dependencies.window_thumbnails.ops.destroy != nullptr)
+        {
+            dependencies.window_thumbnails.ops.destroy(dependencies.window_thumbnails.thumbnails);
+        }
+        if (dependencies.image_loader.ops.destroy != nullptr)
+        {
+            dependencies.image_loader.ops.destroy(dependencies.image_loader.loader);
+        }
+        if (dependencies.application_resolver.ops.destroy != nullptr)
+        {
+            dependencies.application_resolver.ops.destroy(
+                dependencies.application_resolver.resolver);
+        }
+        if (dependencies.clock.ops.destroy != nullptr)
+        {
+            dependencies.clock.ops.destroy(dependencies.clock.source);
+        }
+        if (dependencies.input_language.ops.destroy != nullptr)
+        {
+            dependencies.input_language.ops.destroy(dependencies.input_language.language);
+        }
+        if (dependencies.system_stats.ops.destroy != nullptr)
+        {
+            dependencies.system_stats.ops.destroy(dependencies.system_stats.source);
+        }
         reach_windows_destroy_explorer_desktop_compat_host();
         reach_windows_destroy_render_device(app->render_device);
         delete app;
         return result;
     }
 
-    app->input_source = dependencies.input_source;
     *out_app = app;
     return REACH_OK;
 }
@@ -532,22 +338,39 @@ reach_result reach_app_start(reach_app *app)
         return REACH_INVALID_ARGUMENT;
     }
 
-    reach_result result = reach_host_start(app->host);
-    if (result == REACH_OK)
+    if (app->host->running)
     {
+        return REACH_OK;
+    }
 
-        reach_app_launch_request startup_requests[32] = {};
-        size_t startup_count = reach_windows_collect_startup_apps(startup_requests, 32);
-        for (size_t index = 0; index < startup_count; ++index)
+    reach_result result = reach_host_start(app->host);
+    if (result != REACH_OK)
+    {
+        return result;
+    }
+
+    const auto &input = app->host->input_source;
+    if (input.ops.start != nullptr)
+    {
+        result = input.ops.start(input.source, reach_app_on_input, app);
+        if (result != REACH_OK)
         {
-            (void)reach_host_schedule_app_launch(app->host, &startup_requests[index]);
+            if (input.ops.stop != nullptr)
+            {
+                (void)input.ops.stop(input.source);
+            }
+            reach_host_stop_runtime(app->host);
+            return result;
         }
     }
-    if (result == REACH_OK && app->input_source.ops.start != nullptr)
+
+    reach_app_launch_request startup_requests[32] = {};
+    size_t startup_count = reach_windows_collect_startup_apps(startup_requests, 32);
+    for (size_t index = 0; index < startup_count; ++index)
     {
-        result = app->input_source.ops.start(app->input_source.source, reach_app_on_input, app);
+        (void)reach_host_schedule_app_launch(app->host, &startup_requests[index]);
     }
-    return result;
+    return REACH_OK;
 }
 
 reach_result reach_app_stop(reach_app *app)
@@ -557,10 +380,15 @@ reach_result reach_app_stop(reach_app *app)
     {
         return REACH_INVALID_ARGUMENT;
     }
-
-    if (app->input_source.ops.stop != nullptr)
+    if (!app->host->running)
     {
-        (void)app->input_source.ops.stop(app->input_source.source);
+        return REACH_OK;
+    }
+
+    const auto &input = app->host->input_source;
+    if (input.ops.stop != nullptr)
+    {
+        (void)input.ops.stop(input.source);
     }
     return reach_host_stop(app->host);
 }
@@ -643,6 +471,10 @@ void reach_app_destroy(reach_app *app)
         return;
     }
 
+    if (app->host != nullptr && app->host->running)
+    {
+        (void)reach_app_stop(app);
+    }
     reach_host_destroy(app->host);
     reach_windows_destroy_explorer_desktop_compat_host();
     reach_windows_destroy_render_device(app->render_device);
