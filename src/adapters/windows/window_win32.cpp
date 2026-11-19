@@ -787,6 +787,45 @@ static reach_result reach_platform_window_place_behind(reach_platform_window *wi
     return ok ? REACH_OK : REACH_ERROR;
 }
 
+static reach_result reach_platform_window_show_above_desktop(reach_platform_window *window)
+{
+    if (window == nullptr || window->hwnd == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    HWND desktop = reinterpret_cast<HWND>(reach_windows_desktop_compat_window());
+    if (desktop == nullptr)
+    {
+        desktop = GetShellWindow();
+    }
+    const auto is_topmost = [](HWND hwnd)
+    { return (GetWindowLongPtrW(hwnd, GWL_EXSTYLE) & WS_EX_TOPMOST) != 0; };
+    constexpr UINT flags = SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER;
+    HWND hwnd = window->hwnd;
+    if (desktop != nullptr && !is_topmost(desktop) &&
+        (!is_topmost(hwnd) || SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, flags)))
+    {
+        HWND previous = GetWindow(desktop, GW_HWNDPREV);
+        if (previous == hwnd && IsWindowVisible(hwnd))
+        {
+            return REACH_OK;
+        }
+
+        HWND insert_after = previous == nullptr || is_topmost(previous) ? HWND_TOP : previous;
+        const UINT show_flags = flags | SWP_SHOWWINDOW | (previous == hwnd ? SWP_NOZORDER : 0);
+        if (SetWindowPos(hwnd, insert_after, 0, 0, 0, 0, show_flags) &&
+            GetWindow(desktop, GW_HWNDPREV) == hwnd && !is_topmost(hwnd))
+        {
+            return REACH_OK;
+        }
+    }
+
+    reach_platform_window_release_capture(hwnd);
+    ShowWindow(hwnd, SW_HIDE);
+    return REACH_ERROR;
+}
+
 static reach_result reach_platform_window_show(reach_platform_window *window)
 {
     if (window == nullptr || window->hwnd == nullptr)
@@ -1280,7 +1319,15 @@ static reach_result reach_windows_create_window(uint32_t window_flags, const wch
         reach_platform_window_register_taskman(window);
     }
     out_port->window = window;
-    out_port->ops.show = reach_platform_window_show;
+    if ((window_flags & REACH_WINDOW_STACK_ABOVE_DESKTOP) != 0)
+    {
+        out_port->ops.show = reach_platform_window_show_above_desktop;
+        out_port->ops.restack = reach_platform_window_show_above_desktop;
+    }
+    else
+    {
+        out_port->ops.show = reach_platform_window_show;
+    }
     out_port->ops.hide = reach_platform_window_hide;
     out_port->ops.set_bounds = reach_platform_window_set_bounds;
     out_port->ops.get_bounds = reach_platform_window_get_bounds;

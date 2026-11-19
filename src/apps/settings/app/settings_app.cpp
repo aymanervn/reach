@@ -650,6 +650,17 @@ static void reach_settings_save_theme_config(reach_settings_app *app)
     (void)reach_config_service_set_display(app->config_service, &settings);
 }
 
+static void reach_settings_load_widget_config(reach_settings_app *app, int32_t animate)
+{
+    auto snapshot =
+        std::unique_ptr<reach_config_snapshot>(new (std::nothrow) reach_config_snapshot());
+    if (snapshot != nullptr &&
+        reach_config_service_snapshot(app->config_service, snapshot.get()) == REACH_OK)
+    {
+        reach_settings_model_set_desktop_widgets(&app->model, snapshot->desktop_widgets, animate);
+    }
+}
+
 static void reach_settings_load_top_bar_config(reach_settings_app *app)
 {
     if (app == nullptr || app->config_service == nullptr)
@@ -1787,6 +1798,9 @@ static uint64_t reach_settings_pressable_target(reach_settings_hit_result hit)
     case REACH_SETTINGS_HIT_ACCOUNT_PASSWORD_FIELD:
         detail = (uint32_t)hit.account_field;
         break;
+    case REACH_SETTINGS_HIT_WIDGET_TOGGLE:
+        detail = (uint32_t)hit.widget_index;
+        break;
     case REACH_SETTINGS_HIT_STARTUP_TOGGLE:
         detail = (uint32_t)hit.startup_index;
         break;
@@ -2264,6 +2278,21 @@ static void reach_settings_handle_pointer_up(reach_settings_app *app, const reac
         if (hit.type == REACH_SETTINGS_HIT_STARTUP_TOGGLE)
         {
             reach_settings_schedule_startup_toggle(app, hit.startup_index);
+        }
+    }
+    else if (app->model.selected_page == REACH_SETTINGS_PAGE_WIDGETS)
+    {
+        if (hit.type == REACH_SETTINGS_HIT_WIDGET_TOGGLE)
+        {
+            const int32_t enabled = (app->model.desktop_widgets & (1u << hit.widget_index)) == 0;
+            (void)reach_config_service_set_desktop_widget(app->config_service, hit.widget_index,
+                                                          enabled);
+            reach_settings_load_widget_config(app, 1);
+            app->dirty = 1;
+        }
+        else if (hit.type == REACH_SETTINGS_HIT_WIDGET_RESET)
+        {
+            (void)reach_config_service_reset_widget_positions(app->config_service);
         }
     }
     else if (app->model.selected_page == REACH_SETTINGS_PAGE_THEME)
@@ -2853,6 +2882,7 @@ reach_result reach_settings_app_create(reach_settings_app **out_app,
     {
         reach_settings_load_power_config(app);
         reach_settings_load_theme_config(app);
+        reach_settings_load_widget_config(app, 0);
         reach_settings_load_top_bar_config(app);
     }
 

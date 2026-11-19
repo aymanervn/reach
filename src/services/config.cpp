@@ -29,6 +29,9 @@ enum reach_config_operation_type
     REACH_CONFIG_OPERATION_SET_POWER,
     REACH_CONFIG_OPERATION_SET_DISPLAY,
     REACH_CONFIG_OPERATION_SET_TOP_BAR,
+    REACH_CONFIG_OPERATION_SET_DESKTOP_WIDGET,
+    REACH_CONFIG_OPERATION_RESET_WIDGET_POSITIONS,
+    REACH_CONFIG_OPERATION_SET_WIDGET_PLACEMENT,
     REACH_CONFIG_OPERATION_SET_DOCK_SIZE,
     REACH_CONFIG_OPERATION_SET_WALLPAPERS,
     REACH_CONFIG_OPERATION_SET_MONITOR_WALLPAPER
@@ -46,6 +49,8 @@ struct reach_config_operation
     int32_t dock_size;
     uint32_t pin_id;
     size_t target_index;
+    reach_config_widget_placement widget_placement;
+    int32_t widget_enabled;
     size_t monitor_count;
 };
 
@@ -135,6 +140,34 @@ static reach_result reach_config_apply_operation(reach_config_snapshot *snapshot
         snapshot->top_bar_mode = operation->top_bar.mode;
         snapshot->top_bar_icon_only = operation->top_bar.icon_only;
         return REACH_OK;
+    case REACH_CONFIG_OPERATION_RESET_WIDGET_POSITIONS:
+        *out_changed = 0;
+        for (auto &placement : snapshot->widget_placements)
+        {
+            *out_changed |= placement.x != -1 || placement.y != -1;
+            placement.x = -1;
+            placement.y = -1;
+        }
+        return REACH_OK;
+    case REACH_CONFIG_OPERATION_SET_WIDGET_PLACEMENT:
+        if (operation->target_index >= REACH_MAX_DESKTOP_WIDGETS)
+        {
+            return REACH_INVALID_ARGUMENT;
+        }
+        *out_changed =
+            std::memcmp(&snapshot->widget_placements[operation->target_index],
+                        &operation->widget_placement, sizeof(operation->widget_placement)) != 0;
+        snapshot->widget_placements[operation->target_index] = operation->widget_placement;
+        return REACH_OK;
+    case REACH_CONFIG_OPERATION_SET_DESKTOP_WIDGET:
+    {
+        const uint32_t bit = 1u << operation->target_index;
+        const uint32_t next = operation->widget_enabled ? snapshot->desktop_widgets | bit
+                                                        : snapshot->desktop_widgets & ~bit;
+        *out_changed = next != snapshot->desktop_widgets;
+        snapshot->desktop_widgets = next;
+        return REACH_OK;
+    }
     case REACH_CONFIG_OPERATION_SET_DOCK_SIZE:
         *out_changed = snapshot->dock_size != operation->dock_size;
         snapshot->dock_size = operation->dock_size;
@@ -665,6 +698,48 @@ reach_result reach_config_service_set_top_bar(reach_config_service *service,
     reach_config_operation operation = {};
     operation.type = REACH_CONFIG_OPERATION_SET_TOP_BAR;
     operation.top_bar = *settings;
+    return reach_config_service_commit(service, &operation);
+}
+
+reach_result reach_config_service_reset_widget_positions(reach_config_service *service)
+{
+    reach_config_operation operation = {};
+    operation.type = REACH_CONFIG_OPERATION_RESET_WIDGET_POSITIONS;
+    return reach_config_service_commit(service, &operation);
+}
+
+reach_result reach_config_service_set_widget_placement(reach_config_service *service, size_t index,
+                                                       reach_config_widget_placement placement)
+{
+    const auto *definition = reach_widget_definition_at(index);
+    if (definition == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    const auto &limits = definition->limits;
+    if (placement.width < limits.min_width || placement.height < limits.min_height ||
+        placement.width > limits.max_width || placement.height > limits.max_height)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    reach_config_operation operation = {};
+    operation.type = REACH_CONFIG_OPERATION_SET_WIDGET_PLACEMENT;
+    operation.target_index = index;
+    operation.widget_placement = placement;
+    return reach_config_service_commit(service, &operation);
+}
+
+reach_result reach_config_service_set_desktop_widget(reach_config_service *service, size_t index,
+                                                     int32_t enabled)
+{
+    if (index >= REACH_MAX_DESKTOP_WIDGETS)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    reach_config_operation operation = {};
+    operation.type = REACH_CONFIG_OPERATION_SET_DESKTOP_WIDGET;
+    operation.target_index = index;
+    operation.widget_enabled = enabled != 0;
     return reach_config_service_commit(service, &operation);
 }
 

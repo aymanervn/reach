@@ -80,11 +80,28 @@ int main()
     failed += expect(reach_path_equals(loaded->pinned_apps[0].application.launch.path,
                                        snapshot->pinned_apps[0].application.launch.path));
 
+    failed += expect(WritePrivateProfileStringW(L"widgets", L"enabled", L"1023", path) != 0);
+    failed += expect(WritePrivateProfileStringW(L"widget_7", L"x", L"-1", path) != 0);
+    failed += expect(WritePrivateProfileStringW(L"widget_7", L"width", L"280", path) != 0);
+    failed += expect(WritePrivateProfileStringW(L"widget_4", L"width", L"480", path) != 0);
+    failed += expect(store.ops.load(store.store, loaded.get()) == REACH_OK);
+    failed += expect(loaded->desktop_widgets == REACH_DESKTOP_WIDGET_MASK);
+    failed += expect(loaded->widget_placements[REACH_WIDGET_POMODORO].x == -1);
+    failed += expect(loaded->widget_placements[REACH_WIDGET_POMODORO].width == 280);
+    failed += expect(loaded->widget_placements[REACH_WIDGET_STOPWATCH].width == 0);
+    snapshot->desktop_widgets = loaded->desktop_widgets;
+    snapshot->widget_placements[REACH_WIDGET_POMODORO] =
+        loaded->widget_placements[REACH_WIDGET_POMODORO];
+
     snapshot->pinned_app_count = 1;
     failed += expect(store.ops.save(store.store, snapshot.get()) == REACH_OK);
     std::memset(loaded.get(), 0, sizeof(*loaded));
     failed += expect(store.ops.load(store.store, loaded.get()) == REACH_OK);
     failed += expect(loaded->pinned_app_count == 1);
+    failed += expect(loaded->desktop_widgets == REACH_DESKTOP_WIDGET_MASK);
+    failed += expect(GetPrivateProfileIntW(L"widgets", L"enabled", 0, path) == 207);
+    failed += expect(loaded->widget_placements[REACH_WIDGET_POMODORO].x == -1);
+    failed += expect(loaded->widget_placements[REACH_WIDGET_POMODORO].width == 280);
 
     wchar_t shortcut_path[260] = {};
     wchar_t shortcut_target[260] = {};

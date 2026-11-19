@@ -639,7 +639,8 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
                                                        reach_host_on_feature_update_requested,
                                                        host,
                                                        terminal_icon_ref,
-                                                       &host->screen_capture};
+                                                       &host->screen_capture,
+                                                       host->config_service};
     if (result == REACH_OK)
     {
         result = reach_host_attach_registered_features(host, &feature_dependencies);
