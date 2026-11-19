@@ -18,7 +18,7 @@ void reach_host_release_render_icon(reach_host *host, uint64_t icon_id)
         return;
     }
 
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    for (size_t index = 0; index < host->surface_count; ++index)
     {
         reach_host_release_render_icon_from_surface(host->feature_runtimes[index].surface, icon_id);
     }
@@ -86,7 +86,7 @@ void reach_host_drain_registered_render_resources(reach_host *host)
         return;
     }
 
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    for (size_t index = 0; index < host->surface_count; ++index)
     {
         reach_feature_runtime *runtime = &host->feature_runtimes[index];
         const reach_feature_control_ops *control = runtime->definition->control_ops;
@@ -119,7 +119,7 @@ void reach_host_release_registered_render_resources(reach_host *host)
     }
 
     reach_host_drain_registered_render_resources(host);
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    for (size_t index = 0; index < host->surface_count; ++index)
     {
         reach_feature_runtime *runtime = &host->feature_runtimes[index];
         const reach_feature_control_ops *control = runtime->definition->control_ops;

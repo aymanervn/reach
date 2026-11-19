@@ -179,6 +179,23 @@ static reach_result reach_config_store_load(reach_config_store *store,
     GetPrivateProfileStringW(L"reach", L"version", L"",
                              reinterpret_cast<wchar_t *>(out_snapshot->version), 32, path);
     out_snapshot->dock_height = (float)GetPrivateProfileIntW(L"dock", L"height", 64, path);
+    const uint32_t saved_widgets = (uint32_t)GetPrivateProfileIntW(L"widgets", L"enabled", 0, path);
+    for (size_t index = 0; index < REACH_MAX_DESKTOP_WIDGETS; ++index)
+    {
+        const size_t slot = reach_widget_definition_at(index)->ini_slot;
+        if ((saved_widgets & (1u << slot)) != 0)
+        {
+            out_snapshot->desktop_widgets |= 1u << index;
+        }
+        wchar_t section[24] = {};
+        swprintf_s(section, L"widget_%zu", slot);
+        auto &placement = out_snapshot->widget_placements[index];
+        placement.x = (int32_t)GetPrivateProfileIntW(section, L"x", -1, path);
+        placement.y = (int32_t)GetPrivateProfileIntW(section, L"y", -1, path);
+        placement.width = (int32_t)GetPrivateProfileIntW(section, L"width", 0, path);
+        placement.height = (int32_t)GetPrivateProfileIntW(section, L"height", 0, path);
+    }
+
     int32_t dock_size =
         (int32_t)GetPrivateProfileIntW(L"dock", L"size", REACH_CONFIG_DOCK_SIZE_MAX, path);
     out_snapshot->dock_size =
@@ -349,6 +366,30 @@ static reach_result reach_config_store_save(reach_config_store *store,
     text.append(std::to_wstring((int32_t)snapshot->dock_height));
     text.append(L"\r\nsize=");
     text.append(std::to_wstring(snapshot->dock_size));
+    uint32_t saved_widgets = 0;
+    for (size_t index = 0; index < REACH_MAX_DESKTOP_WIDGETS; ++index)
+    {
+        if ((snapshot->desktop_widgets & (1u << index)) != 0)
+        {
+            saved_widgets |= 1u << reach_widget_definition_at(index)->ini_slot;
+        }
+    }
+    text.append(L"\r\n\r\n[widgets]\r\nenabled=");
+    text.append(std::to_wstring(saved_widgets));
+    for (size_t index = 0; index < REACH_MAX_DESKTOP_WIDGETS; ++index)
+    {
+        const auto &placement = snapshot->widget_placements[index];
+        text.append(L"\r\n\r\n[widget_");
+        text.append(std::to_wstring(reach_widget_definition_at(index)->ini_slot));
+        text.append(L"]\r\nx=");
+        text.append(std::to_wstring(placement.x));
+        text.append(L"\r\ny=");
+        text.append(std::to_wstring(placement.y));
+        text.append(L"\r\nwidth=");
+        text.append(std::to_wstring(placement.width));
+        text.append(L"\r\nheight=");
+        text.append(std::to_wstring(placement.height));
+    }
     text.append(L"\r\n\r\n[top_bar]\r\nstyle=");
     text.append(std::to_wstring((int32_t)snapshot->top_bar_style));
     text.append(L"\r\nmode=");

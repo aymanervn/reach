@@ -88,6 +88,8 @@ extern "C"
         reach_color popup_background;
         reach_color top_bar_dropdown_background;
         reach_color popup_border;
+        reach_color widget_background;
+        reach_color widget_border;
         reach_color popup_separator;
         reach_color system_hud_background;
         reach_color system_hud_border;
@@ -100,6 +102,7 @@ extern "C"
         reach_color toggle_track_off;
         reach_color toggle_knob;
         reach_shadow popup_shadow;
+        reach_shadow widget_shadow;
 
         reach_color primary_text;
         reach_color inverse_text;

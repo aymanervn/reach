@@ -165,6 +165,7 @@ extern "C"
     } reach_top_bar_state;
 
     typedef struct reach_top_bar reach_top_bar;
+    typedef struct reach_top_bar_tray_popup reach_top_bar_tray_popup;
 
     reach_result reach_top_bar_create(reach_top_bar **out_top_bar);
     void reach_top_bar_destroy(reach_top_bar *top_bar);

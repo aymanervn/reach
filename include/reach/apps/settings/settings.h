@@ -28,7 +28,7 @@ extern "C"
 {
 #endif
 
-#define REACH_SETTINGS_NAV_ITEM_COUNT 9
+#define REACH_SETTINGS_NAV_ITEM_COUNT 10
 #define REACH_SETTINGS_POWER_TIMER_COUNT 5
 #define REACH_SETTINGS_POWER_OPTION_COUNT 6
 #define REACH_SETTINGS_POWER_PRESET_COUNT (REACH_SETTINGS_POWER_OPTION_COUNT - 1)
@@ -66,7 +66,8 @@ extern "C"
         REACH_SETTINGS_PAGE_THEME = 5,
         REACH_SETTINGS_PAGE_UPDATE = 6,
         REACH_SETTINGS_PAGE_APPLICATIONS = 7,
-        REACH_SETTINGS_PAGE_DISPLAY = 8
+        REACH_SETTINGS_PAGE_DISPLAY = 8,
+        REACH_SETTINGS_PAGE_WIDGETS = 9
     } reach_settings_page;
 
     typedef enum reach_settings_hit_type
@@ -97,6 +98,8 @@ extern "C"
         REACH_SETTINGS_HIT_TOP_BAR_AUTO_HIDE_TOGGLE,
         REACH_SETTINGS_HIT_TOP_BAR_ICON_ONLY_TOGGLE,
         REACH_SETTINGS_HIT_TOP_BAR_PUSH_TOGGLE,
+        REACH_SETTINGS_HIT_WIDGET_TOGGLE,
+        REACH_SETTINGS_HIT_WIDGET_RESET,
         REACH_SETTINGS_HIT_DOCK_SIZE,
         REACH_SETTINGS_HIT_ACCOUNT_PASSWORD,
         REACH_SETTINGS_HIT_ACCOUNT_PASSWORD_FIELD,
@@ -274,6 +277,8 @@ extern "C"
         reach_motion top_bar_icon_only_toggle;
         int32_t top_bar_overlay;
         reach_motion top_bar_push_toggle;
+        uint32_t desktop_widgets;
+        reach_motion widget_toggles[REACH_MAX_DESKTOP_WIDGETS];
         int32_t dock_size;
         int32_t dragging_slider;
         int32_t hovered_button;
@@ -421,6 +426,9 @@ extern "C"
         reach_rect_f32 top_bar_style_title;
         reach_rect_f32 top_bar_style_subtitle;
         reach_rect_f32 top_bar_style_selector;
+        reach_rect_f32 widget_rows[REACH_MAX_DESKTOP_WIDGETS];
+        reach_rect_f32 widget_toggles[REACH_MAX_DESKTOP_WIDGETS];
+        reach_rect_f32 widget_reset;
         reach_settings_slider_card_layout dock_size;
         reach_rect_f32 top_bar_auto_hide_card;
         reach_rect_f32 top_bar_auto_hide_title;
@@ -511,6 +519,7 @@ extern "C"
         size_t power_option;
         size_t power_custom_field;
         size_t account_field;
+        size_t widget_index;
         size_t startup_index;
         size_t installed_app_index;
         int32_t theme_light;
@@ -533,6 +542,8 @@ extern "C"
     } reach_settings_render_input;
 
     void reach_settings_model_init(reach_settings_model *model);
+    void reach_settings_model_set_desktop_widgets(reach_settings_model *model, uint32_t mask,
+                                                  int32_t animate);
     void reach_settings_model_select_page(reach_settings_model *model, reach_settings_page page);
     double reach_settings_model_caret_deadline(const reach_settings_model *model);
     int32_t reach_settings_model_update_caret(reach_settings_model *model, double now_seconds);

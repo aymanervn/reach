@@ -53,33 +53,14 @@ extern "C"
 
     typedef struct reach_host_dependencies
     {
-        reach_platform_window_port launcher_window;
-        reach_render_backend_port launcher_renderer;
-        reach_platform_window_port dock_window;
-        reach_render_backend_port dock_renderer;
-        reach_platform_window_port top_bar_window;
-        reach_render_backend_port top_bar_renderer;
+        void *surface_factory_user;
+        // The host owns any ports returned by this callback, including on failure.
+        reach_result (*create_surface_ports)(void *user, uint32_t window_flags,
+                                             reach_platform_window_port *window,
+                                             reach_render_backend_port *renderer);
         reach_screen_hotspot_factory_port screen_hotspots;
         reach_image_loader_port image_loader;
-        reach_platform_window_port tray_window;
-        reach_render_backend_port tray_renderer;
-        reach_platform_window_port switcher_window;
-        reach_render_backend_port switcher_renderer;
-        reach_platform_window_port stage_window;
-        reach_render_backend_port stage_renderer;
         reach_window_thumbnail_port window_thumbnails;
-        reach_platform_window_port context_menu_window;
-        reach_render_backend_port context_menu_renderer;
-        reach_platform_window_port quick_settings_window;
-        reach_render_backend_port quick_settings_renderer;
-        reach_platform_window_port battery_window;
-        reach_render_backend_port battery_renderer;
-        reach_platform_window_port system_hud_window;
-        reach_render_backend_port system_hud_renderer;
-        reach_platform_window_port clipboard_window;
-        reach_render_backend_port clipboard_renderer;
-        reach_platform_window_port screenshot_window;
-        reach_render_backend_port screenshot_renderer;
         reach_input_source_port input_source;
         reach_clock_port clock;
         reach_input_language_port input_language;
@@ -110,8 +91,9 @@ extern "C"
         reach_screen_capture_port screen_capture;
     } reach_host_dependencies;
 
+    // Transfers the dependencies and clears the input after successfully creating the surfaces.
     reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
-                                                     const reach_host_dependencies *dependencies,
+                                                     reach_host_dependencies *dependencies,
                                                      reach_host **out_shell);
     void reach_host_set_initial_foreground(reach_host *host, uintptr_t window);
     void reach_host_destroy(reach_host *host);

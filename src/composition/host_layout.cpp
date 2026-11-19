@@ -50,8 +50,8 @@ static void reach_host_layout_apply_visibility(const reach_host_layout_target *t
     if (target->runtime != nullptr)
     {
         reach_surface_runtime *surface = target->runtime->surface;
-        int32_t activates = (target->runtime->definition->surface.behavior_flags &
-                             REACH_SURFACE_BEHAVIOR_ACTIVATES) != 0;
+        int32_t activates =
+            (target->runtime->definition->surface.window_flags & REACH_WINDOW_ACTIVATE) != 0;
 
         if (!visible)
         {
@@ -178,6 +178,14 @@ void reach_host_apply_layout(reach_host *host)
             {
                 (void)reach_host_layout_set_topmost(target, 0);
             }
+            if (entry->visible && target->runtime != nullptr)
+            {
+                const auto &window = target->runtime->surface->window;
+                if (window.ops.restack != nullptr)
+                {
+                    (void)window.ops.restack(window.window);
+                }
+            }
             continue;
         }
         if (!entry->visible)
@@ -209,14 +217,18 @@ void reach_host_apply_layout(reach_host *host)
 
 void reach_host_invalidate_surface_z_order(reach_host *host, reach_surface_id id)
 {
-    if (host == nullptr || id >= REACH_HOST_SURFACE_COUNT || !host->has_applied_layout_plan)
+    if (host == nullptr || id >= host->surface_count || !host->has_applied_layout_plan)
     {
         return;
     }
 
     reach_layout_participant participant = host->surface_participants[id];
     const reach_layout_entry *entry = reach_host_layout_applied_entry(host, participant);
-    if (entry == nullptr || !entry->visible || entry->layer <= 0)
+    if (entry == nullptr || !entry->visible)
+    {
+        return;
+    }
+    if (entry->layer <= 0 && host->surfaces[id].window.ops.restack == nullptr)
     {
         return;
     }

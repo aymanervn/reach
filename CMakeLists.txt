@@ -156,6 +156,7 @@ add_library(reach_core STATIC
     src/core/startup_apps.c
     src/core/theme.c
     src/core/wifi.c
+    src/core/widget_definition.c
 )
 
 reach_configure_common(reach_core)
@@ -229,6 +230,7 @@ add_library(reach_features STATIC
     src/features/top_bar/top_bar_tray.cpp
     src/features/switcher/switcher_feature.cpp
     src/features/switcher/switcher_render.cpp
+    src/features/widgets/widgets_feature.cpp
 )
 
 reach_configure_common(reach_features)

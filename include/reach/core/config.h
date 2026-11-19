@@ -15,6 +15,46 @@ extern "C"
 #define REACH_CONFIG_DOCK_SIZE_MIN 50
 #define REACH_CONFIG_DOCK_SIZE_MAX 100
 
+    typedef enum reach_desktop_widget
+    {
+        REACH_WIDGET_CLOCK,
+        REACH_WIDGET_SYSTEM,
+        REACH_WIDGET_NOW_PLAYING,
+        REACH_WIDGET_CALENDAR,
+        REACH_WIDGET_STOPWATCH,
+        REACH_WIDGET_POMODORO,
+        REACH_MAX_DESKTOP_WIDGETS
+    } reach_desktop_widget;
+
+#define REACH_DESKTOP_WIDGET_MASK ((1u << REACH_MAX_DESKTOP_WIDGETS) - 1u)
+
+    typedef struct reach_config_widget_placement
+    {
+        int32_t x;
+        int32_t y;
+        int32_t width;
+        int32_t height;
+    } reach_config_widget_placement;
+
+    typedef struct reach_config_widget_limits
+    {
+        int32_t min_width;
+        int32_t min_height;
+        int32_t max_width;
+        int32_t max_height;
+    } reach_config_widget_limits;
+
+    typedef struct reach_widget_definition
+    {
+        const uint16_t *label;
+        size_t ini_slot;
+        int32_t default_width;
+        int32_t default_height;
+        reach_config_widget_limits limits;
+    } reach_widget_definition;
+
+    const reach_widget_definition *reach_widget_definition_at(size_t index);
+
     typedef enum reach_config_theme_preference
     {
         REACH_CONFIG_THEME_FOLLOW_REACH = 0,
@@ -43,6 +83,8 @@ extern "C"
         uint16_t wallpaper_path[260];
         uint16_t monitor_wallpaper_paths[REACH_MAX_WALLPAPER_MONITORS][260];
         float dock_height;
+        uint32_t desktop_widgets;
+        reach_config_widget_placement widget_placements[REACH_MAX_DESKTOP_WIDGETS];
         int32_t dock_size;
         reach_config_top_bar_style top_bar_style;
         reach_config_top_bar_mode top_bar_mode;

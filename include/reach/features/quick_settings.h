@@ -372,7 +372,7 @@ extern "C"
                                               int32_t light_theme);
     int32_t reach_quick_settings_select_page(reach_quick_settings *quick_settings,
                                              reach_quick_settings_page page);
-    const reach_ui_event_type *reach_quick_settings_routed_events(size_t *out_count);
+    const reach_ui_event_type *reach_quick_settings_window_events(size_t *out_count);
 
     void reach_quick_settings_refresh_audio(reach_quick_settings *quick_settings);
     void reach_quick_settings_refresh_system(reach_quick_settings *quick_settings,

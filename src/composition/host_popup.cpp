@@ -58,27 +58,21 @@ static int32_t reach_host_press_holds_surface_open(reach_host *host,
     reach_feature_layout_anchor anchor = {};
     int32_t match_index = 0;
 
-    if (spec->dismiss_guard_surface < REACH_HOST_SURFACE_COUNT)
+    if (desc->links->dismiss_guard_surface < host->surface_count)
     {
-        anchor.surface = spec->dismiss_guard_surface;
+        anchor.surface = desc->links->dismiss_guard_surface;
         anchor.slot = spec->dismiss_guard_slot;
     }
     else
     {
-        anchor.surface = desc->definition->layout.anchor;
-        anchor.slot = desc->definition->layout.anchor_slot;
-        if (desc->definition->surface_ops != nullptr &&
-            desc->definition->surface_ops->layout_anchor != nullptr)
+        if (!reach_host_resolve_popup_owner(desc, &anchor))
         {
-            if (!desc->definition->surface_ops->layout_anchor(desc->capsule, &anchor))
-            {
-                return 0;
-            }
-            match_index = 1;
+            return 0;
         }
+        match_index = desc->popup_owner.surface != REACH_SURFACE_ID_INVALID;
     }
 
-    if (anchor.surface >= REACH_HOST_SURFACE_COUNT)
+    if (anchor.surface >= host->surface_count)
     {
         return 0;
     }
@@ -121,7 +115,7 @@ static void reach_host_handle_global_mouse_down(reach_host *host, reach_point_i3
     }
 
     int32_t closed_any = 0;
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    for (size_t index = 0; index < host->surface_count; ++index)
     {
         const reach_feature_runtime *desc = &host->feature_runtimes[index];
         if (desc->definition->surface.cls != REACH_SURFACE_CLASS_TRANSIENT &&
@@ -182,7 +176,7 @@ void reach_host_close_surface_classes(reach_host *host, uint32_t class_mask, int
         return;
     }
 
-    for (size_t index = 0; index < REACH_HOST_SURFACE_COUNT; ++index)
+    for (size_t index = 0; index < host->surface_count; ++index)
     {
         const reach_feature_runtime *desc = &host->feature_runtimes[index];
         if ((class_mask & reach_surface_class_bit(desc->definition->surface.cls)) == 0)
