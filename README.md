@@ -31,6 +31,7 @@ Reach replaces Windows Explorer, nothing gets deleted, only an entry in the regi
 - Most animations are GPU composed
 - Auto hide top bar feature
 - Topbar displays live system statistics such as network speed, CPU and RAM usage
+- Put live CPU, RAM and GPU stats on your desktop, skip tracks from the now playing widget and keep a clock, calendar, stopwatch or Pomodoro timer on hand. Pick the widgets you want in Reach settings, then drag them into place and resize them to fit
 - Animations run at your screen's max refresh rate and drop to 60fps when battery saver is on
 - Keyboard language switch button
 - Hovering the top of the screen pulls down the topbar and moves full screen window further below in a smooth animation
