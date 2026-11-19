@@ -1864,7 +1864,8 @@ static void bar_push_setup(bar_enter_fixture *fixture)
 static int32_t bar_push_layer_intent_active(const bar_enter_fixture *fixture)
 {
     const reach_host *host = fixture->host;
-    return host->layout_manager.participants[host->surface_participants[REACH_SURFACE_ID_TOP_BAR]]
+    const auto top_bar_id = reach_host_find_surface<reach_top_bar>(host);
+    return host->layout_manager.participants[host->surface_participants[top_bar_id]]
         .layer_intent_active;
 }
 
