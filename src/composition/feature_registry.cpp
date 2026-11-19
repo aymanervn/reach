@@ -1,4 +1,5 @@
 #include "host_internal.h"
+#include "reach/features/widgets.h"
 
 #include "reach/features/battery.h"
 #include "reach/features/clipboard.h"
@@ -97,6 +98,29 @@ static reach_result reach_feature_attach_battery(void *capsule,
 {
     reach_battery_attach_services(static_cast<reach_battery *>(capsule),
                                   dependencies != nullptr ? dependencies->system_status : nullptr);
+    return REACH_OK;
+}
+
+static reach_result reach_feature_attach_widgets(void *capsule,
+                                                 const reach_feature_dependencies *dependencies)
+{
+    auto *widgets = static_cast<reach_widgets *>(capsule);
+    reach_widgets_attach_services(widgets,
+                                  dependencies != nullptr ? dependencies->system_stats : nullptr,
+                                  dependencies != nullptr ? dependencies->now_playing : nullptr,
+                                  dependencies != nullptr ? dependencies->clock : nullptr);
+
+    reach_widget_placement_writer writer = {};
+    if (dependencies != nullptr && dependencies->config != nullptr)
+    {
+        writer = {
+            dependencies->config, [](void *context, const reach_widget_placement_intent *intent)
+            {
+                return reach_config_service_set_widget_placement(
+                    static_cast<reach_config_service *>(context), intent->index, intent->placement);
+            }};
+    }
+    reach_widgets_bind_placement_writer(widgets, writer);
     return REACH_OK;
 }
 
@@ -795,6 +819,45 @@ static const reach_feature_render_resource_ops reach_clipboard_resource_ops = {
     reach_feature_clipboard_active_at, reach_feature_clipboard_release_source,
     reach_feature_clipboard_clear_active};
 
+static void reach_feature_notify_widgets(void *capsule,
+                                         const reach_feature_notification *notification,
+                                         reach_feature_tick_result *out)
+{
+    if (capsule == nullptr || notification == nullptr || out == nullptr)
+    {
+        return;
+    }
+    auto *widgets = static_cast<reach_widgets *>(capsule);
+    switch (notification->kind)
+    {
+    case REACH_FEATURE_NOTIFICATION_SYSTEM_STATS_CHANGED:
+        out->redraw = reach_widgets_set_stats(widgets, &notification->system_stats);
+        break;
+    case REACH_FEATURE_NOTIFICATION_NOW_PLAYING_CHANGED:
+        out->redraw = reach_widgets_refresh_media(widgets);
+        break;
+    case REACH_FEATURE_NOTIFICATION_CONFIG_CHANGED:
+        if (notification->config != nullptr)
+        {
+            int32_t changed =
+                reach_widgets_set_enabled(widgets, notification->config->desktop_widgets);
+            for (size_t index = 0; index < REACH_MAX_DESKTOP_WIDGETS; ++index)
+            {
+                changed |= reach_widgets_set_placement(
+                    widgets, index, notification->config->widget_placements[index]);
+            }
+            out->relayout = changed;
+            out->redraw = changed;
+        }
+        break;
+    default:
+        break;
+    }
+}
+
+static const reach_feature_control_ops reach_widgets_control_ops = {
+    nullptr, nullptr, reach_feature_notify_widgets, nullptr, nullptr};
+
 static const reach_feature_control_ops reach_stage_control_ops = {
     reach_feature_control_stage_open, nullptr, reach_feature_notify_stage, nullptr, nullptr};
 static const reach_feature_control_ops reach_context_menu_control_ops = {
@@ -1398,6 +1461,24 @@ static void reach_feature_destroy(void *capsule)
     Destroy(static_cast<Feature *>(capsule));
 }
 
+static int32_t reach_widgets_desktop_surface_arrange(void *capsule,
+                                                     const reach_feature_surface_context *ctx)
+{
+    return reach_widgets_arrange_desktop(static_cast<reach_widgets *>(capsule), ctx->monitor_bounds,
+                                         ctx->available_bounds, ctx->dpi_scale);
+}
+
+static reach_result reach_widgets_desktop_surface_render(void *capsule,
+                                                         const reach_feature_surface_context *ctx,
+                                                         reach_render_command_buffer *out_commands)
+{
+    return reach_widgets_render_desktop(static_cast<reach_widgets *>(capsule), ctx->theme,
+                                        ctx->dpi_scale, &ctx->text_measure, out_commands);
+}
+
+static const reach_feature_surface_ops reach_widgets_desktop_surface_ops = {
+    reach_widgets_desktop_surface_arrange, reach_widgets_desktop_surface_render};
+
 static reach_surface_id reach_find_registered_surface(const reach_feature_definition *definitions,
                                                       size_t count, const reach_surface_key *key)
 {
@@ -1845,6 +1926,31 @@ reach_result reach_host_init_feature_registry(reach_host *host)
                 reach_screenshot_activation_events(&definition.toggle_event_count);
             definition.routed_events =
                 reach_screenshot_routed_events(&definition.routed_event_count);
+            return definition;
+        }(),
+        []
+        {
+            reach_feature_definition definition = {};
+            definition.key = &reach_surface_key_for<reach_widgets>();
+            definition.factory = {reach_feature_create<reach_widgets, reach_widgets_create>,
+                                  reach_feature_destroy<reach_widgets, reach_widgets_destroy>};
+            definition.lifecycle.attach = reach_feature_attach_widgets;
+            definition.lifecycle.detach = reach_feature_detach<reach_feature_attach_widgets>;
+            definition.capsule_ops = reach_widgets_desktop_capsule_ops();
+            definition.surface_ops = &reach_widgets_desktop_surface_ops;
+            definition.control_ops = &reach_widgets_control_ops;
+            definition.commit_config = [](void *capsule)
+            { return reach_widgets_commit_placement(static_cast<reach_widgets *>(capsule)); };
+            definition.surface.cls = REACH_SURFACE_CLASS_PERSISTENT;
+            definition.surface.window_flags =
+                REACH_WINDOW_COMPOSITION_BACKED | REACH_WINDOW_STACK_ABOVE_DESKTOP;
+            definition.surface.redraw_on = REACH_SURFACE_REDRAW_CLOCK;
+            definition.surface.pointer_priority = 110;
+            definition.surface.pointer_flags = REACH_SURFACE_POINTER_SOURCE_GATED |
+                                               REACH_SURFACE_POINTER_CAPTURE_CONSUMES_RELEASE |
+                                               REACH_SURFACE_POINTER_CAPTURE_OWNS_MOVE;
+            definition.layout.priority = 36;
+            definition.layout.uses_reserved_bounds = 1;
             return definition;
         }(),
     };

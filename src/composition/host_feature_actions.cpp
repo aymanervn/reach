@@ -55,6 +55,11 @@ reach_result reach_host_apply_feature_action(reach_host *host, reach_feature_run
         reach_host_take_keyboard_focus(host, desc);
         return REACH_OK;
 
+    case REACH_FEATURE_ACTION_COMMIT_CONFIG:
+        return desc->definition->commit_config != nullptr
+                   ? desc->definition->commit_config(desc->capsule)
+                   : REACH_NOT_IMPLEMENTED;
+
     case REACH_FEATURE_ACTION_MOVE_PIN:
         return reach_host_move_pin(host, (uint32_t)action->id, action->index);
 

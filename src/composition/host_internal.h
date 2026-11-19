@@ -188,6 +188,7 @@ typedef struct reach_feature_dependencies
     void *request_update_user;
     const uint16_t *terminal_icon_ref;
     const reach_screen_capture_port *screen_capture;
+    reach_config_service *config;
 } reach_feature_dependencies;
 
 typedef struct reach_feature_lifecycle_ops
@@ -411,6 +412,7 @@ typedef struct reach_feature_definition
     const reach_ui_event_type *window_events;
     size_t window_event_count;
     reach_ui_event_type refresh_world_before_event;
+    reach_result (*commit_config)(void *capsule);
 } reach_feature_definition;
 
 // Registry-resolved IDs stay separate from the declarative keys.

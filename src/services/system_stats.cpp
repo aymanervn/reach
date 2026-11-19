@@ -21,6 +21,7 @@ struct reach_system_stats
     int32_t thread_started = 0;
     int32_t stop = 0;
     int32_t enabled = 0;
+    size_t monitor_claims = 0;
     int32_t rebaseline = 0;
 
     reach_system_stats_snapshot snapshot = {};
@@ -48,7 +49,14 @@ static float reach_system_stats_percent(uint64_t used, uint64_t total)
 static int32_t reach_system_stats_snapshot_differs(const reach_system_stats_snapshot *a,
                                                    const reach_system_stats_snapshot *b)
 {
-    return a->valid != b->valid || (int32_t)a->cpu_percent != (int32_t)b->cpu_percent ||
+    return a->gpu_available != b->gpu_available ||
+           (int32_t)a->gpu_percent != (int32_t)b->gpu_percent ||
+           a->gpu_temperature_available != b->gpu_temperature_available ||
+           a->gpu_temperature_c != b->gpu_temperature_c || a->cpu_clock_mhz != b->cpu_clock_mhz ||
+           a->memory_speed_mt_s != b->memory_speed_mt_s || a->gpu_clock_mhz != b->gpu_clock_mhz ||
+           a->gpu_clock_max_mhz != b->gpu_clock_max_mhz || a->vram_available != b->vram_available ||
+           (int32_t)a->vram_percent != (int32_t)b->vram_percent || a->valid != b->valid ||
+           (int32_t)a->cpu_percent != (int32_t)b->cpu_percent ||
            (int32_t)a->memory_percent != (int32_t)b->memory_percent ||
            a->network_received_bytes_per_second != b->network_received_bytes_per_second ||
            a->network_sent_bytes_per_second != b->network_sent_bytes_per_second;
@@ -66,6 +74,7 @@ static void reach_system_stats_thread_main(reach_system_stats *service)
 
     for (;;)
     {
+        bool sample_monitor = false;
         {
             std::unique_lock<std::mutex> lock(service->mutex);
             if (!service->stop && !service->enabled)
@@ -85,6 +94,7 @@ static void reach_system_stats_thread_main(reach_system_stats *service)
             {
                 continue;
             }
+            sample_monitor = service->monitor_claims != 0;
             if (service->rebaseline)
             {
                 service->rebaseline = 0;
@@ -129,6 +139,21 @@ static void reach_system_stats_thread_main(reach_system_stats *service)
             has_previous = 1;
         }
 
+        if (sample_monitor && service->source.ops.sample_monitor != nullptr)
+        {
+            service->source.ops.sample_monitor(service->source.source, &sample);
+        }
+        next.gpu_percent = sample.gpu_percent;
+        next.cpu_clock_mhz = sample.cpu_clock_mhz;
+        next.memory_speed_mt_s = sample.memory_speed_mt_s;
+        next.gpu_clock_mhz = sample.gpu_clock_mhz;
+        next.gpu_clock_max_mhz = sample.gpu_clock_max_mhz;
+        next.vram_available = sample.vram_total_bytes != 0;
+        next.vram_percent =
+            reach_system_stats_percent(sample.vram_used_bytes, sample.vram_total_bytes);
+        next.gpu_temperature_c = sample.gpu_temperature_c;
+        next.gpu_available = sample.gpu_available;
+        next.gpu_temperature_available = sample.gpu_temperature_available;
         int32_t differs = reach_system_stats_snapshot_differs(&next, &published);
         published = next;
 
@@ -209,6 +234,27 @@ void reach_system_stats_destroy(reach_system_stats *service)
         service->source.ops.destroy(service->source.source);
     }
     delete service;
+}
+
+void reach_system_stats_acquire_monitor(reach_system_stats *service)
+{
+    if (service != nullptr)
+    {
+        std::lock_guard<std::mutex> lock(service->mutex);
+        ++service->monitor_claims;
+    }
+}
+
+void reach_system_stats_release_monitor(reach_system_stats *service)
+{
+    if (service != nullptr)
+    {
+        std::lock_guard<std::mutex> lock(service->mutex);
+        if (service->monitor_claims > 0)
+        {
+            --service->monitor_claims;
+        }
+    }
 }
 
 void reach_system_stats_set_enabled(reach_system_stats *service, int32_t enabled)
