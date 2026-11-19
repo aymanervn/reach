@@ -75,6 +75,7 @@ void reach_settings_model_init(reach_settings_model *model)
     reach_settings_model_set_top_bar_style(model, REACH_CONFIG_TOP_BAR_STYLE_TRANSPARENT);
     reach_settings_model_set_top_bar_mode(model, REACH_CONFIG_TOP_BAR_MODE_STATIC);
     reach_settings_model_set_top_bar_icon_only(model, 1);
+    reach_settings_model_set_top_bar_overlay(model, 0);
     model->dock_size = REACH_CONFIG_DOCK_SIZE_MAX;
     reach_motion_set(&model->button_press_feedback, 0.0f);
     reach_pressable_init(&model->button_pressable);
@@ -878,12 +879,19 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
         reach_settings_layout_toggle_card(&auto_hide, area_x,
                                           desktop_y + appearance_card_height + card_spacing,
                                           area_width, card_height, scale);
+        reach_settings_toggle_card_rects push = {
+            &layout.top_bar_push_card, nullptr, &layout.top_bar_push_title,
+            &layout.top_bar_push_subtitle, &layout.top_bar_push_toggle};
+        reach_settings_layout_toggle_card(&push, area_x,
+                                          layout.top_bar_auto_hide_card.y +
+                                              layout.top_bar_auto_hide_card.height + card_spacing,
+                                          area_width, card_height, scale);
         reach_settings_toggle_card_rects icon_only = {
             &layout.top_bar_icon_only_card, nullptr, &layout.top_bar_icon_only_title,
             &layout.top_bar_icon_only_subtitle, &layout.top_bar_icon_only_toggle};
         reach_settings_layout_toggle_card(&icon_only, area_x,
-                                          layout.top_bar_auto_hide_card.y +
-                                              layout.top_bar_auto_hide_card.height + card_spacing,
+                                          layout.top_bar_push_card.y +
+                                              layout.top_bar_push_card.height + card_spacing,
                                           area_width, card_height, scale);
         reach_settings_layout_slider_card(&layout.dock_size, area_x,
                                           layout.top_bar_icon_only_card.y +
@@ -1245,6 +1253,14 @@ reach_settings_hit_result reach_settings_hit_test(const reach_settings_layout *l
         result.type = REACH_SETTINGS_HIT_TOP_BAR_AUTO_HIDE_TOGGLE;
         return result;
     }
+    if (theme_pointer && layout->top_bar_push_toggle.width > 0.0f &&
+        (reach_settings_rect_contains(layout->top_bar_push_toggle, x, y) ||
+         reach_settings_rect_contains(layout->top_bar_push_card, x, y)))
+    {
+        result.type = REACH_SETTINGS_HIT_TOP_BAR_PUSH_TOGGLE;
+        return result;
+    }
+
     if (theme_pointer && layout->top_bar_icon_only_toggle.width > 0.0f &&
         (reach_settings_rect_contains(layout->top_bar_icon_only_toggle, x, y) ||
          reach_settings_rect_contains(layout->top_bar_icon_only_card, x, y)))

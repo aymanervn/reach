@@ -1645,7 +1645,7 @@ static int32_t bar_enter_hidden(const bar_enter_fixture *fixture)
     return reach_top_bar_state_ptr(fixture->top_bar)->visibility.target_hidden;
 }
 
-static void bar_enter_setup(bar_enter_fixture *fixture)
+static void bar_enter_setup_with_port(bar_enter_fixture *fixture, reach_window_manager_port port)
 {
     reach_host *host = fixture->host;
     bar_hotspot_created = 0;
@@ -1664,10 +1664,6 @@ static void bar_enter_setup(bar_enter_fixture *fixture)
     host->layout_dpi_scale = 1.0f;
     host->input_source.ops.get_pointer_position = fake_get_pointer_position;
 
-    reach_window_manager_port port = {};
-    port.ops.window_count = fake_foreground_window_count;
-    port.ops.window_at = fake_foreground_window_at;
-    port.ops.outer_bounds = fake_trespassing_outer_bounds;
     observed_foreground_window = 126;
     foreground_window_available = 1;
     expect_true(reach_window_tracking_create(port, &fixture->windows) == REACH_OK,
@@ -1687,6 +1683,15 @@ static void bar_enter_setup(bar_enter_fixture *fixture)
     bar_enter_reconcile(fixture);
     expect_true(bar_enter_hidden(fixture), "the bar settles hidden while the pointer is away");
     expect_true(bar_hotspot_callback != nullptr, "the top bar hotspot callback was captured");
+}
+
+static void bar_enter_setup(bar_enter_fixture *fixture)
+{
+    reach_window_manager_port port = {};
+    port.ops.window_count = fake_foreground_window_count;
+    port.ops.window_at = fake_foreground_window_at;
+    port.ops.outer_bounds = fake_trespassing_outer_bounds;
+    bar_enter_setup_with_port(fixture, port);
 }
 
 static void bar_enter_teardown(bar_enter_fixture *fixture)
@@ -1803,6 +1808,146 @@ static void test_bar_visibility_request_reconciles_idle_top_bar(void)
     reach_host_request_bar_visibility_update(host);
     bar_enter_frame_surface(&fixture);
     expect_true(bar_enter_hidden(&fixture), "a leave hides the idle top bar on the next frame");
+
+    bar_enter_teardown(&fixture);
+}
+
+static reach_window_move bar_push_moves[64];
+static size_t bar_push_move_count;
+
+static reach_result fake_maximized_window_at(const reach_window_manager *manager, size_t index,
+                                             reach_window_snapshot *out_window)
+{
+    reach_result result = fake_foreground_window_at(manager, index, out_window);
+    if (result == REACH_OK)
+    {
+        out_window->maximized = 1;
+    }
+    return result;
+}
+
+static reach_result fake_maximized_frame_bounds(const reach_window_manager *manager,
+                                                reach_window_id window, reach_rect_f32 *out)
+{
+    (void)manager;
+    (void)window;
+    *out = {0.0f, 0.0f, 1000.0f, 800.0f};
+    return REACH_OK;
+}
+
+static reach_result fake_record_move_windows(reach_window_manager *manager,
+                                             const reach_window_move *windows, size_t count)
+{
+    (void)manager;
+    for (size_t index = 0; index < count; ++index)
+    {
+        if (bar_push_move_count < sizeof(bar_push_moves) / sizeof(bar_push_moves[0]))
+        {
+            bar_push_moves[bar_push_move_count++] = windows[index];
+        }
+    }
+    return REACH_OK;
+}
+
+static void bar_push_setup(bar_enter_fixture *fixture)
+{
+    reach_window_manager_port port = {};
+    port.ops.window_count = fake_foreground_window_count;
+    port.ops.window_at = fake_maximized_window_at;
+    port.ops.outer_bounds = fake_trespassing_outer_bounds;
+    port.ops.frame_bounds = fake_maximized_frame_bounds;
+    port.ops.move_windows = fake_record_move_windows;
+    bar_push_move_count = 0;
+    bar_enter_setup_with_port(fixture, port);
+}
+
+static int32_t bar_push_layer_intent_active(const bar_enter_fixture *fixture)
+{
+    const reach_host *host = fixture->host;
+    const auto top_bar_id = reach_host_find_surface<reach_top_bar>(host);
+    return host->layout_manager.participants[host->surface_participants[top_bar_id]]
+        .layer_intent_active;
+}
+
+static void bar_push_step(bar_enter_fixture *fixture)
+{
+    for (int32_t step = 0; step < 8; ++step)
+    {
+        reach_test_motion_clock_advance(0.5);
+        bar_enter_reconcile(fixture);
+    }
+}
+
+static void bar_push_reveal(bar_enter_fixture *fixture)
+{
+    observed_pointer = {500, 0};
+    bar_enter_fire(REACH_SCREEN_HOTSPOT_ENTER);
+    bar_push_step(fixture);
+}
+
+static void bar_push_hide(bar_enter_fixture *fixture)
+{
+    observed_pointer = {500, 400};
+    bar_enter_fire(REACH_SCREEN_HOTSPOT_LEAVE);
+    bar_push_step(fixture);
+}
+
+static void test_top_bar_push_moves_windows_without_overlay(void)
+{
+    bar_enter_fixture fixture = {&bar_enter_host};
+    bar_push_setup(&fixture);
+    expect_true(bar_push_move_count == 0, "a hidden pushing bar has not moved any window");
+
+    bar_push_reveal(&fixture);
+    expect_true(!bar_enter_hidden(&fixture), "the pushing bar reveals on hover");
+    expect_true(bar_push_move_count > 0, "a hover reveal moves the window under the bar");
+    expect_true(bar_push_move_count > 0 && bar_push_moves[bar_push_move_count - 1].window == 126 &&
+                    bar_push_moves[bar_push_move_count - 1].position.y > 0.0f,
+                "the pushed window ends below the top edge");
+    expect_true(!bar_push_layer_intent_active(&fixture),
+                "a settled pushing bar keeps today's layer intent");
+
+    bar_enter_teardown(&fixture);
+}
+
+static void test_top_bar_overlay_never_moves_windows(void)
+{
+    bar_enter_fixture fixture = {&bar_enter_host};
+    bar_push_setup(&fixture);
+    expect_true(reach_top_bar_set_overlay(fixture.top_bar, 1) == 1, "overlay is switched on");
+
+    bar_push_reveal(&fixture);
+    expect_true(!bar_enter_hidden(&fixture), "the overlay bar reveals on hover");
+    expect_true(bar_push_move_count == 0, "an overlay reveal moves no window");
+    expect_true(bar_push_layer_intent_active(&fixture),
+                "a revealed overlay bar stays above windows after it settles");
+
+    bar_push_hide(&fixture);
+    expect_true(bar_enter_hidden(&fixture), "the overlay bar hides when the pointer leaves");
+    expect_true(bar_push_move_count == 0, "an overlay hide moves no window");
+    expect_true(!bar_push_layer_intent_active(&fixture),
+                "a fully hidden overlay bar no longer asks to stay above windows");
+
+    bar_enter_teardown(&fixture);
+}
+
+static void test_top_bar_overlay_releases_an_active_push(void)
+{
+    bar_enter_fixture fixture = {&bar_enter_host};
+    bar_push_setup(&fixture);
+
+    bar_push_reveal(&fixture);
+    expect_true(bar_push_move_count > 0, "the window is pushed before overlay is switched on");
+
+    bar_push_move_count = 0;
+    expect_true(reach_top_bar_set_overlay(fixture.top_bar, 1) == 1, "overlay is switched on");
+    expect_true(bar_push_move_count == 1 && bar_push_moves[0].window == 126 &&
+                    bar_push_moves[0].position.x == 100.0f && bar_push_moves[0].position.y == 0.0f,
+                "switching overlay on moves the pushed window back to its origin");
+
+    bar_push_move_count = 0;
+    bar_push_step(&fixture);
+    expect_true(bar_push_move_count == 0, "the revealed overlay bar does not push again");
 
     bar_enter_teardown(&fixture);
 }
@@ -3712,6 +3857,9 @@ int main(void)
     test_dropped_bar_enter_reveals_after_manipulation_clears();
     test_dropped_bar_enter_is_discarded_by_leave_or_committed_hide();
     test_bar_visibility_request_reconciles_idle_top_bar();
+    test_top_bar_push_moves_windows_without_overlay();
+    test_top_bar_overlay_never_moves_windows();
+    test_top_bar_overlay_releases_an_active_push();
     test_switcher_publishes_arranged_surface_geometry();
     test_system_stats_change_repaints_without_relayout();
     test_feature_tick_redraw_marks_only_its_own_surface();

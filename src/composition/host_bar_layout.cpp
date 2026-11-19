@@ -300,7 +300,7 @@ reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surfa
     {
         reach_layout_set_layer_intent(
             &host->layout_manager, host->surface_participants[id],
-            result.reveal_transition_active ||
+            result.reveal_transition_active || result.keep_above_windows ||
                 (!request.auto_hide_active && geometry != nullptr && geometry->force_topmost),
             desc->definition->surface.bar_reveal.active_layer);
     }

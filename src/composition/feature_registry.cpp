@@ -353,9 +353,12 @@ static void reach_feature_notify_top_bar(void *capsule,
         return;
     }
 
-    if (reach_top_bar_apply_config(static_cast<reach_top_bar *>(capsule),
-                                   notification->config->top_bar_style,
-                                   notification->config->top_bar_mode))
+    reach_top_bar *top_bar = static_cast<reach_top_bar *>(capsule);
+    int32_t config_changed = reach_top_bar_apply_config(
+        top_bar, notification->config->top_bar_style, notification->config->top_bar_mode);
+    int32_t overlay_changed =
+        reach_top_bar_set_overlay(top_bar, notification->config->top_bar_overlay);
+    if (config_changed || overlay_changed)
     {
         out->redraw = 1;
         out->relayout = 1;

@@ -116,3 +116,30 @@ float reach_settings_slider_ratio_at(const reach_settings_slider_card_layout *sl
     float ratio = (x - slider->track.x) / slider->track.width;
     return ratio < 0.0f ? 0.0f : (ratio > 1.0f ? 1.0f : ratio);
 }
+
+void reach_settings_model_set_top_bar_overlay(reach_settings_model *model, int32_t overlay)
+{
+    if (model == nullptr || overlay < 0 || overlay > 1)
+    {
+        return;
+    }
+    model->top_bar_overlay = overlay;
+    reach_motion_set(&model->top_bar_push_toggle, overlay == 0 ? 1.0f : 0.0f);
+}
+
+int32_t reach_settings_model_top_bar_overlay(const reach_settings_model *model)
+{
+    return model != nullptr ? model->top_bar_overlay : 0;
+}
+
+int32_t reach_settings_model_toggle_top_bar_overlay(reach_settings_model *model)
+{
+    if (model == nullptr)
+    {
+        return 0;
+    }
+    model->top_bar_overlay = model->top_bar_overlay == 0 ? 1 : 0;
+    reach_settings_animate(&model->top_bar_push_toggle, model->top_bar_overlay == 0 ? 1.0f : 0.0f,
+                           REACH_MOTION_PRESET_BOUNCY);
+    return 1;
+}

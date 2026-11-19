@@ -97,6 +97,7 @@ extern "C"
         REACH_SETTINGS_HIT_TOP_BAR_STYLE,
         REACH_SETTINGS_HIT_TOP_BAR_AUTO_HIDE_TOGGLE,
         REACH_SETTINGS_HIT_TOP_BAR_ICON_ONLY_TOGGLE,
+        REACH_SETTINGS_HIT_TOP_BAR_PUSH_TOGGLE,
         REACH_SETTINGS_HIT_WIDGET_TOGGLE,
         REACH_SETTINGS_HIT_WIDGET_RESET,
         REACH_SETTINGS_HIT_DOCK_SIZE,
@@ -274,6 +275,8 @@ extern "C"
         reach_motion top_bar_mode_toggle;
         int32_t top_bar_icon_only;
         reach_motion top_bar_icon_only_toggle;
+        int32_t top_bar_overlay;
+        reach_motion top_bar_push_toggle;
         uint32_t desktop_widgets;
         reach_motion widget_toggles[REACH_MAX_DESKTOP_WIDGETS];
         int32_t dock_size;
@@ -435,6 +438,10 @@ extern "C"
         reach_rect_f32 top_bar_icon_only_title;
         reach_rect_f32 top_bar_icon_only_subtitle;
         reach_rect_f32 top_bar_icon_only_toggle;
+        reach_rect_f32 top_bar_push_card;
+        reach_rect_f32 top_bar_push_title;
+        reach_rect_f32 top_bar_push_subtitle;
+        reach_rect_f32 top_bar_push_toggle;
         reach_rect_f32 account_card;
         reach_rect_f32 account_avatar;
         reach_rect_f32 account_name;
@@ -656,6 +663,9 @@ extern "C"
     void reach_settings_model_set_top_bar_icon_only(reach_settings_model *model, int32_t icon_only);
     int32_t reach_settings_model_top_bar_icon_only(const reach_settings_model *model);
     int32_t reach_settings_model_toggle_top_bar_icon_only(reach_settings_model *model);
+    void reach_settings_model_set_top_bar_overlay(reach_settings_model *model, int32_t overlay);
+    int32_t reach_settings_model_top_bar_overlay(const reach_settings_model *model);
+    int32_t reach_settings_model_toggle_top_bar_overlay(reach_settings_model *model);
     int32_t reach_settings_model_set_dock_size(reach_settings_model *model, int32_t size);
     int32_t reach_settings_model_dock_size(const reach_settings_model *model);
     float reach_settings_slider_ratio_at(const reach_settings_slider_card_layout *slider, float x);

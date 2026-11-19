@@ -59,6 +59,24 @@ int32_t reach_top_bar_apply_icon_only(reach_top_bar *top_bar, int32_t icon_only)
     return 1;
 }
 
+int32_t reach_top_bar_set_overlay(reach_top_bar *top_bar, int32_t overlay)
+{
+    if (top_bar == nullptr)
+    {
+        return 0;
+    }
+
+    int32_t resolved = overlay != 0 ? 1 : 0;
+    if (top_bar->state.overlay == resolved)
+    {
+        return 0;
+    }
+    top_bar->state.overlay = resolved;
+    reach_top_bar_window_push_release(top_bar->window_push);
+    reach_top_bar_invalidate_occlusion(top_bar);
+    return 1;
+}
+
 static void reach_top_bar_load_motion_specs(reach_top_bar *top_bar, const reach_theme *theme)
 {
     top_bar->snappy_spec = reach_theme_motion_preset(theme, REACH_MOTION_PRESET_SNAPPY);
@@ -1109,6 +1127,7 @@ static void reach_top_bar_apply_window_push(reach_top_bar *top_bar, float animat
     push_request.fully_hidden = fully_hidden;
     push_request.excluded_window = top_bar->push_excluded_window;
     push_request.recover_maximized = top_bar->state.mode == REACH_CONFIG_TOP_BAR_MODE_DYNAMIC;
+    push_request.overlay = top_bar->state.overlay;
     reach_top_bar_window_push_apply(top_bar->window_push, &push_request);
 }
 
@@ -1186,6 +1205,8 @@ reach_top_bar_bar_update_visibility(void *capsule, const reach_bar_visibility_re
     reach_bar_visibility_result result = reach_bar_update_visibility(
         &top_bar->state.visibility, &top_bar->motions[REACH_TOP_BAR_ANIM_Y], &bar_request);
     result.redraw = was_target_hidden != top_bar->state.visibility.target_hidden;
+    result.keep_above_windows = reach_bar_keep_above_windows(
+        top_bar->state.overlay, request->auto_hide_active, result.reveal_progress);
 
     top_bar->push_monitor_bounds = bar_request.monitor_bounds;
     top_bar->push_shown_bounds = bar_request.shown_bounds;

@@ -680,6 +680,18 @@ static void render_theme_page(const reach_settings_render_input *input,
                                    &model->top_bar_mode_toggle,
                                    REACH_SETTINGS_HIT_TOP_BAR_AUTO_HIDE_TOGGLE};
     render_theme_toggle_card(input, commands, &toggle_style, &auto_hide);
+    theme_toggle_card push = {layout->top_bar_push_card,
+                              {},
+                              layout->top_bar_push_title,
+                              layout->top_bar_push_subtitle,
+                              layout->top_bar_push_toggle,
+                              REACH_VECTOR_ICON_NONE,
+                              nullptr,
+                              L"Move windows when the bar appears",
+                              L"Turn off to show the bar over windows instead",
+                              &model->top_bar_push_toggle,
+                              REACH_SETTINGS_HIT_TOP_BAR_PUSH_TOGGLE};
+    render_theme_toggle_card(input, commands, &toggle_style, &push);
     theme_toggle_card icon_only = {layout->top_bar_icon_only_card,
                                    {},
                                    layout->top_bar_icon_only_title,

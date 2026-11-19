@@ -261,6 +261,43 @@ static void test_resized_shown_bounds_override_an_old_position_animation(void)
                 "adopting resized shown geometry retires the obsolete animation");
 }
 
+static void test_keep_above_windows_only_for_revealed_overlay(void)
+{
+    expect_true(reach_bar_keep_above_windows(1, 1, 0.5f) == 1,
+                "an overlay bar part way revealed stays above windows");
+    expect_true(reach_bar_keep_above_windows(1, 1, 1.0f) == 1,
+                "a fully revealed overlay bar stays above windows");
+    expect_true(reach_bar_keep_above_windows(1, 1, 0.0f) == 0,
+                "a hidden overlay bar does not ask to stay above windows");
+    expect_true(reach_bar_keep_above_windows(0, 1, 1.0f) == 0,
+                "a pushing bar does not ask to stay above windows");
+    expect_true(reach_bar_keep_above_windows(1, 0, 1.0f) == 0,
+                "an overlay bar without auto hide does not ask to stay above windows");
+}
+
+static void test_top_bar_overlay_setting(void)
+{
+    reach_top_bar *top_bar = nullptr;
+    expect_true(reach_top_bar_create(&top_bar) == REACH_OK, "top bar is created for overlay");
+    if (top_bar == nullptr)
+    {
+        return;
+    }
+
+    expect_true(reach_top_bar_state_ptr(top_bar)->overlay == 0, "overlay starts off");
+    expect_true(reach_top_bar_set_overlay(top_bar, 1) == 1, "turning overlay on reports a change");
+    expect_true(reach_top_bar_state_ptr(top_bar)->overlay == 1, "overlay is stored on");
+    expect_true(reach_top_bar_set_overlay(top_bar, 1) == 0,
+                "setting overlay on again is no change");
+    expect_true(reach_top_bar_set_overlay(top_bar, 5) == 0, "a non-zero overlay is still on");
+    expect_true(reach_top_bar_state_ptr(top_bar)->overlay == 1,
+                "a non-zero overlay is stored as 1");
+    expect_true(reach_top_bar_set_overlay(top_bar, 0) == 1, "turning overlay off reports a change");
+    expect_true(reach_top_bar_state_ptr(top_bar)->overlay == 0, "overlay is stored off");
+
+    reach_top_bar_destroy(top_bar);
+}
+
 int main(void)
 {
     test_protected_bands_are_symmetric();
@@ -271,5 +308,7 @@ int main(void)
     test_pointer_observation_wakes_hover_exit();
     test_settled_bar_tracks_resized_shown_bounds();
     test_resized_shown_bounds_override_an_old_position_animation();
+    test_keep_above_windows_only_for_revealed_overlay();
+    test_top_bar_overlay_setting();
     return failures == 0 ? 0 : 1;
 }

@@ -645,7 +645,54 @@ static void test_top_bar_preferences(void)
                 "dynamic mode presents auto hide as enabled");
     expect_true(reach_motion_active(&model->top_bar_style_selection),
                 "top bar preference changes animate their toggles");
+
+    expect_true(reach_settings_model_top_bar_overlay(model.get()) == 0,
+                "top bar defaults to moving windows");
+    expect_true(reach_motion_value(&model->top_bar_push_toggle) == 1.0f,
+                "moving windows presents the toggle as enabled");
+    expect_true(reach_settings_model_toggle_top_bar_overlay(model.get()) == 1,
+                "top bar overlay can toggle");
+    expect_true(reach_settings_model_top_bar_overlay(model.get()) == 1,
+                "top bar overlay toggles to overlaying windows");
+    expect_true(model->top_bar_push_toggle.to == 0.0f,
+                "overlaying windows presents the toggle as disabled");
+    expect_true(reach_settings_model_toggle_top_bar_overlay(model.get()) == 1,
+                "toggling the overlay back also reports a toggle");
+    expect_true(reach_settings_model_top_bar_overlay(model.get()) == 0 &&
+                    model->top_bar_push_toggle.to == 1.0f,
+                "second toggle returns to moving windows");
+    reach_settings_model_toggle_top_bar_overlay(model.get());
+    reach_settings_model_set_top_bar_overlay(model.get(), 0);
+    expect_true(reach_settings_model_top_bar_overlay(model.get()) == 0,
+                "top bar overlay can be restored from the snapshot");
+    expect_true(reach_motion_value(&model->top_bar_push_toggle) == 1.0f,
+                "restoring moving windows presents the toggle as enabled");
 }
+
+static void test_top_bar_push_toggle_hit_testing(void)
+{
+    std::unique_ptr<reach_settings_model> model(new reach_settings_model());
+    reach_settings_model_init(model.get());
+    reach_settings_model_select_page(model.get(), REACH_SETTINGS_PAGE_THEME);
+    reach_rect_f32 bounds = {0.0f, 0.0f, 900.0f, 1400.0f};
+    reach_settings_layout layout =
+        reach_settings_layout_for_bounds(bounds, nullptr, 1.0f, model.get());
+    expect_true(layout.top_bar_push_card.y >=
+                    layout.top_bar_auto_hide_card.y + layout.top_bar_auto_hide_card.height,
+                "push card lies below the auto hide card");
+    expect_true(layout.top_bar_push_toggle.width > 0.0f, "push toggle is laid out");
+
+    reach_settings_hit_result hit = reach_settings_hit_test(
+        &layout, layout.top_bar_push_toggle.x + layout.top_bar_push_toggle.width * 0.5f,
+        layout.top_bar_push_toggle.y + layout.top_bar_push_toggle.height * 0.5f);
+    expect_true(hit.type == REACH_SETTINGS_HIT_TOP_BAR_PUSH_TOGGLE, "push toggle is hit-testable");
+    hit = reach_settings_hit_test(
+        &layout, layout.top_bar_auto_hide_toggle.x + layout.top_bar_auto_hide_toggle.width * 0.5f,
+        layout.top_bar_auto_hide_toggle.y + layout.top_bar_auto_hide_toggle.height * 0.5f);
+    expect_true(hit.type == REACH_SETTINGS_HIT_TOP_BAR_AUTO_HIDE_TOGGLE,
+                "auto hide toggle still hit-tests");
+}
+
 static void test_display_scrollbar_hit_testing(void)
 {
     std::unique_ptr<reach_settings_model> model(new reach_settings_model());
@@ -864,6 +911,7 @@ int main(void)
     test_account_password_form();
     test_button_press_feedback();
     test_top_bar_preferences();
+    test_top_bar_push_toggle_hit_testing();
     test_display_scrollbar_hit_testing();
     test_bluetooth_radio_stops_scan();
     test_installed_apps_loader();
