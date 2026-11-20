@@ -351,6 +351,7 @@ target_link_libraries(reach_windows_adapters PRIVATE
     ole32
     oleaut32
     taskschd
+    CoreMessaging
     runtimeobject
     uuid
     windowscodecs

@@ -65,11 +65,6 @@ static reach_result reach_d2d_begin_frame_impl(reach_render_backend *backend)
                 (void)reach_visual_set_size(backend->root_visual.Get(), static_cast<float>(width),
                                             static_cast<float>(height));
             }
-            if (backend->backdrop_visual != nullptr)
-            {
-                (void)reach_visual_set_size(backend->backdrop_visual.Get(),
-                                            static_cast<float>(width), static_cast<float>(height));
-            }
             if (backend->swap_chain_visual != nullptr)
             {
                 (void)reach_visual_set_size(backend->swap_chain_visual.Get(),
@@ -79,13 +74,9 @@ static reach_result reach_d2d_begin_frame_impl(reach_render_backend *backend)
 
         if (backend->root_visual != nullptr)
             (void)reach_visual_set_size(backend->root_visual.Get(), (float)width, (float)height);
-        if (backend->backdrop_visual != nullptr)
-            (void)reach_visual_set_size(backend->backdrop_visual.Get(), (float)width,
-                                        (float)height);
 
         backend->target_width = width;
         backend->target_height = height;
-        backend->backdrop_content_rect = {};
     }
 
     target = reach_d2d_target(backend);

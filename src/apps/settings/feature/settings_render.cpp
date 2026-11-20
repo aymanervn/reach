@@ -632,6 +632,23 @@ static void render_theme_page(const reach_settings_render_input *input,
         &model->theme_reach_selection, REACH_SETTINGS_HIT_THEME_REACH);
     render_accent_card(input, commands);
 
+    const theme_toggle_card glass = {layout->theme_glass_card,
+                                     {},
+                                     layout->theme_glass_title,
+                                     layout->theme_glass_subtitle,
+                                     layout->theme_glass_toggle,
+                                     REACH_VECTOR_ICON_NONE,
+                                     nullptr,
+                                     L"Glass effect",
+                                     L"Show a blurred backdrop behind bars and menus",
+                                     &model->glass_toggle,
+                                     REACH_SETTINGS_HIT_THEME_GLASS_TOGGLE};
+    render_theme_toggle_card(input, commands, &toggle_style, &glass);
+    render_slider_card(
+        input, commands, &layout->theme_glass_intensity, (const uint16_t *)u"Glass intensity",
+        (const uint16_t *)u"How much of the backdrop shows through",
+        (float)model->glass.intensity / REACH_CONFIG_GLASS_INTENSITY_MAX, model->glass.intensity);
+
     reach_settings_push_text(
         commands, layout->theme_windows_section_title, (const uint16_t *)u"System appearance",
         reach_settings_scale(input, REACH_TEXT_SIZE_XSMALL), REACH_TEXT_WEIGHT_SEMIBOLD,

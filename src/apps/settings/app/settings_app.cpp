@@ -140,6 +140,7 @@ struct reach_settings_app
     reach_bluetooth_service *bluetooth_service;
     reach_installed_apps_service *installed_apps_service;
     std::atomic<int32_t> async_notify;
+    std::atomic<bool> glass_config_pending{false};
     std::atomic<uint32_t> system_controls_change_flags;
     reach_settings_model model;
     reach_settings_layout layout;
@@ -629,6 +630,7 @@ static void reach_settings_load_theme_config(reach_settings_app *app)
     reach_settings_apply_ui_font(app);
     reach_settings_model_set_light_theme(&app->model, snapshot->light_theme);
     reach_settings_model_set_accent_preset(&app->model, snapshot->accent_preset);
+    reach_settings_model_set_glass(&app->model, &snapshot->glass);
     reach_settings_model_set_windows_system_theme(&app->model, snapshot->windows_system_theme);
     reach_settings_model_set_windows_app_theme(&app->model, snapshot->windows_app_theme);
     reach_settings_apply_theme(app);
@@ -694,9 +696,17 @@ static void reach_settings_save_top_bar_config(reach_settings_app *app)
     (void)reach_config_service_set_top_bar(app->config_service, &settings);
 }
 
-static void reach_settings_on_config_service_event(void *, reach_config_service_event event)
+static void reach_settings_async_notify(void *user);
+
+static void reach_settings_on_config_service_event(void *user, reach_config_service_event event)
 {
-    if (event == REACH_CONFIG_SERVICE_PERSISTED)
+    if (event == REACH_CONFIG_SERVICE_SNAPSHOT_CHANGED)
+    {
+        auto *app = static_cast<reach_settings_app *>(user);
+        app->glass_config_pending.store(true);
+        reach_settings_async_notify(app);
+    }
+    else if (event == REACH_CONFIG_SERVICE_PERSISTED)
     {
         (void)reach_windows_notify_config_changed();
     }
@@ -705,8 +715,6 @@ static void reach_settings_on_config_service_event(void *, reach_config_service_
         reach_log_error("Could not persist Reach settings.");
     }
 }
-
-static void reach_settings_async_notify(void *user);
 
 static void reach_settings_update_progress(void *user, reach_windows_update_progress progress)
 {
@@ -1845,6 +1853,7 @@ static uint64_t reach_settings_pressable_target(reach_settings_hit_result hit)
     case REACH_SETTINGS_HIT_BLUETOOTH_SCROLLBAR_TRACK:
     case REACH_SETTINGS_HIT_BLUETOOTH_SCROLLBAR_THUMB:
     case REACH_SETTINGS_HIT_DOCK_SIZE:
+    case REACH_SETTINGS_HIT_THEME_GLASS_INTENSITY:
         return REACH_PRESSABLE_TARGET_NONE;
     default:
         break;
@@ -2068,6 +2077,12 @@ static void reach_settings_drag_slider(reach_settings_app *app, float x)
                              (int32_t)lroundf(ratio * (float)(REACH_CONFIG_DOCK_SIZE_MAX -
                                                               REACH_CONFIG_DOCK_SIZE_MIN)));
     }
+    else if (app->model.dragging_slider == REACH_SETTINGS_HIT_THEME_GLASS_INTENSITY)
+    {
+        float ratio = reach_settings_slider_ratio_at(&app->layout.theme_glass_intensity, x);
+        changed = reach_settings_model_set_glass_intensity(
+            &app->model, (int32_t)lroundf(ratio * REACH_CONFIG_GLASS_INTENSITY_MAX));
+    }
     if (changed)
     {
         app->dirty = 1;
@@ -2081,6 +2096,12 @@ static void reach_settings_end_slider_drag(reach_settings_app *app)
     {
         (void)reach_config_service_set_dock_size(app->config_service,
                                                  reach_settings_model_dock_size(&app->model));
+    }
+    else if (app->model.dragging_slider == REACH_SETTINGS_HIT_THEME_GLASS_INTENSITY &&
+             app->config_service != nullptr)
+    {
+        (void)reach_config_service_set_glass_intensity(app->config_service,
+                                                       app->model.glass.intensity);
     }
     app->model.dragging_slider = REACH_SETTINGS_HIT_NONE;
     if (app->window.ops.set_pointer_capture != nullptr)
@@ -2325,6 +2346,16 @@ static void reach_settings_handle_pointer_up(reach_settings_app *app, const reac
             reach_settings_save_top_bar_config(app);
             app->dirty = 1;
         }
+        else if (hit.type == REACH_SETTINGS_HIT_THEME_GLASS_TOGGLE)
+        {
+            if (app->config_service != nullptr)
+                (void)reach_config_service_toggle_glass(app->config_service);
+            else
+            {
+                reach_settings_model_set_glass_enabled(&app->model, !app->model.glass.enabled);
+                app->dirty = 1;
+            }
+        }
         else if (hit.type == REACH_SETTINGS_HIT_THEME_FPS_TOGGLE)
         {
             (void)reach_settings_model_toggle_high_refresh_rate(&app->model);
@@ -2490,7 +2521,8 @@ static void reach_settings_handle_pointer_down(reach_settings_app *app, const re
     float x = (float)event->x - app->bounds.x;
     float y = (float)event->y - app->bounds.y;
     reach_settings_hit_result hit = reach_settings_hit_test(&app->layout, x, y);
-    if (hit.type == REACH_SETTINGS_HIT_DOCK_SIZE)
+    if (hit.type == REACH_SETTINGS_HIT_DOCK_SIZE ||
+        hit.type == REACH_SETTINGS_HIT_THEME_GLASS_INTENSITY)
     {
         app->model.dragging_slider = hit.type;
         if (app->window.ops.set_pointer_capture != nullptr)
@@ -2997,6 +3029,20 @@ reach_result reach_settings_app_update(reach_settings_app *app, double delta_sec
     if (app->async_notify.exchange(0) != 0)
     {
         app->dirty = 1;
+    }
+    if (app->glass_config_pending.exchange(false))
+    {
+        auto snapshot =
+            std::unique_ptr<reach_config_snapshot>(new (std::nothrow) reach_config_snapshot());
+        if (snapshot != nullptr &&
+            reach_config_service_snapshot(app->config_service, snapshot.get()) == REACH_OK)
+        {
+            reach_settings_model_set_glass_enabled(&app->model, snapshot->glass.enabled);
+            if (app->model.dragging_slider != REACH_SETTINGS_HIT_THEME_GLASS_INTENSITY)
+                (void)reach_settings_model_set_glass_intensity(&app->model,
+                                                               snapshot->glass.intensity);
+            app->dirty = 1;
+        }
     }
     reach_workload_add(REACH_WORKLOAD_APP_UPDATES, 1);
     if (reach_monitor_refresh_retry_due(&app->monitor_refresh_retry) ||

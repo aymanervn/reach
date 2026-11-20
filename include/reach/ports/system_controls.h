@@ -85,7 +85,7 @@ extern "C"
         reach_result (*open_project_menu)(void *userdata);
 
         reach_result (*set_theme_modes)(void *userdata, reach_theme_mode system_mode,
-                                        reach_theme_mode app_mode);
+                                        reach_theme_mode app_mode, int32_t enable_transparency);
 
         reach_result (*start_watching)(void *userdata,
                                        reach_system_controls_change_callback callback,

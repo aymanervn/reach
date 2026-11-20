@@ -137,7 +137,7 @@ extern "C"
                                                    float border, reach_color background,
                                                    reach_color outline, const reach_shadow *shadow,
                                                    float dpi_scale, uint64_t first_id,
-                                                   uint64_t parent_id);
+                                                   uint64_t parent_id, int32_t glass_intensity);
     reach_result reach_ui_bordered_motion_color_feedback_render(
         reach_render_command_buffer *commands, uint64_t first_id, const reach_rect_motion *bounds,
         float radius, float border, reach_color from, reach_color to, reach_color outline,

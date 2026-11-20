@@ -77,6 +77,9 @@ extern "C"
                                                 const reach_config_power_settings *settings);
     reach_result reach_config_service_set_display(reach_config_service *service,
                                                   const reach_config_display_settings *settings);
+    reach_result reach_config_service_toggle_glass(reach_config_service *service);
+    reach_result reach_config_service_set_glass_intensity(reach_config_service *service,
+                                                          int32_t intensity);
     reach_result reach_config_service_set_top_bar(reach_config_service *service,
                                                   const reach_config_top_bar_settings *settings);
     reach_result reach_config_service_reset_widget_positions(reach_config_service *service);

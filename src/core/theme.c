@@ -1,4 +1,5 @@
 #include "reach/core/theme.h"
+#include "reach/core/config.h"
 
 #include <math.h>
 
@@ -101,6 +102,7 @@
 
 static const reach_theme reach_theme_dark = {
     .mode = REACH_THEME_MODE_DARK,
+    .glass_intensity = REACH_CONFIG_GLASS_INTENSITY_DEFAULT,
 
     .dock_background = REACH_DARK_DEEP(1.0f),
     .top_bar_background = REACH_DARK_DEEP(1.0f),
@@ -113,6 +115,7 @@ static const reach_theme reach_theme_dark = {
     .widget_background = REACH_DARK_BASE(1.0f),
     .widget_border = REACH_DARK_EDGE_ON_BASE(1.0f),
     .popup_separator = REACH_DARK_STRUCTURE(1.0f),
+    .glass_popup_separator = REACH_PURE_WHITE(0.18f),
     .system_hud_background = REACH_DARK_BASE(1.0f),
     .system_hud_border = REACH_DARK_EDGE_ON_BASE(1.0f),
     .system_hud_primary_text = REACH_DARK_HIGH_CONTRAST_WHITE(1.0f),
@@ -235,6 +238,7 @@ static const reach_theme reach_theme_dark = {
 
 static const reach_theme reach_theme_light = {
     .mode = REACH_THEME_MODE_LIGHT,
+    .glass_intensity = REACH_CONFIG_GLASS_INTENSITY_DEFAULT,
 
     .dock_background = REACH_LIGHT_BASE(1.0f),
     .top_bar_background = REACH_LIGHT_BASE(1.0f),
@@ -247,6 +251,7 @@ static const reach_theme reach_theme_light = {
     .widget_background = REACH_LIGHT_BASE(1.0f),
     .widget_border = REACH_LIGHT_EDGE_ON_BASE(1.0f),
     .popup_separator = REACH_LIGHT_STRUCTURE(1.0f),
+    .glass_popup_separator = REACH_RGB8(0, 0, 0, 0.18f),
     .system_hud_background = REACH_LIGHT_BASE(1.0f),
     .system_hud_border = REACH_LIGHT_EDGE_ON_BASE(1.0f),
     .system_hud_primary_text = REACH_LIGHT_HIGH_CONTRAST_BLACK(1.0f),

@@ -72,6 +72,33 @@ int32_t reach_settings_model_toggle_bundled_font(reach_settings_model *model)
     return 1;
 }
 
+void reach_settings_model_set_glass(reach_settings_model *model,
+                                    const reach_config_glass_settings *glass)
+{
+    if (model == nullptr || glass == nullptr)
+        return;
+    model->glass = *glass;
+    reach_motion_set(&model->glass_toggle, glass->enabled ? 1.0f : 0.0f);
+}
+
+void reach_settings_model_set_glass_enabled(reach_settings_model *model, int32_t enabled)
+{
+    if (model == nullptr || model->glass.enabled == (enabled != 0))
+        return;
+    model->glass.enabled = enabled != 0;
+    reach_settings_animate(&model->glass_toggle, model->glass.enabled ? 1.0f : 0.0f,
+                           REACH_MOTION_PRESET_BOUNCY);
+}
+
+int32_t reach_settings_model_set_glass_intensity(reach_settings_model *model, int32_t intensity)
+{
+    if (model == nullptr || intensity < 0 || intensity > REACH_CONFIG_GLASS_INTENSITY_MAX ||
+        model->glass.intensity == intensity)
+        return 0;
+    model->glass.intensity = intensity;
+    return 1;
+}
+
 void reach_settings_model_set_light_theme(reach_settings_model *model, int32_t enabled)
 {
     if (model == nullptr)

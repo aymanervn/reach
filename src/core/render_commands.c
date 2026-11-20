@@ -874,6 +874,7 @@ reach_result reach_render_push_shadow(reach_render_command_buffer *buffer,
 
     command = *shape;
     command.type = REACH_RENDER_COMMAND_SHADOW;
+    command.glass_intensity = 0;
     command.color = shadow->color;
     command.stroke_width = 0.0f;
     command.blur_radius = shadow->blur * scale;

@@ -71,6 +71,7 @@ extern "C"
         reach_color background_color_override;
         int32_t has_background_color_override;
         int32_t hide_notch;
+        int32_t glass_intensity;
     } reach_popup_background_input;
 
     float reach_popup_radius(const reach_theme *theme);
