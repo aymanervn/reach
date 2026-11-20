@@ -72,6 +72,8 @@ void reach_settings_model_init(reach_settings_model *model)
     model->account_focused_field = -1;
     model->hovered_button = REACH_SETTINGS_HIT_NONE;
     reach_motion_set(&model->theme_reach_selection, 0);
+    const reach_config_glass_settings glass = {1, REACH_CONFIG_GLASS_INTENSITY_DEFAULT};
+    reach_settings_model_set_glass(model, &glass);
     reach_settings_model_set_top_bar_style(model, REACH_CONFIG_TOP_BAR_STYLE_TRANSPARENT);
     reach_settings_model_set_top_bar_mode(model, REACH_CONFIG_TOP_BAR_MODE_STATIC);
     reach_settings_model_set_top_bar_icon_only(model, 1);
@@ -846,7 +848,17 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
                 swatch_size, swatch_size);
         }
 
-        float section_y = accent_card_y + theme_card_height + 18.0f * scale;
+        reach_settings_toggle_card_rects glass = {
+            &layout.theme_glass_card, nullptr, &layout.theme_glass_title,
+            &layout.theme_glass_subtitle, &layout.theme_glass_toggle};
+        float glass_y = accent_card_y + theme_card_height + card_spacing;
+        reach_settings_layout_toggle_card(&glass, area_x, glass_y, area_width, card_height, scale);
+        reach_settings_layout_slider_card(&layout.theme_glass_intensity, area_x,
+                                          glass_y + card_height + card_spacing, area_width,
+                                          theme_card_height, scale);
+
+        float section_y = layout.theme_glass_intensity.card.y +
+                          layout.theme_glass_intensity.card.height + 18.0f * scale;
         layout.theme_windows_section_title =
             reach_settings_rect(area_x, section_y, area_width, 18.0f * scale);
         float appearance_y = section_y + 26.0f * scale;
@@ -1211,6 +1223,8 @@ reach_settings_hit_result reach_settings_hit_test(const reach_settings_layout *l
     } theme_cards[] = {
         {layout->theme_fps_card, layout->theme_fps_toggle, REACH_SETTINGS_HIT_THEME_FPS_TOGGLE},
         {layout->theme_font_card, layout->theme_font_toggle, REACH_SETTINGS_HIT_THEME_FONT_TOGGLE},
+        {layout->theme_glass_card, layout->theme_glass_toggle,
+         REACH_SETTINGS_HIT_THEME_GLASS_TOGGLE},
     };
     for (size_t index = 0; index < sizeof(theme_cards) / sizeof(theme_cards[0]); ++index)
     {
@@ -1269,6 +1283,11 @@ reach_settings_hit_result reach_settings_hit_test(const reach_settings_layout *l
         return result;
     }
 
+    if (theme_pointer && reach_settings_rect_contains(layout->theme_glass_intensity.slider, x, y))
+    {
+        result.type = REACH_SETTINGS_HIT_THEME_GLASS_INTENSITY;
+        return result;
+    }
     if (theme_pointer && reach_settings_rect_contains(layout->dock_size.slider, x, y))
     {
         result.type = REACH_SETTINGS_HIT_DOCK_SIZE;

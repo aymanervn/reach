@@ -214,6 +214,7 @@ extern "C"
         int32_t icon_crop_to_fill;
         int32_t corner_mask;
         int32_t fill_gradient;
+        int32_t glass_intensity;
         int32_t text_weight;
         float text_size;
         float notch_center_x;

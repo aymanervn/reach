@@ -1384,7 +1384,12 @@ static HRESULT sync_layer(reach_render_backend *backend, reach_d2d_retained_laye
     bool surface_recreated = false;
     HRESULT hr = S_OK;
     if (content_changed && count != 0)
+    {
         hr = draw_layer(backend, layer, local, width, height, &surface_recreated);
+        if (SUCCEEDED(hr) && backend->compositor != nullptr)
+            hr = reach_wuc_sync_glass(backend, layer, local.front().glass_intensity,
+                                      surface_recreated);
+    }
     else if (content_changed)
     {
         hr = backend->compositor != nullptr ? layer.visual->put_Brush(nullptr)
@@ -1393,6 +1398,7 @@ static HRESULT sync_layer(reach_render_backend *backend, reach_d2d_retained_laye
         {
             layer.surface.Reset();
             layer.surface_brush.Reset();
+            layer.glass_intensity = 0;
             layer.dcomp_surface.Reset();
             layer.commands.clear();
             layer.width = layer.height = 0;
@@ -1948,9 +1954,6 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
         reach_d2d_release_retained(backend);
         return reach_d2d_device_check(backend->device, hr, L"create_scene");
     }
-    reach_result clip_result = reach_wuc_apply_content_clip(backend, commands->content_rect);
-    if (clip_result != REACH_OK)
-        return clip_result;
     const reach_transform_f32 &transform = commands->content_transform;
     const reach_transform_f32 &previous_transform = backend->scene_content_transform;
     bool transform_changed = !backend->has_scene_content_transform ||

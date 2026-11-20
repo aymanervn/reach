@@ -1005,8 +1005,6 @@ void reach_host_reload_wallpaper(reach_host *host, int32_t force);
 
 void reach_host_apply_ui_font(reach_host *host, int32_t bundled_font);
 
-void reach_host_apply_theme(reach_host *host, int32_t light_theme, int32_t accent_preset);
-
 void reach_host_apply_display_config(reach_host *host, const reach_config_snapshot *snapshot);
 void reach_host_set_light_theme(reach_host *host, int32_t light_theme);
 void reach_host_take_keyboard_focus(reach_host *host, reach_feature_runtime *runtime);

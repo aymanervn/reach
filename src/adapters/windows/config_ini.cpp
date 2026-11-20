@@ -242,6 +242,14 @@ static reach_result reach_config_store_load(reach_config_store *store,
         (int32_t)GetPrivateProfileIntW(L"display", L"light_theme", 0, path) != 0;
     out_snapshot->accent_preset = reach_accent_preset_clamp(
         (int32_t)GetPrivateProfileIntW(L"display", L"accent", REACH_ACCENT_PRESET_BLUE, path));
+    out_snapshot->glass.enabled = GetPrivateProfileIntW(L"display", L"glass_enabled", 1, path) != 0;
+    int32_t glass_intensity = (int32_t)GetPrivateProfileIntW(
+        L"display", L"glass_intensity", REACH_CONFIG_GLASS_INTENSITY_DEFAULT, path);
+    out_snapshot->glass.intensity =
+        glass_intensity < 0
+            ? 0
+            : (glass_intensity > REACH_CONFIG_GLASS_INTENSITY_MAX ? REACH_CONFIG_GLASS_INTENSITY_MAX
+                                                                  : glass_intensity);
     int32_t windows_system_theme =
         (int32_t)GetPrivateProfileIntW(L"display", L"windows_system_theme", 0, path);
     out_snapshot->windows_system_theme = windows_system_theme >= REACH_CONFIG_THEME_FOLLOW_REACH &&
@@ -422,6 +430,10 @@ static reach_result reach_config_store_save(reach_config_store *store,
     text.append(std::to_wstring(snapshot->light_theme ? 1 : 0));
     text.append(L"\r\naccent=");
     text.append(std::to_wstring(reach_accent_preset_clamp(snapshot->accent_preset)));
+    text.append(L"\r\nglass_enabled=");
+    text.append(std::to_wstring(snapshot->glass.enabled ? 1 : 0));
+    text.append(L"\r\nglass_intensity=");
+    text.append(std::to_wstring(snapshot->glass.intensity));
     text.append(L"\r\nwindows_system_theme=");
     text.append(std::to_wstring((int32_t)snapshot->windows_system_theme));
     text.append(L"\r\nwindows_app_theme=");

@@ -343,6 +343,7 @@ reach_result reach_popup_push_background(const reach_popup_background_input *inp
     }
 
     reach_render_command shape = reach_popup_shape(input);
+    shape.glass_intensity = input->glass_intensity;
     reach_color background = input->has_background_color_override ? input->background_color_override
                                                                   : input->theme->popup_background;
     return reach_render_push_bordered_background(
@@ -386,32 +387,52 @@ reach_result reach_popup_push_height_background(const reach_popup_background_inp
                            (input->notch_side == REACH_NOTCH_SIDE_BOTTOM ? notch : 0));
     source.bounds.height = stretch.top + stretch.bottom + 1;
     float source_body_height = source.bounds.height - pad.top - pad.bottom;
-    if (minimum == maximum && minimum < source_body_height)
+    bool stretched = minimum != maximum || minimum >= source_body_height;
+    if (stretched)
+    {
+        shape.bounds.height = source_body_height;
+        reach_motion_set(&stretch.width, source.bounds.width);
+        reach_motion body = *height;
+        if (minimum < source_body_height)
+            body =
+                reach_motion_clamp(height, source_body_height, fmaxf(source_body_height, maximum));
+        stretch.height = reach_motion_affine(&body, 1, pad.top + pad.bottom);
+    }
+    else
     {
         shape.bounds.height = maximum;
         source.bounds.height = ceilf(maximum + pad.top + pad.bottom);
-        reach_result result = reach_popup_push_background(&shape, commands.get());
-        if (result != REACH_OK)
-            return result;
-        result = reach_render_command_buffer_begin_group(out_commands, &source);
-        if (result != REACH_OK)
-            return result;
-        for (size_t index = 0; index < commands->count && result == REACH_OK; ++index)
-            result = reach_render_command_buffer_push(out_commands, &commands->commands[index]);
-        reach_render_command_buffer_end_group(out_commands);
-        return result;
     }
-    shape.bounds.height = source.bounds.height - pad.top - pad.bottom;
+
     reach_result result = reach_popup_push_background(&shape, commands.get());
     if (result != REACH_OK)
         return result;
-    reach_motion_set(&stretch.width, source.bounds.width);
-    reach_motion body = *height;
-    if (minimum < source_body_height)
-        body = reach_motion_clamp(height, source_body_height, fmaxf(source_body_height, maximum));
-    stretch.height = reach_motion_affine(&body, 1, pad.top + pad.bottom);
-    return reach_render_push_stretched_chrome(out_commands, &source, &stretch, commands->commands,
-                                              commands->count);
+    const auto append = [&](const reach_render_command *paint, size_t count)
+    {
+        if (stretched)
+            return reach_render_push_stretched_chrome(out_commands, &source, &stretch, paint,
+                                                      count);
+        reach_result append_result = reach_render_command_buffer_begin_group(out_commands, &source);
+        if (append_result != REACH_OK)
+            return append_result;
+        for (size_t index = 0; index < count && append_result == REACH_OK; ++index)
+            append_result = reach_render_command_buffer_push(out_commands, &paint[index]);
+        reach_render_command_buffer_end_group(out_commands);
+        return append_result;
+    };
+    const auto *paint = commands->commands;
+    size_t count = commands->count;
+    // Keep the shadow separate so the glass brush only samples inside the background shape.
+    if (input->glass_intensity && count > 1 && paint->type == REACH_RENDER_COMMAND_SHADOW)
+    {
+        result = append(paint, 1);
+        if (result != REACH_OK)
+            return result;
+        source.id += reach_render_stretch_patch_count(&stretch);
+        ++paint;
+        --count;
+    }
+    return append(paint, count);
 }
 
 static reach_result reach_popup_motion_shape(reach_render_command_buffer *out, uint64_t parent,

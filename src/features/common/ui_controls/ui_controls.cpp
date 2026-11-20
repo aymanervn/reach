@@ -127,7 +127,7 @@ reach_result reach_ui_motion_background_render(reach_render_command_buffer *comm
                                                float border, reach_color background,
                                                reach_color outline, const reach_shadow *shadow,
                                                float dpi_scale, uint64_t first_id,
-                                               uint64_t parent_id)
+                                               uint64_t parent_id, int32_t glass_intensity)
 {
     if (commands == nullptr || bounds == nullptr || commands->current_group_id != 0 ||
         first_id == 0 || first_id >= UINT64_C(0x8000000000000000) - 7 || !isfinite(dpi_scale) ||
@@ -193,8 +193,20 @@ reach_result reach_ui_motion_background_render(reach_render_command_buffer *comm
         result = reach_render_command_buffer_begin_group(commands, &background_source);
         reach_render_command shape = {};
         shape.type = REACH_RENDER_COMMAND_RECT;
-        shape.rect = reach_rect_motion_value_at(bounds, 0);
+        shape.rect = reach_render_pixel_aligned_rect(reach_rect_motion_value_at(bounds, 0));
         shape.radius = radius;
+        shape.glass_intensity = glass_intensity;
+        if (result == REACH_OK && casts && glass_intensity != 0 && shape.rect.width > 0.0f &&
+            shape.rect.height > 0.0f)
+        {
+            result = reach_render_push_shadow(commands, &shape, shadow, dpi_scale);
+            reach_render_command_buffer_end_group(commands);
+            background_source.id = first_id + 3;
+            background_source.bounds = shape.rect;
+            if (result == REACH_OK)
+                result = reach_render_command_buffer_begin_group(commands, &background_source);
+            shadow = nullptr;
+        }
         if (result == REACH_OK)
             result = reach_render_push_bordered_background(commands, &shape, background, outline,
                                                            border, shadow, dpi_scale);
@@ -251,6 +263,7 @@ reach_result reach_ui_motion_background_render(reach_render_command_buffer *comm
     background.a = outline.a = 1;
     source.id = first_id + 3;
     source.parent_id = parent_id;
+    size_t first_paint = commands->count;
     if (result == REACH_OK)
         result = reach_render_push_rect_motion(commands, &source, &paint, radius,
                                                bordered ? outline : background);
@@ -269,6 +282,8 @@ reach_result reach_ui_motion_background_render(reach_render_command_buffer *comm
         result = reach_render_push_rect_motion(commands, &source, &inner, fmaxf(0, radius - border),
                                                background);
     }
+    for (size_t index = first_paint; index < commands->count; ++index)
+        commands->commands[index].glass_intensity = glass_intensity;
     commands->has_scissor = scissored;
     if (result != REACH_OK)
     {
@@ -356,8 +371,9 @@ reach_result reach_ui_bordered_motion_color_feedback_render(
     uint64_t parent = commands->current_group_id;
     commands->current_group_id = 0;
     size_t begin = commands->group_count;
-    reach_result result = reach_ui_motion_background_render(
-        commands, bounds, radius, border, {1, 1, 1, 1}, {1, 1, 1, 1}, nullptr, 1, first_id, parent);
+    reach_result result =
+        reach_ui_motion_background_render(commands, bounds, radius, border, {1, 1, 1, 1},
+                                          {1, 1, 1, 1}, nullptr, 1, first_id, parent, 0);
     commands->current_group_id = parent;
     if (result != REACH_OK)
         return result;

@@ -222,7 +222,7 @@ reach_result reach_windows_create_render_device(reach_render_device **out_device
 
     if (SUCCEEDED(hr))
     {
-        HRESULT compositor_hr = reach_winrt_activate_compositor(&device->compositor);
+        HRESULT compositor_hr = reach_winrt_activate_compositor(device);
         reach_d2d_log_hresult(L"RoActivateInstance(Compositor)", compositor_hr);
         if (SUCCEEDED(compositor_hr))
         {
@@ -263,6 +263,7 @@ void reach_windows_destroy_render_device(reach_render_device *device)
     reach_d2d_device_release_fonts(device);
     device->composition_graphics_device.Reset();
     device->compositor.Reset();
+    reach_winrt_shutdown_dispatcher_queue(device);
     reach_d2d_device_unregister_removed_event(device);
     reach_d2d_device_unregister_adapters_event(device);
     if (device->d2d_device != nullptr)

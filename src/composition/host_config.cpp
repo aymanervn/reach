@@ -253,7 +253,7 @@ void reach_host_set_light_theme(reach_host *host, int32_t light_theme)
     }
 }
 
-void reach_host_apply_theme(reach_host *host, int32_t light_theme, int32_t accent_preset)
+static void reach_host_apply_theme(reach_host *host, const reach_config_snapshot *snapshot)
 {
     if (host == nullptr)
     {
@@ -261,9 +261,15 @@ void reach_host_apply_theme(reach_host *host, int32_t light_theme, int32_t accen
     }
     const uint32_t previous = host->theme_revision;
     const reach_accent_pair accent =
-        reach_accent_preset_pair(reach_accent_preset_clamp(accent_preset));
-    reach_host_set_theme(host, light_theme ? REACH_THEME_MODE_LIGHT : REACH_THEME_MODE_DARK,
-                         &accent);
+        reach_accent_preset_pair(reach_accent_preset_clamp(snapshot->accent_preset));
+    reach_host_set_theme(
+        host, snapshot->light_theme ? REACH_THEME_MODE_LIGHT : REACH_THEME_MODE_DARK, &accent);
+    int32_t intensity = snapshot->glass.enabled ? snapshot->glass.intensity : 0;
+    if (host->theme_storage.glass_intensity != intensity)
+    {
+        host->theme_storage.glass_intensity = intensity;
+        ++host->theme_revision;
+    }
     if (host->theme_revision == previous)
     {
         return;
@@ -302,7 +308,7 @@ void reach_host_apply_display_config(reach_host *host, const reach_config_snapsh
 
     host->high_refresh_rate = snapshot->high_refresh_rate ? 1 : 0;
     reach_host_apply_ui_font(host, snapshot->bundled_font);
-    reach_host_apply_theme(host, snapshot->light_theme, snapshot->accent_preset);
+    reach_host_apply_theme(host, snapshot);
 
     if (host->system_controls.set_theme_modes == nullptr)
     {
@@ -314,7 +320,7 @@ void reach_host_apply_display_config(reach_host *host, const reach_config_snapsh
     reach_theme_mode app_mode =
         reach_host_resolve_system_theme(snapshot->windows_app_theme, reach_mode);
     (void)host->system_controls.set_theme_modes(host->system_controls.userdata, system_mode,
-                                                app_mode);
+                                                app_mode, snapshot->glass.enabled);
 }
 
 void reach_host_reload_wallpaper(reach_host *host, int32_t force)

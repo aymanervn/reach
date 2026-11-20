@@ -14,6 +14,8 @@ extern "C"
 #define REACH_MAX_WALLPAPER_MONITORS 8
 #define REACH_CONFIG_DOCK_SIZE_MIN 50
 #define REACH_CONFIG_DOCK_SIZE_MAX 100
+#define REACH_CONFIG_GLASS_INTENSITY_MAX 100
+#define REACH_CONFIG_GLASS_INTENSITY_DEFAULT 64
 
     typedef enum reach_desktop_widget
     {
@@ -75,6 +77,12 @@ extern "C"
         REACH_CONFIG_TOP_BAR_MODE_STATIC = 1
     } reach_config_top_bar_mode;
 
+    typedef struct reach_config_glass_settings
+    {
+        int32_t enabled;
+        int32_t intensity;
+    } reach_config_glass_settings;
+
     typedef struct reach_config_snapshot
     {
         uint16_t version[32];
@@ -102,6 +110,7 @@ extern "C"
         int32_t bundled_font;
         int32_t light_theme;
         int32_t accent_preset;
+        reach_config_glass_settings glass;
         reach_config_theme_preference windows_system_theme;
         reach_config_theme_preference windows_app_theme;
         int32_t stage_animation_ms;

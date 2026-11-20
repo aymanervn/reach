@@ -1,19 +1,15 @@
 #include "render_d2d_internal.h"
+#include "render_d2d_wuc_effect.h"
 #include "reach/support/workload.h"
 
 #include <algorithm>
 #include <cmath>
 #include <d2d1effects.h>
-#include <winrt/Windows.Foundation.h>
-#include <winrt/Windows.Graphics.Effects.h>
 #include <winrt/Windows.UI.Composition.h>
-#include <windows.graphics.effects.interop.h>
 
 namespace composition = winrt::Windows::UI::Composition;
 using effect_source = winrt::Windows::Graphics::Effects::IGraphicsEffectSource;
 using effect_value = winrt::Windows::Foundation::IInspectable;
-using ABI::Windows::Graphics::Effects::GRAPHICS_EFFECT_PROPERTY_MAPPING;
-using ABI::Windows::Graphics::Effects::IGraphicsEffectD2D1Interop;
 
 struct reach_d2d_shadow_scene
 {
@@ -33,92 +29,6 @@ struct reach_d2d_shadow_scene
 
 namespace
 {
-struct shadow_effect
-    : winrt::implements<shadow_effect, winrt::Windows::Graphics::Effects::IGraphicsEffect,
-                        effect_source, IGraphicsEffectD2D1Interop>
-{
-    GUID id;
-    winrt::hstring name;
-    std::vector<effect_value> properties;
-    std::vector<effect_source> sources;
-
-    shadow_effect(GUID effect_id, winrt::hstring label, std::vector<effect_value> values,
-                  std::vector<effect_source> inputs)
-        : id(effect_id), name(std::move(label)), properties(std::move(values)),
-          sources(std::move(inputs))
-    {
-    }
-    winrt::hstring Name() const
-    {
-        return name;
-    }
-    void Name(winrt::hstring const &value)
-    {
-        name = value;
-    }
-    HRESULT __stdcall GetEffectId(GUID *out) noexcept override
-    {
-        if (!out)
-            return E_POINTER;
-        *out = id;
-        return S_OK;
-    }
-    HRESULT __stdcall GetNamedPropertyMapping(LPCWSTR, UINT *,
-                                              GRAPHICS_EFFECT_PROPERTY_MAPPING *) noexcept override
-    {
-        return E_INVALIDARG;
-    }
-    HRESULT __stdcall GetPropertyCount(UINT *out) noexcept override
-    {
-        if (!out)
-            return E_POINTER;
-        *out = (UINT)properties.size();
-        return S_OK;
-    }
-    HRESULT __stdcall GetProperty(UINT index,
-                                  ABI::Windows::Foundation::IPropertyValue **out) noexcept override
-    {
-        if (!out)
-            return E_POINTER;
-        *out = nullptr;
-        if (index >= properties.size())
-            return E_INVALIDARG;
-        try
-        {
-            auto value = properties[index].as<winrt::Windows::Foundation::IPropertyValue>();
-            *out =
-                reinterpret_cast<ABI::Windows::Foundation::IPropertyValue *>(winrt::get_abi(value));
-            (*out)->AddRef();
-            return S_OK;
-        }
-        catch (...)
-        {
-            return winrt::to_hresult();
-        }
-    }
-    HRESULT __stdcall GetSourceCount(UINT *out) noexcept override
-    {
-        if (!out)
-            return E_POINTER;
-        *out = (UINT)sources.size();
-        return S_OK;
-    }
-    HRESULT __stdcall
-    GetSource(UINT index,
-              ABI::Windows::Graphics::Effects::IGraphicsEffectSource **out) noexcept override
-    {
-        if (!out)
-            return E_POINTER;
-        *out = nullptr;
-        if (index >= sources.size())
-            return E_INVALIDARG;
-        *out = reinterpret_cast<ABI::Windows::Graphics::Effects::IGraphicsEffectSource *>(
-            winrt::get_abi(sources[index]));
-        (*out)->AddRef();
-        return S_OK;
-    }
-};
-
 void configure_wuc(composition::Compositor const &compositor, reach_d2d_shadow_scene &scene,
                    reach_render_group const &group)
 {
@@ -129,7 +39,7 @@ void configure_wuc(composition::Compositor const &compositor, reach_d2d_shadow_s
     auto shifted = compositor.CreateSurfaceBrush(scene.surface);
     shifted.Stretch(composition::CompositionStretch::None);
     shifted.Offset({shadow.offset_x, shadow.offset_y});
-    auto blur = winrt::make<shadow_effect>(
+    auto blur = winrt::make<reach_wuc_effect>(
         CLSID_D2D1GaussianBlur, L"Blur",
         std::vector<effect_value>{
             PropertyValue::CreateSingle(shadow.blur * .5f),
@@ -141,14 +51,14 @@ void configure_wuc(composition::Compositor const &compositor, reach_d2d_shadow_s
     matrix[16] = shadow.color.r;
     matrix[17] = shadow.color.g;
     matrix[18] = shadow.color.b;
-    auto color = winrt::make<shadow_effect>(
+    auto color = winrt::make<reach_wuc_effect>(
         CLSID_D2D1ColorMatrix, L"Color",
         std::vector<effect_value>{
             PropertyValue::CreateSingleArray(matrix),
             PropertyValue::CreateUInt32(D2D1_COLORMATRIX_ALPHA_MODE_PREMULTIPLIED),
             PropertyValue::CreateBoolean(true)},
         std::vector<effect_source>{blur.as<effect_source>()});
-    auto cutout = winrt::make<shadow_effect>(
+    auto cutout = winrt::make<reach_wuc_effect>(
         CLSID_D2D1Composite, L"Cutout",
         std::vector<effect_value>{PropertyValue::CreateUInt32(D2D1_COMPOSITE_MODE_DESTINATION_OUT)},
         std::vector<effect_source>{color.as<effect_source>(),

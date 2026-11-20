@@ -103,6 +103,7 @@ static reach_result reach_top_bar_push_pill_background(const reach_theme *theme,
     shape.type = REACH_RENDER_COMMAND_RECT;
     shape.rect = pill;
     shape.radius = radius;
+    shape.glass_intensity = theme->glass_intensity;
     return reach_render_push_bordered_background(
         commands, &shape, theme->top_bar_background, theme->bar_border,
         border ? reach_theme_border_thickness(theme, dpi_scale) : 0.0f, &theme->bar_shadow,

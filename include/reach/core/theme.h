@@ -78,6 +78,7 @@ extern "C"
     typedef struct reach_theme
     {
         reach_theme_mode mode;
+        int32_t glass_intensity;
 
         reach_color dock_background;
         reach_color top_bar_background;
@@ -91,6 +92,7 @@ extern "C"
         reach_color widget_background;
         reach_color widget_border;
         reach_color popup_separator;
+        reach_color glass_popup_separator;
         reach_color system_hud_background;
         reach_color system_hud_border;
         reach_color system_hud_primary_text;
