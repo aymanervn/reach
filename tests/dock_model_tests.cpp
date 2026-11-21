@@ -1556,6 +1556,50 @@ static void test_fixed_dock_reserves_settled_bounds_while_resizing(void)
     reach_dock_destroy(dock);
 }
 
+static void test_fixed_dock_holds_its_reserved_space_while_the_rim_is_dragged(void)
+{
+    resize_route_log log = {};
+    reach_dock *dock = make_resize_dock(&log, 100, 1920.0f, 1);
+    expect_true(dock != nullptr, "fixed dock drag test creates a dock");
+    if (dock == nullptr)
+        return;
+    const reach_feature_capsule_ops *ops = reach_dock_capsule_ops();
+    reach_dock_set_auto_hide(dock, 0);
+    reach_dock_arrange_context arrange = resize_arrange_context(1920.0f);
+    (void)reach_dock_arrange(dock, &arrange);
+    reach_feature_surface_geometry before = {};
+    ops->surface_geometry(dock, &before);
+    expect_true(before.reserve_monitor_work_area, "the fixed dock reserves its strip");
+
+    resize_edge_point start = resize_edge_point_of(dock);
+    reach_capsule_pointer_result result = {};
+    arm_resize_edge(dock);
+    resize_event(dock, REACH_POINTER_EVENT_DOWN, start.x, start.y, &result);
+    int32_t y = start.y;
+    for (int32_t step = 1; step <= 4; ++step)
+    {
+        y = start.y + (int32_t)lroundf(0.10f * start.native_height * (float)step);
+        resize_event(dock, REACH_POINTER_EVENT_MOVE, start.x, y, &result);
+        (void)reach_dock_arrange(dock, &arrange);
+        reach_feature_surface_geometry during = {};
+        ops->surface_geometry(dock, &during);
+        expect_true(
+            !rect_f32_same(reach_dock_arranged_layout(dock)->bounds, before.work_area_bounds),
+            "the dock follows the pointer while dragging");
+        expect_true(rect_f32_same(during.work_area_bounds, before.work_area_bounds) &&
+                        during.work_area_clearance == before.work_area_clearance,
+                    "the reserved strip does not move on every drag step");
+    }
+    resize_event(dock, REACH_POINTER_EVENT_UP, start.x, y, &result);
+    (void)reach_dock_arrange(dock, &arrange);
+    reach_feature_surface_geometry after = {};
+    ops->surface_geometry(dock, &after);
+    expect_true(rect_f32_same(after.work_area_bounds, reach_dock_arranged_layout(dock)->bounds) &&
+                    !rect_f32_same(after.work_area_bounds, before.work_area_bounds),
+                "releasing the drag reserves the new size once");
+    reach_dock_destroy(dock);
+}
+
 int main(void)
 {
     test_dock_metrics_are_spaced_before_any_configuration_arrives();
@@ -1600,5 +1644,6 @@ int main(void)
     test_dock_trespass_uses_current_horizontal_span();
     test_dock_auto_hide_publishes_work_area();
     test_fixed_dock_reserves_settled_bounds_while_resizing();
+    test_fixed_dock_holds_its_reserved_space_while_the_rim_is_dragged();
     return failures == 0 ? 0 : 1;
 }

@@ -1169,7 +1169,8 @@ int32_t reach_dock_arrange(reach_dock *dock, const reach_dock_arrange_context *c
             dock->hover_owner_key = 0;
         }
     }
-    if (dock->pointer_layout_valid && !reach_dock_size_animating(dock) &&
+    /* A drag sets the size directly with no animation, so hold the reservation until release. */
+    if (dock->pointer_layout_valid && !dock->resize_active && !reach_dock_size_animating(dock) &&
         !reach_dock_slots_animating(dock))
     {
         dock->settled_bounds = dock->pointer_layout.bounds;
