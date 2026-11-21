@@ -63,6 +63,10 @@ struct reach_dock
     reach_dock_model metrics;
     reach_motion size_scale;
     int32_t size_configured;
+    int32_t auto_hide;
+    reach_rect_f32 arranged_monitor_bounds;
+    reach_rect_f32 settled_bounds;
+    int32_t settled_bounds_valid;
     uint32_t next_app_key;
     reach_dock_routes routes;
     const reach_theme *pointer_theme;
@@ -174,6 +178,7 @@ reach_result reach_dock_create(reach_dock **out_animations)
     reach_dock_model_defaults(&animations->metrics);
     reach_motion_set(&animations->size_scale, 1.0f);
     reach_motion_set(&animations->y_motion, 0.0f);
+    animations->auto_hide = 1;
     for (reach_motion &motion : animations->slot_motions)
         reach_motion_set(&motion, 0.0f);
     reach_draggable_init(&animations->state.drag.gesture);
@@ -439,6 +444,19 @@ static void reach_dock_capsule_surface_geometry(const void *capsule,
         return;
     }
     out->deadline_seconds = dock->hover_deadline;
+    // A fixed dock reserves its strip like the static top bar; auto hide reserves nothing. The
+    // reservation follows settled bounds only, so resizing never reflows windows every frame.
+    out->manage_monitor_work_area = 1;
+    out->reserve_monitor_work_area = !dock->auto_hide && dock->settled_bounds_valid;
+    out->bar_reveal_policy =
+        dock->auto_hide ? REACH_FEATURE_BAR_REVEAL_ALWAYS : REACH_FEATURE_BAR_REVEAL_FULLSCREEN;
+    if (out->reserve_monitor_work_area)
+    {
+        float gap_below = dock->arranged_monitor_bounds.y + dock->arranged_monitor_bounds.height -
+                          (dock->settled_bounds.y + dock->settled_bounds.height);
+        out->work_area_bounds = dock->settled_bounds;
+        out->work_area_clearance = gap_below > 0.0f ? gap_below : 0.0f;
+    }
     if (!dock->state.visibility.animation_initialized || !(dock->reveal_travel > 0.0f))
     {
         return;
@@ -865,6 +883,14 @@ static int32_t reach_dock_capsule_control_at_point(const void *capsule, int32_t 
     }
 }
 
+void reach_dock_set_auto_hide(reach_dock *dock, int32_t auto_hide)
+{
+    if (dock != nullptr)
+    {
+        dock->auto_hide = auto_hide ? 1 : 0;
+    }
+}
+
 void reach_dock_apply_config(reach_dock *dock, float height, int32_t size)
 {
     if (dock == nullptr)
@@ -905,6 +931,7 @@ int32_t reach_dock_arrange(reach_dock *dock, const reach_dock_arrange_context *c
 
     const reach_theme *theme = ctx->theme != nullptr ? ctx->theme : reach_theme_default();
     dock->metrics.icon_size = reach_theme_icon_box_size(theme, dock->metrics.height);
+    dock->arranged_monitor_bounds = ctx->monitor_bounds;
 
     reach_ui_layout_input input = {};
     input.monitor_bounds = ctx->monitor_bounds;
@@ -953,6 +980,12 @@ int32_t reach_dock_arrange(reach_dock *dock, const reach_dock_arrange_context *c
             dock->routes.item_windows_changed(dock->routes.user, nullptr);
             dock->hover_owner_key = 0;
         }
+    }
+    if (dock->pointer_layout_valid && !reach_dock_size_animating(dock) &&
+        !reach_dock_slots_animating(dock))
+    {
+        dock->settled_bounds = dock->pointer_layout.bounds;
+        dock->settled_bounds_valid = 1;
     }
     return !reach_rect_equal(before, dock->pointer_layout.bounds) ||
            reach_dock_slots_animating(dock);
@@ -1043,7 +1076,7 @@ reach_dock_bar_update_visibility(void *capsule, const reach_bar_visibility_reque
         animations->coverage_protected_clearance = request->protected_clearance;
         animations->coverage_valid = 1;
     }
-    bar_request.can_hide = animations->coverage_trespassed;
+    bar_request.can_hide = request->auto_hide_active && animations->coverage_trespassed;
 
     reach_bar_visibility_result result = reach_bar_update_visibility(
         &animations->state.visibility, &animations->y_motion, &bar_request);

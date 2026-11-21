@@ -459,6 +459,7 @@ add_library(reach_settings_feature STATIC
     src/apps/settings/feature/settings_bluetooth.cpp
     src/apps/settings/feature/settings_bluetooth_layout.cpp
     src/apps/settings/feature/settings_bluetooth_render.cpp
+    src/apps/settings/feature/settings_dock.cpp
     src/apps/settings/feature/settings_feature.cpp
     src/apps/settings/feature/settings_installed_apps.cpp
     src/apps/settings/feature/settings_monitors_scaling.cpp
@@ -1167,6 +1168,7 @@ target_link_libraries(reach_search_ranking_tests PRIVATE
 
 add_executable(reach_dock_model_tests
     tests/dock_model_tests.cpp
+    tests/motion_clock_test_support.cpp
 )
 
 reach_configure_common(reach_dock_model_tests)
