@@ -459,6 +459,7 @@ add_library(reach_settings_feature STATIC
     src/apps/settings/feature/settings_bluetooth.cpp
     src/apps/settings/feature/settings_bluetooth_layout.cpp
     src/apps/settings/feature/settings_bluetooth_render.cpp
+    src/apps/settings/feature/settings_dock.cpp
     src/apps/settings/feature/settings_feature.cpp
     src/apps/settings/feature/settings_installed_apps.cpp
     src/apps/settings/feature/settings_monitors_scaling.cpp
