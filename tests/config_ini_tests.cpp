@@ -4,6 +4,7 @@
 #include <windows.h>
 #include <shobjidl.h>
 
+#include <atomic>
 #include <cstring>
 #include <memory>
 #include <string>
@@ -11,6 +12,76 @@
 static int expect(int condition)
 {
     return condition ? 0 : 1;
+}
+
+static void count_change(void *user)
+{
+    static_cast<std::atomic<int> *>(user)->fetch_add(1);
+}
+
+static int wait_for_changes(const std::atomic<int> &changes, int at_least)
+{
+    for (int waited = 0; waited < 3000 && changes.load() < at_least; waited += 10)
+    {
+        Sleep(10);
+    }
+    return changes.load() >= at_least;
+}
+
+static int test_config_watch(const reach_config_snapshot *snapshot)
+{
+    int failed = 0;
+
+    // A private directory keeps unrelated temp-file churn out of the notifications.
+    wchar_t temp_directory[260] = {};
+    failed += expect(GetTempPathW(260, temp_directory) != 0);
+    std::wstring directory(temp_directory);
+    directory.append(L"reach_watch_test_");
+    directory.append(std::to_wstring(GetCurrentProcessId()));
+    failed += expect(CreateDirectoryW(directory.c_str(), nullptr) != 0);
+    std::wstring config_path = directory + L"\\reach.ini";
+    std::wstring sibling_path = directory + L"\\other.ini";
+
+    reach_config_store_port store = {};
+    failed +=
+        expect(reach_windows_create_config_store(
+                   reinterpret_cast<const uint16_t *>(config_path.c_str()), &store) == REACH_OK);
+    std::atomic<int> changes(0);
+    reach_windows_config_watch *watch = nullptr;
+    failed += expect(
+        reach_windows_config_watch_create(reinterpret_cast<const uint16_t *>(config_path.c_str()),
+                                          count_change, &changes, &watch) == REACH_OK);
+    if (watch == nullptr || store.ops.save == nullptr)
+    {
+        return failed + 1;
+    }
+
+    // Saves replace the file through a temp file; that must read as one change to reach.ini.
+    failed += expect(store.ops.save(store.store, snapshot) == REACH_OK);
+    failed += expect(wait_for_changes(changes, 1));
+
+    // The watcher is armed now. Let trailing notifications drain, then a sibling file in
+    // the same directory must not count.
+    Sleep(300);
+    changes.store(0);
+    failed += expect(WritePrivateProfileStringW(L"x", L"y", L"1", sibling_path.c_str()) != 0);
+    Sleep(300);
+    failed += expect(changes.load() == 0);
+
+    // And it keeps working after the quiet period.
+    failed += expect(store.ops.save(store.store, snapshot) == REACH_OK);
+    failed += expect(wait_for_changes(changes, 1));
+
+    reach_windows_config_watch_destroy(watch);
+    if (store.ops.destroy != nullptr)
+    {
+        store.ops.destroy(store.store);
+    }
+    DeleteFileW(sibling_path.c_str());
+    DeleteFileW(config_path.c_str());
+    DeleteFileW((config_path + L".tmp").c_str());
+    RemoveDirectoryW(directory.c_str());
+    return failed;
 }
 
 int main()
@@ -184,6 +255,8 @@ int main()
         failed += expect(bom == 0xFEFF);
         CloseHandle(file);
     }
+
+    failed += test_config_watch(snapshot.get());
 
     if (store.ops.destroy != nullptr)
     {

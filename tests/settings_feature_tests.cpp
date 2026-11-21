@@ -927,8 +927,37 @@ static void test_pressed_buttons_render_worst_case(void)
     }
 }
 
+static void test_power_snapshot_keeps_unapplied_edits(void)
+{
+    std::unique_ptr<reach_settings_model> model(new reach_settings_model());
+    reach_settings_model_init(model.get());
+    std::unique_ptr<reach_config_snapshot> snapshot(new reach_config_snapshot());
+    *snapshot = {};
+    snapshot->power_screen_off_minutes = 10;
+    snapshot->power_sleep_minutes = 30;
+    snapshot->power_sleep_wait_apps = 1;
+
+    expect_true(reach_settings_model_apply_power_snapshot(model.get(), snapshot.get()),
+                "a clean power page takes the saved values");
+    expect_true(reach_settings_model_power_minutes(model.get(), REACH_SETTINGS_POWER_TIMER_SLEEP) ==
+                    30,
+                "saved sleep minutes are shown");
+    expect_true(!reach_settings_model_power_dirty(model.get()),
+                "values loaded from the config count as applied");
+
+    reach_settings_model_set_power_minutes(model.get(), REACH_SETTINGS_POWER_TIMER_SLEEP, 45);
+    snapshot->power_sleep_minutes = 60;
+    expect_true(!reach_settings_model_apply_power_snapshot(model.get(), snapshot.get()),
+                "a power page with unapplied edits is left alone");
+    expect_true(reach_settings_model_power_minutes(model.get(), REACH_SETTINGS_POWER_TIMER_SLEEP) ==
+                    45,
+                "the unapplied edit survives a refresh");
+    expect_true(reach_settings_model_power_dirty(model.get()), "the edit is still unapplied");
+}
+
 int main(void)
 {
+    test_power_snapshot_keeps_unapplied_edits();
     test_policy();
     test_required_security_maintenance_classifications();
     test_navigation_pages();

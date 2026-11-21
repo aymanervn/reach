@@ -403,3 +403,31 @@ void reach_settings_model_power_mark_applied(reach_settings_model *model)
         model->power_applied_wait_apps[timer] = model->power_wait_apps[timer];
     }
 }
+
+int32_t reach_settings_model_apply_power_snapshot(reach_settings_model *model,
+                                                  const reach_config_snapshot *snapshot)
+{
+    // Unapplied edits wait for the Apply button; a refresh must not discard them.
+    if (model == nullptr || snapshot == nullptr || reach_settings_model_power_dirty(model))
+    {
+        return 0;
+    }
+    reach_settings_model_set_power_minutes(model, REACH_SETTINGS_POWER_TIMER_SCREEN_OFF,
+                                           snapshot->power_screen_off_minutes);
+    reach_settings_model_set_power_minutes(model, REACH_SETTINGS_POWER_TIMER_SLEEP,
+                                           snapshot->power_sleep_minutes);
+    reach_settings_model_set_power_minutes(model, REACH_SETTINGS_POWER_TIMER_LOCK,
+                                           snapshot->power_lock_minutes);
+    reach_settings_model_set_power_minutes(model, REACH_SETTINGS_POWER_TIMER_SHUTDOWN,
+                                           snapshot->power_shutdown_minutes);
+    reach_settings_model_set_power_minutes(model, REACH_SETTINGS_POWER_TIMER_RESTART,
+                                           snapshot->power_restart_minutes);
+    reach_settings_model_set_power_wait_apps(model, REACH_SETTINGS_POWER_TIMER_SLEEP,
+                                             snapshot->power_sleep_wait_apps);
+    reach_settings_model_set_power_wait_apps(model, REACH_SETTINGS_POWER_TIMER_SHUTDOWN,
+                                             snapshot->power_shutdown_wait_apps);
+    reach_settings_model_set_power_wait_apps(model, REACH_SETTINGS_POWER_TIMER_RESTART,
+                                             snapshot->power_restart_wait_apps);
+    reach_settings_model_power_mark_applied(model);
+    return 1;
+}
