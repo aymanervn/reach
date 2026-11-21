@@ -116,6 +116,11 @@ extern "C"
     reach_result reach_windows_create_config_store(const uint16_t *path,
                                                    reach_config_store_port *out_port);
     reach_result reach_windows_notify_config_changed(void);
+    typedef struct reach_windows_config_watch reach_windows_config_watch;
+    reach_result reach_windows_config_watch_create(const uint16_t *config_path,
+                                                   void (*changed)(void *user), void *user,
+                                                   reach_windows_config_watch **out_watch);
+    void reach_windows_config_watch_destroy(reach_windows_config_watch *watch);
     reach_result reach_windows_create_window_manager(reach_window_manager_port *out_port);
     reach_result reach_windows_create_explorer_service(reach_explorer_service_port *out_port);
     reach_result reach_windows_create_wallpaper_service(reach_wallpaper_service_port *out_port);

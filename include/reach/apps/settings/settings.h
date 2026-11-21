@@ -681,6 +681,8 @@ extern "C"
     float reach_settings_slider_ratio_at(const reach_settings_slider_card_layout *slider, float x);
     int32_t reach_settings_model_power_dirty(const reach_settings_model *model);
     void reach_settings_model_power_mark_applied(reach_settings_model *model);
+    int32_t reach_settings_model_apply_power_snapshot(reach_settings_model *model,
+                                                      const reach_config_snapshot *snapshot);
 
     void reach_settings_model_set_account(reach_settings_model *model, const uint16_t *display_name,
                                           const uint16_t *user_name, int32_t is_admin,

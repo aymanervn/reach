@@ -140,6 +140,9 @@ struct reach_settings_app
     reach_bluetooth_service *bluetooth_service;
     reach_installed_apps_service *installed_apps_service;
     std::atomic<int32_t> async_notify;
+    std::atomic<int32_t> config_refresh;
+    std::thread::id ui_thread;
+    reach_windows_config_watch *config_watch;
     std::atomic<uint32_t> system_controls_change_flags;
     reach_settings_model model;
     reach_settings_layout layout;
@@ -541,23 +544,7 @@ static void reach_settings_load_power_config(reach_settings_app *app)
     {
         return;
     }
-    reach_settings_model_set_power_minutes(&app->model, REACH_SETTINGS_POWER_TIMER_SCREEN_OFF,
-                                           snapshot->power_screen_off_minutes);
-    reach_settings_model_set_power_minutes(&app->model, REACH_SETTINGS_POWER_TIMER_SLEEP,
-                                           snapshot->power_sleep_minutes);
-    reach_settings_model_set_power_minutes(&app->model, REACH_SETTINGS_POWER_TIMER_LOCK,
-                                           snapshot->power_lock_minutes);
-    reach_settings_model_set_power_minutes(&app->model, REACH_SETTINGS_POWER_TIMER_SHUTDOWN,
-                                           snapshot->power_shutdown_minutes);
-    reach_settings_model_set_power_minutes(&app->model, REACH_SETTINGS_POWER_TIMER_RESTART,
-                                           snapshot->power_restart_minutes);
-    reach_settings_model_set_power_wait_apps(&app->model, REACH_SETTINGS_POWER_TIMER_SLEEP,
-                                             snapshot->power_sleep_wait_apps);
-    reach_settings_model_set_power_wait_apps(&app->model, REACH_SETTINGS_POWER_TIMER_SHUTDOWN,
-                                             snapshot->power_shutdown_wait_apps);
-    reach_settings_model_set_power_wait_apps(&app->model, REACH_SETTINGS_POWER_TIMER_RESTART,
-                                             snapshot->power_restart_wait_apps);
-    reach_settings_model_power_mark_applied(&app->model);
+    (void)reach_settings_model_apply_power_snapshot(&app->model, snapshot.get());
 }
 
 static void reach_settings_save_power_config(reach_settings_app *app)
@@ -681,6 +668,91 @@ static void reach_settings_load_top_bar_config(reach_settings_app *app)
     reach_settings_model_set_dock_auto_hide(&app->model, snapshot->dock_auto_hide);
 }
 
+// Other processes (the shell, quick settings, reachctl) write the same config file. The
+// file watcher calls this on its own thread and only asks the service to reload; the
+// service publishes the fresh snapshot from its worker thread (see the event handler below)
+// and the UI thread applies it from reach_settings_app_update.
+static void reach_settings_on_config_file_changed(void *user)
+{
+    reach_settings_app *app = static_cast<reach_settings_app *>(user);
+    if (app != nullptr && app->config_service != nullptr)
+    {
+        (void)reach_config_service_reload(app->config_service);
+    }
+}
+
+// True when the model already shows every value the loaders would set. Settings' own saves
+// echo back through the file watcher with exactly the values on screen; reloading them
+// would cut its toggle animations short.
+static int32_t reach_settings_model_shows_config(const reach_settings_app *app,
+                                                 const reach_config_snapshot *snapshot)
+{
+    const reach_settings_model *model = &app->model;
+    if (!reach_settings_model_power_dirty(model))
+    {
+        const int32_t power_minutes[] = {
+            snapshot->power_screen_off_minutes, snapshot->power_sleep_minutes,
+            snapshot->power_lock_minutes, snapshot->power_shutdown_minutes,
+            snapshot->power_restart_minutes};
+        const size_t power_minute_timers[] = {
+            REACH_SETTINGS_POWER_TIMER_SCREEN_OFF, REACH_SETTINGS_POWER_TIMER_SLEEP,
+            REACH_SETTINGS_POWER_TIMER_LOCK, REACH_SETTINGS_POWER_TIMER_SHUTDOWN,
+            REACH_SETTINGS_POWER_TIMER_RESTART};
+        for (size_t index = 0; index < 5; ++index)
+        {
+            if (reach_settings_model_power_minutes(model, power_minute_timers[index]) !=
+                power_minutes[index])
+            {
+                return 0;
+            }
+        }
+        if (reach_settings_model_power_wait_apps(model, REACH_SETTINGS_POWER_TIMER_SLEEP) !=
+                snapshot->power_sleep_wait_apps ||
+            reach_settings_model_power_wait_apps(model, REACH_SETTINGS_POWER_TIMER_SHUTDOWN) !=
+                snapshot->power_shutdown_wait_apps ||
+            reach_settings_model_power_wait_apps(model, REACH_SETTINGS_POWER_TIMER_RESTART) !=
+                snapshot->power_restart_wait_apps)
+        {
+            return 0;
+        }
+    }
+    return reach_settings_model_high_refresh_rate(model) == snapshot->high_refresh_rate &&
+           reach_settings_model_bundled_font(model) == snapshot->bundled_font &&
+           reach_settings_model_light_theme(model) == snapshot->light_theme &&
+           reach_settings_model_accent_preset(model) == snapshot->accent_preset &&
+           reach_settings_model_windows_system_theme(model) == snapshot->windows_system_theme &&
+           reach_settings_model_windows_app_theme(model) == snapshot->windows_app_theme &&
+           model->desktop_widgets == snapshot->desktop_widgets &&
+           reach_settings_model_top_bar_style(model) == snapshot->top_bar_style &&
+           reach_settings_model_top_bar_mode(model) == snapshot->top_bar_mode &&
+           reach_settings_model_top_bar_icon_only(model) == snapshot->top_bar_icon_only &&
+           reach_settings_model_top_bar_overlay(model) == snapshot->top_bar_overlay &&
+           reach_settings_model_dock_size(model) == snapshot->dock_size &&
+           reach_settings_model_dock_auto_hide(model) == snapshot->dock_auto_hide;
+}
+
+static void reach_settings_apply_config_refresh(reach_settings_app *app)
+{
+    // A refresh landing mid-drag would yank the slider; it stays pending until the drag ends.
+    if (app->model.dragging_slider != REACH_SETTINGS_HIT_NONE ||
+        app->config_refresh.exchange(0) == 0)
+    {
+        return;
+    }
+    std::unique_ptr<reach_config_snapshot> snapshot(new (std::nothrow) reach_config_snapshot());
+    if (snapshot == nullptr ||
+        reach_config_service_snapshot(app->config_service, snapshot.get()) != REACH_OK ||
+        reach_settings_model_shows_config(app, snapshot.get()))
+    {
+        return;
+    }
+    reach_settings_load_power_config(app);
+    reach_settings_load_theme_config(app);
+    reach_settings_load_widget_config(app, 1);
+    reach_settings_load_top_bar_config(app);
+    app->dirty = 1;
+}
+
 static void reach_settings_save_top_bar_config(reach_settings_app *app)
 {
     if (app == nullptr || app->config_service == nullptr)
@@ -695,9 +767,20 @@ static void reach_settings_save_top_bar_config(reach_settings_app *app)
     (void)reach_config_service_set_top_bar(app->config_service, &settings);
 }
 
-static void reach_settings_on_config_service_event(void *, reach_config_service_event event)
+static void reach_settings_async_notify(void *user);
+
+static void reach_settings_on_config_service_event(void *user, reach_config_service_event event)
 {
-    if (event == REACH_CONFIG_SERVICE_PERSISTED)
+    reach_settings_app *app = static_cast<reach_settings_app *>(user);
+    // Settings' own commits publish synchronously on the UI thread; a publish from the
+    // service's worker thread (a reload) carries what other processes wrote to the file.
+    if (event == REACH_CONFIG_SERVICE_SNAPSHOT_CHANGED && app != nullptr &&
+        std::this_thread::get_id() != app->ui_thread)
+    {
+        app->config_refresh.store(1);
+        reach_settings_async_notify(app);
+    }
+    else if (event == REACH_CONFIG_SERVICE_PERSISTED)
     {
         (void)reach_windows_notify_config_changed();
     }
@@ -706,8 +789,6 @@ static void reach_settings_on_config_service_event(void *, reach_config_service_
         reach_log_error("Could not persist Reach settings.");
     }
 }
-
-static void reach_settings_async_notify(void *user);
 
 static void reach_settings_update_progress(void *user, reach_windows_update_progress progress)
 {
@@ -2790,6 +2871,7 @@ reach_result reach_settings_app_create(reach_settings_app **out_app,
     }
     app->notify = notify;
     app->notify_user = notify_user;
+    app->ui_thread = std::this_thread::get_id();
     app->theme = *reach_theme_default();
     reach_settings_model_init(&app->model);
 
@@ -2899,6 +2981,11 @@ reach_result reach_settings_app_create(reach_settings_app **out_app,
         reach_config_service_create(app->config_store, reach_settings_on_config_service_event, app,
                                     &app->config_service) == REACH_OK)
     {
+        if (reach_windows_config_watch_create(config_path, reach_settings_on_config_file_changed,
+                                              app, &app->config_watch) != REACH_OK)
+        {
+            reach_log_error("Could not watch the Reach config; Settings will not update live.");
+        }
         reach_settings_load_power_config(app);
         reach_settings_load_theme_config(app);
         reach_settings_load_widget_config(app, 0);
@@ -3009,6 +3096,7 @@ reach_result reach_settings_app_update(reach_settings_app *app, double delta_sec
     {
         app->dirty = 1;
     }
+    reach_settings_apply_config_refresh(app);
     reach_workload_add(REACH_WORKLOAD_APP_UPDATES, 1);
     if (reach_monitor_refresh_retry_due(&app->monitor_refresh_retry) ||
         reach_monitor_topology_confirmation_due(&app->monitor_topology))
@@ -3358,6 +3446,8 @@ void reach_settings_app_destroy(reach_settings_app *app)
     {
         app->windows_update.destroy(app->windows_update.userdata);
     }
+    reach_windows_config_watch_destroy(app->config_watch);
+    app->config_watch = nullptr;
     (void)reach_config_service_flush(app->config_service);
     reach_config_service_destroy(app->config_service);
     app->config_service = nullptr;

@@ -287,6 +287,7 @@ add_library(reach_windows_adapters STATIC
     src/adapters/windows/media_controls_win32.cpp
     src/adapters/windows/config_ini.cpp
     src/adapters/windows/config_path_win32.cpp
+    src/adapters/windows/config_watch_win32.cpp
     src/adapters/windows/window_management/window_query_win32.cpp
     src/adapters/windows/window_management/reach_service_client_win32.cpp
     src/adapters/windows/window_management/reach_service_shared_state_win32.cpp
