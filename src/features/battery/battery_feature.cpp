@@ -551,8 +551,9 @@ static uint64_t reach_battery_pressable_target(reach_battery_pointer_action_kind
 static void reach_battery_toggle_saver(reach_battery *battery)
 {
     int32_t target_enabled = reach_battery_model_saver_effective(&battery->state.model) ? 0 : 1;
-    reach_battery_set_saver_pending(battery, 1, target_enabled);
-    (void)reach_system_status_set_battery_saver_enabled(battery->status, target_enabled);
+    const reach_result result =
+        reach_system_status_set_battery_saver_enabled(battery->status, target_enabled);
+    reach_battery_set_saver_pending(battery, result == REACH_OK, target_enabled);
     (void)reach_battery_refresh_power(battery);
 }
 
