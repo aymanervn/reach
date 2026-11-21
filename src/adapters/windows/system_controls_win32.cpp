@@ -22,7 +22,9 @@
 #include <winrt/Windows.Foundation.Collections.h>
 #include <wrl/client.h>
 
+#include <atomic>
 #include <cstdio>
+#include <cstring>
 #include <new>
 
 using Microsoft::WRL::ComPtr;
@@ -41,6 +43,7 @@ static const GUID *const REACH_CONTROL_POWER_SETTINGS[] = {
     &GUID_BATTERY_PERCENTAGE_REMAINING,
     &GUID_ACDC_POWER_SOURCE,
 };
+static constexpr DWORD REACH_ENERGY_SAVER_STATUS_UNKNOWN = MAXDWORD;
 
 struct reach_system_controls_adapter
 {
@@ -54,6 +57,7 @@ struct reach_system_controls_adapter
     void *callback_user;
     HPOWERNOTIFY power_notifications[ARRAYSIZE(REACH_CONTROL_POWER_SETTINGS)];
     DEVICE_NOTIFY_SUBSCRIBE_PARAMETERS power_subscription;
+    std::atomic<DWORD> energy_saver_status{REACH_ENERGY_SAVER_STATUS_UNKNOWN};
     HANDLE bluetooth_thread;
     HANDLE bluetooth_stop;
     HANDLE bluetooth_request;
@@ -115,11 +119,20 @@ static void reach_system_controls_notify(reach_system_controls_adapter *adapter,
 static ULONG CALLBACK reach_system_controls_power_notification(void *context, ULONG type,
                                                                void *setting)
 {
-    (void)setting;
     if (type == PBT_POWERSETTINGCHANGE)
     {
-        reach_system_controls_notify(static_cast<reach_system_controls_adapter *>(context),
-                                     REACH_SYSTEM_CONTROLS_CHANGE_POWER);
+        auto *adapter = static_cast<reach_system_controls_adapter *>(context);
+        const auto *change = static_cast<const POWERBROADCAST_SETTING *>(setting);
+        if (change != nullptr && IsEqualGUID(change->PowerSetting, GUID_ENERGY_SAVER_STATUS) &&
+            change->DataLength == sizeof(DWORD))
+        {
+            DWORD status = 0;
+            std::memcpy(&status, change->Data, sizeof(status));
+            adapter->energy_saver_status.store(
+                status <= ENERGY_SAVER_HIGH_SAVINGS ? status : REACH_ENERGY_SAVER_STATUS_UNKNOWN,
+                std::memory_order_relaxed);
+        }
+        reach_system_controls_notify(adapter, REACH_SYSTEM_CONTROLS_CHANGE_POWER);
     }
     return ERROR_SUCCESS;
 }
@@ -906,8 +919,6 @@ static reach_result reach_system_controls_set_theme_modes(void *userdata,
 static reach_result reach_system_controls_get_power_state(void *userdata,
                                                           reach_power_state *out_state)
 {
-    (void)userdata;
-
     if (out_state == nullptr)
     {
         return REACH_INVALID_ARGUMENT;
@@ -924,7 +935,14 @@ static reach_result reach_system_controls_get_power_state(void *userdata,
     out_state->has_battery = (status.BatteryFlag & 128) == 0 && status.BatteryFlag != 255 ? 1 : 0;
     out_state->battery_percent =
         status.BatteryLifePercent == 255 ? -1 : (int32_t)status.BatteryLifePercent;
-    out_state->battery_saver_on = status.SystemStatusFlag == 1 ? 1 : 0;
+    const auto *adapter = static_cast<const reach_system_controls_adapter *>(userdata);
+    const DWORD energy_saver_status =
+        adapter != nullptr ? adapter->energy_saver_status.load(std::memory_order_relaxed)
+                           : REACH_ENERGY_SAVER_STATUS_UNKNOWN;
+    // The legacy flag can be off while Windows is in Standard Energy Saver mode.
+    out_state->battery_saver_on = energy_saver_status == REACH_ENERGY_SAVER_STATUS_UNKNOWN
+                                      ? status.SystemStatusFlag == 1
+                                      : energy_saver_status != ENERGY_SAVER_OFF;
     out_state->battery_charging = out_state->has_battery && status.ACLineStatus == 1 ? 1 : 0;
     out_state->battery_seconds_remaining =
         out_state->has_battery && status.ACLineStatus == 0 && status.BatteryLifeTime != (DWORD)-1
@@ -1552,6 +1570,8 @@ static void reach_system_controls_stop_watching(void *userdata)
             notification = nullptr;
         }
     }
+    adapter->energy_saver_status.store(REACH_ENERGY_SAVER_STATUS_UNKNOWN,
+                                       std::memory_order_relaxed);
     adapter->callback = nullptr;
     adapter->callback_user = nullptr;
     adapter->main_thread_id = 0;
