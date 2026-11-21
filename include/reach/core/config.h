@@ -86,6 +86,7 @@ extern "C"
         uint32_t desktop_widgets;
         reach_config_widget_placement widget_placements[REACH_MAX_DESKTOP_WIDGETS];
         int32_t dock_size;
+        int32_t dock_auto_hide;
         reach_config_top_bar_style top_bar_style;
         reach_config_top_bar_mode top_bar_mode;
         int32_t top_bar_icon_only;

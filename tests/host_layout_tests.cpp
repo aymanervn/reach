@@ -3825,8 +3825,41 @@ static void test_desktop_widgets_render_worst_case(void)
     reach_clock_destroy(clock);
 }
 
+static int32_t rect_i32_is(reach_rect_i32 rect, int32_t left, int32_t top, int32_t right,
+                           int32_t bottom)
+{
+    return rect.left == left && rect.top == top && rect.right == right && rect.bottom == bottom;
+}
+
+static void test_work_area_claims_merge_per_monitor(void)
+{
+    const reach_rect_i32 monitor = {0, 0, 1920, 1080};
+    reach_host_work_area_claim claims[3] = {};
+    claims[0] = {1, REACH_LAYOUT_RESERVATION_TOP, 47.2f, monitor};
+    claims[1] = {1, REACH_LAYOUT_RESERVATION_BOTTOM, 1010.6f, monitor};
+    expect_true(rect_i32_is(reach_host_merge_work_area(monitor, claims, 2), 0, 48, 1920, 1010),
+                "merge keeps top and bottom claims");
+
+    claims[0].active = 0;
+    claims[1].edge_value = 1000.0f;
+    expect_true(rect_i32_is(reach_host_merge_work_area(monitor, claims, 2), 0, 0, 1920, 1000),
+                "inactive claim does not reset other claims");
+
+    claims[1].active = 0;
+    expect_true(rect_i32_is(reach_host_merge_work_area(monitor, claims, 2), 0, 0, 1920, 1080),
+                "inactive claim releases edge");
+
+    claims[2] = {1, REACH_LAYOUT_RESERVATION_BOTTOM, 900.0f, {1920, 0, 3840, 1080}};
+    expect_true(rect_i32_is(reach_host_merge_work_area(monitor, claims, 3), 0, 0, 1920, 1080),
+                "claim for another monitor is ignored");
+
+    expect_true(rect_i32_is(reach_host_merge_work_area(monitor, nullptr, 0), 0, 0, 1920, 1080),
+                "no claims leave the whole monitor");
+}
+
 int main(void)
 {
+    test_work_area_claims_merge_per_monitor();
     test_close_handoff_readiness_waits_for_observed_restore();
     test_native_overlay_placement_follows_surface_presentation();
     test_order_invalidation_rechains_without_replaying_visibility();

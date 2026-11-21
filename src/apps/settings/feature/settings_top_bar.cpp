@@ -91,22 +91,6 @@ int32_t reach_settings_model_toggle_top_bar_icon_only(reach_settings_model *mode
     return 1;
 }
 
-int32_t reach_settings_model_set_dock_size(reach_settings_model *model, int32_t size)
-{
-    if (model == nullptr || size < REACH_CONFIG_DOCK_SIZE_MIN ||
-        size > REACH_CONFIG_DOCK_SIZE_MAX || model->dock_size == size)
-    {
-        return 0;
-    }
-    model->dock_size = size;
-    return 1;
-}
-
-int32_t reach_settings_model_dock_size(const reach_settings_model *model)
-{
-    return model != nullptr ? model->dock_size : REACH_CONFIG_DOCK_SIZE_MAX;
-}
-
 float reach_settings_slider_ratio_at(const reach_settings_slider_card_layout *slider, float x)
 {
     if (slider == nullptr || slider->track.width <= 0.0f)

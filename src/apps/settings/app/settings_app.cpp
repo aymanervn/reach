@@ -678,6 +678,7 @@ static void reach_settings_load_top_bar_config(reach_settings_app *app)
     reach_settings_model_set_top_bar_icon_only(&app->model, snapshot->top_bar_icon_only);
     reach_settings_model_set_top_bar_overlay(&app->model, snapshot->top_bar_overlay);
     (void)reach_settings_model_set_dock_size(&app->model, snapshot->dock_size);
+    reach_settings_model_set_dock_auto_hide(&app->model, snapshot->dock_auto_hide);
 }
 
 static void reach_settings_save_top_bar_config(reach_settings_app *app)
@@ -2323,6 +2324,16 @@ static void reach_settings_handle_pointer_up(reach_settings_app *app, const reac
         {
             (void)reach_settings_model_toggle_top_bar_icon_only(&app->model);
             reach_settings_save_top_bar_config(app);
+            app->dirty = 1;
+        }
+        else if (hit.type == REACH_SETTINGS_HIT_DOCK_AUTO_HIDE_TOGGLE)
+        {
+            (void)reach_settings_model_toggle_dock_auto_hide(&app->model);
+            if (app->config_service != nullptr)
+            {
+                (void)reach_config_service_set_dock_auto_hide(
+                    app->config_service, reach_settings_model_dock_auto_hide(&app->model));
+            }
             app->dirty = 1;
         }
         else if (hit.type == REACH_SETTINGS_HIT_THEME_FPS_TOGGLE)

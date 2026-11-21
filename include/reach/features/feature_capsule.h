@@ -123,6 +123,8 @@ extern "C"
         int32_t manage_monitor_work_area;
         int32_t reserve_monitor_work_area;
         float work_area_clearance;
+        // Bounds the reservation is measured from; zero height means visible_bounds.
+        reach_rect_f32 work_area_bounds;
         int32_t shadowless;
         reach_feature_bar_reveal_policy bar_reveal_policy;
         int32_t force_topmost;

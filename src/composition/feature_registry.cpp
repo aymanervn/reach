@@ -315,6 +315,7 @@ static void reach_feature_notify_dock(void *capsule, const reach_feature_notific
     {
         reach_dock_apply_config(dock, notification->config->dock_height,
                                 notification->config->dock_size);
+        reach_dock_set_auto_hide(dock, notification->config->dock_auto_hide);
         out->relayout = 1;
         out->redraw = 1;
     }
