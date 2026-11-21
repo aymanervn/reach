@@ -1,5 +1,6 @@
 #include "windows_adapters_internal.h"
 
+#include "reach/adapters/windows/diagnostics_log.h"
 #include "reach/ports/system_controls.h"
 #include "system_controls_network.h"
 
@@ -21,6 +22,7 @@
 #include <winrt/Windows.Foundation.Collections.h>
 #include <wrl/client.h>
 
+#include <cstdio>
 #include <new>
 
 using Microsoft::WRL::ComPtr;
@@ -33,6 +35,13 @@ typedef enum reach_bluetooth_request_type
     REACH_BLUETOOTH_REQUEST_SET_ENABLED_ASYNC
 } reach_bluetooth_request_type;
 
+static const GUID *const REACH_CONTROL_POWER_SETTINGS[] = {
+    &GUID_ENERGY_SAVER_STATUS,
+    &GUID_POWER_SAVING_STATUS,
+    &GUID_BATTERY_PERCENTAGE_REMAINING,
+    &GUID_ACDC_POWER_SOURCE,
+};
+
 struct reach_system_controls_adapter
 {
     HANDLE wlan;
@@ -43,7 +52,7 @@ struct reach_system_controls_adapter
     DWORD main_thread_id;
     reach_system_controls_change_callback callback;
     void *callback_user;
-    HPOWERNOTIFY power_notifications[3];
+    HPOWERNOTIFY power_notifications[ARRAYSIZE(REACH_CONTROL_POWER_SETTINGS)];
     DEVICE_NOTIFY_SUBSCRIBE_PARAMETERS power_subscription;
     HANDLE bluetooth_thread;
     HANDLE bluetooth_stop;
@@ -926,8 +935,7 @@ static reach_result reach_system_controls_get_power_state(void *userdata,
 
 static const wchar_t REACH_POWER_BACKUP_KEY[] = L"Software\\Reach";
 static const wchar_t REACH_POWER_BACKUP_VALUE[] = L"BatterySaverThreshold";
-static const DWORD REACH_ENERGY_SAVER_ALWAYS = 100;
-static const DWORD REACH_ENERGY_SAVER_NEVER = 0;
+static const DWORD REACH_LEGACY_SAVER_THRESHOLD_OVERRIDE = 100;
 
 static int32_t reach_system_controls_read_saver_backup(DWORD *out_threshold)
 {
@@ -945,27 +953,14 @@ static int32_t reach_system_controls_read_saver_backup(DWORD *out_threshold)
                                    reinterpret_cast<BYTE *>(&value), &size);
     RegCloseKey(key);
 
-    if (status != ERROR_SUCCESS || type != REG_DWORD || value > 100)
+    if (status != ERROR_SUCCESS || type != REG_DWORD ||
+        value >= REACH_LEGACY_SAVER_THRESHOLD_OVERRIDE)
     {
         return 0;
     }
 
     *out_threshold = value;
     return 1;
-}
-
-static void reach_system_controls_write_saver_backup(DWORD threshold)
-{
-    HKEY key = nullptr;
-    if (RegCreateKeyExW(HKEY_CURRENT_USER, REACH_POWER_BACKUP_KEY, 0, nullptr, 0, KEY_SET_VALUE,
-                        nullptr, &key, nullptr) != ERROR_SUCCESS)
-    {
-        return;
-    }
-
-    (void)RegSetValueExW(key, REACH_POWER_BACKUP_VALUE, 0, REG_DWORD,
-                         reinterpret_cast<const BYTE *>(&threshold), sizeof(threshold));
-    RegCloseKey(key);
 }
 
 static void reach_system_controls_clear_saver_backup(void)
@@ -981,59 +976,63 @@ static void reach_system_controls_clear_saver_backup(void)
     RegCloseKey(key);
 }
 
-// Windows exposes no API that turns battery saver on or off — powrprof only exports the overlay
-// scheme setters and WinRT PowerManager is read-only. Driving the charge level at which Windows
-// engages it is the documented stand-in: 100 means "whenever on battery", 0 means never. The
-// previous threshold is kept in the registry so turning saver off restores the user's setting
-// even across a restart.
-static reach_result reach_system_controls_set_battery_saver_enabled(void *userdata, int32_t enabled)
+static void reach_system_controls_restore_legacy_saver_threshold()
 {
-    (void)userdata;
+    DWORD saved_threshold = 0;
+    if (!reach_system_controls_read_saver_backup(&saved_threshold))
+        return;
 
     GUID *scheme = nullptr;
     if (PowerGetActiveScheme(nullptr, &scheme) != ERROR_SUCCESS || scheme == nullptr)
+        return;
+
+    DWORD current = 0;
+    // Older builds saved the user's threshold before writing 100. Leave a threshold the
+    // user has since changed alone.
+    if (PowerReadDCValueIndex(nullptr, scheme, &GUID_ENERGY_SAVER_SUBGROUP,
+                              &GUID_ENERGY_SAVER_BATTERY_THRESHOLD, &current) == ERROR_SUCCESS &&
+        current == REACH_LEGACY_SAVER_THRESHOLD_OVERRIDE &&
+        PowerWriteDCValueIndex(nullptr, scheme, &GUID_ENERGY_SAVER_SUBGROUP,
+                               &GUID_ENERGY_SAVER_BATTERY_THRESHOLD,
+                               saved_threshold) == ERROR_SUCCESS)
     {
+        if (PowerSetActiveScheme(nullptr, scheme) == ERROR_SUCCESS)
+            reach_system_controls_clear_saver_backup();
+        else
+            (void)PowerWriteDCValueIndex(nullptr, scheme, &GUID_ENERGY_SAVER_SUBGROUP,
+                                         &GUID_ENERGY_SAVER_BATTERY_THRESHOLD, current);
+    }
+    LocalFree(scheme);
+}
+
+static reach_result reach_system_controls_set_battery_saver_enabled(void *userdata, int32_t enabled)
+{
+    (void)userdata;
+    // Windows Settings publishes this Energy Saver override for a manual toggle. The power plan's
+    // battery threshold controls automatic activation and does not override a manual Off.
+    using publish_power_state_fn =
+        LONG(NTAPI *)(uint64_t, const void *, const void *, ULONG, const void *);
+    static const auto publish_power_state = reinterpret_cast<publish_power_state_fn>(
+        GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "RtlPublishWnfStateData"));
+    if (publish_power_state == nullptr)
+        return REACH_NOT_IMPLEMENTED;
+
+    constexpr uint64_t WNF_PO_ENERGY_SAVER_OVERRIDE = UINT64_C(0x41c6013da3bc3075);
+    const DWORD override_value = enabled ? 1u : 0u;
+    const LONG status = publish_power_state(WNF_PO_ENERGY_SAVER_OVERRIDE, nullptr, &override_value,
+                                            sizeof(override_value), nullptr);
+    if (status < 0)
+    {
+        char message[128];
+        snprintf(message, sizeof(message), "Energy Saver override failed ntstatus=0x%08lX",
+                 (unsigned long)status);
+        reach_diagnostics_log_write("warn", message);
         return REACH_ERROR;
     }
 
-    DWORD current = 0;
-    int32_t current_valid =
-        PowerReadDCValueIndex(nullptr, scheme, &GUID_ENERGY_SAVER_SUBGROUP,
-                              &GUID_ENERGY_SAVER_BATTERY_THRESHOLD, &current) == ERROR_SUCCESS;
-
-    DWORD target = REACH_ENERGY_SAVER_NEVER;
-    if (enabled)
-    {
-        if (current_valid && current < REACH_ENERGY_SAVER_ALWAYS)
-        {
-            reach_system_controls_write_saver_backup(current);
-        }
-        target = REACH_ENERGY_SAVER_ALWAYS;
-    }
-    else
-    {
-        DWORD restored = 0;
-        if (reach_system_controls_read_saver_backup(&restored))
-        {
-            target = restored;
-        }
-    }
-
-    reach_result result = REACH_OK;
-    if (PowerWriteDCValueIndex(nullptr, scheme, &GUID_ENERGY_SAVER_SUBGROUP,
-                               &GUID_ENERGY_SAVER_BATTERY_THRESHOLD, target) != ERROR_SUCCESS ||
-        PowerSetActiveScheme(nullptr, scheme) != ERROR_SUCCESS)
-    {
-        result = REACH_ERROR;
-    }
-
-    if (result == REACH_OK && !enabled)
-    {
-        reach_system_controls_clear_saver_backup();
-    }
-
-    LocalFree(scheme);
-    return result;
+    if (!enabled)
+        reach_system_controls_restore_legacy_saver_threshold();
+    return REACH_OK;
 }
 
 static int32_t reach_system_controls_variant_bool(const VARIANT *variant)
@@ -1483,13 +1482,13 @@ reach_system_controls_start_watching(void *userdata, reach_system_controls_chang
 
     adapter->power_subscription.Callback = reach_system_controls_power_notification;
     adapter->power_subscription.Context = adapter;
-    const GUID *power_settings[] = {&GUID_POWER_SAVING_STATUS, &GUID_BATTERY_PERCENTAGE_REMAINING,
-                                    &GUID_ACDC_POWER_SOURCE};
-    for (size_t index = 0; index < 3; ++index)
+    bool power_watching = false;
+    for (size_t index = 0; index < ARRAYSIZE(REACH_CONTROL_POWER_SETTINGS); ++index)
     {
-        (void)PowerSettingRegisterNotification(power_settings[index], DEVICE_NOTIFY_CALLBACK,
-                                               &adapter->power_subscription,
-                                               &adapter->power_notifications[index]);
+        const DWORD result = PowerSettingRegisterNotification(
+            REACH_CONTROL_POWER_SETTINGS[index], DEVICE_NOTIFY_CALLBACK,
+            &adapter->power_subscription, &adapter->power_notifications[index]);
+        power_watching |= result == ERROR_SUCCESS;
     }
 
     DWORD negotiated_version = 0;
@@ -1516,8 +1515,7 @@ reach_system_controls_start_watching(void *userdata, reach_system_controls_chang
     }
 
     if (adapter->wlan == nullptr && adapter->addr_change_thread == nullptr &&
-        adapter->bluetooth_thread == nullptr && adapter->power_notifications[0] == nullptr &&
-        adapter->power_notifications[1] == nullptr && adapter->power_notifications[2] == nullptr)
+        adapter->bluetooth_thread == nullptr && !power_watching)
     {
         if (adapter->addr_change != nullptr)
         {
