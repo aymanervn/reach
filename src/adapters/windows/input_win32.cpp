@@ -1,12 +1,15 @@
 #include "windows_adapters_internal.h"
 
 #include "mouse_hook_thread_win32.h"
+#include "touchpad_reports_win32.h"
 #include "window_management/reach_service_shared_state_win32.h"
 
+#include "reach/adapters/windows/diagnostics_log.h"
 #include "reach/ports/input_source.h"
 
 #include <windows.h>
 #include <new>
+#include <stdio.h>
 
 static const size_t REACH_INPUT_POINTER_REGION_CAPACITY = 16;
 
@@ -36,7 +39,13 @@ struct reach_input_source
     SRWLOCK pointer_region_lock;
     reach_input_pointer_region pointer_regions[REACH_INPUT_POINTER_REGION_CAPACITY];
     volatile LONG manipulation_event_pending;
+    reach_touchpad_reports *touchpad;
+    uint32_t touchpad_logged_contacts;
+    uint32_t touchpad_frames;
 };
+
+static const USHORT REACH_INPUT_HID_PAGE_DIGITIZER = 0x0D;
+static const USHORT REACH_INPUT_HID_USAGE_TOUCHPAD = 0x05;
 
 static reach_input_source *g_pointer_hook_source;
 
@@ -518,6 +527,35 @@ static void reach_input_shared_callback(void *user, reach_service_shared_reader_
     }
 }
 
+static void reach_input_register_touchpad(reach_input_source *source, int32_t enable)
+{
+    RAWINPUTDEVICE device = {};
+    device.usUsagePage = REACH_INPUT_HID_PAGE_DIGITIZER;
+    device.usUsage = REACH_INPUT_HID_USAGE_TOUCHPAD;
+    device.dwFlags = enable ? RIDEV_INPUTSINK : RIDEV_REMOVE;
+    device.hwndTarget = enable ? source->window : nullptr;
+    /* Machines without a precision touchpad simply never send reports. */
+    (void)RegisterRawInputDevices(&device, 1, sizeof(device));
+}
+
+/* Temporary spike logging: proves touchpad frames reach Reach before gestures are built. */
+static void reach_input_log_touchpad_frame(reach_input_source *source,
+                                           const reach_touchpad_frame *frame)
+{
+    ++source->touchpad_frames;
+    if (frame->contact_count == source->touchpad_logged_contacts &&
+        source->touchpad_frames % 10 != 0)
+    {
+        return;
+    }
+    source->touchpad_logged_contacts = frame->contact_count;
+    char line[128];
+    (void)snprintf(line, sizeof(line), "touchpad contacts=%u x=%.0f y=%.0f range=%.0fx%.0f",
+                   frame->contact_count, frame->centroid_x, frame->centroid_y, frame->range_x,
+                   frame->range_y);
+    reach_diagnostics_log_write("info", line);
+}
+
 static LRESULT CALLBACK reach_input_window_proc(HWND hwnd, UINT message, WPARAM wparam,
                                                 LPARAM lparam)
 {
@@ -568,6 +606,17 @@ static LRESULT CALLBACK reach_input_window_proc(HWND hwnd, UINT message, WPARAM 
     {
         reach_input_process_shared_hotkeys(source);
         return 0;
+    }
+    if (message == WM_INPUT && source != nullptr && source->touchpad != nullptr)
+    {
+        reach_touchpad_frame frame = {};
+        if (reach_touchpad_reports_feed(source->touchpad, reinterpret_cast<HRAWINPUT>(lparam),
+                                        &frame))
+        {
+            reach_input_log_touchpad_frame(source, &frame);
+        }
+        /* DefWindowProc releases the raw input buffer. */
+        return DefWindowProcW(hwnd, message, wparam, lparam);
     }
     if (message == WM_HOTKEY && source != nullptr)
     {
@@ -625,6 +674,14 @@ static reach_result reach_input_start(reach_input_source *source,
 
     (void)reach_service_shared_reader_subscribe(reach_input_shared_callback, source);
     reach_input_register_media_hotkeys(source);
+    if (source->touchpad == nullptr)
+    {
+        source->touchpad = reach_touchpad_reports_create();
+    }
+    if (source->touchpad != nullptr)
+    {
+        reach_input_register_touchpad(source, 1);
+    }
     return REACH_OK;
 }
 
@@ -638,6 +695,12 @@ static reach_result reach_input_stop(reach_input_source *source)
 
     reach_service_shared_reader_unsubscribe(source);
     reach_input_unregister_media_hotkeys(source);
+    if (source->touchpad != nullptr)
+    {
+        reach_input_register_touchpad(source, 0);
+        reach_touchpad_reports_destroy(source->touchpad);
+        source->touchpad = nullptr;
+    }
     reach_input_reset_hotkey_state(source);
     for (size_t index = 0; index < REACH_INPUT_POINTER_REGION_CAPACITY; ++index)
     {
