@@ -1167,6 +1167,7 @@ target_link_libraries(reach_search_ranking_tests PRIVATE
 
 add_executable(reach_dock_model_tests
     tests/dock_model_tests.cpp
+    tests/motion_clock_test_support.cpp
 )
 
 reach_configure_common(reach_dock_model_tests)

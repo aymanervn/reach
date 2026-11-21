@@ -1338,6 +1338,31 @@ static void test_host_pushes_dock_cursor_region_to_window(void)
     expect_true(reach_host_frame_registered_surface(host, dock, &frame) == REACH_OK,
                 "the dock frame succeeds");
 
+    expect_true(!cursor_region_present,
+                "before the hover dwell the window receives no dock cursor region");
+    {
+        reach_dock *dock_capsule = static_cast<reach_dock *>(dock->capsule);
+        const reach_dock_layout *dock_layout = reach_dock_arranged_layout(dock_capsule);
+        expect_true(dock_layout != nullptr, "the framed dock exposes its layout");
+        if (dock_layout != nullptr)
+        {
+            reach_rect_f32 edge = reach_dock_resize_edge_rect(dock_layout);
+            reach_pointer_event pointer = {};
+            pointer.kind = REACH_POINTER_EVENT_MOVE;
+            pointer.x = (int32_t)(dock_layout->bounds.x + edge.x + edge.width * 0.5f);
+            pointer.y = (int32_t)(dock_layout->bounds.y + edge.y + edge.height * 0.5f);
+            reach_capsule_pointer_result moved = {};
+            reach_dock_capsule_ops()->handle_pointer(dock_capsule, &pointer, &moved);
+            reach_test_motion_clock_advance(0.25);
+            reach_feature_tick_result ticked = {};
+            reach_dock_capsule_ops()->tick(dock_capsule, 0.0, &ticked);
+        }
+    }
+    cursor_region_calls = 0;
+    dock->surface->dirty_flags = 1;
+    expect_true(reach_host_frame_registered_surface(host, dock, &frame) == REACH_OK,
+                "the armed dock frame succeeds");
+
     reach_feature_surface_geometry geometry = {};
     reach_dock_capsule_ops()->surface_geometry(dock->capsule, &geometry);
     reach_shadow_pad pad = reach_host_surface_shadow_pad(host, dock_id);
@@ -3999,6 +4024,12 @@ static void test_dock_rim_drag_release_saves_dock_size_through_the_bound_route(v
         reach_pointer_event pointer = {};
         pointer.button = REACH_POINTER_BUTTON_PRIMARY;
         reach_capsule_pointer_result result = {};
+        pointer.kind = REACH_POINTER_EVENT_MOVE;
+        pointer.x = x;
+        pointer.y = y;
+        ops->handle_pointer(dock, &pointer, &result);
+        reach_test_motion_clock_advance(0.25);
+        ops->tick(dock, 0.0, &tick);
         pointer.kind = REACH_POINTER_EVENT_DOWN;
         pointer.x = x;
         pointer.y = y;

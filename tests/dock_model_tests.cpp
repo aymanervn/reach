@@ -1,6 +1,8 @@
 #include "reach/support/util.h"
 #include "reach/core/config.h"
 #include "reach/features/dock.h"
+#include "motion_clock_test_support.h"
+#include "reach/support/motion.h"
 #include "test_utf16.h"
 #include "../src/features/dock/dock_interaction.h"
 
@@ -582,6 +584,8 @@ static void test_resize_edge_hits_the_top_rim(void)
     reach_dock_destroy(dock);
 }
 
+static void arm_resize_edge(reach_dock *dock);
+
 static void test_dock_geometry_exposes_resize_cursor_region(void)
 {
     const reach_feature_capsule_ops *ops = reach_dock_capsule_ops();
@@ -600,8 +604,13 @@ static void test_dock_geometry_exposes_resize_cursor_region(void)
     {
         geometry = {};
         ops->surface_geometry(dock, &geometry);
+        expect_true(geometry.has_resize_cursor_region == 0,
+                    "an unarmed rim offers no resize cursor region");
+        arm_resize_edge(dock);
+        geometry = {};
+        ops->surface_geometry(dock, &geometry);
         expect_true(geometry.has_resize_cursor_region == 1,
-                    "an arranged dock offers a resize cursor region");
+                    "an armed rim offers a resize cursor region");
         expect_true(
             reach_rect_equal(geometry.resize_cursor_region, reach_dock_resize_edge_rect(layout)),
             "the resize cursor region is exactly the rim the hit test resizes from");
@@ -750,6 +759,27 @@ static resize_edge_point resize_edge_point_of(const reach_dock *dock)
     return point;
 }
 
+static void resize_edge_move_to(reach_dock *dock, int32_t x, int32_t y)
+{
+    reach_capsule_pointer_result result = {};
+    resize_event(dock, REACH_POINTER_EVENT_MOVE, x, y, &result);
+}
+
+static void resize_edge_tick(reach_dock *dock)
+{
+    reach_feature_tick_result tick = {};
+    reach_dock_capsule_ops()->tick(dock, 0.0, &tick);
+}
+
+/* Hover the rim for longer than the dwell so a press starts the resize. */
+static void arm_resize_edge(reach_dock *dock)
+{
+    resize_edge_point edge = resize_edge_point_of(dock);
+    resize_edge_move_to(dock, edge.x, edge.y);
+    reach_test_motion_clock_advance(0.25);
+    resize_edge_tick(dock);
+}
+
 /* Press the edge, drag to each dy (positive is upward) in turn, then release where the last
    move ended. */
 static reach_capsule_pointer_result press_edge(reach_dock *dock, const float *dy_list, size_t count,
@@ -757,6 +787,7 @@ static reach_capsule_pointer_result press_edge(reach_dock *dock, const float *dy
 {
     resize_edge_point start = resize_edge_point_of(dock);
     reach_capsule_pointer_result result = {};
+    arm_resize_edge(dock);
     resize_event(dock, REACH_POINTER_EVENT_DOWN, start.x, start.y, &result);
     int32_t y = start.y;
     for (size_t index = 0; index < count; ++index)
@@ -778,6 +809,7 @@ static void test_resize_drag_up_and_down_scales_proportionally(void)
     resize_edge_point start = resize_edge_point_of(dock);
     int32_t down_y = start.y + (int32_t)lroundf(0.10f * start.native_height);
     reach_capsule_pointer_result result = {};
+    arm_resize_edge(dock);
     resize_event(dock, REACH_POINTER_EVENT_DOWN, start.x, start.y, &result);
     expect_true(result.handled && result.capture == 1 && result.sync_pointer_subscriptions,
                 "pressing the edge is handled and captures the pointer");
@@ -846,6 +878,7 @@ static void test_resize_press_never_activates_or_reorders(void)
     resize_edge_point start = resize_edge_point_of(dock);
     reach_capsule_pointer_result result = {};
     int32_t unexpected_actions = 0;
+    arm_resize_edge(dock);
     resize_event(dock, REACH_POINTER_EVENT_DOWN, start.x, start.y, &result);
     unexpected_actions += result.action.kind != REACH_FEATURE_ACTION_NONE;
     resize_event(dock, REACH_POINTER_EVENT_MOVE, start.x + 200, start.y, &result);
@@ -871,6 +904,7 @@ static void test_resize_cancel_restores_start_size(void)
         const reach_feature_capsule_ops *ops = reach_dock_capsule_ops();
         resize_edge_point start = resize_edge_point_of(dock);
         reach_capsule_pointer_result result = {};
+        arm_resize_edge(dock);
         resize_event(dock, REACH_POINTER_EVENT_DOWN, start.x, start.y, &result);
         resize_event(dock, REACH_POINTER_EVENT_MOVE, start.x,
                      start.y + (int32_t)lroundf(0.20f * start.native_height), &result);
@@ -922,6 +956,7 @@ static void test_resize_below_minimum_cap_never_saves_out_of_range(void)
     float height = resize_edge_point_of(dock).native_height;
     resize_edge_point click = resize_edge_point_of(dock);
     reach_capsule_pointer_result pressed = {};
+    arm_resize_edge(dock);
     resize_event(dock, REACH_POINTER_EVENT_DOWN, click.x, click.y, &pressed);
     expect_true(pressed.capture == 1, "the click lands on the resize edge");
     resize_event(dock, REACH_POINTER_EVENT_UP, click.x, click.y, &pressed);
@@ -977,6 +1012,7 @@ static void test_resize_config_echo_mid_drag_leaves_live_scale_alone(void)
     resize_edge_point start = resize_edge_point_of(dock);
     int32_t down_y = start.y + (int32_t)lroundf(0.10f * start.native_height);
     reach_capsule_pointer_result result = {};
+    arm_resize_edge(dock);
     resize_event(dock, REACH_POINTER_EVENT_DOWN, start.x, start.y, &result);
     resize_event(dock, REACH_POINTER_EVENT_MOVE, start.x, down_y, &result);
     reach_dock_arrange_context arrange = resize_arrange_context(1920.0f);
@@ -1006,6 +1042,7 @@ static void test_resize_keeps_dock_revealed(void)
     const reach_feature_capsule_ops *ops = reach_dock_capsule_ops();
     resize_edge_point start = resize_edge_point_of(dock);
     reach_capsule_pointer_result result = {};
+    arm_resize_edge(dock);
     resize_event(dock, REACH_POINTER_EVENT_DOWN, start.x, start.y, &result);
     expect_true(ops->pointer_sequence_active(dock) && ops->wants_pointer_move(dock) &&
                     ops->pointer_capture_active(dock),
@@ -1014,6 +1051,224 @@ static void test_resize_keeps_dock_revealed(void)
     expect_true(!ops->pointer_sequence_active(dock) && !ops->wants_pointer_move(dock) &&
                     !ops->pointer_capture_active(dock),
                 "releasing ends the resize sequence");
+    reach_dock_destroy(dock);
+}
+
+static int32_t resize_cursor_region_present(const reach_dock *dock)
+{
+    reach_feature_surface_geometry geometry = {};
+    reach_dock_capsule_ops()->surface_geometry(dock, &geometry);
+    return geometry.has_resize_cursor_region;
+}
+
+static resize_edge_point resize_slot_point_of(const reach_dock *dock)
+{
+    const reach_dock_layout *layout = reach_dock_arranged_layout(dock);
+    resize_edge_point point = {};
+    point.x =
+        (int32_t)(layout->bounds.x + layout->app_slots[0].x + layout->app_slots[0].width * 0.5f);
+    point.y =
+        (int32_t)(layout->bounds.y + layout->app_slots[0].y + layout->app_slots[0].height * 0.5f);
+    return point;
+}
+
+static void test_resize_edge_press_before_dwell_does_nothing(void)
+{
+    resize_route_log log = {};
+    reach_dock *dock = make_resize_dock(&log, 80, 1920.0f, 1);
+    expect_true(dock != nullptr, "dwell press test creates a dock");
+    if (dock == nullptr)
+        return;
+    const reach_feature_capsule_ops *ops = reach_dock_capsule_ops();
+    resize_edge_point edge = resize_edge_point_of(dock);
+    resize_edge_move_to(dock, edge.x, edge.y);
+    reach_capsule_pointer_result result = {};
+    resize_event(dock, REACH_POINTER_EVENT_DOWN, edge.x, edge.y, &result);
+    expect_true(result.handled == 0, "a press before the dwell is not handled");
+    expect_true(ops->pointer_sequence_active(dock) == 0, "a press before the dwell starts nothing");
+    resize_event(dock, REACH_POINTER_EVENT_UP, edge.x, edge.y, &result);
+    expect_true(log.calls == 0, "a press before the dwell saves nothing");
+    reach_dock_destroy(dock);
+}
+
+static void test_resize_edge_arms_after_dwell(void)
+{
+    resize_route_log log = {};
+    reach_dock *dock = make_resize_dock(&log, 80, 1920.0f, 1);
+    expect_true(dock != nullptr, "dwell arm test creates a dock");
+    if (dock == nullptr)
+        return;
+    resize_edge_point edge = resize_edge_point_of(dock);
+    resize_edge_move_to(dock, edge.x, edge.y);
+    reach_test_motion_clock_advance(0.19);
+    resize_edge_tick(dock);
+    expect_true(resize_cursor_region_present(dock) == 0, "no cursor region before 200 ms");
+    reach_test_motion_clock_advance(0.02);
+    resize_edge_tick(dock);
+    expect_true(resize_cursor_region_present(dock) == 1, "the cursor region appears after 200 ms");
+    reach_capsule_pointer_result result = {};
+    resize_event(dock, REACH_POINTER_EVENT_DOWN, edge.x, edge.y, &result);
+    expect_true(reach_dock_capsule_ops()->pointer_sequence_active(dock) == 1,
+                "a press after the dwell starts the resize");
+    reach_dock_destroy(dock);
+}
+
+static void test_resize_edge_dwell_restarts_when_pointer_leaves(void)
+{
+    resize_route_log log = {};
+    reach_dock *dock = make_resize_dock(&log, 80, 1920.0f, 1);
+    expect_true(dock != nullptr, "dwell restart test creates a dock");
+    if (dock == nullptr)
+        return;
+    resize_edge_point edge = resize_edge_point_of(dock);
+    resize_edge_point slot = resize_slot_point_of(dock);
+    resize_edge_move_to(dock, edge.x, edge.y);
+    reach_test_motion_clock_advance(0.15);
+    resize_edge_move_to(dock, slot.x, slot.y);
+    reach_test_motion_clock_advance(0.15);
+    resize_edge_move_to(dock, edge.x, edge.y);
+    reach_test_motion_clock_advance(0.15);
+    resize_edge_tick(dock);
+    expect_true(resize_cursor_region_present(dock) == 0, "re-entering restarts the dwell");
+    reach_capsule_pointer_result result = {};
+    resize_event(dock, REACH_POINTER_EVENT_DOWN, edge.x, edge.y, &result);
+    expect_true(reach_dock_capsule_ops()->pointer_sequence_active(dock) == 0,
+                "a press during the restarted dwell does nothing");
+    resize_event(dock, REACH_POINTER_EVENT_UP, edge.x, edge.y, &result);
+    reach_test_motion_clock_advance(0.06);
+    resize_edge_tick(dock);
+    expect_true(resize_cursor_region_present(dock) == 1, "the restarted dwell completes");
+    reach_dock_destroy(dock);
+}
+
+static void test_sliding_across_the_rim_never_shows_the_cursor_region(void)
+{
+    resize_route_log log = {};
+    reach_dock *dock = make_resize_dock(&log, 80, 1920.0f, 1);
+    expect_true(dock != nullptr, "slide test creates a dock");
+    if (dock == nullptr)
+        return;
+    resize_edge_point edge = resize_edge_point_of(dock);
+    resize_edge_point slot = resize_slot_point_of(dock);
+    int32_t ever_shown = 0;
+    for (int32_t pass = 0; pass < 5; ++pass)
+    {
+        resize_edge_move_to(dock, edge.x, edge.y);
+        reach_test_motion_clock_advance(0.05);
+        resize_edge_tick(dock);
+        ever_shown |= resize_cursor_region_present(dock);
+        resize_edge_move_to(dock, slot.x, slot.y);
+        resize_edge_tick(dock);
+        ever_shown |= resize_cursor_region_present(dock);
+    }
+    expect_true(ever_shown == 0, "sliding across the rim never shows the cursor region");
+    resize_edge_move_to(dock, edge.x, edge.y);
+    reach_capsule_pointer_result pressed = {};
+    resize_event(dock, REACH_POINTER_EVENT_DOWN, edge.x, edge.y, &pressed);
+    expect_true(pressed.handled == 0 &&
+                    reach_dock_capsule_ops()->pointer_sequence_active(dock) == 0,
+                "a press after summed band time under many short stays does nothing");
+    reach_dock_destroy(dock);
+}
+
+static void test_resize_edge_further_band_moves_do_not_restart_the_dwell(void)
+{
+    resize_route_log log = {};
+    reach_dock *dock = make_resize_dock(&log, 80, 1920.0f, 1);
+    expect_true(dock != nullptr, "dwell no-restart test creates a dock");
+    if (dock == nullptr)
+        return;
+    resize_edge_point edge = resize_edge_point_of(dock);
+    resize_edge_move_to(dock, edge.x, edge.y);
+    reach_test_motion_clock_advance(0.15);
+    resize_edge_move_to(dock, edge.x + 1, edge.y);
+    reach_test_motion_clock_advance(0.06);
+    resize_edge_tick(dock);
+    expect_true(resize_cursor_region_present(dock) == 1,
+                "moves along the band do not restart the dwell");
+    reach_capsule_pointer_result result = {};
+    resize_event(dock, REACH_POINTER_EVENT_DOWN, edge.x, edge.y, &result);
+    expect_true(reach_dock_capsule_ops()->pointer_sequence_active(dock) == 1,
+                "a press after the original dwell starts the resize");
+    reach_dock_destroy(dock);
+}
+
+static void test_resize_edge_game_mode_and_reset_disarm(void)
+{
+    resize_route_log log = {};
+    reach_dock *dock = make_resize_dock(&log, 80, 1920.0f, 1);
+    expect_true(dock != nullptr, "dwell disarm test creates a dock");
+    if (dock == nullptr)
+        return;
+    const reach_feature_capsule_ops *ops = reach_dock_capsule_ops();
+    arm_resize_edge(dock);
+    expect_true(resize_cursor_region_present(dock) == 1, "the rim is armed before game mode");
+    ops->on_game_mode(dock, 1);
+    resize_edge_tick(dock);
+    expect_true(resize_cursor_region_present(dock) == 0, "game mode disarms the rim");
+    arm_resize_edge(dock);
+    expect_true(resize_cursor_region_present(dock) == 1, "the rim re-arms after game mode");
+    ops->reset(dock);
+    resize_edge_tick(dock);
+    expect_true(resize_cursor_region_present(dock) == 0, "a capsule reset disarms the rim");
+    reach_dock_destroy(dock);
+}
+
+static void test_resize_edge_leave_disarms(void)
+{
+    resize_route_log log = {};
+    reach_dock *dock = make_resize_dock(&log, 80, 1920.0f, 1);
+    expect_true(dock != nullptr, "dwell leave test creates a dock");
+    if (dock == nullptr)
+        return;
+    arm_resize_edge(dock);
+    expect_true(resize_cursor_region_present(dock) == 1, "the rim is armed");
+    resize_edge_point edge = resize_edge_point_of(dock);
+    reach_capsule_pointer_result result = {};
+    resize_event(dock, REACH_POINTER_EVENT_LEAVE, edge.x, edge.y, &result);
+    expect_true(result.relayout == 1, "disarming asks the host to re-sync the cursor region");
+    expect_true(resize_cursor_region_present(dock) == 0, "leaving the dock disarms the rim");
+    resize_edge_move_to(dock, edge.x, edge.y);
+    resize_event(dock, REACH_POINTER_EVENT_DOWN, edge.x, edge.y, &result);
+    expect_true(reach_dock_capsule_ops()->pointer_sequence_active(dock) == 0,
+                "a press right after re-entering does nothing");
+    resize_event(dock, REACH_POINTER_EVENT_UP, edge.x, edge.y, &result);
+    reach_dock_destroy(dock);
+}
+
+static void test_resize_edge_dwell_exposes_a_wake_deadline(void)
+{
+    resize_route_log log = {};
+    reach_dock *dock = make_resize_dock(&log, 80, 1920.0f, 1);
+    expect_true(dock != nullptr, "dwell deadline test creates a dock");
+    if (dock == nullptr)
+        return;
+    const reach_feature_capsule_ops *ops = reach_dock_capsule_ops();
+    resize_edge_point edge = resize_edge_point_of(dock);
+    const double now = reach_motion_now_seconds();
+    resize_edge_move_to(dock, edge.x, edge.y);
+    reach_feature_surface_geometry geometry = {};
+    ops->surface_geometry(dock, &geometry);
+    expect_true(geometry.deadline_seconds >= now + 0.19 && geometry.deadline_seconds <= now + 0.21,
+                "the dwell exposes a wake deadline about 200 ms ahead");
+    reach_test_motion_clock_advance(0.25);
+    resize_edge_tick(dock);
+    geometry = {};
+    ops->surface_geometry(dock, &geometry);
+    expect_true(geometry.deadline_seconds == 0.0, "an armed rim has no pending deadline");
+    reach_dock_destroy(dock);
+}
+
+static void test_resize_edge_disarms_after_the_resize_ends(void)
+{
+    resize_route_log log = {};
+    reach_dock *dock = make_resize_dock(&log, 80, 1920.0f, 1);
+    expect_true(dock != nullptr, "dwell end test creates a dock");
+    if (dock == nullptr)
+        return;
+    float up[1] = {20.0f};
+    (void)press_edge(dock, up, 1);
+    expect_true(resize_cursor_region_present(dock) == 0, "the rim disarms once the resize ends");
     reach_dock_destroy(dock);
 }
 
@@ -1202,6 +1457,15 @@ int main(void)
     test_resize_commit_then_config_echo_is_silent();
     test_resize_config_echo_mid_drag_leaves_live_scale_alone();
     test_resize_keeps_dock_revealed();
+    test_resize_edge_press_before_dwell_does_nothing();
+    test_resize_edge_arms_after_dwell();
+    test_resize_edge_dwell_restarts_when_pointer_leaves();
+    test_sliding_across_the_rim_never_shows_the_cursor_region();
+    test_resize_edge_further_band_moves_do_not_restart_the_dwell();
+    test_resize_edge_game_mode_and_reset_disarm();
+    test_resize_edge_leave_disarms();
+    test_resize_edge_dwell_exposes_a_wake_deadline();
+    test_resize_edge_disarms_after_the_resize_ends();
     test_pinned_reorder_survives_the_config_round_trip();
     test_unpinned_windows_group_into_one_item();
     test_item_keeps_every_open_window_as_an_instance();

@@ -213,6 +213,33 @@ static int32_t reach_platform_window_unpresent_point(const reach_platform_window
     return 1;
 }
 
+static void reach_platform_window_update_cursor(const reach_platform_window *window, HWND hwnd,
+                                                bool client_area)
+{
+    if (window != nullptr && window->has_cursor_region && client_area)
+    {
+        POINT point = {};
+        if (GetCursorPos(&point) && ScreenToClient(hwnd, &point))
+        {
+            float point_x = (float)point.x;
+            float point_y = (float)point.y;
+            const reach_rect_f32 &region = window->cursor_region;
+            if (reach_platform_window_unpresent_point(window, reach_motion_now_seconds(), &point_x,
+                                                      &point_y) &&
+                point_x >= region.x && point_x < region.x + region.width && point_y >= region.y &&
+                point_y < region.y + region.height)
+            {
+                SetCursor(LoadCursor(nullptr, IDC_SIZENS));
+                return;
+            }
+        }
+    }
+    SetCursor(LoadCursor(
+        nullptr, window != nullptr && (window->window_flags & REACH_WINDOW_CROSSHAIR_CURSOR) != 0
+                     ? IDC_CROSS
+                     : IDC_ARROW));
+}
+
 static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 {
     reach_platform_window *window =
@@ -296,28 +323,7 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
         }
         return DefWindowProcW(hwnd, message, wparam, lparam);
     case WM_SETCURSOR:
-        if (window != nullptr && window->has_cursor_region && LOWORD(lparam) == HTCLIENT)
-        {
-            POINT point = {};
-            if (GetCursorPos(&point) && ScreenToClient(hwnd, &point))
-            {
-                float point_x = (float)point.x;
-                float point_y = (float)point.y;
-                const reach_rect_f32 &region = window->cursor_region;
-                if (reach_platform_window_unpresent_point(window, reach_motion_now_seconds(),
-                                                          &point_x, &point_y) &&
-                    point_x >= region.x && point_x < region.x + region.width &&
-                    point_y >= region.y && point_y < region.y + region.height)
-                {
-                    SetCursor(LoadCursor(nullptr, IDC_SIZENS));
-                    return TRUE;
-                }
-            }
-        }
-        SetCursor(LoadCursor(nullptr, window != nullptr && (window->window_flags &
-                                                            REACH_WINDOW_CROSSHAIR_CURSOR) != 0
-                                          ? IDC_CROSS
-                                          : IDC_ARROW));
+        reach_platform_window_update_cursor(window, hwnd, LOWORD(lparam) == HTCLIENT);
         return TRUE;
     case WM_ACTIVATE:
         if (window != nullptr && LOWORD(wparam) == WA_INACTIVE &&
@@ -1224,13 +1230,34 @@ static reach_result reach_platform_window_set_input_regions(reach_platform_windo
     return REACH_OK;
 }
 
+static void reach_platform_window_refresh_cursor(reach_platform_window *window)
+{
+    /* Windows sends no WM_SETCURSOR under mouse capture, so the cursor set at press time must stay.
+     */
+    if (GetCapture() != nullptr)
+        return;
+    POINT point = {};
+    if (window->hwnd == nullptr || !GetCursorPos(&point) ||
+        WindowFromPoint(point) != window->hwnd ||
+        SendMessageW(window->hwnd, WM_NCHITTEST, 0, MAKELPARAM(point.x, point.y)) != HTCLIENT)
+        return;
+    reach_platform_window_update_cursor(window, window->hwnd, true);
+}
+
 static reach_result reach_platform_window_set_cursor_region(reach_platform_window *window,
                                                             const reach_rect_f32 *region)
 {
     if (window == nullptr)
         return REACH_INVALID_ARGUMENT;
+    const int had_region = window->has_cursor_region;
+    const reach_rect_f32 previous = window->cursor_region;
     window->has_cursor_region = region != nullptr && region->width > 0.0f && region->height > 0.0f;
     window->cursor_region = window->has_cursor_region ? *region : reach_rect_f32{};
+    /* Windows only asks for the cursor when the mouse moves, so a region that appears under a
+       resting pointer has to refresh it here. */
+    if (had_region != window->has_cursor_region ||
+        (window->has_cursor_region && !reach_rect_equal(previous, window->cursor_region)))
+        reach_platform_window_refresh_cursor(window);
     return REACH_OK;
 }
 
