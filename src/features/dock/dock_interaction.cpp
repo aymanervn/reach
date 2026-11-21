@@ -14,6 +14,43 @@ static int32_t reach_dock_rect_contains(reach_rect_f32 rect, int32_t x, int32_t 
            (float)y <= rect.y + rect.height;
 }
 
+/* 6 dp at the default 64 dp dock height; native_height already carries the dpi scale. */
+static const float REACH_DOCK_RESIZE_EDGE_HEIGHT_RATIO = 6.0f / 64.0f;
+
+reach_rect_f32 reach_dock_resize_edge_rect(const reach_dock_layout *layout)
+{
+    reach_rect_f32 none = {};
+    if (layout == nullptr)
+    {
+        return none;
+    }
+
+    /* The pill background is drawn from local y = 0 across the full bounds width. */
+    float content_top = layout->trigger_button.y;
+    for (size_t index = 0; index < layout->app_slot_count; ++index)
+    {
+        if (layout->app_slots[index].y < content_top)
+        {
+            content_top = layout->app_slots[index].y;
+        }
+    }
+
+    float height = layout->native_height * REACH_DOCK_RESIZE_EDGE_HEIGHT_RATIO;
+    if (content_top < height)
+    {
+        height = content_top;
+    }
+
+    float radius = reach_theme_dock_corner_radius(nullptr, layout->bounds.height);
+    float width = layout->bounds.width - radius * 2.0f;
+    if (height <= 0.0f || width <= 0.0f)
+    {
+        return none;
+    }
+
+    return {radius, 0.0f, width, height};
+}
+
 reach_dock_hit_result reach_dock_hit_test(const reach_dock_layout *layout, int32_t x, int32_t y)
 {
     reach_dock_hit_result result = {};
@@ -22,6 +59,14 @@ reach_dock_hit_result reach_dock_hit_test(const reach_dock_layout *layout, int32
 
     if (layout == nullptr)
     {
+        return result;
+    }
+
+    reach_rect_f32 edge = reach_dock_resize_edge_rect(layout);
+    if ((float)x >= edge.x && (float)x < edge.x + edge.width && (float)y >= edge.y &&
+        (float)y < edge.y + edge.height)
+    {
+        result.type = REACH_DOCK_HIT_RESIZE_EDGE;
         return result;
     }
 
