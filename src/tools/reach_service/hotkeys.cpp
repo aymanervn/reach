@@ -1,4 +1,5 @@
 #include "hotkeys.h"
+#include "touchpad.h"
 
 #include "../../adapters/windows/window_management/reach_service_shared_state_win32.h"
 
@@ -535,10 +536,13 @@ static DWORD WINAPI reach_helper_hotkey_thread(void *param)
     g_hotkeys.thread_id = GetCurrentThreadId();
     g_hotkeys.hook =
         SetWindowsHookExW(WH_KEYBOARD_LL, reach_helper_keyboard_proc, GetModuleHandleW(nullptr), 0);
+    reach_helper_touchpad_start();
 
     while (GetMessageW(&message, nullptr, 0, 0) > 0)
     {
+        DispatchMessageW(&message);
     }
+    reach_helper_touchpad_stop();
 
     if (g_hotkeys.hook != nullptr)
     {

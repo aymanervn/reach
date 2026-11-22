@@ -1578,6 +1578,8 @@ reach_result reach_host_set_feature_registry(reach_host *host,
             ((lifecycle.attach == nullptr) != (lifecycle.detach == nullptr)) ||
             (lifecycle.start != nullptr && lifecycle.stop == nullptr) ||
             (entry.toggle_event_count != 0 && entry.toggle_events == nullptr) ||
+            (entry.open_event_count != 0 && entry.open_events == nullptr) ||
+            (entry.close_event_count != 0 && entry.close_events == nullptr) ||
             (entry.routed_event_count != 0 && entry.routed_events == nullptr) ||
             (entry.window_event_count != 0 && entry.window_events == nullptr))
         {
@@ -1853,6 +1855,8 @@ reach_result reach_host_init_feature_registry(reach_host *host)
             definition.capsule_ops = reach_stage_capsule_ops();
             definition.surface_ops = &reach_stage_surface_ops;
             definition.control_ops = &reach_stage_control_ops;
+            definition.open_events = reach_stage_open_events(&definition.open_event_count);
+            definition.close_events = reach_stage_close_events(&definition.close_event_count);
             definition.surface.refresh_world_on_open = 1;
             definition.surface.dismiss_guard_surface = &reach_surface_key_for<reach_dock>();
             definition.surface.dismiss_guard_slot = REACH_DOCK_CONTROL_TRIGGER;

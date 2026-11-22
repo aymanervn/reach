@@ -414,6 +414,12 @@ typedef struct reach_feature_definition
 
     const reach_ui_event_type *toggle_events;
     size_t toggle_event_count;
+    // Open-only and close-only counterparts of toggle events. A close event that closes an open
+    // surface is consumed.
+    const reach_ui_event_type *open_events;
+    size_t open_event_count;
+    const reach_ui_event_type *close_events;
+    size_t close_event_count;
     // Routed events and toggles are shell-wide regardless of which window emitted the event.
     const reach_ui_event_type *routed_events;
     size_t routed_event_count;

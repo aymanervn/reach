@@ -27,6 +27,7 @@ reach_service_shared_finish_window_manipulation(const reach_service_window_snaps
                                                 uint32_t window_count);
 reach_result reach_service_shared_publish_game_mode(int32_t active);
 reach_result reach_service_shared_append_hotkey(uint32_t key, uint32_t action, uint32_t modifiers);
+reach_result reach_service_shared_append_gesture(uint32_t ui_event);
 
 reach_result reach_service_shared_reader_subscribe(reach_service_shared_reader_callback callback,
                                                    void *user);

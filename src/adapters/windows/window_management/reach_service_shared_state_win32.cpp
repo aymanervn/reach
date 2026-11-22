@@ -837,7 +837,8 @@ reach_result reach_service_shared_publish_game_mode(int32_t active)
     return REACH_OK;
 }
 
-reach_result reach_service_shared_append_hotkey(uint32_t key, uint32_t action, uint32_t modifiers)
+static reach_result reach_service_shared_append_record(uint32_t key, uint32_t action,
+                                                       uint32_t modifiers, uint32_t ui_event)
 {
     if (g_writer.view == nullptr)
     {
@@ -869,6 +870,7 @@ reach_result reach_service_shared_append_hotkey(uint32_t key, uint32_t action, u
     record.key = key;
     record.action = action;
     record.modifiers = modifiers;
+    record.ui_event = ui_event;
     g_writer.view->hotkeys[index] = record;
 
     if (g_writer.view->hotkey_queue_count == 1)
@@ -884,4 +886,15 @@ reach_result reach_service_shared_append_hotkey(uint32_t key, uint32_t action, u
     ++g_writer.view->hotkey_sequence;
     reach_shared_writer_end_publish();
     return REACH_OK;
+}
+
+reach_result reach_service_shared_append_hotkey(uint32_t key, uint32_t action, uint32_t modifiers)
+{
+    return reach_service_shared_append_record(key, action, modifiers, 0);
+}
+
+reach_result reach_service_shared_append_gesture(uint32_t ui_event)
+{
+    return reach_service_shared_append_record(REACH_SERVICE_HOTKEY_GESTURE,
+                                              REACH_SERVICE_HOTKEY_PRESSED, 0, ui_event);
 }
