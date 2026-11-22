@@ -25,6 +25,7 @@ Reach replaces Windows Explorer, nothing gets deleted, only an entry in the regi
 - Multiple theme, style and font selection options and supports both dark and light themes
 - Enhanced features, a lot of quality of life improvements over Windows explorer
 - Stage manager with live window thumbnails and smooth animations.
+- Three-finger touchpad swipes, also over admin windows: left and right switch apps, up opens Stage, down closes it or shows the desktop
 - Configurable screen off, sleep, shutdown and restart timer
 - System HUD for hardware keys such as brightness, audio controls and media
 - You can run commands directly from the launcher, start by typing ! followed by a command to run it in the windows terminal if its installed

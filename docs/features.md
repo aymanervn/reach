@@ -22,9 +22,17 @@
 - On an app-click handoff, the activated window is published as a presentation-only front source and stays above the other relationships through teardown, with its tile chrome drawn last. This must not fork close geometry, timing or teardown.
 - Stage thumbnails are best-effort during presentation: retry missing relationships without aborting the frame. Close boundaries stay strict.
 
+## Touchpad gestures
+
+- Three-finger swipes on a precision touchpad are read and recognized in the elevated `reachService` helper, which keeps receiving every contact while an elevated window has focus. Recognized swipes reach `reach.exe` as gesture records in the shared hotkey queue. Swipes need the helper, like Alt+Tab and Win+D.
+- Exactly three contacts start a gesture; a fourth abandons it.
+- Left and right drive the Switcher through the Alt+Tab events; left mirrors right. The step per app shrinks with finger speed, from 20% of the pad width for slow drags to 10% for quick swipes. Travelling back walks toward the current app; lifting a finger commits. A keyboard Alt+Tab in progress wins.
+- Up opens Stage. Down closes Stage when it is open, otherwise minimizes all windows like Win+D.
+
 ## Game mode
 
 - Game mode suppresses Reach actions for the Windows key and its chords without consuming them (`src/tools/reach_service/hotkeys.cpp`).
+- Three-finger left and right stay active; up and down are ignored.
 - Alt-Tab and media/volume keys stay active. Switcher stays visible and never minimizes the game; committing another target exits the game through ordinary activation. Now Playing stays active with async metadata and covers.
 - `system_stats` sampling stops during game mode and rebaselines after.
 - Game mode never changes a monitor work area; a static Top Bar reservation stays applied (`reach_host_update_game_mode_surfaces`, `reach_host_sync_work_area_reservation`).
