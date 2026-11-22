@@ -27,34 +27,33 @@ void reach_host_sync_surface_input_regions(const reach_host *host,
                                                       region_count);
 }
 
-/* Pushes the geometry's resize cursor region in the window-local space the input regions use,
-   only when it differs from what the window last received. */
 static void reach_host_sync_surface_cursor_region(reach_feature_runtime *desc,
                                                   const reach_feature_surface_geometry *geometry,
                                                   reach_transform_f32 transform)
 {
     if (desc->surface == nullptr || desc->surface->window.ops.set_cursor_region == nullptr)
         return;
-    int32_t valid = geometry->has_resize_cursor_region &&
-                    geometry->resize_cursor_region.width > 0.0f &&
-                    geometry->resize_cursor_region.height > 0.0f;
+    reach_cursor_kind kind =
+        geometry->cursor_region.width > 0.0f && geometry->cursor_region.height > 0.0f
+            ? geometry->cursor_kind
+            : REACH_CURSOR_DEFAULT;
     reach_rect_f32 region = {};
-    if (valid)
+    if (kind != REACH_CURSOR_DEFAULT)
     {
-        region = geometry->resize_cursor_region;
+        region = geometry->cursor_region;
         region.x = region.x * transform.scale_x + transform.offset_x;
         region.y = region.y * transform.scale_y + transform.offset_y;
         region.width *= transform.scale_x;
         region.height *= transform.scale_y;
     }
     reach_platform_window *window = desc->surface->window.window;
-    if (desc->cursor_region_window == window && desc->cursor_region_valid == valid &&
-        (!valid || reach_rect_equal(desc->cursor_region, region)))
+    if (desc->cursor_region_window == window && desc->cursor_kind == kind &&
+        (kind == REACH_CURSOR_DEFAULT || reach_rect_equal(desc->cursor_region, region)))
         return;
-    if (desc->surface->window.ops.set_cursor_region(window, valid ? &region : nullptr) != REACH_OK)
+    if (desc->surface->window.ops.set_cursor_region(window, &region, kind) != REACH_OK)
         return;
     desc->cursor_region_window = window;
-    desc->cursor_region_valid = valid;
+    desc->cursor_kind = kind;
     desc->cursor_region = region;
 }
 
@@ -723,8 +722,7 @@ static int32_t reach_host_surface_geometry_equal(const reach_feature_surface_geo
            reach_motion_equal(&a->presentation.center_x, &b->presentation.center_x) &&
            reach_motion_equal(&a->presentation.center_y, &b->presentation.center_y) &&
            reach_render_group_equal(&a->presentation.group, &b->presentation.group) &&
-           a->has_resize_cursor_region == b->has_resize_cursor_region &&
-           reach_rect_equal(a->resize_cursor_region, b->resize_cursor_region);
+           a->cursor_kind == b->cursor_kind && reach_rect_equal(a->cursor_region, b->cursor_region);
 }
 
 static void reach_host_cache_surface_frame(reach_feature_runtime *desc,

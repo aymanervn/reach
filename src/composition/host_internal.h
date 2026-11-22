@@ -469,7 +469,7 @@ typedef struct reach_feature_runtime
     reach_feature_surface_geometry frame_geometry;
     reach_shadow_pad native_overlay_shadow_pad;
     reach_platform_window *cursor_region_window;
-    int32_t cursor_region_valid;
+    reach_cursor_kind cursor_kind;
     reach_rect_f32 cursor_region;
     const reach_feature_definition *definition;
 } reach_feature_runtime;

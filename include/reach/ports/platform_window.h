@@ -96,10 +96,10 @@ extern "C"
         reach_result (*take_keyboard_focus)(reach_platform_window *window);
         /* Reapply the surface's platform-managed stacking while it is presented. */
         reach_result (*restack)(reach_platform_window *window);
-        /* A window-local rect (the space of set_input_regions) that shows the vertical resize
-           cursor; nullptr clears it. */
+        /* region is window-local, in the space of set_input_regions; REACH_CURSOR_DEFAULT clears
+           it. */
         reach_result (*set_cursor_region)(reach_platform_window *window,
-                                          const reach_rect_f32 *region);
+                                          const reach_rect_f32 *region, reach_cursor_kind kind);
     } reach_platform_window_ops;
 
     typedef struct reach_platform_window_port

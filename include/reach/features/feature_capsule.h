@@ -141,9 +141,9 @@ extern "C"
             reach_motion center_x;
             reach_motion center_y;
         } presentation;
-        /* Where the pointer shows the vertical resize cursor, local to visible_bounds. */
-        int32_t has_resize_cursor_region;
-        reach_rect_f32 resize_cursor_region;
+        /* Local to visible_bounds; REACH_CURSOR_DEFAULT means no region. */
+        reach_cursor_kind cursor_kind;
+        reach_rect_f32 cursor_region;
     } reach_feature_surface_geometry;
 
     typedef struct reach_feature_capsule_ops

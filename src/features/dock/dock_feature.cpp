@@ -68,7 +68,6 @@ struct reach_dock
     reach_rect_f32 settled_bounds;
     int32_t settled_bounds_valid;
     int32_t configured_size;
-    int32_t resize_cap_percent;
     int32_t resize_active;
     int32_t resize_start_y;
     int32_t resize_start_setting;
@@ -81,6 +80,7 @@ struct reach_dock
     int32_t resize_edge_armed;
     uint32_t next_app_key;
     reach_dock_routes routes;
+    reach_dock_size_writer size_writer;
     const reach_theme *pointer_theme;
     reach_dock_layout pointer_layout;
     int32_t pointer_layout_valid;
@@ -114,6 +114,14 @@ void reach_dock_attach_services(reach_dock *dock, reach_icon_service *icons,
     {
         dock->icons = icons;
         dock->windows = windows;
+    }
+}
+
+void reach_dock_bind_size_writer(reach_dock *dock, reach_dock_size_writer writer)
+{
+    if (dock != nullptr)
+    {
+        dock->size_writer = writer;
     }
 }
 
@@ -190,7 +198,6 @@ reach_result reach_dock_create(reach_dock **out_animations)
     reach_dock_model_defaults(&animations->metrics);
     reach_motion_set(&animations->size_scale, 1.0f);
     animations->configured_size = REACH_CONFIG_DOCK_SIZE_MAX;
-    animations->resize_cap_percent = REACH_CONFIG_DOCK_SIZE_MAX;
     reach_motion_set(&animations->y_motion, 0.0f);
     animations->auto_hide = 1;
     for (reach_motion &motion : animations->slot_motions)
@@ -365,8 +372,6 @@ size_t reach_dock_collect_item_windows(reach_dock *dock, size_t item_index,
     return count;
 }
 
-/* Rim resize session. The drag drives the live size scale; only a release that changed the
-   setting reports it, so the dock never writes configuration while the pointer is moving. */
 static void reach_dock_resize_apply_percent(reach_dock *dock, float percent)
 {
     reach_motion_set(&dock->size_scale, percent / (float)REACH_CONFIG_DOCK_SIZE_MAX);
@@ -374,16 +379,18 @@ static void reach_dock_resize_apply_percent(reach_dock *dock, float percent)
 
 static void reach_dock_resize_begin(reach_dock *dock, int32_t screen_y)
 {
-    const int32_t cap = dock->resize_cap_percent;
+    const float max_scale = dock->pointer_layout.max_size_scale;
+    const int32_t cap = max_scale > 0.0f && max_scale < 1.0f
+                            ? (int32_t)floorf(max_scale * (float)REACH_CONFIG_DOCK_SIZE_MAX)
+                            : REACH_CONFIG_DOCK_SIZE_MAX;
     dock->resize_active = 1;
     dock->resize_start_scale = dock->size_scale.to;
     dock->resize_start_y = screen_y;
     dock->resize_start_setting = dock->configured_size;
     dock->resize_start_visible_percent =
         (float)(dock->configured_size < cap ? dock->configured_size : cap);
-    int32_t upper = cap < REACH_CONFIG_DOCK_SIZE_MAX ? cap : REACH_CONFIG_DOCK_SIZE_MAX;
     dock->resize_upper_percent =
-        upper > REACH_CONFIG_DOCK_SIZE_MIN ? upper : REACH_CONFIG_DOCK_SIZE_MIN;
+        cap > REACH_CONFIG_DOCK_SIZE_MIN ? cap : REACH_CONFIG_DOCK_SIZE_MIN;
     int32_t start_percent = (int32_t)lroundf(dock->resize_start_visible_percent);
     if (start_percent < REACH_CONFIG_DOCK_SIZE_MIN)
         start_percent = REACH_CONFIG_DOCK_SIZE_MIN;
@@ -422,7 +429,6 @@ static void reach_dock_resize_cancel(reach_dock *dock)
 static void reach_dock_resize_commit(reach_dock *dock)
 {
     dock->resize_active = 0;
-    /* A click, or a drag that ends where it began, changes nothing. */
     if (dock->resize_percent == dock->resize_start_percent)
     {
         reach_motion_set(&dock->size_scale, dock->resize_start_scale);
@@ -433,12 +439,10 @@ static void reach_dock_resize_commit(reach_dock *dock)
     const int32_t save = dock->resize_percent;
     dock->configured_size = save;
     reach_dock_resize_apply_percent(dock, (float)save);
-    if (save != dock->resize_start_setting && dock->routes.size_committed != nullptr)
-        dock->routes.size_committed(dock->routes.user, save);
+    if (save != dock->resize_start_setting && dock->size_writer.submit != nullptr)
+        (void)dock->size_writer.submit(dock->size_writer.context, save);
 }
 
-/* The rim unlocks only after the pointer rests on it, so sliding across it never flashes the
-   resize cursor and a stray press there does nothing. Returns whether it was armed. */
 static int32_t reach_dock_resize_edge_disarm(reach_dock *dock)
 {
     const int32_t was_armed = dock->resize_edge_armed;
@@ -568,11 +572,11 @@ static void reach_dock_capsule_surface_geometry(const void *capsule,
     if (dock != nullptr && dock->pointer_layout_valid)
     {
         out->visible_bounds = dock->pointer_layout.bounds;
-        /* The cursor region is the exact band the hit test resizes from. */
-        out->resize_cursor_region = reach_dock_resize_edge_rect(&dock->pointer_layout);
-        out->has_resize_cursor_region = (dock->resize_edge_armed || dock->resize_active) &&
-                                        out->resize_cursor_region.width > 0.0f &&
-                                        out->resize_cursor_region.height > 0.0f;
+        if (dock->resize_edge_armed || dock->resize_active)
+        {
+            out->cursor_region = dock->pointer_layout.resize_edge;
+            out->cursor_kind = REACH_CURSOR_RESIZE_VERTICAL;
+        }
     }
     if (dock == nullptr)
     {
@@ -2114,14 +2118,10 @@ void reach_dock_build_layout(reach_dock *dock, const reach_dock_build_context *c
     const reach_dock_fit_result fit = reach_dock_fit_metrics(
         native_height, ctx->icon_size * dpi_scale, ctx->gap * dpi_scale, native_border_thickness,
         layout->available_width, app_slot_units, ctx->size_scale);
-    /* The largest size the width allows, for the rim resize to clamp against. */
     const reach_dock_fit_result full_fit = reach_dock_fit_metrics(
         native_height, ctx->icon_size * dpi_scale, ctx->gap * dpi_scale, native_border_thickness,
         layout->available_width, app_slot_units, 1.0f);
-    dock->resize_cap_percent =
-        full_fit.scale >= 1.0f
-            ? REACH_CONFIG_DOCK_SIZE_MAX
-            : (int32_t)floorf(full_fit.scale * (float)REACH_CONFIG_DOCK_SIZE_MAX);
+    layout->max_size_scale = full_fit.scale < 1.0f ? full_fit.scale : 1.0f;
     const float center_x = layout->bounds.x + layout->bounds.width * 0.5f;
     const float bottom = layout->bounds.y + layout->bounds.height;
     layout->bounds.x = center_x - fit.width * 0.5f;
@@ -2174,6 +2174,7 @@ void reach_dock_build_layout(reach_dock *dock, const reach_dock_build_context *c
         x += app_slot_width;
     }
 
+    layout->resize_edge = reach_dock_resize_edge_rect(ctx->theme, layout);
     dock->pointer_layout = *layout;
     dock->pointer_layout_valid = 1;
 }

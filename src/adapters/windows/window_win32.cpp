@@ -34,7 +34,7 @@ struct reach_platform_window
     int input_regions_active;
     reach_platform_window_input_presentation input_presentation;
     int input_passthrough;
-    int has_cursor_region;
+    reach_cursor_kind cursor_kind;
     reach_rect_f32 cursor_region;
 };
 
@@ -181,8 +181,6 @@ static void reach_delete_menu_font(HFONT font)
     }
 }
 
-/* Maps a client point back through the window's input presentation (its retained translation and
-   scale) into the space of its input regions; returns 0 while the presentation has no extent. */
 static int32_t reach_platform_window_unpresent_point(const reach_platform_window *window,
                                                      double now_seconds, float *point_x,
                                                      float *point_y)
@@ -213,10 +211,22 @@ static int32_t reach_platform_window_unpresent_point(const reach_platform_window
     return 1;
 }
 
+static LPCWSTR reach_platform_window_cursor_id(reach_cursor_kind kind)
+{
+    switch (kind)
+    {
+    case REACH_CURSOR_RESIZE_VERTICAL:
+        return IDC_SIZENS;
+    case REACH_CURSOR_DEFAULT:
+    default:
+        return IDC_ARROW;
+    }
+}
+
 static void reach_platform_window_update_cursor(const reach_platform_window *window, HWND hwnd,
                                                 bool client_area)
 {
-    if (window != nullptr && window->has_cursor_region && client_area)
+    if (window != nullptr && window->cursor_kind != REACH_CURSOR_DEFAULT && client_area)
     {
         POINT point = {};
         if (GetCursorPos(&point) && ScreenToClient(hwnd, &point))
@@ -229,7 +239,8 @@ static void reach_platform_window_update_cursor(const reach_platform_window *win
                 point_x >= region.x && point_x < region.x + region.width && point_y >= region.y &&
                 point_y < region.y + region.height)
             {
-                SetCursor(LoadCursor(nullptr, IDC_SIZENS));
+                SetCursor(
+                    LoadCursor(nullptr, reach_platform_window_cursor_id(window->cursor_kind)));
                 return;
             }
         }
@@ -1245,18 +1256,23 @@ static void reach_platform_window_refresh_cursor(reach_platform_window *window)
 }
 
 static reach_result reach_platform_window_set_cursor_region(reach_platform_window *window,
-                                                            const reach_rect_f32 *region)
+                                                            const reach_rect_f32 *region,
+                                                            reach_cursor_kind kind)
 {
     if (window == nullptr)
         return REACH_INVALID_ARGUMENT;
-    const int had_region = window->has_cursor_region;
+    const reach_cursor_kind previous_kind = window->cursor_kind;
     const reach_rect_f32 previous = window->cursor_region;
-    window->has_cursor_region = region != nullptr && region->width > 0.0f && region->height > 0.0f;
-    window->cursor_region = window->has_cursor_region ? *region : reach_rect_f32{};
+    window->cursor_kind = region != nullptr && region->width > 0.0f && region->height > 0.0f
+                              ? kind
+                              : REACH_CURSOR_DEFAULT;
+    window->cursor_region =
+        window->cursor_kind != REACH_CURSOR_DEFAULT ? *region : reach_rect_f32{};
     /* Windows only asks for the cursor when the mouse moves, so a region that appears under a
        resting pointer has to refresh it here. */
-    if (had_region != window->has_cursor_region ||
-        (window->has_cursor_region && !reach_rect_equal(previous, window->cursor_region)))
+    if (previous_kind != window->cursor_kind ||
+        (window->cursor_kind != REACH_CURSOR_DEFAULT &&
+         !reach_rect_equal(previous, window->cursor_region)))
         reach_platform_window_refresh_cursor(window);
     return REACH_OK;
 }

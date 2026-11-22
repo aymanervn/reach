@@ -136,8 +136,15 @@ extern "C"
         void (*item_hovered)(void *user, const reach_menu_request *request);
         void (*trigger_activated)(void *user, size_t trigger);
         void (*item_windows_changed)(void *user, const reach_menu_request *request);
-        void (*size_committed)(void *user, int32_t size_percent);
     } reach_dock_routes;
+
+    typedef reach_result reach_dock_size_submit(void *context, int32_t size_percent);
+
+    typedef struct reach_dock_size_writer
+    {
+        void *context;
+        reach_dock_size_submit *submit;
+    } reach_dock_size_writer;
 
 #define REACH_DOCK_TRIGGER_PRIMARY 0
 
@@ -154,6 +161,8 @@ extern "C"
 
     void reach_dock_attach_services(reach_dock *dock, reach_icon_service *icons,
                                     reach_window_tracking *windows);
+
+    void reach_dock_bind_size_writer(reach_dock *dock, reach_dock_size_writer writer);
 
     void reach_dock_set_routes(reach_dock *dock, const reach_dock_routes *routes);
 
