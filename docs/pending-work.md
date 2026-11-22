@@ -33,6 +33,8 @@ Open items only.
 - Concurrent config INI verification failure (2026-10-12), not yet explained.
 - WUC root completion callback is missing in repeated native diagnostics.
 - Validate startup and shutdown, bar stacking and focused popup keyboard input on a deployed [surface registry build](surface-registry-migration.md).
+- Before Explorer has run once since boot, `RoActivateInstance(Compositor)` fails with `E_ACCESSDENIED` in Reach and Settings, so no WUC surface or glass exists (events.log, 2026-11-22). Cause unknown.
+- The compat host skips `SetShellWindow` when another shell window exists at that moment; after `reachctl --start` Reach was seen owning no shell window (`explorer_desktop_compat_host_win32.cpp`, `reach_explorer_desktop_compat_register_shell_window`).
 - Idle Watch starts during host creation. A full host stop ends its worker until the host is recreated (`host_lifecycle.cpp`, `idle_watch.cpp`).
 
 ## Architecture debt (cleanup phase)
