@@ -17,10 +17,23 @@
 - The layout manager stays pure: it owns cross-surface placement, layer, visibility and dependency order, and emits resolved bounds. Extend its generic declarations instead of adding feature branches.
 - Definitions do not receive `reach_host` to regain arbitrary composition access.
 - Feature definitions may declare `open_events` and `close_events` beside `toggle_events`. Composition's shell-wide fallbacks run only for events no feature consumed (`reach_host_dispatch_registered_events`).
+- Surfaces are identified only by `reach_surface_key_for<T>()`, written only in the two seams. Slots come from definition order and are runtime detail: never add a numeric surface ID, index runtimes by slot or seed a slot from a constant.
+- A definition is one self-contained block. Generic code reads behavior from definition fields and callbacks (flags, events, layout, redraw, lifecycle hooks); a new behavior gets a generic field, not a branch on which feature is running.
+- Routes only assign callbacks and slots. They do not reach into another feature's runtime, renderer or dirty state.
+- Removing a feature is the reverse: delete its files, registry entry and route. Nothing generic, no host dependency, adapter or checker entry changes.
+
+## Shared contracts
+
+- Anything one feature's value can break in another is a declared contract, checked by the registry or `tools/check_architecture.py`, or listed in `pending-work.md` until a check exists. Never leave it a silent convention.
+- Ordering values (surface layer, edge-reveal layer, pointer priority, layout priority) are named constants in one ordering table in `feature_registry.cpp`, so the full stack and hit order read top to bottom. Definitions never use literals. Registration rejects duplicate values in the same ordering.
+- Each routed or toggle event has one owning definition. An event that several definitions handle (Escape) must be in an explicit shared set; registration rejects any other duplicate.
+- Every callback across a seam states its calling thread at its declaration. Work finished off the UI thread returns through a posted event; UI-thread entry points `REACH_ASSERT` the thread.
+- A new shared value or callback adds its declaration and check in the same commit.
 
 ## Ports, adapters, services
 
 - A port expresses a generic Reach contract, not a thin copy of an OS API. OS code stays in adapters.
+- Ports and host dependencies describe capabilities, never feature identities: window behavior is `reach_platform_window_flag` bits, native surfaces come from `create_surface_ports`. No per-feature role, field, factory or list.
 - Ongoing OS-derived state lives in a service over its port; the service owns refresh, snapshots, caching, threading, generations and policy. A direct read is fine only when it is simple and stateless.
 - `reach_config_service` is the only owner of live config in a process. Features read snapshot copies and submit typed mutations. Only composition and bootstrap code hold `reach_config_store_port`.
 - A surface that owns work-area policy publishes management and reservation intent with its geometry and far-edge clearance. Composition derives the band without knowing feature styles; the monitor port applies it (`manage_monitor_work_area`, `reserve_monitor_work_area`, `set_work_area`). `reachctl` uses the same port for repair.

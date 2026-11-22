@@ -474,6 +474,9 @@ typedef struct reach_feature_runtime
     int32_t resolved_anchor_valid;
     reach_feature_surface_geometry frame_geometry;
     reach_shadow_pad native_overlay_shadow_pad;
+    reach_platform_window *cursor_region_window;
+    reach_cursor_kind cursor_kind;
+    reach_rect_f32 cursor_region;
     const reach_feature_definition *definition;
 } reach_feature_runtime;
 

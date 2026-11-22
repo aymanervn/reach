@@ -28,6 +28,8 @@ extern "C"
         float available_width;
         float native_height;
         float content_scale;
+        float max_size_scale;
+        reach_rect_f32 resize_edge;
     } reach_dock_layout;
 
     typedef struct reach_launcher_layout

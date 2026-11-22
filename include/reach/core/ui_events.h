@@ -15,6 +15,12 @@ extern "C"
         REACH_POINTER_BUTTON_MIDDLE = 2
     } reach_pointer_button;
 
+    typedef enum reach_cursor_kind
+    {
+        REACH_CURSOR_DEFAULT = 0,
+        REACH_CURSOR_RESIZE_VERTICAL = 1
+    } reach_cursor_kind;
+
     typedef enum reach_ui_event_type
     {
         REACH_UI_EVENT_NONE = 0,

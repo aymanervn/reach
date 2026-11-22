@@ -7,7 +7,8 @@ typedef enum reach_dock_hit_type
 {
     REACH_DOCK_HIT_NONE = 0,
     REACH_DOCK_HIT_ITEM = 1,
-    REACH_DOCK_HIT_TRIGGER = 5
+    REACH_DOCK_HIT_TRIGGER = 5,
+    REACH_DOCK_HIT_RESIZE_EDGE = 6
 } reach_dock_hit_type;
 
 typedef struct reach_dock_hit_result
@@ -16,6 +17,8 @@ typedef struct reach_dock_hit_result
     size_t index;
 } reach_dock_hit_result;
 
+reach_rect_f32 reach_dock_resize_edge_rect(const reach_theme *theme,
+                                           const reach_dock_layout *layout);
 reach_dock_hit_result reach_dock_hit_test(const reach_dock_layout *layout, int32_t x, int32_t y);
 float reach_dock_drag_clamped_x(const reach_theme *theme, const reach_dock_layout *layout,
                                 int32_t cursor_x, float grab_offset_x);

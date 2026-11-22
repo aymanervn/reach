@@ -27,6 +27,36 @@ void reach_host_sync_surface_input_regions(const reach_host *host,
                                                       region_count);
 }
 
+static void reach_host_sync_surface_cursor_region(reach_feature_runtime *desc,
+                                                  const reach_feature_surface_geometry *geometry,
+                                                  reach_transform_f32 transform)
+{
+    if (desc->surface == nullptr || desc->surface->window.ops.set_cursor_region == nullptr)
+        return;
+    reach_cursor_kind kind =
+        geometry->cursor_region.width > 0.0f && geometry->cursor_region.height > 0.0f
+            ? geometry->cursor_kind
+            : REACH_CURSOR_DEFAULT;
+    reach_rect_f32 region = {};
+    if (kind != REACH_CURSOR_DEFAULT)
+    {
+        region = geometry->cursor_region;
+        region.x = region.x * transform.scale_x + transform.offset_x;
+        region.y = region.y * transform.scale_y + transform.offset_y;
+        region.width *= transform.scale_x;
+        region.height *= transform.scale_y;
+    }
+    reach_platform_window *window = desc->surface->window.window;
+    if (desc->cursor_region_window == window && desc->cursor_kind == kind &&
+        (kind == REACH_CURSOR_DEFAULT || reach_rect_equal(desc->cursor_region, region)))
+        return;
+    if (desc->surface->window.ops.set_cursor_region(window, &region, kind) != REACH_OK)
+        return;
+    desc->cursor_region_window = window;
+    desc->cursor_kind = kind;
+    desc->cursor_region = region;
+}
+
 static void reach_host_set_surface_visible(reach_host *host, reach_surface_id id, int32_t visible)
 {
     reach_layout_set_visible(&host->layout_manager, host->surface_participants[id], visible);
@@ -691,7 +721,8 @@ static int32_t reach_host_surface_geometry_equal(const reach_feature_surface_geo
            a->presentation.retained == b->presentation.retained &&
            reach_motion_equal(&a->presentation.center_x, &b->presentation.center_x) &&
            reach_motion_equal(&a->presentation.center_y, &b->presentation.center_y) &&
-           reach_render_group_equal(&a->presentation.group, &b->presentation.group);
+           reach_render_group_equal(&a->presentation.group, &b->presentation.group) &&
+           a->cursor_kind == b->cursor_kind && reach_rect_equal(a->cursor_region, b->cursor_region);
 }
 
 static void reach_host_cache_surface_frame(reach_feature_runtime *desc,
@@ -997,6 +1028,11 @@ reach_result reach_host_frame_registered_surface(reach_host *host, reach_feature
             desc->surface->window.window,
             geometry.has_input_bounds || input.input_regions_at != nullptr ? &input : nullptr);
     }
+    reach_host_sync_surface_cursor_region(
+        desc, &geometry,
+        surface_ctx.content_transform_active
+            ? surface_ctx.render_transform
+            : reach_transform_f32{1, 1, shadow_pad.left, shadow_pad.top});
     surface_ctx.render_bounds = bounds;
 
     int32_t window_changed = 0;

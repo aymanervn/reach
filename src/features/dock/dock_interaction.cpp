@@ -14,6 +14,40 @@ static int32_t reach_dock_rect_contains(reach_rect_f32 rect, int32_t x, int32_t 
            (float)y <= rect.y + rect.height;
 }
 
+reach_rect_f32 reach_dock_resize_edge_rect(const reach_theme *theme,
+                                           const reach_dock_layout *layout)
+{
+    reach_rect_f32 none = {};
+    if (layout == nullptr)
+    {
+        return none;
+    }
+
+    float content_top = layout->trigger_button.y;
+    for (size_t index = 0; index < layout->app_slot_count; ++index)
+    {
+        if (layout->app_slots[index].y < content_top)
+        {
+            content_top = layout->app_slots[index].y;
+        }
+    }
+
+    float height = layout->native_height * reach_dock_metrics_values.resize_edge_height_ratio;
+    if (content_top < height)
+    {
+        height = content_top;
+    }
+
+    float radius = reach_theme_dock_corner_radius(theme, layout->bounds.height);
+    float width = layout->bounds.width - radius * 2.0f;
+    if (height <= 0.0f || width <= 0.0f)
+    {
+        return none;
+    }
+
+    return {radius, 0.0f, width, height};
+}
+
 reach_dock_hit_result reach_dock_hit_test(const reach_dock_layout *layout, int32_t x, int32_t y)
 {
     reach_dock_hit_result result = {};
@@ -22,6 +56,14 @@ reach_dock_hit_result reach_dock_hit_test(const reach_dock_layout *layout, int32
 
     if (layout == nullptr)
     {
+        return result;
+    }
+
+    const reach_rect_f32 edge = layout->resize_edge;
+    if ((float)x >= edge.x && (float)x < edge.x + edge.width && (float)y >= edge.y &&
+        (float)y < edge.y + edge.height)
+    {
+        result.type = REACH_DOCK_HIT_RESIZE_EDGE;
         return result;
     }
 

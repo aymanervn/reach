@@ -12,8 +12,10 @@ struct reach_dock_metrics
     float running_indicator_alpha;
 
     float reorder_neighbor_threshold_ratio;
+    float resize_edge_height_ratio;
 
     double hover_reveal_delay_seconds;
+    double resize_edge_dwell_seconds;
 };
 
 static constexpr reach_dock_metrics reach_dock_make_metrics()
@@ -27,8 +29,10 @@ static constexpr reach_dock_metrics reach_dock_make_metrics()
     metrics.running_indicator_alpha = 1.0f;
 
     metrics.reorder_neighbor_threshold_ratio = 0.25f;
+    metrics.resize_edge_height_ratio = 6.0f / 64.0f;
 
     metrics.hover_reveal_delay_seconds = 0.2;
+    metrics.resize_edge_dwell_seconds = 0.2;
 
     return metrics;
 }
