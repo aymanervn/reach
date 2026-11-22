@@ -25,8 +25,8 @@
 ## Touchpad gestures
 
 - Three-finger swipes on a precision touchpad are read and recognized in the elevated `reachService` helper, which keeps receiving every contact while an elevated window has focus. Recognized swipes reach `reach.exe` as gesture records in the shared hotkey queue. Swipes need the helper, like Alt+Tab and Win+D.
-- Exactly three contacts start a gesture; a fourth abandons it.
-- Left and right drive the Switcher through the Alt+Tab events; left mirrors right. The step per app shrinks with finger speed, from 20% of the pad width for slow drags to 10% for quick swipes. Travelling back walks toward the current app; lifting a finger commits. A keyboard Alt+Tab in progress wins.
+- Exactly three confident contacts start a gesture; any further contact, including one the touchpad marks as a palm, abandons it. Locking the session or lost touchpad reports cancel a swipe-opened switcher.
+- Left and right drive the Switcher through the Alt+Tab events, and the highlight follows the fingers: a right swipe opens on the previous app, a left swipe on the oldest (like Alt+Shift+Tab). The step per app shrinks with finger speed, from 20% of the pad width for slow drags to 10% for quick swipes. Reversing walks back; lifting a finger commits. A keyboard Alt+Tab in progress wins.
 - Up opens Stage. Down closes Stage when it is open, otherwise minimizes all windows like Win+D.
 
 ## Game mode
