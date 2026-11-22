@@ -90,6 +90,8 @@ extern "C"
                                                          size_t index, int32_t enabled);
 
     reach_result reach_config_service_set_dock_size(reach_config_service *service, int32_t size);
+    reach_result reach_config_service_set_dock_auto_hide(reach_config_service *service,
+                                                         int32_t auto_hide);
     reach_result reach_config_service_set_wallpapers(reach_config_service *service,
                                                      const uint16_t *wallpaper_path,
                                                      const uint16_t monitor_wallpaper_paths[][260],

@@ -238,6 +238,17 @@ int main()
     top_bar.mode = REACH_CONFIG_TOP_BAR_MODE_DYNAMIC;
     top_bar.style = (reach_config_top_bar_style)99;
     failed += expect(reach_config_service_set_top_bar(service, &top_bar) == REACH_INVALID_ARGUMENT);
+
+    failed += expect(reach_config_service_set_dock_auto_hide(service, 0) == REACH_OK);
+    failed += expect(reach_config_service_flush(service) == REACH_OK);
+    std::memset(&live, 0, sizeof(live));
+    failed += expect(reach_config_service_snapshot(service, &live) == REACH_OK);
+    failed += expect(live.dock_auto_hide == 0);
+    failed += expect(reach_config_service_set_dock_auto_hide(service, 7) == REACH_OK);
+    failed += expect(reach_config_service_flush(service) == REACH_OK);
+    std::memset(&live, 0, sizeof(live));
+    failed += expect(reach_config_service_snapshot(service, &live) == REACH_OK);
+    failed += expect(live.dock_auto_hide == 1);
     reach_config_service_destroy(service);
 
     static test_config_store failed_store = {};

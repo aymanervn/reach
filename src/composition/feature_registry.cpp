@@ -28,9 +28,20 @@ static reach_result reach_feature_attach_launcher(void *capsule,
 static reach_result reach_feature_attach_dock(void *capsule,
                                               const reach_feature_dependencies *dependencies)
 {
-    reach_dock_attach_services(static_cast<reach_dock *>(capsule),
-                               dependencies != nullptr ? dependencies->icons : nullptr,
+    auto *dock = static_cast<reach_dock *>(capsule);
+    reach_dock_attach_services(dock, dependencies != nullptr ? dependencies->icons : nullptr,
                                dependencies != nullptr ? dependencies->windows : nullptr);
+
+    reach_dock_size_writer writer = {};
+    if (dependencies != nullptr && dependencies->config != nullptr)
+    {
+        writer = {dependencies->config, [](void *context, int32_t size_percent)
+                  {
+                      return reach_config_service_set_dock_size(
+                          static_cast<reach_config_service *>(context), size_percent);
+                  }};
+    }
+    reach_dock_bind_size_writer(dock, writer);
     return REACH_OK;
 }
 
@@ -315,6 +326,7 @@ static void reach_feature_notify_dock(void *capsule, const reach_feature_notific
     {
         reach_dock_apply_config(dock, notification->config->dock_height,
                                 notification->config->dock_size);
+        reach_dock_set_auto_hide(dock, notification->config->dock_auto_hide);
         out->relayout = 1;
         out->redraw = 1;
     }

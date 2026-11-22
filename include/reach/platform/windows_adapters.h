@@ -103,6 +103,13 @@ extern "C"
     reach_result reach_windows_default_config_path(uint16_t *path, uint32_t path_count);
     reach_result reach_windows_notify_config_changed(void);
 
+    // Calls `changed` on a background thread whenever the config file is written or replaced.
+    typedef struct reach_windows_config_watch reach_windows_config_watch;
+    reach_result reach_windows_config_watch_create(const uint16_t *config_path,
+                                                   void (*changed)(void *user), void *user,
+                                                   reach_windows_config_watch **out_watch);
+    void reach_windows_config_watch_destroy(reach_windows_config_watch *watch);
+
     reach_result reach_windows_create_startup_apps(reach_startup_apps_port *out_port);
     reach_result reach_windows_create_installed_apps(reach_installed_apps_port *out_port);
     reach_result reach_windows_collect_installed_apps(reach_installed_app_list *out_list);

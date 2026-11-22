@@ -1,6 +1,8 @@
 #include "reach/support/util.h"
+#include "reach/core/config.h"
 #include "reach/features/dock.h"
 #include "test_utf16.h"
+#include "motion_clock_test_support.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -675,6 +677,7 @@ static void test_dock_trespass_uses_current_horizontal_span(void)
     request.shown_bounds = {400.0f, 1016.0f, 200.0f, 64.0f};
     request.monitor_bounds = {0.0f, 0.0f, 1000.0f, 1080.0f};
     request.reveal = reach_motion_spec_curve(0.25, REACH_EASING_EASE_IN_OUT);
+    request.auto_hide_active = 1;
     const reach_bar_reveal_ops *ops = reach_dock_reveal_ops();
     reach_bar_visibility_result result = ops->update_visibility(dock, &request);
     expect_true(!result.reveal_edge_shown,
@@ -682,6 +685,11 @@ static void test_dock_trespass_uses_current_horizontal_span(void)
 
     refresh_dock_test_window(windows, 350.0f, 200.0f);
     ops->invalidate_coverage(dock);
+    request.auto_hide_active = 0;
+    result = ops->update_visibility(dock, &request);
+    expect_true(!result.reveal_edge_shown,
+                "a fixed Dock stays shown when a window overlaps its span");
+    request.auto_hide_active = 1;
     result = ops->update_visibility(dock, &request);
     expect_true(result.reveal_edge_shown, "a window overlapping the Dock span hides the Dock");
 
@@ -697,6 +705,116 @@ static void test_dock_trespass_uses_current_horizontal_span(void)
                 "a changed Dock position and width update the trespass span");
 
     reach_window_tracking_destroy(windows);
+    reach_dock_destroy(dock);
+}
+
+static void test_dock_auto_hide_publishes_work_area(void)
+{
+    reach_dock *dock = nullptr;
+    expect_true(reach_dock_create(&dock) == REACH_OK && dock != nullptr,
+                "auto hide test creates a dock");
+    if (dock == nullptr)
+    {
+        return;
+    }
+    reach_dock_arrange_context arrange = {};
+    arrange.theme = reach_theme_default();
+    arrange.monitor_bounds = {0.0f, 0.0f, 1920.0f, 1080.0f};
+    arrange.dpi_scale = 1.0f;
+    (void)reach_dock_arrange(dock, &arrange);
+
+    reach_feature_surface_geometry geometry = {};
+    reach_dock_capsule_ops()->surface_geometry(dock, &geometry);
+    expect_true(geometry.manage_monitor_work_area == 1,
+                "dock always takes part in work-area management");
+    expect_true(geometry.reserve_monitor_work_area == 0, "auto hide dock reserves nothing");
+    expect_true(geometry.bar_reveal_policy == REACH_FEATURE_BAR_REVEAL_ALWAYS,
+                "auto hide dock hides for any overlapping window");
+
+    reach_dock_set_auto_hide(dock, 0);
+    (void)reach_dock_arrange(dock, &arrange);
+    geometry = {};
+    reach_dock_capsule_ops()->surface_geometry(dock, &geometry);
+    const reach_dock_layout *layout = reach_dock_arranged_layout(dock);
+    expect_true(layout != nullptr, "fixed dock has an arranged layout");
+    expect_true(geometry.reserve_monitor_work_area == 1, "fixed dock reserves its strip");
+    expect_true(geometry.bar_reveal_policy == REACH_FEATURE_BAR_REVEAL_FULLSCREEN,
+                "fixed dock hides only for fullscreen apps");
+    if (layout != nullptr)
+    {
+        float gap_below = 1080.0f - (layout->bounds.y + layout->bounds.height);
+        expect_near(geometry.work_area_clearance, gap_below, 0.0001f,
+                    "fixed dock keeps the same gap above as below");
+        expect_true(gap_below >= 0.0f, "dock sits inside the monitor");
+    }
+
+    reach_dock_set_auto_hide(dock, 1);
+    geometry = {};
+    reach_dock_capsule_ops()->surface_geometry(dock, &geometry);
+    expect_true(geometry.reserve_monitor_work_area == 0 &&
+                    geometry.bar_reveal_policy == REACH_FEATURE_BAR_REVEAL_ALWAYS,
+                "turning auto hide back on releases the strip");
+
+    reach_dock_destroy(dock);
+}
+
+static int32_t rect_f32_same(reach_rect_f32 a, reach_rect_f32 b)
+{
+    return fabsf(a.x - b.x) < 0.001f && fabsf(a.y - b.y) < 0.001f &&
+           fabsf(a.width - b.width) < 0.001f && fabsf(a.height - b.height) < 0.001f;
+}
+
+static void test_fixed_dock_reserves_settled_bounds_while_resizing(void)
+{
+    reach_dock *dock = nullptr;
+    expect_true(reach_dock_create(&dock) == REACH_OK && dock != nullptr,
+                "settled reservation test creates a dock");
+    if (dock == nullptr)
+    {
+        return;
+    }
+    const reach_feature_capsule_ops *ops = reach_dock_capsule_ops();
+    reach_feature_tick_result tick = {};
+    reach_dock_arrange_context arrange = {};
+    arrange.theme = reach_theme_default();
+    arrange.monitor_bounds = {0.0f, 0.0f, 1920.0f, 1080.0f};
+    arrange.dpi_scale = 1.0f;
+
+    reach_dock_set_auto_hide(dock, 0);
+    reach_dock_apply_config(dock, 64.0f, REACH_CONFIG_DOCK_SIZE_MAX);
+    ops->tick(dock, 0.0, &tick);
+    (void)reach_dock_arrange(dock, &arrange);
+    reach_feature_surface_geometry settled = {};
+    ops->surface_geometry(dock, &settled);
+    const reach_dock_layout *layout = reach_dock_arranged_layout(dock);
+    expect_true(layout != nullptr && settled.reserve_monitor_work_area &&
+                    rect_f32_same(settled.work_area_bounds, layout->bounds),
+                "settled fixed dock reserves from its own bounds");
+
+    reach_dock_apply_config(dock, 64.0f, REACH_CONFIG_DOCK_SIZE_MIN);
+    reach_test_motion_clock_advance(0.05);
+    ops->tick(dock, 0.0, &tick);
+    (void)reach_dock_arrange(dock, &arrange);
+    reach_feature_surface_geometry resizing = {};
+    ops->surface_geometry(dock, &resizing);
+    layout = reach_dock_arranged_layout(dock);
+    expect_true(layout != nullptr && !rect_f32_same(layout->bounds, settled.work_area_bounds),
+                "dock bounds move while the size animates");
+    expect_true(resizing.reserve_monitor_work_area &&
+                    rect_f32_same(resizing.work_area_bounds, settled.work_area_bounds) &&
+                    resizing.work_area_clearance == settled.work_area_clearance,
+                "animating dock keeps its settled reservation");
+
+    reach_test_motion_clock_advance(5.0);
+    ops->tick(dock, 0.0, &tick);
+    (void)reach_dock_arrange(dock, &arrange);
+    reach_feature_surface_geometry resized = {};
+    ops->surface_geometry(dock, &resized);
+    layout = reach_dock_arranged_layout(dock);
+    expect_true(layout != nullptr && rect_f32_same(resized.work_area_bounds, layout->bounds) &&
+                    !rect_f32_same(resized.work_area_bounds, settled.work_area_bounds),
+                "settled dock reserves its new size");
+
     reach_dock_destroy(dock);
 }
 
@@ -719,5 +837,7 @@ int main(void)
     test_fit_metrics_scale_every_dimension_without_a_minimum();
     test_adaptive_layout_rebuild_keeps_native_height();
     test_dock_trespass_uses_current_horizontal_span();
+    test_dock_auto_hide_publishes_work_area();
+    test_fixed_dock_reserves_settled_bounds_while_resizing();
     return failures == 0 ? 0 : 1;
 }

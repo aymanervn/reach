@@ -35,6 +35,7 @@ enum reach_config_operation_type
     REACH_CONFIG_OPERATION_RESET_WIDGET_POSITIONS,
     REACH_CONFIG_OPERATION_SET_WIDGET_PLACEMENT,
     REACH_CONFIG_OPERATION_SET_DOCK_SIZE,
+    REACH_CONFIG_OPERATION_SET_DOCK_AUTO_HIDE,
     REACH_CONFIG_OPERATION_SET_WALLPAPERS,
     REACH_CONFIG_OPERATION_SET_MONITOR_WALLPAPER
 };
@@ -50,6 +51,7 @@ struct reach_config_operation
     int32_t glass_intensity;
     reach_config_top_bar_settings top_bar;
     int32_t dock_size;
+    int32_t dock_auto_hide;
     uint32_t pin_id;
     size_t target_index;
     reach_config_widget_placement widget_placement;
@@ -184,6 +186,10 @@ static reach_result reach_config_apply_operation(reach_config_snapshot *snapshot
     case REACH_CONFIG_OPERATION_SET_DOCK_SIZE:
         *out_changed = snapshot->dock_size != operation->dock_size;
         snapshot->dock_size = operation->dock_size;
+        return REACH_OK;
+    case REACH_CONFIG_OPERATION_SET_DOCK_AUTO_HIDE:
+        *out_changed = snapshot->dock_auto_hide != operation->dock_auto_hide;
+        snapshot->dock_auto_hide = operation->dock_auto_hide;
         return REACH_OK;
     case REACH_CONFIG_OPERATION_SET_WALLPAPERS:
         *out_changed = !reach_path_equals(snapshot->wallpaper_path, operation->path);
@@ -785,6 +791,15 @@ reach_result reach_config_service_set_dock_size(reach_config_service *service, i
     reach_config_operation operation = {};
     operation.type = REACH_CONFIG_OPERATION_SET_DOCK_SIZE;
     operation.dock_size = size;
+    return reach_config_service_commit(service, &operation);
+}
+
+reach_result reach_config_service_set_dock_auto_hide(reach_config_service *service,
+                                                     int32_t auto_hide)
+{
+    reach_config_operation operation = {};
+    operation.type = REACH_CONFIG_OPERATION_SET_DOCK_AUTO_HIDE;
+    operation.dock_auto_hide = auto_hide ? 1 : 0;
     return reach_config_service_commit(service, &operation);
 }
 

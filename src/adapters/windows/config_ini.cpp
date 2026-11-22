@@ -202,6 +202,8 @@ static reach_result reach_config_store_load(reach_config_store *store,
         dock_size < REACH_CONFIG_DOCK_SIZE_MIN
             ? REACH_CONFIG_DOCK_SIZE_MIN
             : (dock_size > REACH_CONFIG_DOCK_SIZE_MAX ? REACH_CONFIG_DOCK_SIZE_MAX : dock_size);
+    out_snapshot->dock_auto_hide =
+        (int32_t)GetPrivateProfileIntW(L"dock", L"auto_hide", 1, path) != 0;
     int32_t top_bar_style = (int32_t)GetPrivateProfileIntW(
         L"top_bar", L"style", REACH_CONFIG_TOP_BAR_STYLE_TRANSPARENT, path);
     out_snapshot->top_bar_style = top_bar_style >= REACH_CONFIG_TOP_BAR_STYLE_SPLIT &&
@@ -374,6 +376,8 @@ static reach_result reach_config_store_save(reach_config_store *store,
     text.append(std::to_wstring((int32_t)snapshot->dock_height));
     text.append(L"\r\nsize=");
     text.append(std::to_wstring(snapshot->dock_size));
+    text.append(L"\r\nauto_hide=");
+    text.append(std::to_wstring(snapshot->dock_auto_hide ? 1 : 0));
     uint32_t saved_widgets = 0;
     for (size_t index = 0; index < REACH_MAX_DESKTOP_WIDGETS; ++index)
     {

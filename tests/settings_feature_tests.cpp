@@ -693,6 +693,40 @@ static void test_top_bar_push_toggle_hit_testing(void)
                 "auto hide toggle still hit-tests");
 }
 
+static void test_dock_auto_hide_preference(void)
+{
+    std::unique_ptr<reach_settings_model> model(new reach_settings_model());
+    reach_settings_model_init(model.get());
+
+    expect_true(reach_settings_model_dock_auto_hide(model.get()) == 1,
+                "dock auto hide defaults to on");
+    expect_true(reach_motion_value(&model->dock_auto_hide_toggle) == 1.0f,
+                "dock auto hide toggle starts enabled");
+    expect_true(reach_settings_model_toggle_dock_auto_hide(model.get()),
+                "dock auto hide can toggle");
+    expect_true(reach_settings_model_dock_auto_hide(model.get()) == 0,
+                "dock auto hide toggles off");
+    expect_true(model->dock_auto_hide_toggle.to == 0.0f, "fixed dock presents the toggle off");
+    reach_settings_model_set_dock_auto_hide(model.get(), 1);
+    expect_true(reach_settings_model_dock_auto_hide(model.get()) == 1 &&
+                    reach_motion_value(&model->dock_auto_hide_toggle) == 1.0f,
+                "dock auto hide can be set from config");
+
+    reach_settings_model_select_page(model.get(), REACH_SETTINGS_PAGE_THEME);
+    reach_rect_f32 bounds = {0.0f, 0.0f, 900.0f, 2400.0f};
+    reach_settings_layout layout =
+        reach_settings_layout_for_bounds(bounds, nullptr, 1.0f, model.get());
+    expect_true(layout.dock_auto_hide_toggle.width > 0.0f,
+                "theme page lays out the dock auto hide toggle");
+    expect_true(layout.dock_auto_hide_card.y >=
+                    layout.dock_size.card.y + layout.dock_size.card.height,
+                "dock auto hide card sits below the dock size slider");
+    reach_settings_hit_result hit = reach_settings_hit_test(
+        &layout, layout.dock_auto_hide_card.x + layout.dock_auto_hide_card.width * 0.5f,
+        layout.dock_auto_hide_card.y + layout.dock_auto_hide_card.height * 0.5f);
+    expect_true(hit.type == REACH_SETTINGS_HIT_DOCK_AUTO_HIDE_TOGGLE,
+                "dock auto hide card hit-tests as its toggle");
+}
 static void test_display_scrollbar_hit_testing(void)
 {
     std::unique_ptr<reach_settings_model> model(new reach_settings_model());
@@ -893,8 +927,37 @@ static void test_pressed_buttons_render_worst_case(void)
     }
 }
 
+static void test_power_snapshot_keeps_unapplied_edits(void)
+{
+    std::unique_ptr<reach_settings_model> model(new reach_settings_model());
+    reach_settings_model_init(model.get());
+    std::unique_ptr<reach_config_snapshot> snapshot(new reach_config_snapshot());
+    *snapshot = {};
+    snapshot->power_screen_off_minutes = 10;
+    snapshot->power_sleep_minutes = 30;
+    snapshot->power_sleep_wait_apps = 1;
+
+    expect_true(reach_settings_model_apply_power_snapshot(model.get(), snapshot.get()),
+                "a clean power page takes the saved values");
+    expect_true(reach_settings_model_power_minutes(model.get(), REACH_SETTINGS_POWER_TIMER_SLEEP) ==
+                    30,
+                "saved sleep minutes are shown");
+    expect_true(!reach_settings_model_power_dirty(model.get()),
+                "values loaded from the config count as applied");
+
+    reach_settings_model_set_power_minutes(model.get(), REACH_SETTINGS_POWER_TIMER_SLEEP, 45);
+    snapshot->power_sleep_minutes = 60;
+    expect_true(!reach_settings_model_apply_power_snapshot(model.get(), snapshot.get()),
+                "a power page with unapplied edits is left alone");
+    expect_true(reach_settings_model_power_minutes(model.get(), REACH_SETTINGS_POWER_TIMER_SLEEP) ==
+                    45,
+                "the unapplied edit survives a refresh");
+    expect_true(reach_settings_model_power_dirty(model.get()), "the edit is still unapplied");
+}
+
 int main(void)
 {
+    test_power_snapshot_keeps_unapplied_edits();
     test_policy();
     test_required_security_maintenance_classifications();
     test_navigation_pages();
@@ -912,6 +975,7 @@ int main(void)
     test_button_press_feedback();
     test_top_bar_preferences();
     test_top_bar_push_toggle_hit_testing();
+    test_dock_auto_hide_preference();
     test_display_scrollbar_hit_testing();
     test_bluetooth_radio_stops_scan();
     test_installed_apps_loader();

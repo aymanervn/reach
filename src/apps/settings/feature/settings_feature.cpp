@@ -79,6 +79,7 @@ void reach_settings_model_init(reach_settings_model *model)
     reach_settings_model_set_top_bar_icon_only(model, 1);
     reach_settings_model_set_top_bar_overlay(model, 0);
     model->dock_size = REACH_CONFIG_DOCK_SIZE_MAX;
+    reach_settings_model_set_dock_auto_hide(model, 1);
     reach_motion_set(&model->button_press_feedback, 0.0f);
     reach_pressable_init(&model->button_pressable);
     for (size_t field = 0; field < REACH_SETTINGS_ACCOUNT_FIELD_COUNT; ++field)
@@ -909,8 +910,15 @@ reach_settings_layout reach_settings_layout_for_bounds(reach_rect_f32 bounds,
                                           layout.top_bar_icon_only_card.y +
                                               layout.top_bar_icon_only_card.height + card_spacing,
                                           area_width, appearance_card_height, scale);
+        reach_settings_toggle_card_rects dock_auto_hide = {
+            &layout.dock_auto_hide_card, nullptr, &layout.dock_auto_hide_title,
+            &layout.dock_auto_hide_subtitle, &layout.dock_auto_hide_toggle};
+        reach_settings_layout_toggle_card(&dock_auto_hide, area_x,
+                                          layout.dock_size.card.y + layout.dock_size.card.height +
+                                              card_spacing,
+                                          area_width, card_height, scale);
         layout.theme_content_height =
-            layout.dock_size.card.y + layout.dock_size.card.height +
+            layout.dock_auto_hide_card.y + layout.dock_auto_hide_card.height +
             reach_scroll_view_value_at(&model->theme_scroll, layout.scroll_time) - viewport_y;
         reach_settings_layout_scroll(&model->theme_scroll, layout.theme_viewport,
                                      layout.theme_scrollbar_track, layout.theme_content_height,
@@ -1291,6 +1299,13 @@ reach_settings_hit_result reach_settings_hit_test(const reach_settings_layout *l
     if (theme_pointer && reach_settings_rect_contains(layout->dock_size.slider, x, y))
     {
         result.type = REACH_SETTINGS_HIT_DOCK_SIZE;
+        return result;
+    }
+    if (theme_pointer && layout->dock_auto_hide_toggle.width > 0.0f &&
+        (reach_settings_rect_contains(layout->dock_auto_hide_toggle, x, y) ||
+         reach_settings_rect_contains(layout->dock_auto_hide_card, x, y)))
+    {
+        result.type = REACH_SETTINGS_HIT_DOCK_AUTO_HIDE_TOGGLE;
         return result;
     }
 

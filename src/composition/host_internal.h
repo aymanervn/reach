@@ -296,6 +296,16 @@ typedef enum reach_layout_reservation_edge
     REACH_LAYOUT_RESERVATION_BOTTOM = 2
 } reach_layout_reservation_edge;
 
+// One surface's share of a monitor's work area; the host merges every surface's claim so bars
+// on different edges never overwrite each other's reservation.
+typedef struct reach_host_work_area_claim
+{
+    int32_t active;
+    reach_layout_reservation_edge edge;
+    float edge_value;
+    reach_rect_i32 monitor;
+} reach_host_work_area_claim;
+
 typedef struct reach_feature_layout_anchor
 {
     reach_surface_id surface = REACH_SURFACE_ID_INVALID;
@@ -434,6 +444,7 @@ typedef struct reach_feature_runtime
     reach_rect_f32 resolved_bounds;
     int32_t resolved_bounds_valid;
     int32_t bar_auto_hide_active;
+    reach_host_work_area_claim work_area_claim;
     reach_window_thumbnail_id native_overlay_ids[REACH_SURFACE_NATIVE_OVERLAY_CAPACITY];
     reach_window_id native_overlay_sources[REACH_SURFACE_NATIVE_OVERLAY_CAPACITY];
     reach_window_thumbnail_plane native_overlay_planes[REACH_SURFACE_NATIVE_OVERLAY_CAPACITY];
@@ -457,6 +468,9 @@ typedef struct reach_feature_runtime
     int32_t resolved_anchor_valid;
     reach_feature_surface_geometry frame_geometry;
     reach_shadow_pad native_overlay_shadow_pad;
+    reach_platform_window *cursor_region_window;
+    reach_cursor_kind cursor_kind;
+    reach_rect_f32 cursor_region;
     const reach_feature_definition *definition;
 } reach_feature_runtime;
 
@@ -968,6 +982,8 @@ float reach_host_bar_parking_offset(const reach_feature_runtime *runtime,
                                     reach_rect_f32 shown_bounds);
 float reach_host_bar_protected_clearance(const reach_host *host,
                                          const reach_feature_runtime *runtime);
+reach_rect_i32 reach_host_merge_work_area(reach_rect_i32 monitor,
+                                          const reach_host_work_area_claim *claims, size_t count);
 
 reach_rect_f32 reach_host_reconcile_bar_visibility(reach_host *host, reach_surface_id id,
                                                    reach_rect_f32 shown_bounds,

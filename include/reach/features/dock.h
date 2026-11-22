@@ -116,7 +116,8 @@ extern "C"
     {
         REACH_DOCK_POINTER_REGION_NONE = 0,
         REACH_DOCK_POINTER_REGION_ITEM = 1,
-        REACH_DOCK_POINTER_REGION_TRIGGER = 5
+        REACH_DOCK_POINTER_REGION_TRIGGER = 5,
+        REACH_DOCK_POINTER_REGION_RESIZE_EDGE = 6
     } reach_dock_pointer_region;
 
     typedef enum reach_dock_control_slot
@@ -137,6 +138,14 @@ extern "C"
         void (*item_windows_changed)(void *user, const reach_menu_request *request);
     } reach_dock_routes;
 
+    typedef reach_result reach_dock_size_submit(void *context, int32_t size_percent);
+
+    typedef struct reach_dock_size_writer
+    {
+        void *context;
+        reach_dock_size_submit *submit;
+    } reach_dock_size_writer;
+
 #define REACH_DOCK_TRIGGER_PRIMARY 0
 
     size_t reach_dock_reorder_target(const reach_dock_feature_model *model,
@@ -152,6 +161,8 @@ extern "C"
 
     void reach_dock_attach_services(reach_dock *dock, reach_icon_service *icons,
                                     reach_window_tracking *windows);
+
+    void reach_dock_bind_size_writer(reach_dock *dock, reach_dock_size_writer writer);
 
     void reach_dock_set_routes(reach_dock *dock, const reach_dock_routes *routes);
 
@@ -209,6 +220,7 @@ extern "C"
     int32_t reach_dock_slots_animating(const reach_dock *dock);
 
     void reach_dock_apply_config(reach_dock *dock, float height, int32_t size);
+    void reach_dock_set_auto_hide(reach_dock *dock, int32_t auto_hide);
     int32_t reach_dock_arrange(reach_dock *dock, const reach_dock_arrange_context *ctx);
     const reach_dock_layout *reach_dock_arranged_layout(const reach_dock *dock);
 

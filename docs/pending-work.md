@@ -32,7 +32,7 @@ Open items only.
 - Parallel Windows-adapter builds contend for one PDB.
 - Concurrent config INI verification failure (2026-10-12), not yet explained.
 - WUC root completion callback is missing in repeated native diagnostics.
-- Validate startup and shutdown, bar stacking and focused popup keyboard input on a deployed [surface registry build](surface-registry-migration.md).
+- Validate startup and shutdown, bar stacking and focused popup keyboard input on a deployed surface registry build.
 - `RoActivateInstance(Compositor)` failed with `E_ACCESSDENIED` in Reach and Settings on every start until Explorer had run once (events.log, up to 2026-11-22 17:14). Not reproduced on a cold boot straight into Reach after the transparency-policy fix (2026-11-22 20:29). Cause unknown; reopen if it returns.
 - The compat host skips `SetShellWindow` when another shell window exists at that moment; after `reachctl --start` Reach was seen owning no shell window (`explorer_desktop_compat_host_win32.cpp`, `reach_explorer_desktop_compat_register_shell_window`).
 - Idle Watch starts during host creation. A full host stop ends its worker until the host is recreated (`host_lifecycle.cpp`, `idle_watch.cpp`).
@@ -42,6 +42,8 @@ Open items only.
 - `reach_feature_capsule_ops` is bound positionally with five identical signatures.
 - `interfeature_routes.cpp` holds the window-list orchestration, not just slot assignment.
 - Move feature-owned notification, control, resource and rendering adapters out of `feature_registry.cpp` during capsule cleanup. Keep the definitions and service wiring in composition.
+- Shared contracts are not enforced yet: ordering values are literals in each definition (`feature_registry.cpp:1546-1835`), duplicate event owners and duplicate ordering values are accepted, seam callbacks do not state their calling thread, and no UI-thread assertion exists.
+- Numeric surface IDs remain: composition indexes state by `reach_surface_id` (`host->surface_participants[id]` in `host_surface_frames.cpp`) instead of `reach_surface_key_for<T>()` alone.
 - Capsule state structs are public and composition reads them. A third of the public feature API is internals. Per-feature action enums remain in public headers.
 - Dock and Launcher internals live in `core`.
 - `reach_ui_layout` and its only consumer are dead.
