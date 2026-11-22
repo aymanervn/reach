@@ -97,6 +97,8 @@ enum reach_service_hotkey_key : uint32_t
     REACH_SERVICE_HOTKEY_ARROW_DOWN = 12,
     REACH_SERVICE_HOTKEY_V = 13,
     REACH_SERVICE_HOTKEY_S = 14,
+    /* Not a key: a recognized touchpad gesture whose reach_ui_event_type is in ui_event. */
+    REACH_SERVICE_HOTKEY_GESTURE = 15,
 };
 
 enum reach_service_hotkey_action : uint32_t
@@ -158,7 +160,8 @@ struct reach_service_hotkey_record
     uint32_t key;
     uint32_t action;
     uint32_t modifiers;
-    uint32_t reserved;
+    /* REACH_SERVICE_HOTKEY_GESTURE only; zero for keys. */
+    uint32_t ui_event;
 };
 
 struct reach_service_shared_state

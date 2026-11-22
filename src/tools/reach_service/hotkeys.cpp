@@ -1,4 +1,5 @@
 #include "hotkeys.h"
+#include "touchpad.h"
 
 #include "../../adapters/windows/window_management/reach_service_shared_state_win32.h"
 
@@ -525,6 +526,11 @@ static LRESULT CALLBACK reach_helper_keyboard_proc(int code, WPARAM wparam, LPAR
     return reach_helper_pass_key_event(code, wparam, lparam);
 }
 
+static int32_t reach_helper_alt_tab_active(void)
+{
+    return g_hotkeys.alt_tab_active;
+}
+
 static DWORD WINAPI reach_helper_hotkey_thread(void *param)
 {
     (void)param;
@@ -535,10 +541,13 @@ static DWORD WINAPI reach_helper_hotkey_thread(void *param)
     g_hotkeys.thread_id = GetCurrentThreadId();
     g_hotkeys.hook =
         SetWindowsHookExW(WH_KEYBOARD_LL, reach_helper_keyboard_proc, GetModuleHandleW(nullptr), 0);
+    reach_helper_touchpad_start(reach_helper_alt_tab_active);
 
     while (GetMessageW(&message, nullptr, 0, 0) > 0)
     {
+        DispatchMessageW(&message);
     }
+    reach_helper_touchpad_stop();
 
     if (g_hotkeys.hook != nullptr)
     {

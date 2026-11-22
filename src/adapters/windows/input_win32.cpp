@@ -1,8 +1,6 @@
 #include "windows_adapters_internal.h"
 
 #include "mouse_hook_thread_win32.h"
-#include "touchpad_reports_win32.h"
-#include "touchpad_swipe.h"
 #include "window_management/reach_service_shared_state_win32.h"
 
 #include "reach/ports/input_source.h"
@@ -38,12 +36,7 @@ struct reach_input_source
     SRWLOCK pointer_region_lock;
     reach_input_pointer_region pointer_regions[REACH_INPUT_POINTER_REGION_CAPACITY];
     volatile LONG manipulation_event_pending;
-    reach_touchpad_reports *touchpad;
-    reach_touchpad_swipe touchpad_swipe;
 };
-
-static const USHORT REACH_INPUT_HID_PAGE_DIGITIZER = 0x0D;
-static const USHORT REACH_INPUT_HID_USAGE_TOUCHPAD = 0x05;
 
 static reach_input_source *g_pointer_hook_source;
 
@@ -373,6 +366,14 @@ static void reach_input_reset_hotkey_state(reach_input_source *source)
     source->windows_key_chord = 0;
 }
 
+static int32_t reach_input_is_gesture_event(uint32_t type)
+{
+    return type == REACH_UI_EVENT_APP_SWITCH_BEGIN || type == REACH_UI_EVENT_APP_SWITCH_NEXT ||
+           type == REACH_UI_EVENT_APP_SWITCH_PREVIOUS || type == REACH_UI_EVENT_APP_SWITCH_COMMIT ||
+           type == REACH_UI_EVENT_APP_SWITCH_CANCEL || type == REACH_UI_EVENT_SWIPE_UP ||
+           type == REACH_UI_EVENT_SWIPE_DOWN;
+}
+
 static void reach_input_handle_hotkey_record(reach_input_source *source,
                                              const reach_service_hotkey_record *record)
 {
@@ -416,6 +417,13 @@ static void reach_input_handle_hotkey_record(reach_input_source *source,
         {
             source->alt_tab_active = 0;
             reach_input_post_ui_event(source, REACH_UI_EVENT_APP_SWITCH_CANCEL, 0);
+        }
+        break;
+    case REACH_SERVICE_HOTKEY_GESTURE:
+        /* The elevated helper recognized a touchpad swipe; forward only gesture events. */
+        if (reach_input_is_gesture_event(record->ui_event))
+        {
+            reach_input_post_ui_event(source, (reach_ui_event_type)record->ui_event, 0);
         }
         break;
     case REACH_SERVICE_HOTKEY_LEFT_WIN:
@@ -525,35 +533,6 @@ static void reach_input_shared_callback(void *user, reach_service_shared_reader_
     }
 }
 
-static void reach_input_register_touchpad(reach_input_source *source, int32_t enable)
-{
-    RAWINPUTDEVICE device = {};
-    device.usUsagePage = REACH_INPUT_HID_PAGE_DIGITIZER;
-    device.usUsage = REACH_INPUT_HID_USAGE_TOUCHPAD;
-    device.dwFlags = enable ? RIDEV_INPUTSINK : RIDEV_REMOVE;
-    device.hwndTarget = enable ? source->window : nullptr;
-    /* Machines without a precision touchpad simply never send reports. */
-    (void)RegisterRawInputDevices(&device, 1, sizeof(device));
-}
-
-static void reach_input_handle_touchpad_frame(reach_input_source *source,
-                                              const reach_touchpad_frame *frame)
-{
-    reach_ui_event_type events[8] = {};
-    const size_t count = reach_touchpad_swipe_update(&source->touchpad_swipe, frame, events,
-                                                     sizeof(events) / sizeof(events[0]));
-    for (size_t index = 0; index < count; ++index)
-    {
-        /* The keyboard and the touchpad share one switcher; a keyboard switch in progress wins. */
-        if (events[index] == REACH_UI_EVENT_APP_SWITCH_BEGIN && source->alt_tab_active)
-        {
-            reach_touchpad_swipe_abandon(&source->touchpad_swipe);
-            return;
-        }
-        reach_input_post_ui_event(source, events[index], 0);
-    }
-}
-
 static LRESULT CALLBACK reach_input_window_proc(HWND hwnd, UINT message, WPARAM wparam,
                                                 LPARAM lparam)
 {
@@ -604,19 +583,6 @@ static LRESULT CALLBACK reach_input_window_proc(HWND hwnd, UINT message, WPARAM 
     {
         reach_input_process_shared_hotkeys(source);
         return 0;
-    }
-    if (message == WM_INPUT && source != nullptr && source->touchpad != nullptr)
-    {
-        reach_touchpad_frame frame = {};
-        if (reach_touchpad_reports_feed(source->touchpad, reinterpret_cast<HRAWINPUT>(lparam),
-                                        &frame))
-        {
-            /* Raw input carries no timestamp; the message time is when Windows queued it. */
-            frame.time_seconds = (double)(DWORD)GetMessageTime() / 1000.0;
-            reach_input_handle_touchpad_frame(source, &frame);
-        }
-        /* DefWindowProc releases the raw input buffer. */
-        return DefWindowProcW(hwnd, message, wparam, lparam);
     }
     if (message == WM_HOTKEY && source != nullptr)
     {
@@ -674,14 +640,6 @@ static reach_result reach_input_start(reach_input_source *source,
 
     (void)reach_service_shared_reader_subscribe(reach_input_shared_callback, source);
     reach_input_register_media_hotkeys(source);
-    if (source->touchpad == nullptr)
-    {
-        source->touchpad = reach_touchpad_reports_create();
-    }
-    if (source->touchpad != nullptr)
-    {
-        reach_input_register_touchpad(source, 1);
-    }
     return REACH_OK;
 }
 
@@ -695,13 +653,6 @@ static reach_result reach_input_stop(reach_input_source *source)
 
     reach_service_shared_reader_unsubscribe(source);
     reach_input_unregister_media_hotkeys(source);
-    if (source->touchpad != nullptr)
-    {
-        reach_input_register_touchpad(source, 0);
-        reach_touchpad_reports_destroy(source->touchpad);
-        source->touchpad = nullptr;
-    }
-    source->touchpad_swipe = {};
     reach_input_reset_hotkey_state(source);
     for (size_t index = 0; index < REACH_INPUT_POINTER_REGION_CAPACITY; ++index)
     {
