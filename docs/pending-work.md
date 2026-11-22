@@ -42,7 +42,7 @@ Open items only.
 - `reach_feature_capsule_ops` is bound positionally with five identical signatures.
 - `interfeature_routes.cpp` holds the window-list orchestration, not just slot assignment.
 - Move feature-owned notification, control, resource and rendering adapters out of `feature_registry.cpp` during capsule cleanup. Keep the definitions and service wiring in composition.
-- Shared contracts are not enforced yet: ordering values are literals in each definition (`feature_registry.cpp:1546-1835`), duplicate event owners and duplicate ordering values are accepted, seam callbacks do not state their calling thread, and no UI-thread assertion exists.
+- Shared contracts are not enforced yet: ordering values are literals in each definition (`feature_registry.cpp:1628-1971`), duplicate event owners and duplicate ordering values are accepted, seam callbacks do not state their calling thread, and no UI-thread assertion exists.
 - Numeric surface IDs remain: composition indexes state by `reach_surface_id` (`host->surface_participants[id]` in `host_surface_frames.cpp`) instead of `reach_surface_key_for<T>()` alone.
 - Capsule state structs are public and composition reads them. A third of the public feature API is internals. Per-feature action enums remain in public headers.
 - Dock and Launcher internals live in `core`.
