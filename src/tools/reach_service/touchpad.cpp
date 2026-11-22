@@ -1,7 +1,8 @@
 #include "touchpad.h"
 
 #include "../../adapters/windows/touchpad_reports_win32.h"
-#include "../../adapters/windows/touchpad_swipe.h"
+#include "touchpad_swipe.h"
+
 #include "../../adapters/windows/window_management/reach_service_shared_state_win32.h"
 
 #include <windows.h>
@@ -17,7 +18,6 @@ struct reach_helper_touchpad
     HWINEVENTHOOK desktop_switch_hook;
     reach_touchpad_reports *reports;
     reach_touchpad_swipe swipe;
-    int32_t (*alt_tab_active)(void);
 };
 
 static reach_helper_touchpad g_touchpad;
@@ -30,13 +30,6 @@ static void reach_helper_touchpad_handle_frame(const reach_touchpad_frame *frame
                                                      sizeof(events) / sizeof(events[0]));
     for (size_t index = 0; index < count; ++index)
     {
-        /* The keyboard and the touchpad share one switcher; a keyboard switch in progress wins. */
-        if (events[index] == REACH_UI_EVENT_APP_SWITCH_BEGIN &&
-            g_touchpad.alt_tab_active != nullptr && g_touchpad.alt_tab_active())
-        {
-            reach_touchpad_swipe_abandon(&g_touchpad.swipe);
-            return;
-        }
         (void)reach_service_shared_append_gesture((uint32_t)events[index]);
     }
 }
@@ -87,14 +80,13 @@ static void CALLBACK reach_helper_touchpad_desktop_switched(HWINEVENTHOOK hook, 
     reach_helper_touchpad_cancel_switch();
 }
 
-void reach_helper_touchpad_start(int32_t (*alt_tab_active)(void))
+void reach_helper_touchpad_start(void)
 {
     if (g_touchpad.window != nullptr)
     {
         return;
     }
     g_touchpad = {};
-    g_touchpad.alt_tab_active = alt_tab_active;
 
     WNDCLASSEXW wc = {};
     wc.cbSize = sizeof(wc);

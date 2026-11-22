@@ -811,9 +811,9 @@ static bool reach_host_event_matches(reach_ui_event_type type, const reach_ui_ev
 static reach_result reach_host_dispatch_registered_events(reach_host *host,
                                                           const reach_ui_event *event,
                                                           reach_surface_id source,
-                                                          int32_t game_mode, int32_t *out_closed)
+                                                          int32_t game_mode, int32_t *out_consumed)
 {
-    *out_closed = 0;
+    *out_consumed = 0;
     for (size_t index = 0; index < host->surface_count; ++index)
     {
         auto *runtime = &host->feature_runtimes[index];
@@ -838,12 +838,14 @@ static reach_result reach_host_dispatch_registered_events(reach_host *host,
             reach_host_refresh_window_world(host);
             reach_host_apply_foreground_change(host);
         }
+        int32_t handled = 0;
         const reach_result result =
-            reach_host_dispatch_capsule_event(host, runtime, event, nullptr);
+            reach_host_dispatch_capsule_event(host, runtime, event, &handled);
         if (result != REACH_OK)
         {
             return result;
         }
+        *out_consumed = *out_consumed || handled;
     }
     for (size_t index = 0; index < host->surface_count; ++index)
     {
@@ -858,6 +860,7 @@ static reach_result reach_host_dispatch_registered_events(reach_host *host,
             if (definition.toggle_events[entry] == event->type)
             {
                 reach_host_toggle_registered_surface(host, definition.id);
+                *out_consumed = 1;
                 break;
             }
         }
@@ -866,12 +869,13 @@ static reach_result reach_host_dispatch_registered_events(reach_host *host,
                                               definition.open_event_count))
         {
             reach_host_set_registered_surface_open(host, definition.id, 1);
+            *out_consumed = 1;
         }
         if (open && reach_host_event_matches(event->type, definition.close_events,
                                              definition.close_event_count))
         {
             reach_host_close_registered_surface(host, definition.id, REACH_SURFACE_CLOSE_DISMISS);
-            *out_closed = 1;
+            *out_consumed = 1;
         }
     }
     return REACH_OK;
@@ -1117,18 +1121,19 @@ static reach_result reach_host_handle_surface_event(reach_host *host, const reac
         return reach_host_step_brightness(host, -0.02f);
     }
 
-    int32_t closed = 0;
+    int32_t consumed = 0;
     const reach_result result =
-        reach_host_dispatch_registered_events(host, event, source, game_mode, &closed);
+        reach_host_dispatch_registered_events(host, event, source, game_mode, &consumed);
     if (result != REACH_OK)
     {
         return result;
     }
 
-    if (event->type == REACH_UI_EVENT_SWIPE_DOWN && !closed)
+    if (event->type == REACH_UI_EVENT_SWIPE_DOWN && !consumed)
     {
-        (void)reach_host_schedule_minimize_open_windows(host, nullptr);
-        return REACH_OK;
+        reach_ui_event minimize_all = *event;
+        minimize_all.type = REACH_UI_EVENT_MINIMIZE_ALL;
+        return reach_host_handle_surface_event(host, &minimize_all, source);
     }
 
     if (event->type == REACH_UI_EVENT_ESCAPE)

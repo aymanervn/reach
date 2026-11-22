@@ -18,6 +18,13 @@ struct reach_input_pointer_region
     reach_point_i32 point;
 };
 
+enum reach_input_switch_owner
+{
+    REACH_INPUT_SWITCH_OWNER_NONE = 0,
+    REACH_INPUT_SWITCH_OWNER_KEYBOARD = 1,
+    REACH_INPUT_SWITCH_OWNER_GESTURE = 2,
+};
+
 struct reach_input_source
 {
     reach_input_event_callback callback;
@@ -27,9 +34,7 @@ struct reach_input_source
     uint64_t last_hotkey_event;
     int32_t alt_down;
     int32_t shift_down;
-    int32_t alt_tab_active;
-    /* A swipe from the helper opened the switcher and has not committed or cancelled it yet. */
-    int32_t gesture_switch_active;
+    reach_input_switch_owner switch_owner;
     int32_t windows_key_down;
     int32_t windows_key_chord;
     uint32_t registered_media_hotkeys;
@@ -357,24 +362,53 @@ static void reach_input_reset_hotkey_state(reach_input_source *source)
     {
         return;
     }
-    if (source->alt_tab_active || source->gesture_switch_active)
+    if (source->switch_owner != REACH_INPUT_SWITCH_OWNER_NONE)
     {
         reach_input_post_ui_event(source, REACH_UI_EVENT_APP_SWITCH_CANCEL, 0);
     }
-    source->gesture_switch_active = 0;
+    source->switch_owner = REACH_INPUT_SWITCH_OWNER_NONE;
     source->alt_down = 0;
     source->shift_down = 0;
-    source->alt_tab_active = 0;
     source->windows_key_down = 0;
     source->windows_key_chord = 0;
 }
 
-static int32_t reach_input_is_gesture_event(uint32_t type)
+static int32_t reach_input_is_gesture_switch_event(uint32_t type)
 {
-    return type == REACH_UI_EVENT_APP_SWITCH_BEGIN || type == REACH_UI_EVENT_APP_SWITCH_NEXT ||
-           type == REACH_UI_EVENT_APP_SWITCH_PREVIOUS || type == REACH_UI_EVENT_APP_SWITCH_COMMIT ||
-           type == REACH_UI_EVENT_APP_SWITCH_CANCEL || type == REACH_UI_EVENT_SWIPE_UP ||
-           type == REACH_UI_EVENT_SWIPE_DOWN;
+    return type == REACH_UI_EVENT_APP_SWITCH_NEXT || type == REACH_UI_EVENT_APP_SWITCH_PREVIOUS ||
+           type == REACH_UI_EVENT_APP_SWITCH_COMMIT || type == REACH_UI_EVENT_APP_SWITCH_CANCEL;
+}
+
+static void reach_input_handle_gesture(reach_input_source *source, uint32_t type)
+{
+    if (source->switch_owner == REACH_INPUT_SWITCH_OWNER_KEYBOARD)
+    {
+        return;
+    }
+    if (type == REACH_UI_EVENT_APP_SWITCH_BEGIN)
+    {
+        if (source->switch_owner != REACH_INPUT_SWITCH_OWNER_NONE)
+        {
+            return;
+        }
+        source->switch_owner = REACH_INPUT_SWITCH_OWNER_GESTURE;
+    }
+    else if (reach_input_is_gesture_switch_event(type))
+    {
+        if (source->switch_owner != REACH_INPUT_SWITCH_OWNER_GESTURE)
+        {
+            return;
+        }
+        if (type == REACH_UI_EVENT_APP_SWITCH_COMMIT || type == REACH_UI_EVENT_APP_SWITCH_CANCEL)
+        {
+            source->switch_owner = REACH_INPUT_SWITCH_OWNER_NONE;
+        }
+    }
+    else if (type != REACH_UI_EVENT_SWIPE_UP && type != REACH_UI_EVENT_SWIPE_DOWN)
+    {
+        return;
+    }
+    reach_input_post_ui_event(source, (reach_ui_event_type)type, 0);
 }
 
 static void reach_input_handle_hotkey_record(reach_input_source *source,
@@ -390,9 +424,9 @@ static void reach_input_handle_hotkey_record(reach_input_source *source,
     {
     case REACH_SERVICE_HOTKEY_ALT:
         source->alt_down = pressed;
-        if (!pressed && source->alt_tab_active)
+        if (!pressed && source->switch_owner == REACH_INPUT_SWITCH_OWNER_KEYBOARD)
         {
-            source->alt_tab_active = 0;
+            source->switch_owner = REACH_INPUT_SWITCH_OWNER_NONE;
             reach_input_post_ui_event(source, REACH_UI_EVENT_APP_SWITCH_COMMIT, 0);
         }
         break;
@@ -402,15 +436,15 @@ static void reach_input_handle_hotkey_record(reach_input_source *source,
     case REACH_SERVICE_HOTKEY_TAB:
         if (pressed && (source->alt_down || (record->modifiers & REACH_SERVICE_MODIFIER_ALT) != 0))
         {
-            if (!source->alt_tab_active)
+            if (source->switch_owner == REACH_INPUT_SWITCH_OWNER_GESTURE)
             {
-                source->alt_tab_active = 1;
-                /* A swipe already opened the switcher: keep its selection and step from it. */
-                if (!source->gesture_switch_active)
-                {
-                    reach_input_post_ui_event(source, REACH_UI_EVENT_APP_SWITCH_BEGIN, 0);
-                    break;
-                }
+                break;
+            }
+            if (source->switch_owner == REACH_INPUT_SWITCH_OWNER_NONE)
+            {
+                source->switch_owner = REACH_INPUT_SWITCH_OWNER_KEYBOARD;
+                reach_input_post_ui_event(source, REACH_UI_EVENT_APP_SWITCH_BEGIN, 0);
+                break;
             }
             int32_t shift_down =
                 source->shift_down || ((record->modifiers & REACH_SERVICE_MODIFIER_SHIFT) != 0);
@@ -420,32 +454,18 @@ static void reach_input_handle_hotkey_record(reach_input_source *source,
         }
         break;
     case REACH_SERVICE_HOTKEY_ESCAPE:
-        if (pressed && (source->alt_tab_active || source->gesture_switch_active))
+        if (pressed && source->switch_owner != REACH_INPUT_SWITCH_OWNER_NONE)
         {
-            source->alt_tab_active = 0;
-            source->gesture_switch_active = 0;
+            source->switch_owner = REACH_INPUT_SWITCH_OWNER_NONE;
             reach_input_post_ui_event(source, REACH_UI_EVENT_APP_SWITCH_CANCEL, 0);
         }
         break;
     case REACH_SERVICE_HOTKEY_GESTURE:
-        /* The elevated helper recognized a touchpad swipe; forward only gesture events. */
-        if (reach_input_is_gesture_event(record->ui_event))
-        {
-            if (record->ui_event == REACH_UI_EVENT_APP_SWITCH_BEGIN)
-            {
-                source->gesture_switch_active = 1;
-            }
-            else if (record->ui_event == REACH_UI_EVENT_APP_SWITCH_COMMIT ||
-                     record->ui_event == REACH_UI_EVENT_APP_SWITCH_CANCEL)
-            {
-                source->gesture_switch_active = 0;
-            }
-            reach_input_post_ui_event(source, (reach_ui_event_type)record->ui_event, 0);
-        }
+        reach_input_handle_gesture(source, record->ui_event);
         break;
     case REACH_SERVICE_HOTKEY_LEFT_WIN:
     case REACH_SERVICE_HOTKEY_RIGHT_WIN:
-        if (source->alt_tab_active)
+        if (source->switch_owner == REACH_INPUT_SWITCH_OWNER_KEYBOARD)
         {
             source->windows_key_down = 0;
             source->windows_key_chord = 0;

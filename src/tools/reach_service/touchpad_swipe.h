@@ -1,7 +1,7 @@
-#ifndef REACH_ADAPTERS_WINDOWS_TOUCHPAD_SWIPE_H
-#define REACH_ADAPTERS_WINDOWS_TOUCHPAD_SWIPE_H
+#ifndef REACH_TOOLS_REACH_SERVICE_TOUCHPAD_SWIPE_H
+#define REACH_TOOLS_REACH_SERVICE_TOUCHPAD_SWIPE_H
 
-#include "touchpad_frame.h"
+#include "../../adapters/windows/touchpad_frame.h"
 
 #include "reach/core/ui_events.h"
 

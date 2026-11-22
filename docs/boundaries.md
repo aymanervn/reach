@@ -16,7 +16,7 @@
 - A new feature may change only its header, `src/features/<feature>/`, one registry entry, one route if needed, tests, build and resources. Any other composition change is an exception: stop, name the missing generic contract and ask.
 - The layout manager stays pure: it owns cross-surface placement, layer, visibility and dependency order, and emits resolved bounds. Extend its generic declarations instead of adding feature branches.
 - Definitions do not receive `reach_host` to regain arbitrary composition access.
-- Feature definitions may declare open-only and close-only events beside toggle events. A close event that closes an open surface is consumed.
+- Feature definitions may declare `open_events` and `close_events` beside `toggle_events`. Composition's shell-wide fallbacks run only for events no feature consumed (`reach_host_dispatch_registered_events`).
 
 ## Ports, adapters, services
 

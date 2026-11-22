@@ -147,7 +147,7 @@ size_t reach_touchpad_swipe_update(reach_touchpad_swipe *swipe, const reach_touc
         {
             reach_touchpad_swipe_emit(REACH_UI_EVENT_APP_SWITCH_CANCEL, out_events, capacity,
                                       &count);
-            swipe->phase = touching == 0 ? REACH_TOUCHPAD_SWIPE_IDLE : REACH_TOUCHPAD_SWIPE_SETTLED;
+            swipe->phase = REACH_TOUCHPAD_SWIPE_SETTLED;
         }
         else if (contacts < REACH_TOUCHPAD_SWIPE_FINGERS)
         {
