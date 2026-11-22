@@ -2,14 +2,13 @@
 
 #include "mouse_hook_thread_win32.h"
 #include "touchpad_reports_win32.h"
+#include "touchpad_swipe.h"
 #include "window_management/reach_service_shared_state_win32.h"
 
-#include "reach/adapters/windows/diagnostics_log.h"
 #include "reach/ports/input_source.h"
 
 #include <windows.h>
 #include <new>
-#include <stdio.h>
 
 static const size_t REACH_INPUT_POINTER_REGION_CAPACITY = 16;
 
@@ -40,8 +39,7 @@ struct reach_input_source
     reach_input_pointer_region pointer_regions[REACH_INPUT_POINTER_REGION_CAPACITY];
     volatile LONG manipulation_event_pending;
     reach_touchpad_reports *touchpad;
-    uint32_t touchpad_logged_contacts;
-    uint32_t touchpad_frames;
+    reach_touchpad_swipe touchpad_swipe;
 };
 
 static const USHORT REACH_INPUT_HID_PAGE_DIGITIZER = 0x0D;
@@ -538,22 +536,22 @@ static void reach_input_register_touchpad(reach_input_source *source, int32_t en
     (void)RegisterRawInputDevices(&device, 1, sizeof(device));
 }
 
-/* Temporary spike logging: proves touchpad frames reach Reach before gestures are built. */
-static void reach_input_log_touchpad_frame(reach_input_source *source,
-                                           const reach_touchpad_frame *frame)
+static void reach_input_handle_touchpad_frame(reach_input_source *source,
+                                              const reach_touchpad_frame *frame)
 {
-    ++source->touchpad_frames;
-    if (frame->contact_count == source->touchpad_logged_contacts &&
-        source->touchpad_frames % 10 != 0)
+    reach_ui_event_type events[8] = {};
+    const size_t count = reach_touchpad_swipe_update(&source->touchpad_swipe, frame, events,
+                                                     sizeof(events) / sizeof(events[0]));
+    for (size_t index = 0; index < count; ++index)
     {
-        return;
+        /* The keyboard and the touchpad share one switcher; a keyboard switch in progress wins. */
+        if (events[index] == REACH_UI_EVENT_APP_SWITCH_BEGIN && source->alt_tab_active)
+        {
+            reach_touchpad_swipe_abandon(&source->touchpad_swipe);
+            return;
+        }
+        reach_input_post_ui_event(source, events[index], 0);
     }
-    source->touchpad_logged_contacts = frame->contact_count;
-    char line[128];
-    (void)snprintf(line, sizeof(line), "touchpad contacts=%u x=%.0f y=%.0f range=%.0fx%.0f",
-                   frame->contact_count, frame->centroid_x, frame->centroid_y, frame->range_x,
-                   frame->range_y);
-    reach_diagnostics_log_write("info", line);
 }
 
 static LRESULT CALLBACK reach_input_window_proc(HWND hwnd, UINT message, WPARAM wparam,
@@ -613,7 +611,7 @@ static LRESULT CALLBACK reach_input_window_proc(HWND hwnd, UINT message, WPARAM 
         if (reach_touchpad_reports_feed(source->touchpad, reinterpret_cast<HRAWINPUT>(lparam),
                                         &frame))
         {
-            reach_input_log_touchpad_frame(source, &frame);
+            reach_input_handle_touchpad_frame(source, &frame);
         }
         /* DefWindowProc releases the raw input buffer. */
         return DefWindowProcW(hwnd, message, wparam, lparam);
@@ -701,6 +699,7 @@ static reach_result reach_input_stop(reach_input_source *source)
         reach_touchpad_reports_destroy(source->touchpad);
         source->touchpad = nullptr;
     }
+    source->touchpad_swipe = {};
     reach_input_reset_hotkey_state(source);
     for (size_t index = 0; index < REACH_INPUT_POINTER_REGION_CAPACITY; ++index)
     {

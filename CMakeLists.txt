@@ -285,6 +285,7 @@ add_library(reach_windows_adapters STATIC
     src/adapters/windows/installed_apps_win32.cpp
     src/adapters/windows/input_win32.cpp
     src/adapters/windows/touchpad_reports_win32.cpp
+    src/adapters/windows/touchpad_swipe.cpp
     src/adapters/windows/media_controls_win32.cpp
     src/adapters/windows/config_ini.cpp
     src/adapters/windows/config_path_win32.cpp
