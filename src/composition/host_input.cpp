@@ -811,8 +811,9 @@ static bool reach_host_event_matches(reach_ui_event_type type, const reach_ui_ev
 static reach_result reach_host_dispatch_registered_events(reach_host *host,
                                                           const reach_ui_event *event,
                                                           reach_surface_id source,
-                                                          int32_t game_mode)
+                                                          int32_t game_mode, int32_t *out_closed)
 {
+    *out_closed = 0;
     for (size_t index = 0; index < host->surface_count; ++index)
     {
         auto *runtime = &host->feature_runtimes[index];
@@ -859,6 +860,18 @@ static reach_result reach_host_dispatch_registered_events(reach_host *host,
                 reach_host_toggle_registered_surface(host, definition.id);
                 break;
             }
+        }
+        const int32_t open = reach_host_surface_is_open(&host->feature_runtimes[index]);
+        if (!open && reach_host_event_matches(event->type, definition.open_events,
+                                              definition.open_event_count))
+        {
+            reach_host_set_registered_surface_open(host, definition.id, 1);
+        }
+        if (open && reach_host_event_matches(event->type, definition.close_events,
+                                             definition.close_event_count))
+        {
+            reach_host_close_registered_surface(host, definition.id, REACH_SURFACE_CLOSE_DISMISS);
+            *out_closed = 1;
         }
     }
     return REACH_OK;
@@ -1104,11 +1117,18 @@ static reach_result reach_host_handle_surface_event(reach_host *host, const reac
         return reach_host_step_brightness(host, -0.02f);
     }
 
+    int32_t closed = 0;
     const reach_result result =
-        reach_host_dispatch_registered_events(host, event, source, game_mode);
+        reach_host_dispatch_registered_events(host, event, source, game_mode, &closed);
     if (result != REACH_OK)
     {
         return result;
+    }
+
+    if (event->type == REACH_UI_EVENT_SWIPE_DOWN && !closed)
+    {
+        (void)reach_host_schedule_minimize_open_windows(host, nullptr);
+        return REACH_OK;
     }
 
     if (event->type == REACH_UI_EVENT_ESCAPE)
