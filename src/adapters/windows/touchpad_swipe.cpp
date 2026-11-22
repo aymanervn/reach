@@ -8,6 +8,9 @@ static const uint32_t REACH_TOUCHPAD_SWIPE_FINGERS = 3;
 /* Speed smoothing time constant, and the longest frame gap still treated as continuous motion. */
 static const double REACH_TOUCHPAD_SWIPE_SPEED_SMOOTHING_SECONDS = 0.05;
 static const double REACH_TOUCHPAD_SWIPE_MAX_FRAME_GAP_SECONDS = 0.25;
+/* A touched pad reports continuously; a longer silence mid-switch means reports were lost (secure
+   desktop, device reset), so the switch is cancelled rather than committed on the next touch. */
+static const double REACH_TOUCHPAD_SWIPE_STALE_SECONDS = 0.5;
 
 float reach_touchpad_swipe_step_fraction(const reach_touchpad_swipe *swipe)
 {
@@ -57,8 +60,16 @@ static void reach_touchpad_swipe_track(reach_touchpad_swipe *swipe,
     if (fabsf(dx) >= fabsf(dy))
     {
         reach_touchpad_swipe_emit(REACH_UI_EVENT_APP_SWITCH_BEGIN, out_events, capacity, count);
+        if (dx < 0.0f)
+        {
+            /* BEGIN selects the previous app; two steps back wrap to the far end, like
+               Alt+Shift+Tab, so a left swipe moves the highlight left from there. */
+            reach_touchpad_swipe_emit(REACH_UI_EVENT_APP_SWITCH_PREVIOUS, out_events, capacity,
+                                      count);
+            reach_touchpad_swipe_emit(REACH_UI_EVENT_APP_SWITCH_PREVIOUS, out_events, capacity,
+                                      count);
+        }
         swipe->step_anchor_x = frame->centroid_x;
-        swipe->direction = dx >= 0.0f ? 1.0f : -1.0f;
         swipe->phase = REACH_TOUCHPAD_SWIPE_SWITCHING;
         return;
     }
@@ -74,9 +85,8 @@ static void reach_touchpad_swipe_step(reach_touchpad_swipe *swipe,
                                       reach_ui_event_type *out_events, size_t capacity,
                                       size_t *count)
 {
-    /* Travel is measured along the starting direction, so a left swipe mirrors a right one. */
-    const float step =
-        reach_touchpad_swipe_step_fraction(swipe) * frame->range_x * swipe->direction;
+    /* Rightward travel moves the highlight right (older apps), leftward moves it left. */
+    const float step = reach_touchpad_swipe_step_fraction(swipe) * frame->range_x;
     while ((frame->centroid_x - swipe->step_anchor_x) / step >= 1.0f && *count < capacity)
     {
         reach_touchpad_swipe_emit(REACH_UI_EVENT_APP_SWITCH_NEXT, out_events, capacity, count);
@@ -103,11 +113,14 @@ size_t reach_touchpad_swipe_update(reach_touchpad_swipe *swipe, const reach_touc
         return 0;
     }
 
+    /* Only confident contacts start or steer a gesture; any extra contact, palm included,
+       abandons it. */
     const uint32_t contacts = frame->contact_count;
+    const uint32_t touching = frame->contact_count + frame->uncertain_count;
     switch (swipe->phase)
     {
     case REACH_TOUCHPAD_SWIPE_IDLE:
-        if (contacts == REACH_TOUCHPAD_SWIPE_FINGERS)
+        if (contacts == REACH_TOUCHPAD_SWIPE_FINGERS && touching == REACH_TOUCHPAD_SWIPE_FINGERS)
         {
             swipe->origin_x = frame->centroid_x;
             swipe->origin_y = frame->centroid_y;
@@ -118,13 +131,13 @@ size_t reach_touchpad_swipe_update(reach_touchpad_swipe *swipe, const reach_touc
         }
         break;
     case REACH_TOUCHPAD_SWIPE_TRACKING:
-        if (contacts < REACH_TOUCHPAD_SWIPE_FINGERS)
-        {
-            swipe->phase = REACH_TOUCHPAD_SWIPE_IDLE;
-        }
-        else if (contacts > REACH_TOUCHPAD_SWIPE_FINGERS)
+        if (touching > REACH_TOUCHPAD_SWIPE_FINGERS)
         {
             swipe->phase = REACH_TOUCHPAD_SWIPE_SETTLED;
+        }
+        else if (contacts < REACH_TOUCHPAD_SWIPE_FINGERS)
+        {
+            swipe->phase = REACH_TOUCHPAD_SWIPE_IDLE;
         }
         else
         {
@@ -133,17 +146,18 @@ size_t reach_touchpad_swipe_update(reach_touchpad_swipe *swipe, const reach_touc
         }
         break;
     case REACH_TOUCHPAD_SWIPE_SWITCHING:
-        if (contacts < REACH_TOUCHPAD_SWIPE_FINGERS)
-        {
-            reach_touchpad_swipe_emit(REACH_UI_EVENT_APP_SWITCH_COMMIT, out_events, capacity,
-                                      &count);
-            swipe->phase = contacts == 0 ? REACH_TOUCHPAD_SWIPE_IDLE : REACH_TOUCHPAD_SWIPE_SETTLED;
-        }
-        else if (contacts > REACH_TOUCHPAD_SWIPE_FINGERS)
+        if (frame->time_seconds - swipe->last_time_seconds > REACH_TOUCHPAD_SWIPE_STALE_SECONDS ||
+            touching > REACH_TOUCHPAD_SWIPE_FINGERS)
         {
             reach_touchpad_swipe_emit(REACH_UI_EVENT_APP_SWITCH_CANCEL, out_events, capacity,
                                       &count);
-            swipe->phase = REACH_TOUCHPAD_SWIPE_SETTLED;
+            swipe->phase = touching == 0 ? REACH_TOUCHPAD_SWIPE_IDLE : REACH_TOUCHPAD_SWIPE_SETTLED;
+        }
+        else if (contacts < REACH_TOUCHPAD_SWIPE_FINGERS)
+        {
+            reach_touchpad_swipe_emit(REACH_UI_EVENT_APP_SWITCH_COMMIT, out_events, capacity,
+                                      &count);
+            swipe->phase = touching == 0 ? REACH_TOUCHPAD_SWIPE_IDLE : REACH_TOUCHPAD_SWIPE_SETTLED;
         }
         else
         {
@@ -152,13 +166,18 @@ size_t reach_touchpad_swipe_update(reach_touchpad_swipe *swipe, const reach_touc
         }
         break;
     case REACH_TOUCHPAD_SWIPE_SETTLED:
-        if (contacts == 0)
+        if (touching == 0)
         {
             swipe->phase = REACH_TOUCHPAD_SWIPE_IDLE;
         }
         break;
     }
     return count;
+}
+
+int32_t reach_touchpad_swipe_switching(const reach_touchpad_swipe *swipe)
+{
+    return swipe != nullptr && swipe->phase == REACH_TOUCHPAD_SWIPE_SWITCHING;
 }
 
 void reach_touchpad_swipe_abandon(reach_touchpad_swipe *swipe)

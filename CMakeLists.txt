@@ -629,6 +629,7 @@ target_compile_features(reach_service PRIVATE
 )
 target_link_libraries(reach_service PRIVATE
     hid
+    wtsapi32
     dwmapi
     user32
     shell32

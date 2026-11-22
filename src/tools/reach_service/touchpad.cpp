@@ -5,6 +5,7 @@
 #include "../../adapters/windows/window_management/reach_service_shared_state_win32.h"
 
 #include <windows.h>
+#include <wtsapi32.h>
 
 static const wchar_t *REACH_HELPER_TOUCHPAD_WINDOW_CLASS = L"ReachHelperTouchpadWindow";
 static const USHORT REACH_HELPER_HID_PAGE_DIGITIZER = 0x0D;
@@ -38,9 +39,25 @@ static void reach_helper_touchpad_handle_frame(const reach_touchpad_frame *frame
     }
 }
 
+static void reach_helper_touchpad_cancel_switch(void)
+{
+    /* Never leave reach.exe with a switcher only this swipe could close. */
+    if (reach_touchpad_swipe_switching(&g_touchpad.swipe))
+    {
+        (void)reach_service_shared_append_gesture(REACH_UI_EVENT_APP_SWITCH_CANCEL);
+    }
+    reach_touchpad_swipe_abandon(&g_touchpad.swipe);
+}
+
 static LRESULT CALLBACK reach_helper_touchpad_window_proc(HWND hwnd, UINT message, WPARAM wparam,
                                                           LPARAM lparam)
 {
+    /* Locking switches to the secure desktop, where no touchpad reports arrive. */
+    if (message == WM_WTSSESSION_CHANGE && wparam == WTS_SESSION_LOCK)
+    {
+        reach_helper_touchpad_cancel_switch();
+        return 0;
+    }
     if (message == WM_INPUT && g_touchpad.reports != nullptr)
     {
         reach_touchpad_frame frame = {};
@@ -94,12 +111,15 @@ void reach_helper_touchpad_start(int32_t (*alt_tab_active)(void))
     device.hwndTarget = g_touchpad.window;
     /* Machines without a precision touchpad simply never send reports. */
     (void)RegisterRawInputDevices(&device, 1, sizeof(device));
+    (void)WTSRegisterSessionNotification(g_touchpad.window, NOTIFY_FOR_THIS_SESSION);
 }
 
 void reach_helper_touchpad_stop(void)
 {
+    reach_helper_touchpad_cancel_switch();
     if (g_touchpad.window != nullptr)
     {
+        (void)WTSUnRegisterSessionNotification(g_touchpad.window);
         RAWINPUTDEVICE device = {};
         device.usUsagePage = REACH_HELPER_HID_PAGE_DIGITIZER;
         device.usUsage = REACH_HELPER_HID_USAGE_TOUCHPAD;
