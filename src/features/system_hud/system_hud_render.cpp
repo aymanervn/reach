@@ -86,7 +86,7 @@ static reach_result reach_system_hud_render_media(const reach_system_hud_state *
     artwork.cover_image_id = state->media.cover_image_id;
     artwork.base_background = theme->system_hud_background;
     artwork.overlay = theme->now_playing_background;
-    artwork.glass_intensity = theme->glass_intensity;
+    artwork.glass = theme->glass;
     artwork.radius = artwork_bounds.height * 0.5f;
     artwork.blur = REACH_SYSTEM_HUD_ARTWORK_BLUR;
     artwork.cover_radius = state->layout.media_cover.height * 0.5f;
@@ -249,7 +249,7 @@ reach_result reach_system_hud_append_render_commands(const reach_system_hud *hud
     shape.type = REACH_RENDER_COMMAND_RECT;
     shape.rect = {0.0f, 0.0f, state->layout.bounds.width, state->layout.bounds.height};
     shape.radius = shape.rect.height * 0.5f;
-    shape.glass_intensity = render_ctx->theme->glass_intensity;
+    shape.glass = render_ctx->theme->glass;
     reach_render_command shapes[2] = {};
     size_t shape_count = reach_render_bordered_background_shapes(
         &shape, render_ctx->theme->system_hud_background, render_ctx->theme->system_hud_border,

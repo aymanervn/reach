@@ -33,7 +33,7 @@ reach_result reach_context_menu_build_render_commands(const reach_context_menu_r
         popup.background_color_override = input->theme->top_bar_dropdown_background;
         popup.has_background_color_override = 1;
         popup.hide_notch = 1;
-        popup.glass_intensity = input->theme->glass_intensity;
+        popup.glass = input->theme->glass;
     }
     reach_result popup_result = reach_popup_push_background(&popup, out_commands);
     if (popup_result != REACH_OK)
@@ -41,7 +41,7 @@ reach_result reach_context_menu_build_render_commands(const reach_context_menu_r
         return popup_result;
     }
 
-    const reach_color separator = popup.glass_intensity != 0 ? input->theme->glass_popup_separator
+    const reach_color separator = popup.glass.intensity != 0 ? input->theme->glass_popup_separator
                                                              : input->theme->popup_separator;
     reach_render_command_buffer_set_scissor(out_commands, input->item_viewport);
     float hover_radius =

@@ -81,7 +81,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
     reach_result result = reach_ui_motion_background_render(
         out_commands, &bounds, launcher_radius, border_thickness, theme->launcher_search_background,
         theme->launcher_border, &theme->popup_shadow, input->dpi_scale,
-        UINT64_C(0x2900000000040000), 0, theme->glass_intensity);
+        UINT64_C(0x2900000000040000), 0, theme->glass);
     reach_render_command command = {};
     if (result != REACH_OK)
     {

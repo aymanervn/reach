@@ -155,7 +155,7 @@ static void test_transparent_top_bar_scrim_renders_within_budget(void)
                         int32_t scrim_found = 0;
                         for (size_t index = 0; index < buffer.count; ++index)
                         {
-                            all_ok &= buffer.commands[index].glass_intensity == 0;
+                            all_ok &= buffer.commands[index].glass.intensity == 0;
                             scrim_found |= buffer.commands[index].fill_gradient ==
                                            REACH_RENDER_FILL_EASED_FADE_DOWN;
                         }

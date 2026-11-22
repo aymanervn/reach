@@ -177,7 +177,7 @@ struct reach_d2d_retained_layer
     UINT capacity_width = 0;
     UINT capacity_height = 0;
     bool initialized = false;
-    int32_t glass_intensity = 0;
+    reach_glass glass = {};
     bool raster_birth_aligned = false;
     bool raster_finite_translation = false;
     bool has_children = false;
@@ -287,7 +287,7 @@ struct reach_render_backend
     ComPtr<ABI::Windows::UI::Composition::IContainerVisual> root_visual;
     ComPtr<ABI::Windows::UI::Composition::ICompositionBrush> host_backdrop_brush;
     ComPtr<ABI::Windows::UI::Composition::ICompositionEffectFactory> glass_factory;
-    int32_t glass_factory_intensity = 0;
+    reach_glass glass_factory_glass = {};
     ComPtr<ABI::Windows::UI::Composition::ISpriteVisual> swap_chain_visual;
     ComPtr<ABI::Windows::UI::Composition::ICompositionSurface> composition_surface;
     ComPtr<ABI::Windows::UI::Composition::ICompositionGraphicsDevice> composition_graphics_device;
@@ -437,7 +437,7 @@ reach_result reach_d2d_execute_fallback(reach_render_backend *backend,
                                         const reach_render_command_buffer *commands,
                                         double now_seconds);
 HRESULT reach_wuc_sync_glass(reach_render_backend *backend, reach_d2d_retained_layer &layer,
-                             int32_t intensity, bool surface_recreated);
+                             reach_glass glass, bool surface_recreated);
 reach_result reach_d2d_draw_triangle(ID2D1RenderTarget *target,
                                      const reach_render_command *command);
 reach_result reach_d2d_fill_rect_or_rounded_rect(ID2D1RenderTarget *target,

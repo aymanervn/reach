@@ -196,7 +196,7 @@ static reach_result reach_dock_push_background(const reach_dock_render_input *in
     shape.type = REACH_RENDER_COMMAND_RECT;
     shape.rect = reach_dock_rect(0.0f, 0.0f, layout->bounds.width, layout->bounds.height);
     shape.radius = dock_radius;
-    shape.glass_intensity = theme->glass_intensity;
+    shape.glass = theme->glass;
     return reach_render_push_bordered_background(
         commands, &shape, theme->dock_background, theme->bar_border,
         reach_theme_border_thickness(theme, input->dpi_scale) * layout->content_scale,

@@ -5,14 +5,14 @@ static const float REACH_NOW_PLAYING_ARTWORK_CONTRAST = 1.20f;
 
 static reach_result reach_now_playing_artwork_push_rect(reach_render_command_buffer *commands,
                                                         reach_rect_f32 rect, reach_color color,
-                                                        float radius, int32_t glass_intensity)
+                                                        float radius, reach_glass glass)
 {
     reach_render_command command = {};
     command.type = REACH_RENDER_COMMAND_RECT;
     command.rect = rect;
     command.color = color;
     command.radius = radius;
-    command.glass_intensity = glass_intensity;
+    command.glass = glass;
     return reach_render_command_buffer_push(commands, &command);
 }
 
@@ -30,9 +30,8 @@ reach_now_playing_artwork_build_render_commands(const reach_now_playing_artwork_
     }
     if (input->cover_image_id == 0)
     {
-        return reach_now_playing_artwork_push_rect(out_commands, input->bounds,
-                                                   input->base_background, input->radius,
-                                                   input->glass_intensity);
+        return reach_now_playing_artwork_push_rect(
+            out_commands, input->bounds, input->base_background, input->radius, input->glass);
     }
 
     float width = input->bounds.width * REACH_NOW_PLAYING_ARTWORK_BACKGROUND_SCALE;
@@ -44,7 +43,7 @@ reach_now_playing_artwork_build_render_commands(const reach_now_playing_artwork_
     blurred.icon_id = input->cover_image_id;
     blurred.icon_crop_to_fill = 1;
     blurred.radius = input->radius;
-    blurred.glass_intensity = input->glass_intensity;
+    blurred.glass = input->glass;
     blurred.blur_radius = input->bounds.height * input->blur;
     blurred.image_contrast = REACH_NOW_PLAYING_ARTWORK_CONTRAST;
     blurred.color.a = 1.0f;
@@ -76,5 +75,5 @@ reach_now_playing_artwork_build_render_commands(const reach_now_playing_artwork_
     }
 
     return reach_now_playing_artwork_push_rect(out_commands, input->bounds, input->overlay,
-                                               input->radius, 0);
+                                               input->radius, {});
 }

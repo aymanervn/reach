@@ -366,7 +366,7 @@ void reach_host_set_theme(reach_host *host, reach_theme_mode mode, const reach_a
     reach_theme_resolve(mode, accent, &resolved);
     const reach_theme *current = host->theme;
     if (current != nullptr)
-        resolved.glass_intensity = current->glass_intensity;
+        resolved.glass.intensity = current->glass.intensity;
     if (current == &host->theme_storage && current->mode == resolved.mode &&
         current->accent.r == resolved.accent.r && current->accent.g == resolved.accent.g &&
         current->accent.b == resolved.accent.b)

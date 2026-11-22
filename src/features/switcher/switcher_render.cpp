@@ -52,7 +52,7 @@ reach_result reach_switcher_append_render_commands(reach_switcher *switcher,
     if (result == REACH_OK)
         result = reach_ui_motion_background_render(
             out_commands, &chrome, theme->radius_large * scale, border, theme->switcher_background,
-            theme->bar_border, &theme->popup_shadow, scale, 8, body.id, theme->glass_intensity);
+            theme->bar_border, &theme->popup_shadow, scale, 8, body.id, theme->glass);
     if (result != REACH_OK)
         return result;
     float card_scale = layout.card_scale > 0 ? layout.card_scale : scale;

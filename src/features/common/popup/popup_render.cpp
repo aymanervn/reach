@@ -343,7 +343,7 @@ reach_result reach_popup_push_background(const reach_popup_background_input *inp
     }
 
     reach_render_command shape = reach_popup_shape(input);
-    shape.glass_intensity = input->glass_intensity;
+    shape.glass = input->glass;
     reach_color background = input->has_background_color_override ? input->background_color_override
                                                                   : input->theme->popup_background;
     return reach_render_push_bordered_background(
@@ -423,7 +423,7 @@ reach_result reach_popup_push_height_background(const reach_popup_background_inp
     const auto *paint = commands->commands;
     size_t count = commands->count;
     // Keep the shadow separate so the glass brush only samples inside the background shape.
-    if (input->glass_intensity && count > 1 && paint->type == REACH_RENDER_COMMAND_SHADOW)
+    if (input->glass.intensity && count > 1 && paint->type == REACH_RENDER_COMMAND_SHADOW)
     {
         result = append(paint, 1);
         if (result != REACH_OK)

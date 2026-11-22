@@ -43,7 +43,7 @@ void reach_d2d_destroy(reach_render_backend *backend)
     backend->swap_chain_visual.Reset();
     backend->host_backdrop_brush.Reset();
     backend->glass_factory.Reset();
-    backend->glass_factory_intensity = 0;
+    backend->glass_factory_glass = {};
     backend->root_visual.Reset();
     backend->composition_target.Reset();
     backend->compositor.Reset();
@@ -76,7 +76,7 @@ static void reach_d2d_release_composition_target_state(reach_render_backend *bac
     backend->swap_chain_visual.Reset();
     backend->host_backdrop_brush.Reset();
     backend->glass_factory.Reset();
-    backend->glass_factory_intensity = 0;
+    backend->glass_factory_glass = {};
     backend->root_visual.Reset();
 
     if (backend->composition_target != nullptr)

@@ -637,7 +637,7 @@ reach_result reach_clipboard_build_render_commands(const reach_clipboard_render_
     result = reach_ui_motion_background_render(
         commands, &background, radius, border_thickness, theme->clipboard_background,
         theme->clipboard_border, &theme->popup_shadow, input->dpi_scale,
-        UINT64_C(0x7200000000000000), anchor.id, theme->glass_intensity);
+        UINT64_C(0x7200000000000000), anchor.id, theme->glass);
     if (result != REACH_OK)
         return result;
     reach_render_group interior = {};

@@ -265,9 +265,9 @@ static void reach_host_apply_theme(reach_host *host, const reach_config_snapshot
     reach_host_set_theme(
         host, snapshot->light_theme ? REACH_THEME_MODE_LIGHT : REACH_THEME_MODE_DARK, &accent);
     int32_t intensity = snapshot->glass.enabled ? snapshot->glass.intensity : 0;
-    if (host->theme_storage.glass_intensity != intensity)
+    if (host->theme_storage.glass.intensity != intensity)
     {
-        host->theme_storage.glass_intensity = intensity;
+        host->theme_storage.glass.intensity = intensity;
         ++host->theme_revision;
     }
     if (host->theme_revision == previous)

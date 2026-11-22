@@ -22,7 +22,7 @@ extern "C"
         float cover_radius;
         float cover_fade_start;
         int32_t cover_corner_mask;
-        int32_t glass_intensity;
+        reach_glass glass;
     } reach_now_playing_artwork_render_input;
 
     reach_result reach_now_playing_artwork_build_render_commands(

@@ -10,12 +10,79 @@
 
 namespace composition = winrt::Windows::UI::Composition;
 
-static composition::CompositionEffectFactory
-reach_wuc_create_glass_factory(const composition::Compositor &compositor, int32_t intensity)
+using reach_wuc_source = winrt::Windows::Graphics::Effects::IGraphicsEffectSource;
+using reach_wuc_value = winrt::Windows::Foundation::IInspectable;
+
+// Works on premultiplied values: rgb = clamp(scale * rgb + alpha_weight * a), alpha = 0.
+static reach_wuc_source reach_wuc_glass_matrix(const wchar_t *name, reach_wuc_source input,
+                                               float scale, float alpha_weight)
 {
     using winrt::Windows::Foundation::PropertyValue;
-    using source = winrt::Windows::Graphics::Effects::IGraphicsEffectSource;
-    using value = winrt::Windows::Foundation::IInspectable;
+    float matrix[20] = {};
+    matrix[0] = matrix[5] = matrix[10] = scale;
+    matrix[12] = matrix[13] = matrix[14] = alpha_weight;
+    return winrt::make<reach_wuc_effect>(
+        CLSID_D2D1ColorMatrix, name,
+        std::vector<reach_wuc_value>{
+            PropertyValue::CreateSingleArray(matrix),
+            PropertyValue::CreateUInt32(D2D1_COLORMATRIX_ALPHA_MODE_STRAIGHT),
+            PropertyValue::CreateBoolean(true)},
+        std::vector<reach_wuc_source>{input});
+}
+
+// clamp(first + second_weight * second) on every channel.
+static reach_wuc_source reach_wuc_glass_sum(const wchar_t *name, reach_wuc_source first,
+                                            reach_wuc_source second, float second_weight)
+{
+    using winrt::Windows::Foundation::PropertyValue;
+    float coefficients[4] = {0, 1, second_weight, 0};
+    return winrt::make<reach_wuc_effect>(
+        CLSID_D2D1ArithmeticComposite, name,
+        std::vector<reach_wuc_value>{PropertyValue::CreateSingleArray(coefficients),
+                                     PropertyValue::CreateBoolean(true)},
+        std::vector<reach_wuc_source>{first, second});
+}
+
+// max(paint, ceiling) or min(paint, floor): the theme bound, never overriding the paint itself so
+// borders and artwork past it keep their colors.
+static reach_wuc_source reach_wuc_glass_bound(const wchar_t *matrix_name, const wchar_t *name,
+                                              float level, bool ceiling)
+{
+    reach_wuc_source paint = composition::CompositionEffectSourceParameter(L"Paint");
+    auto offset = reach_wuc_glass_matrix(matrix_name, paint, ceiling ? -1.0f : 1.0f,
+                                         ceiling ? level : -level);
+    return reach_wuc_glass_sum(name, paint, offset, ceiling ? 1.0f : -1.0f);
+}
+
+// A knee: the backdrop moves the glass freely until it reaches the theme bound, then stops there.
+// Composition accepts only tree-shaped graphs with unique effect names, so the glass input is used
+// once and each bound is built twice.
+static reach_wuc_source reach_wuc_glass_ceiling(reach_wuc_source glass, float ceiling)
+{
+    auto excess = reach_wuc_glass_sum(
+        L"GlassCeilingExcess",
+        reach_wuc_glass_bound(L"GlassCeilingRaiseA", L"GlassCeilingBoundA", ceiling, true), glass,
+        -1);
+    return reach_wuc_glass_sum(
+        L"GlassCeiling",
+        reach_wuc_glass_bound(L"GlassCeilingRaiseB", L"GlassCeilingBoundB", ceiling, true), excess,
+        -1);
+}
+
+static reach_wuc_source reach_wuc_glass_floor(reach_wuc_source glass, float floor)
+{
+    auto rise = reach_wuc_glass_sum(
+        L"GlassFloorRise", glass,
+        reach_wuc_glass_bound(L"GlassFloorLowerA", L"GlassFloorBoundA", floor, false), -1);
+    return reach_wuc_glass_sum(
+        L"GlassFloor",
+        reach_wuc_glass_bound(L"GlassFloorLowerB", L"GlassFloorBoundB", floor, false), rise, 1);
+}
+
+static composition::CompositionEffectFactory
+reach_wuc_create_glass_factory(const composition::Compositor &compositor, reach_glass glass)
+{
+    using winrt::Windows::Foundation::PropertyValue;
     // Windows already blurs the host backdrop. Blend it with the painted theme color.
     float matrix[20] = {};
     matrix[0] = matrix[5] = matrix[10] = 1;
@@ -23,52 +90,60 @@ reach_wuc_create_glass_factory(const composition::Compositor &compositor, int32_
     constexpr float maximum_weight = 0.85f;
     constexpr float default_intensity = (float)REACH_CONFIG_GLASS_INTENSITY_DEFAULT;
     constexpr float intensity_span = REACH_CONFIG_GLASS_INTENSITY_MAX - default_intensity;
+    const float intensity = (float)glass.intensity;
     matrix[15] = intensity <= default_intensity
-                     ? default_weight * (float)intensity / default_intensity
+                     ? default_weight * intensity / default_intensity
                      : default_weight + (maximum_weight - default_weight) *
-                                            ((float)intensity - default_intensity) / intensity_span;
+                                            (intensity - default_intensity) / intensity_span;
     auto tinted_backdrop = winrt::make<reach_wuc_effect>(
         CLSID_D2D1ColorMatrix, L"GlassOpacity",
-        std::vector<value>{PropertyValue::CreateSingleArray(matrix),
-                           PropertyValue::CreateUInt32(D2D1_COLORMATRIX_ALPHA_MODE_PREMULTIPLIED),
-                           PropertyValue::CreateBoolean(true)},
-        std::vector<source>{composition::CompositionEffectSourceParameter(L"Backdrop")});
+        std::vector<reach_wuc_value>{
+            PropertyValue::CreateSingleArray(matrix),
+            PropertyValue::CreateUInt32(D2D1_COLORMATRIX_ALPHA_MODE_PREMULTIPLIED),
+            PropertyValue::CreateBoolean(true)},
+        std::vector<reach_wuc_source>{composition::CompositionEffectSourceParameter(L"Backdrop")});
     // Source-atop keeps the painted silhouette, including antialiased corners, as the mask.
     auto composite = winrt::make<reach_wuc_effect>(
         CLSID_D2D1Composite, L"Glass",
-        std::vector<value>{PropertyValue::CreateUInt32(D2D1_COMPOSITE_MODE_SOURCE_ATOP)},
-        std::vector<source>{composition::CompositionEffectSourceParameter(L"Paint"),
-                            tinted_backdrop.as<source>()});
-    return compositor.CreateEffectFactory(composite);
+        std::vector<reach_wuc_value>{PropertyValue::CreateUInt32(D2D1_COMPOSITE_MODE_SOURCE_ATOP)},
+        std::vector<reach_wuc_source>{composition::CompositionEffectSourceParameter(L"Paint"),
+                                      tinted_backdrop.as<reach_wuc_source>()});
+    reach_wuc_source result = composite.as<reach_wuc_source>();
+    if (glass.ceiling < 1)
+        result = reach_wuc_glass_ceiling(result, glass.ceiling);
+    if (glass.floor > 0)
+        result = reach_wuc_glass_floor(result, glass.floor);
+    return compositor.CreateEffectFactory(
+        result.as<winrt::Windows::Graphics::Effects::IGraphicsEffect>());
 }
 
 HRESULT reach_wuc_sync_glass(reach_render_backend *backend, reach_d2d_retained_layer &layer,
-                             int32_t intensity, bool surface_recreated)
+                             reach_glass glass, bool surface_recreated)
 {
     if (surface_recreated)
-        layer.glass_intensity = 0;
-    if (layer.glass_intensity == intensity)
+        layer.glass = {};
+    if (reach_glass_equal(layer.glass, glass))
         return S_OK;
 
     ComPtr<ABI::Windows::UI::Composition::ICompositionBrush> paint;
     HRESULT hr = layer.surface_brush.As(&paint);
     if (FAILED(hr))
         return hr;
-    if (layer.glass_intensity != 0)
+    if (layer.glass.intensity != 0)
     {
         hr = layer.visual->put_Brush(paint.Get());
         if (FAILED(hr))
             return hr;
-        layer.glass_intensity = 0;
+        layer.glass = {};
     }
-    if (intensity == 0)
+    if (glass.intensity == 0)
         return S_OK;
 
     try
     {
-        if (backend->glass_factory_intensity != intensity)
+        if (!reach_glass_equal(backend->glass_factory_glass, glass))
         {
-            backend->glass_factory_intensity = intensity;
+            backend->glass_factory_glass = glass;
             backend->glass_factory.Reset();
             composition::Compositor compositor{nullptr};
             winrt::copy_from_abi(compositor, backend->compositor.Get());
@@ -89,7 +164,7 @@ HRESULT reach_wuc_sync_glass(reach_render_backend *backend, reach_d2d_retained_l
                     static_cast<ABI::Windows::UI::Composition::ICompositionBrush *>(
                         winrt::get_abi(backdrop));
             }
-            auto factory = reach_wuc_create_glass_factory(compositor, intensity);
+            auto factory = reach_wuc_create_glass_factory(compositor, glass);
             winrt::check_hresult(factory.ExtendedError());
             backend->glass_factory =
                 static_cast<ABI::Windows::UI::Composition::ICompositionEffectFactory *>(
@@ -108,7 +183,7 @@ HRESULT reach_wuc_sync_glass(reach_render_backend *backend, reach_d2d_retained_l
             composition::SpriteVisual visual{nullptr};
             winrt::copy_from_abi(visual, layer.visual.Get());
             visual.Brush(effect);
-            layer.glass_intensity = intensity;
+            layer.glass = glass;
         }
     }
     catch (...)

@@ -126,7 +126,7 @@ void reach_d2d_retained_runs(const reach_render_command_buffer *buffer,
             while (end < buffer->count && buffer->commands[end].group_id == first.group_id &&
                    (first.group_id != 0 ||
                     (buffer->commands[end].type != REACH_RENDER_COMMAND_TEXTBOX &&
-                     buffer->commands[end].glass_intensity == first.glass_intensity)))
+                     reach_glass_equal(buffer->commands[end].glass, first.glass))))
                 ++end;
         }
         uint64_t id = first.group_id;

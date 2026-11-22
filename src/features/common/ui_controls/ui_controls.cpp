@@ -127,7 +127,7 @@ reach_result reach_ui_motion_background_render(reach_render_command_buffer *comm
                                                float border, reach_color background,
                                                reach_color outline, const reach_shadow *shadow,
                                                float dpi_scale, uint64_t first_id,
-                                               uint64_t parent_id, int32_t glass_intensity)
+                                               uint64_t parent_id, reach_glass glass)
 {
     if (commands == nullptr || bounds == nullptr || commands->current_group_id != 0 ||
         first_id == 0 || first_id >= UINT64_C(0x8000000000000000) - 7 || !isfinite(dpi_scale) ||
@@ -195,8 +195,8 @@ reach_result reach_ui_motion_background_render(reach_render_command_buffer *comm
         shape.type = REACH_RENDER_COMMAND_RECT;
         shape.rect = reach_render_pixel_aligned_rect(reach_rect_motion_value_at(bounds, 0));
         shape.radius = radius;
-        shape.glass_intensity = glass_intensity;
-        if (result == REACH_OK && casts && glass_intensity != 0 && shape.rect.width > 0.0f &&
+        shape.glass = glass;
+        if (result == REACH_OK && casts && glass.intensity != 0 && shape.rect.width > 0.0f &&
             shape.rect.height > 0.0f)
         {
             result = reach_render_push_shadow(commands, &shape, shadow, dpi_scale);
@@ -283,7 +283,7 @@ reach_result reach_ui_motion_background_render(reach_render_command_buffer *comm
                                                background);
     }
     for (size_t index = first_paint; index < commands->count; ++index)
-        commands->commands[index].glass_intensity = glass_intensity;
+        commands->commands[index].glass = glass;
     commands->has_scissor = scissored;
     if (result != REACH_OK)
     {
@@ -373,7 +373,7 @@ reach_result reach_ui_bordered_motion_color_feedback_render(
     size_t begin = commands->group_count;
     reach_result result =
         reach_ui_motion_background_render(commands, bounds, radius, border, {1, 1, 1, 1},
-                                          {1, 1, 1, 1}, nullptr, 1, first_id, parent, 0);
+                                          {1, 1, 1, 1}, nullptr, 1, first_id, parent, {});
     commands->current_group_id = parent;
     if (result != REACH_OK)
         return result;

@@ -1387,8 +1387,7 @@ static HRESULT sync_layer(reach_render_backend *backend, reach_d2d_retained_laye
     {
         hr = draw_layer(backend, layer, local, width, height, &surface_recreated);
         if (SUCCEEDED(hr) && backend->compositor != nullptr)
-            hr = reach_wuc_sync_glass(backend, layer, local.front().glass_intensity,
-                                      surface_recreated);
+            hr = reach_wuc_sync_glass(backend, layer, local.front().glass, surface_recreated);
     }
     else if (content_changed)
     {
@@ -1398,7 +1397,7 @@ static HRESULT sync_layer(reach_render_backend *backend, reach_d2d_retained_laye
         {
             layer.surface.Reset();
             layer.surface_brush.Reset();
-            layer.glass_intensity = 0;
+            layer.glass = {};
             layer.dcomp_surface.Reset();
             layer.commands.clear();
             layer.width = layer.height = 0;

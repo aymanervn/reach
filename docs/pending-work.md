@@ -4,6 +4,7 @@ Open items only.
 
 ## Needs the user's decision
 
+- Glass contrast tiers: primary text 4.5:1, secondary text 3:1 against the glass bound (`REACH_THEME_GLASS_*_CONTRAST`, `reach_theme_glass_limit` in `theme.c`). Secondary at 4.5:1 would stop light glass at gray 241 (nearly opaque).
 
 ## Bugs
 
@@ -46,6 +47,8 @@ Open items only.
 - Numeric surface IDs remain: composition indexes state by `reach_surface_id` (`host->surface_participants[id]` in `host_surface_frames.cpp`) instead of `reach_surface_key_for<T>()` alone.
 - Capsule state structs are public and composition reads them. A third of the public feature API is internals. Per-feature action enums remain in public headers.
 - Dock and Launcher internals live in `core`.
+- Glass policy is split: `theme.c` includes `core/config.h` for the default intensity, and the intensity-to-backdrop-weight curve lives in the adapter (`reach_wuc_create_glass_factory`).
+- `glass_popup_separator` is a raw 18% black or white used only by the Context Menu; other glass surfaces keep `popup_separator`.
 - `reach_ui_layout` and its only consumer are dead.
 - Context Menu uses the Dock's capacity as its "no target" sentinel.
 - Point-in-rect is implemented 14 times with three semantics; `reach_rect_equal` is redefined 4 times.

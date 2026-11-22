@@ -1544,7 +1544,7 @@ reach_quick_settings_build_render_commands(const reach_quick_settings_render_inp
         background.background_color_override = input->theme.top_bar_dropdown_background;
         background.has_background_color_override = 1;
         background.hide_notch = 1;
-        background.glass_intensity = input->theme.glass_intensity;
+        background.glass = input->theme.glass;
         reach_result result = reach_popup_push_height_background(
             &background, &input->surface_motion.height, 7, 1700, commands);
         if (result != REACH_OK)
