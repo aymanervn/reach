@@ -67,6 +67,18 @@ struct reach_dock
     reach_rect_f32 arranged_monitor_bounds;
     reach_rect_f32 settled_bounds;
     int32_t settled_bounds_valid;
+    int32_t configured_size;
+    int32_t resize_cap_percent;
+    int32_t resize_active;
+    int32_t resize_start_y;
+    int32_t resize_start_setting;
+    float resize_start_visible_percent;
+    float resize_start_scale;
+    int32_t resize_upper_percent;
+    int32_t resize_percent;
+    int32_t resize_start_percent;
+    double resize_edge_dwell_deadline;
+    int32_t resize_edge_armed;
     uint32_t next_app_key;
     reach_dock_routes routes;
     const reach_theme *pointer_theme;
@@ -177,6 +189,8 @@ reach_result reach_dock_create(reach_dock **out_animations)
     }
     reach_dock_model_defaults(&animations->metrics);
     reach_motion_set(&animations->size_scale, 1.0f);
+    animations->configured_size = REACH_CONFIG_DOCK_SIZE_MAX;
+    animations->resize_cap_percent = REACH_CONFIG_DOCK_SIZE_MAX;
     reach_motion_set(&animations->y_motion, 0.0f);
     animations->auto_hide = 1;
     for (reach_motion &motion : animations->slot_motions)
@@ -271,6 +285,8 @@ reach_dock_pointer_region reach_dock_pointer_region_at(const reach_dock *dock, i
         return REACH_DOCK_POINTER_REGION_ITEM;
     case REACH_DOCK_HIT_TRIGGER:
         return REACH_DOCK_POINTER_REGION_TRIGGER;
+    case REACH_DOCK_HIT_RESIZE_EDGE:
+        return REACH_DOCK_POINTER_REGION_RESIZE_EDGE;
     case REACH_DOCK_HIT_NONE:
     default:
         return REACH_DOCK_POINTER_REGION_NONE;
@@ -349,12 +365,111 @@ size_t reach_dock_collect_item_windows(reach_dock *dock, size_t item_index,
     return count;
 }
 
+/* Rim resize session. The drag drives the live size scale; only a release that changed the
+   setting reports it, so the dock never writes configuration while the pointer is moving. */
+static void reach_dock_resize_apply_percent(reach_dock *dock, float percent)
+{
+    reach_motion_set(&dock->size_scale, percent / (float)REACH_CONFIG_DOCK_SIZE_MAX);
+}
+
+static void reach_dock_resize_begin(reach_dock *dock, int32_t screen_y)
+{
+    const int32_t cap = dock->resize_cap_percent;
+    dock->resize_active = 1;
+    dock->resize_start_scale = dock->size_scale.to;
+    dock->resize_start_y = screen_y;
+    dock->resize_start_setting = dock->configured_size;
+    dock->resize_start_visible_percent =
+        (float)(dock->configured_size < cap ? dock->configured_size : cap);
+    int32_t upper = cap < REACH_CONFIG_DOCK_SIZE_MAX ? cap : REACH_CONFIG_DOCK_SIZE_MAX;
+    dock->resize_upper_percent =
+        upper > REACH_CONFIG_DOCK_SIZE_MIN ? upper : REACH_CONFIG_DOCK_SIZE_MIN;
+    int32_t start_percent = (int32_t)lroundf(dock->resize_start_visible_percent);
+    if (start_percent < REACH_CONFIG_DOCK_SIZE_MIN)
+        start_percent = REACH_CONFIG_DOCK_SIZE_MIN;
+    if (start_percent > dock->resize_upper_percent)
+        start_percent = dock->resize_upper_percent;
+    dock->resize_start_percent = start_percent;
+    dock->resize_percent = start_percent;
+}
+
+static void reach_dock_resize_move(reach_dock *dock, int32_t screen_y)
+{
+    const float native_height = dock->pointer_layout.native_height > 0.0f
+                                    ? dock->pointer_layout.native_height
+                                    : dock->pointer_layout.bounds.height;
+    if (native_height <= 0.0f)
+        return;
+    float percent = dock->resize_start_visible_percent +
+                    (float)(dock->resize_start_y - screen_y) / native_height * 100.0f;
+    int32_t rounded = (int32_t)lroundf(percent);
+    if (rounded < REACH_CONFIG_DOCK_SIZE_MIN)
+        rounded = REACH_CONFIG_DOCK_SIZE_MIN;
+    if (rounded > dock->resize_upper_percent)
+        rounded = dock->resize_upper_percent;
+    dock->resize_percent = rounded;
+    reach_dock_resize_apply_percent(dock, (float)rounded);
+}
+
+static void reach_dock_resize_cancel(reach_dock *dock)
+{
+    if (!dock->resize_active)
+        return;
+    dock->resize_active = 0;
+    reach_motion_set(&dock->size_scale, dock->resize_start_scale);
+}
+
+static void reach_dock_resize_commit(reach_dock *dock)
+{
+    dock->resize_active = 0;
+    /* A click, or a drag that ends where it began, changes nothing. */
+    if (dock->resize_percent == dock->resize_start_percent)
+    {
+        reach_motion_set(&dock->size_scale, dock->resize_start_scale);
+        return;
+    }
+    /* At the width cap the start percent equals the cap, so reaching the cap is "unchanged" and
+       the stored setting is never lowered. */
+    const int32_t save = dock->resize_percent;
+    dock->configured_size = save;
+    reach_dock_resize_apply_percent(dock, (float)save);
+    if (save != dock->resize_start_setting && dock->routes.size_committed != nullptr)
+        dock->routes.size_committed(dock->routes.user, save);
+}
+
+/* The rim unlocks only after the pointer rests on it, so sliding across it never flashes the
+   resize cursor and a stray press there does nothing. Returns whether it was armed. */
+static int32_t reach_dock_resize_edge_disarm(reach_dock *dock)
+{
+    const int32_t was_armed = dock->resize_edge_armed;
+    dock->resize_edge_armed = 0;
+    dock->resize_edge_dwell_deadline = 0.0;
+    return was_armed;
+}
+
+static void reach_dock_resize_edge_hover(reach_dock *dock, int32_t on_edge,
+                                         reach_capsule_pointer_result *out)
+{
+    if (!on_edge)
+    {
+        if (reach_dock_resize_edge_disarm(dock))
+            out->relayout = 1;
+        return;
+    }
+    if (dock->resize_edge_armed || dock->resize_edge_dwell_deadline > 0.0)
+        return;
+    dock->resize_edge_dwell_deadline =
+        reach_motion_now_seconds() + reach_dock_metrics_values.resize_edge_dwell_seconds;
+}
+
 static void reach_dock_capsule_reset(void *capsule)
 {
     reach_dock *dock = static_cast<reach_dock *>(capsule);
     reach_dock_reset_model(dock);
     if (dock != nullptr)
     {
+        reach_dock_resize_cancel(dock);
+        (void)reach_dock_resize_edge_disarm(dock);
         dock->pointer_layout_valid = 0;
         dock->state.hovered_item = REACH_MAX_DOCK_ITEMS;
         dock->hover_owner_key = 0;
@@ -380,6 +495,13 @@ static void reach_dock_capsule_tick(void *capsule, double, reach_feature_tick_re
     if (dock != nullptr)
     {
         reach_dock_reveal_due_hover(dock, now);
+        if (out != nullptr && dock->resize_edge_dwell_deadline > 0.0 &&
+            now >= dock->resize_edge_dwell_deadline)
+        {
+            dock->resize_edge_dwell_deadline = 0.0;
+            dock->resize_edge_armed = 1;
+            out->relayout = 1;
+        }
     }
 }
 
@@ -393,6 +515,12 @@ static void reach_dock_capsule_on_game_mode(void *capsule, int32_t enabled)
 {
     if (enabled)
     {
+        reach_dock *dock = static_cast<reach_dock *>(capsule);
+        if (dock != nullptr)
+        {
+            reach_dock_resize_cancel(dock);
+            (void)reach_dock_resize_edge_disarm(dock);
+        }
         reach_dock_reset_reveal_state(static_cast<reach_dock *>(capsule));
         reach_dock_clear_item_x_animations(static_cast<reach_dock *>(capsule));
     }
@@ -412,7 +540,8 @@ static int32_t reach_dock_capsule_needs_frame(const void *capsule)
 static int32_t reach_dock_capsule_pointer_sequence_active(const void *capsule)
 {
     const reach_dock *dock = static_cast<const reach_dock *>(capsule);
-    return dock != nullptr && reach_pressable_tracking(&dock->state.pressable);
+    return dock != nullptr &&
+           (dock->resize_active || reach_pressable_tracking(&dock->state.pressable));
 }
 
 static int32_t reach_dock_capsule_wants_pointer_move(const void *capsule)
@@ -423,7 +552,8 @@ static int32_t reach_dock_capsule_wants_pointer_move(const void *capsule)
 static int32_t reach_dock_capsule_pointer_capture_active(const void *capsule)
 {
     const reach_dock *dock = static_cast<const reach_dock *>(capsule);
-    return dock != nullptr && reach_pressable_tracking(&dock->state.pressable);
+    return dock != nullptr &&
+           (dock->resize_active || reach_pressable_tracking(&dock->state.pressable));
 }
 
 static void reach_dock_capsule_surface_geometry(const void *capsule,
@@ -438,12 +568,20 @@ static void reach_dock_capsule_surface_geometry(const void *capsule,
     if (dock != nullptr && dock->pointer_layout_valid)
     {
         out->visible_bounds = dock->pointer_layout.bounds;
+        /* The cursor region is the exact band the hit test resizes from. */
+        out->resize_cursor_region = reach_dock_resize_edge_rect(&dock->pointer_layout);
+        out->has_resize_cursor_region = (dock->resize_edge_armed || dock->resize_active) &&
+                                        out->resize_cursor_region.width > 0.0f &&
+                                        out->resize_cursor_region.height > 0.0f;
     }
     if (dock == nullptr)
     {
         return;
     }
     out->deadline_seconds = dock->hover_deadline;
+    if (dock->resize_edge_dwell_deadline > 0.0 &&
+        (out->deadline_seconds <= 0.0 || dock->resize_edge_dwell_deadline < out->deadline_seconds))
+        out->deadline_seconds = dock->resize_edge_dwell_deadline;
     // A fixed dock reserves its strip like the static top bar; auto hide reserves nothing. The
     // reservation follows settled bounds only, so resizing never reflows windows every frame.
     out->manage_monitor_work_area = 1;
@@ -661,6 +799,36 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
         return;
     }
 
+    if (dock->resize_active)
+    {
+        /* Screen space: the layout moves under the pointer while the size changes. */
+        if (event->kind == REACH_POINTER_EVENT_MOVE)
+        {
+            reach_dock_resize_move(dock, event->y);
+            out->handled = out->redraw = out->relayout = 1;
+        }
+        else if (event->kind == REACH_POINTER_EVENT_UP &&
+                 event->button == REACH_POINTER_BUTTON_PRIMARY)
+        {
+            reach_dock_resize_move(dock, event->y);
+            reach_dock_resize_commit(dock);
+            (void)reach_dock_resize_edge_disarm(dock);
+            out->handled = out->redraw = out->relayout = 1;
+            out->capture = -1;
+            out->sync_pointer_subscriptions = 1;
+        }
+        else if (event->kind == REACH_POINTER_EVENT_CANCEL)
+        {
+            reach_dock_resize_cancel(dock);
+            (void)reach_dock_resize_edge_disarm(dock);
+            out->handled = out->redraw = out->relayout = 1;
+            out->capture = -1;
+            out->sync_pointer_subscriptions = 1;
+        }
+        return;
+    }
+
+    const int32_t raw_screen_y = event->y;
     reach_pointer_event local_event = *event;
     if (dock->pointer_layout_valid)
     {
@@ -682,6 +850,15 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
 
     if (event->kind == REACH_POINTER_EVENT_DOWN)
     {
+        if (hit.type == REACH_DOCK_HIT_RESIZE_EDGE && dock->resize_edge_armed &&
+            event->button == REACH_POINTER_BUTTON_PRIMARY)
+        {
+            reach_dock_resize_begin(dock, raw_screen_y);
+            out->handled = 1;
+            out->capture = 1;
+            out->sync_pointer_subscriptions = 1;
+            return;
+        }
         uint64_t target = reach_dock_pressable_target(dock, hit, event->button);
         if (target == REACH_PRESSABLE_TARGET_NONE)
         {
@@ -795,6 +972,7 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
     }
     if (event->kind == REACH_POINTER_EVENT_MOVE)
     {
+        reach_dock_resize_edge_hover(dock, hit.type == REACH_DOCK_HIT_RESIZE_EDGE, out);
         reach_pressable_feedback_style feedback = reach_dock_pressable_feedback(dock);
         reach_pressable_result pressable = {};
         reach_pressable_update(
@@ -843,6 +1021,7 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
         reach_pressable_cancel(&state->pressable, &feedback, &pressable);
         reach_dock_capsule_apply_pressable_result(&pressable, out);
         reach_dock_end_hover(dock);
+        reach_dock_resize_edge_hover(dock, 0, out);
         return;
     }
     if (event->kind == REACH_POINTER_EVENT_LEAVE)
@@ -851,6 +1030,7 @@ static void reach_dock_capsule_handle_pointer(void *capsule, const reach_pointer
         reach_pressable_update(&state->pressable, REACH_PRESSABLE_TARGET_NONE, &pressable);
         reach_dock_capsule_apply_pressable_result(&pressable, out);
         reach_dock_end_hover(dock);
+        reach_dock_resize_edge_hover(dock, 0, out);
     }
 }
 
@@ -904,7 +1084,15 @@ void reach_dock_apply_config(reach_dock *dock, float height, int32_t size)
     if (size >= REACH_CONFIG_DOCK_SIZE_MIN && size <= REACH_CONFIG_DOCK_SIZE_MAX)
     {
         float scale = (float)size / (float)REACH_CONFIG_DOCK_SIZE_MAX;
-        if (!dock->size_configured)
+        dock->configured_size = size;
+        if (dock->resize_active)
+        {
+            /* A drag owns the live scale; a config change only moves what the release compares
+               against and what an unchanged release restores. */
+            dock->resize_start_setting = size;
+            dock->resize_start_scale = scale;
+        }
+        else if (!dock->size_configured)
             reach_motion_set(&dock->size_scale, scale);
         else if (dock->size_scale.to != scale)
             reach_motion_animate_spec_to_at(
@@ -981,7 +1169,8 @@ int32_t reach_dock_arrange(reach_dock *dock, const reach_dock_arrange_context *c
             dock->hover_owner_key = 0;
         }
     }
-    if (dock->pointer_layout_valid && !reach_dock_size_animating(dock) &&
+    /* A drag sets the size directly with no animation, so hold the reservation until release. */
+    if (dock->pointer_layout_valid && !dock->resize_active && !reach_dock_size_animating(dock) &&
         !reach_dock_slots_animating(dock))
     {
         dock->settled_bounds = dock->pointer_layout.bounds;
@@ -1053,7 +1242,8 @@ reach_dock_bar_update_visibility(void *capsule, const reach_bar_visibility_reque
 
     reach_bar_visibility_request bar_request = *request;
     bar_request.edge = REACH_DOCK_EDGE;
-    bar_request.pointer_sequence_active = reach_pressable_tracking(&animations->state.pressable);
+    bar_request.pointer_sequence_active =
+        animations->resize_active || reach_pressable_tracking(&animations->state.pressable);
     int32_t bounds_changed =
         fabsf(animations->coverage_shown_bounds.x - request->shown_bounds.x) >= 0.5f ||
         fabsf(animations->coverage_shown_bounds.y - request->shown_bounds.y) >= 0.5f ||
@@ -1924,6 +2114,14 @@ void reach_dock_build_layout(reach_dock *dock, const reach_dock_build_context *c
     const reach_dock_fit_result fit = reach_dock_fit_metrics(
         native_height, ctx->icon_size * dpi_scale, ctx->gap * dpi_scale, native_border_thickness,
         layout->available_width, app_slot_units, ctx->size_scale);
+    /* The largest size the width allows, for the rim resize to clamp against. */
+    const reach_dock_fit_result full_fit = reach_dock_fit_metrics(
+        native_height, ctx->icon_size * dpi_scale, ctx->gap * dpi_scale, native_border_thickness,
+        layout->available_width, app_slot_units, 1.0f);
+    dock->resize_cap_percent =
+        full_fit.scale >= 1.0f
+            ? REACH_CONFIG_DOCK_SIZE_MAX
+            : (int32_t)floorf(full_fit.scale * (float)REACH_CONFIG_DOCK_SIZE_MAX);
     const float center_x = layout->bounds.x + layout->bounds.width * 0.5f;
     const float bottom = layout->bounds.y + layout->bounds.height;
     layout->bounds.x = center_x - fit.width * 0.5f;
