@@ -8,9 +8,6 @@ static const uint32_t REACH_TOUCHPAD_SWIPE_FINGERS = 3;
 /* Speed smoothing time constant, and the longest frame gap still treated as continuous motion. */
 static const double REACH_TOUCHPAD_SWIPE_SPEED_SMOOTHING_SECONDS = 0.05;
 static const double REACH_TOUCHPAD_SWIPE_MAX_FRAME_GAP_SECONDS = 0.25;
-/* A touched pad reports continuously; a longer silence mid-switch means reports were lost (secure
-   desktop, device reset), so the switch is cancelled rather than committed on the next touch. */
-static const double REACH_TOUCHPAD_SWIPE_STALE_SECONDS = 0.5;
 
 float reach_touchpad_swipe_step_fraction(const reach_touchpad_swipe *swipe)
 {
@@ -146,8 +143,7 @@ size_t reach_touchpad_swipe_update(reach_touchpad_swipe *swipe, const reach_touc
         }
         break;
     case REACH_TOUCHPAD_SWIPE_SWITCHING:
-        if (frame->time_seconds - swipe->last_time_seconds > REACH_TOUCHPAD_SWIPE_STALE_SECONDS ||
-            touching > REACH_TOUCHPAD_SWIPE_FINGERS)
+        if (touching > REACH_TOUCHPAD_SWIPE_FINGERS)
         {
             reach_touchpad_swipe_emit(REACH_UI_EVENT_APP_SWITCH_CANCEL, out_events, capacity,
                                       &count);

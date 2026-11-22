@@ -3,6 +3,7 @@
 
 #include "touchpad_frame.h"
 
+#include <stddef.h>
 #include <stdint.h>
 
 #include <windows.h>
@@ -17,8 +18,12 @@ reach_touchpad_reports *reach_touchpad_reports_create(void);
 
 void reach_touchpad_reports_destroy(reach_touchpad_reports *reports);
 
-/* Returns 1 when out_frame holds a completed frame. */
-int32_t reach_touchpad_reports_feed(reach_touchpad_reports *reports, HRAWINPUT input,
-                                    reach_touchpad_frame *out_frame);
+typedef void (*reach_touchpad_frame_callback)(const reach_touchpad_frame *frame, void *user);
+
+/* Calls callback once per frame the input completes, in order, stamping each with time_seconds.
+   Returns the number of frames delivered. */
+size_t reach_touchpad_reports_feed(reach_touchpad_reports *reports, HRAWINPUT input,
+                                   double time_seconds, reach_touchpad_frame_callback callback,
+                                   void *user);
 
 #endif

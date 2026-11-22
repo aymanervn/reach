@@ -13,7 +13,6 @@
 #include "reach/core/render_commands.h"
 #include "reach/core/theme.h"
 #include "reach/core/ui_events.h"
-#include "reach/core/ui_events.h"
 #include "reach/features/feature_capsule.h"
 #include "reach/support/util.h"
 

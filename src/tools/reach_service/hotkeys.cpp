@@ -528,7 +528,9 @@ static LRESULT CALLBACK reach_helper_keyboard_proc(int code, WPARAM wparam, LPAR
 
 static int32_t reach_helper_alt_tab_active(void)
 {
-    return g_hotkeys.alt_tab_active;
+    /* The flag clears on an observed Alt release, which the hook misses on the secure desktop;
+       a stale flag must not block swipes once Alt is physically up. */
+    return g_hotkeys.alt_tab_active && reach_helper_physical_alt_down();
 }
 
 static DWORD WINAPI reach_helper_hotkey_thread(void *param)

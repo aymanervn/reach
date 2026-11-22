@@ -404,9 +404,13 @@ static void reach_input_handle_hotkey_record(reach_input_source *source,
         {
             if (!source->alt_tab_active)
             {
-                reach_input_post_ui_event(source, REACH_UI_EVENT_APP_SWITCH_BEGIN, 0);
                 source->alt_tab_active = 1;
-                break;
+                /* A swipe already opened the switcher: keep its selection and step from it. */
+                if (!source->gesture_switch_active)
+                {
+                    reach_input_post_ui_event(source, REACH_UI_EVENT_APP_SWITCH_BEGIN, 0);
+                    break;
+                }
             }
             int32_t shift_down =
                 source->shift_down || ((record->modifiers & REACH_SERVICE_MODIFIER_SHIFT) != 0);
@@ -416,9 +420,10 @@ static void reach_input_handle_hotkey_record(reach_input_source *source,
         }
         break;
     case REACH_SERVICE_HOTKEY_ESCAPE:
-        if (pressed && source->alt_tab_active)
+        if (pressed && (source->alt_tab_active || source->gesture_switch_active))
         {
             source->alt_tab_active = 0;
+            source->gesture_switch_active = 0;
             reach_input_post_ui_event(source, REACH_UI_EVENT_APP_SWITCH_CANCEL, 0);
         }
         break;

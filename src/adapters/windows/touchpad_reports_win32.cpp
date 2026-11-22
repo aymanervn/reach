@@ -19,6 +19,8 @@ static const USAGE REACH_HID_USAGE_CONTACT_COUNT = 0x54;
 
 static const size_t REACH_TOUCHPAD_DEVICE_CAPACITY = 4;
 static const size_t REACH_TOUCHPAD_FINGER_LINK_CAPACITY = 16;
+/* Describing a device can fail transiently (e.g. right after resume); retry a few times. */
+static const uint32_t REACH_TOUCHPAD_DESCRIBE_ATTEMPTS = 3;
 
 struct reach_touchpad_device
 {
@@ -29,6 +31,12 @@ struct reach_touchpad_device
     size_t finger_link_count;
     float range_x;
     float range_y;
+    /* Coordinate field widths; descriptors with a negative logical minimum need sign extension. */
+    USHORT x_bits;
+    USHORT y_bits;
+    int32_t x_signed;
+    int32_t y_signed;
+    uint32_t describe_attempts;
     /* Reports a per-contact Confidence bit; firmware clears it for contacts it takes for a palm. */
     int32_t has_confidence;
     int32_t usable;
@@ -111,7 +119,9 @@ static int32_t reach_touchpad_has_button(reach_touchpad_device *device, USHORT c
 
 static void reach_touchpad_describe_device(reach_touchpad_device *device)
 {
+    ++device->describe_attempts;
     device->usable = 0;
+    device->finger_link_count = 0;
     UINT size = 0;
     if (GetRawInputDeviceInfoW(device->handle, RIDI_PREPARSEDDATA, nullptr, &size) != 0 ||
         size == 0)
@@ -154,11 +164,15 @@ static void reach_touchpad_describe_device(reach_touchpad_device *device)
         {
             reach_touchpad_add_finger_link(device, cap.LinkCollection);
             device->range_x = (float)(cap.LogicalMax - cap.LogicalMin);
+            device->x_bits = cap.BitSize;
+            device->x_signed = cap.LogicalMin < 0;
         }
         else if (reach_touchpad_value_cap_is(cap, REACH_HID_PAGE_GENERIC_DESKTOP,
                                              REACH_HID_USAGE_Y))
         {
             device->range_y = (float)(cap.LogicalMax - cap.LogicalMin);
+            device->y_bits = cap.BitSize;
+            device->y_signed = cap.LogicalMin < 0;
         }
     }
     device->has_confidence = reach_touchpad_has_button(
@@ -172,9 +186,14 @@ static reach_touchpad_device *reach_touchpad_device_for(reach_touchpad_reports *
 {
     for (size_t index = 0; index < reports->device_count; ++index)
     {
-        if (reports->devices[index].handle == handle)
+        reach_touchpad_device *known = &reports->devices[index];
+        if (known->handle == handle)
         {
-            return &reports->devices[index];
+            if (!known->usable && known->describe_attempts < REACH_TOUCHPAD_DESCRIBE_ATTEMPTS)
+            {
+                reach_touchpad_describe_device(known);
+            }
+            return known;
         }
     }
     reach_touchpad_device *device = nullptr;
@@ -257,6 +276,19 @@ static reach_touchpad_slot_state reach_touchpad_slot_read(reach_touchpad_device 
     return confident ? REACH_TOUCHPAD_SLOT_CONFIDENT : REACH_TOUCHPAD_SLOT_UNCERTAIN;
 }
 
+/* HidP_GetUsageValue returns the raw field bits; a signed field needs its sign bit extended. */
+static double reach_touchpad_signed_value(ULONG raw, USHORT bits, int32_t is_signed)
+{
+    if (!is_signed || bits == 0 || bits >= 32)
+    {
+        return is_signed ? (double)(LONG)raw : (double)raw;
+    }
+    const ULONG sign = 1ul << (bits - 1);
+    const ULONG mask = (1ul << bits) - 1;
+    raw &= mask;
+    return (raw & sign) != 0 ? (double)(LONG)(raw | ~mask) : (double)raw;
+}
+
 /* Reads one HID report into the open frame. Returns 1 when that completes a frame. */
 static int32_t reach_touchpad_read_report(reach_touchpad_reports *reports,
                                           reach_touchpad_device *device, PCHAR report, ULONG length,
@@ -298,18 +330,20 @@ static int32_t reach_touchpad_read_report(reach_touchpad_reports *reports,
             ++reports->frame_uncertain;
             continue;
         }
-        ULONG x = 0;
-        ULONG y = 0;
+        ULONG x_raw = 0;
+        ULONG y_raw = 0;
         if (HidP_GetUsageValue(HidP_Input, REACH_HID_PAGE_GENERIC_DESKTOP, link, REACH_HID_USAGE_X,
-                               &x, preparsed, report, length) != HIDP_STATUS_SUCCESS ||
+                               &x_raw, preparsed, report, length) != HIDP_STATUS_SUCCESS ||
             HidP_GetUsageValue(HidP_Input, REACH_HID_PAGE_GENERIC_DESKTOP, link, REACH_HID_USAGE_Y,
-                               &y, preparsed, report, length) != HIDP_STATUS_SUCCESS)
+                               &y_raw, preparsed, report, length) != HIDP_STATUS_SUCCESS)
         {
             continue;
         }
+        const double x = reach_touchpad_signed_value(x_raw, device->x_bits, device->x_signed);
+        const double y = reach_touchpad_signed_value(y_raw, device->y_bits, device->y_signed);
         ++reports->frame_touching;
-        reports->frame_sum_x += (double)x;
-        reports->frame_sum_y += (double)y;
+        reports->frame_sum_x += x;
+        reports->frame_sum_y += y;
     }
 
     if (reports->frame_read >= reports->frame_expected)
@@ -329,10 +363,11 @@ void reach_touchpad_reports_destroy(reach_touchpad_reports *reports)
     delete reports;
 }
 
-int32_t reach_touchpad_reports_feed(reach_touchpad_reports *reports, HRAWINPUT input,
-                                    reach_touchpad_frame *out_frame)
+size_t reach_touchpad_reports_feed(reach_touchpad_reports *reports, HRAWINPUT input,
+                                   double time_seconds, reach_touchpad_frame_callback callback,
+                                   void *user)
 {
-    if (reports == nullptr || out_frame == nullptr)
+    if (reports == nullptr || callback == nullptr)
     {
         return 0;
     }
@@ -360,16 +395,20 @@ int32_t reach_touchpad_reports_feed(reach_touchpad_reports *reports, HRAWINPUT i
         return 0;
     }
 
-    /* Several reports can arrive in one message; the last completed frame wins. */
-    int32_t completed = 0;
+    /* Several reports can arrive in one message; every completed frame is delivered in order so a
+       brief contact (a palm landing) is never skipped. */
+    size_t completed = 0;
     const DWORD report_size = raw->data.hid.dwSizeHid;
     for (DWORD index = 0; index < raw->data.hid.dwCount; ++index)
     {
         PCHAR report = reinterpret_cast<PCHAR>(const_cast<BYTE *>(raw->data.hid.bRawData)) +
                        (size_t)index * report_size;
-        if (reach_touchpad_read_report(reports, device, report, report_size, out_frame))
+        reach_touchpad_frame frame = {};
+        if (reach_touchpad_read_report(reports, device, report, report_size, &frame))
         {
-            completed = 1;
+            frame.time_seconds = time_seconds;
+            callback(&frame, user);
+            ++completed;
         }
     }
     return completed;
