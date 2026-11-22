@@ -11,6 +11,8 @@ typedef struct reach_touchpad_frame
     float centroid_y;
     float range_x;
     float range_y;
+    /* When the frame arrived, in seconds on any monotonic clock. */
+    double time_seconds;
 } reach_touchpad_frame;
 
 #endif

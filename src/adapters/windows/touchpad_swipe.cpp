@@ -5,6 +5,32 @@
 #include <math.h>
 
 static const uint32_t REACH_TOUCHPAD_SWIPE_FINGERS = 3;
+/* Speed smoothing time constant, and the longest frame gap still treated as continuous motion. */
+static const double REACH_TOUCHPAD_SWIPE_SPEED_SMOOTHING_SECONDS = 0.05;
+static const double REACH_TOUCHPAD_SWIPE_MAX_FRAME_GAP_SECONDS = 0.25;
+
+float reach_touchpad_swipe_step_fraction(const reach_touchpad_swipe *swipe)
+{
+    const float span = REACH_TOUCHPAD_SWIPE_FAST_SPEED - REACH_TOUCHPAD_SWIPE_SLOW_SPEED;
+    float t = (swipe->speed - REACH_TOUCHPAD_SWIPE_SLOW_SPEED) / span;
+    t = t < 0.0f ? 0.0f : (t > 1.0f ? 1.0f : t);
+    return REACH_TOUCHPAD_SWIPE_SLOW_STEP_FRACTION +
+           (REACH_TOUCHPAD_SWIPE_FAST_STEP_FRACTION - REACH_TOUCHPAD_SWIPE_SLOW_STEP_FRACTION) * t;
+}
+
+static void reach_touchpad_swipe_track_speed(reach_touchpad_swipe *swipe,
+                                             const reach_touchpad_frame *frame)
+{
+    const double dt = frame->time_seconds - swipe->last_time_seconds;
+    if (dt > 0.0 && dt <= REACH_TOUCHPAD_SWIPE_MAX_FRAME_GAP_SECONDS)
+    {
+        const float instant = fabsf(frame->centroid_x - swipe->last_x) / frame->range_x / (float)dt;
+        const float alpha = (float)(dt / (dt + REACH_TOUCHPAD_SWIPE_SPEED_SMOOTHING_SECONDS));
+        swipe->speed += alpha * (instant - swipe->speed);
+    }
+    swipe->last_x = frame->centroid_x;
+    swipe->last_time_seconds = frame->time_seconds;
+}
 
 static void reach_touchpad_swipe_emit(reach_ui_event_type type, reach_ui_event_type *out_events,
                                       size_t capacity, size_t *count)
@@ -49,7 +75,8 @@ static void reach_touchpad_swipe_step(reach_touchpad_swipe *swipe,
                                       size_t *count)
 {
     /* Travel is measured along the starting direction, so a left swipe mirrors a right one. */
-    const float step = REACH_TOUCHPAD_SWIPE_STEP_FRACTION * frame->range_x * swipe->direction;
+    const float step =
+        reach_touchpad_swipe_step_fraction(swipe) * frame->range_x * swipe->direction;
     while ((frame->centroid_x - swipe->step_anchor_x) / step >= 1.0f && *count < capacity)
     {
         reach_touchpad_swipe_emit(REACH_UI_EVENT_APP_SWITCH_NEXT, out_events, capacity, count);
@@ -84,6 +111,9 @@ size_t reach_touchpad_swipe_update(reach_touchpad_swipe *swipe, const reach_touc
         {
             swipe->origin_x = frame->centroid_x;
             swipe->origin_y = frame->centroid_y;
+            swipe->speed = 0.0f;
+            swipe->last_x = frame->centroid_x;
+            swipe->last_time_seconds = frame->time_seconds;
             swipe->phase = REACH_TOUCHPAD_SWIPE_TRACKING;
         }
         break;
@@ -98,6 +128,7 @@ size_t reach_touchpad_swipe_update(reach_touchpad_swipe *swipe, const reach_touc
         }
         else
         {
+            reach_touchpad_swipe_track_speed(swipe, frame);
             reach_touchpad_swipe_track(swipe, frame, out_events, capacity, &count);
         }
         break;
@@ -116,6 +147,7 @@ size_t reach_touchpad_swipe_update(reach_touchpad_swipe *swipe, const reach_touc
         }
         else
         {
+            reach_touchpad_swipe_track_speed(swipe, frame);
             reach_touchpad_swipe_step(swipe, frame, out_events, capacity, &count);
         }
         break;

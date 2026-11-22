@@ -611,6 +611,8 @@ static LRESULT CALLBACK reach_input_window_proc(HWND hwnd, UINT message, WPARAM 
         if (reach_touchpad_reports_feed(source->touchpad, reinterpret_cast<HRAWINPUT>(lparam),
                                         &frame))
         {
+            /* Raw input carries no timestamp; the message time is when Windows queued it. */
+            frame.time_seconds = (double)(DWORD)GetMessageTime() / 1000.0;
             reach_input_handle_touchpad_frame(source, &frame);
         }
         /* DefWindowProc releases the raw input buffer. */
