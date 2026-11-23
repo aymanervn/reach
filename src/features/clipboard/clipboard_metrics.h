@@ -22,7 +22,6 @@ struct reach_clipboard_metrics
     float clear_button_height;
     float clear_button_gap;
     float clear_button_radius;
-    float clear_button_background_alpha;
 
     float scrollbar_gutter;
     float item_scrollbar_gap;
@@ -63,7 +62,6 @@ static constexpr reach_clipboard_metrics reach_clipboard_make_metrics()
     metrics.clear_button_height = 24.0f;
     metrics.clear_button_gap = 8.0f;
     metrics.clear_button_radius = 5.0f;
-    metrics.clear_button_background_alpha = 0.10f;
 
     metrics.padding = 8.0f;
     metrics.scrollbar_gutter = 15.0f;

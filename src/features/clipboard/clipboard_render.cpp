@@ -696,8 +696,7 @@ reach_result reach_clipboard_build_render_commands(const reach_clipboard_render_
         command = {};
         command.type = REACH_RENDER_COMMAND_TEXT;
         command.rect = reach_clipboard_local(empty_text_rect, origin);
-        command.color = theme->clipboard_secondary_text;
-        command.color.a *= 0.75f;
+        command.color = theme->clipboard_empty_text;
         command.text_size = metrics.items_font_size;
         command.text_alignment = REACH_TEXT_ALIGNMENT_CENTER;
         reach_copy_utf16(command.text, 260, (const uint16_t *)L"Nothing in the clipboard");
@@ -711,8 +710,8 @@ reach_result reach_clipboard_build_render_commands(const reach_clipboard_render_
         command = {};
         command.type = REACH_RENDER_COMMAND_RECT;
         command.rect = clear_button;
-        command.color = theme->clipboard_secondary_text;
-        command.color.a = metrics.clear_button_background_alpha * (clear_enabled ? 1.0f : 0.35f);
+        command.color = clear_enabled ? theme->clipboard_clear_button_background
+                                      : theme->clipboard_clear_button_disabled_background;
         command.radius = metrics.clear_button_radius;
         result = reach_render_command_buffer_push(commands, &command);
 

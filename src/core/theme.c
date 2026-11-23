@@ -146,7 +146,10 @@ static const reach_theme reach_theme_dark = {
     .clipboard_border = REACH_DARK_EDGE_ON_DEEP(1.0f),
     .clipboard_primary_text = REACH_DARK_HIGH_CONTRAST_WHITE(1.0f),
     .clipboard_secondary_text = REACH_DARK_MID_CONTRAST_GRAY(1.0f),
+    .clipboard_empty_text = REACH_DARK_MID_CONTRAST_GRAY(0.75f),
     .clipboard_item_background = REACH_DARK_RAISED(1.0f),
+    .clipboard_clear_button_background = REACH_DARK_MID_CONTRAST_GRAY(0.10f),
+    .clipboard_clear_button_disabled_background = REACH_DARK_MID_CONTRAST_GRAY(0.035f),
     .clipboard_scrollbar_track = REACH_DARK_STRUCTURE(1.0f),
     .clipboard_scrollbar_thumb = REACH_DARK_MID_CONTRAST_GRAY(1.0f),
 
@@ -284,7 +287,10 @@ static const reach_theme reach_theme_light = {
     .clipboard_border = REACH_LIGHT_EDGE_ON_BASE(1.0f),
     .clipboard_primary_text = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.90f),
     .clipboard_secondary_text = REACH_LIGHT_MID_CONTRAST_GRAY(1.0f),
+    .clipboard_empty_text = REACH_LIGHT_MID_CONTRAST_GRAY(0.75f),
     .clipboard_item_background = REACH_LIGHT_RAISED(1.0f),
+    .clipboard_clear_button_background = REACH_LIGHT_MID_CONTRAST_GRAY(0.10f),
+    .clipboard_clear_button_disabled_background = REACH_LIGHT_MID_CONTRAST_GRAY(0.035f),
     .clipboard_scrollbar_track = REACH_LIGHT_MIDTONE(1.0f),
     .clipboard_scrollbar_thumb = REACH_LIGHT_MID_CONTRAST_GRAY(1.0f),
 

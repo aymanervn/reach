@@ -185,7 +185,10 @@ extern "C"
         reach_color clipboard_border;
         reach_color clipboard_primary_text;
         reach_color clipboard_secondary_text;
+        reach_color clipboard_empty_text;
         reach_color clipboard_item_background;
+        reach_color clipboard_clear_button_background;
+        reach_color clipboard_clear_button_disabled_background;
         reach_color clipboard_scrollbar_track;
         reach_color clipboard_scrollbar_thumb;
 
