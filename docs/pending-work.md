@@ -4,7 +4,6 @@ Open items only.
 
 ## Needs the user's decision
 
-- Theme redesign phase 5, accent roles (`ACCENT_STRENGTHS`), is applied; validate live: Widgets cards, meters, dividers, decoration ribbons (0.08–0.09 became 0.12), media control washes and drag marker; Settings pills, avatar, neutral and danger buttons in light mode, window buttons; Dock and tray fallback icon letters; Settings and Wi-Fi placeholders (now tertiary), unit suffixes, version footer, out-of-range Wi-Fi icon, power "Wait for apps" label; Clipboard clear-button text.
 
 ## Bugs
 
