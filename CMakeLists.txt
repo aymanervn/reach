@@ -604,6 +604,9 @@ add_executable(reach_service WIN32
     src/tools/reach_service/reach_service.cpp
     src/tools/reach_service/hotkeys.cpp
     src/tools/reach_service/window_actions.cpp
+    src/tools/reach_service/touchpad.cpp
+    src/tools/reach_service/touchpad_swipe.cpp
+    src/adapters/windows/touchpad_reports_win32.cpp
     src/protocol/reach_service_protocol.cpp
     src/adapters/windows/window_management/reach_service_shared_state_win32.cpp
     src/adapters/windows/window_management/window_query_win32.cpp
@@ -626,6 +629,8 @@ target_compile_features(reach_service PRIVATE
     cxx_std_17
 )
 target_link_libraries(reach_service PRIVATE
+    hid
+    wtsapi32
     dwmapi
     user32
     shell32

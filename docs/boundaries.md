@@ -16,6 +16,7 @@
 - A new feature may change only its header, `src/features/<feature>/`, one registry entry, one route if needed, tests, build and resources. Any other composition change is an exception: stop, name the missing generic contract and ask.
 - The layout manager stays pure: it owns cross-surface placement, layer, visibility and dependency order, and emits resolved bounds. Extend its generic declarations instead of adding feature branches.
 - Definitions do not receive `reach_host` to regain arbitrary composition access.
+- Feature definitions may declare `open_events` and `close_events` beside `toggle_events`. Composition's shell-wide fallbacks run only for events no feature consumed (`reach_host_dispatch_registered_events`).
 - Surfaces are identified only by `reach_surface_key_for<T>()`, written only in the two seams. Slots come from definition order and are runtime detail: never add a numeric surface ID, index runtimes by slot or seed a slot from a constant.
 - A definition is one self-contained block. Generic code reads behavior from definition fields and callbacks (flags, events, layout, redraw, lifecycle hooks); a new behavior gets a generic field, not a branch on which feature is running.
 - Routes only assign callbacks and slots. They do not reach into another feature's runtime, renderer or dirty state.

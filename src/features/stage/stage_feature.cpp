@@ -1116,6 +1116,26 @@ int32_t reach_stage_sync_windows(reach_stage *stage)
     return reach_stage_update_windows(stage, windows, count);
 }
 
+const reach_ui_event_type *reach_stage_open_events(size_t *out_count)
+{
+    static const reach_ui_event_type events[] = {REACH_UI_EVENT_SWIPE_UP};
+    if (out_count != nullptr)
+    {
+        *out_count = sizeof(events) / sizeof(events[0]);
+    }
+    return events;
+}
+
+const reach_ui_event_type *reach_stage_close_events(size_t *out_count)
+{
+    static const reach_ui_event_type events[] = {REACH_UI_EVENT_SWIPE_DOWN};
+    if (out_count != nullptr)
+    {
+        *out_count = sizeof(events) / sizeof(events[0]);
+    }
+    return events;
+}
+
 const reach_feature_capsule_ops *reach_stage_capsule_ops(void)
 {
     static const reach_feature_capsule_ops ops = {reach_stage_capsule_reset,

@@ -29,6 +29,8 @@ Open items only.
 - Editing an embedded SVG does not rebuild `reach.exe` resources.
 - Product-composed opacity motions fail render validation; worked around in the Dock window list.
 - A capsule tick's `request_update` does not keep frames running (`host_update.cpp:158`). Audit CPU animations that rely on it.
+- `reachService` writes the shared state from two threads without a lock: the hook thread appends hotkeys and touchpad gestures while the main thread publishes windows and game mode through the same non-atomic `reach_shared_writer_begin_publish`/`end_publish` (`reach_service_shared_state_win32.cpp`). A reader can accept a torn snapshot. Serialize writers.
+- `reach_frame_wait_tests` segfaults intermittently under `ctest` (14/20 runs on 2026-11-22 at `a0d362f`), never when run directly.
 - Retire-queue overflow: Clipboard leaks the payload (`clipboard_feature.cpp:287`); tray never releases the cached icon (`tray_win32.cpp:222`).
 - Parallel Windows-adapter builds contend for one PDB.
 - Concurrent config INI verification failure (2026-10-12), not yet explained.

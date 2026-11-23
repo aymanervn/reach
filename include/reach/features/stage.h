@@ -153,6 +153,8 @@ extern "C"
     reach_rect_f32 reach_stage_tile_close_button_rect(const reach_stage *stage, size_t index);
 
     const reach_feature_capsule_ops *reach_stage_capsule_ops(void);
+    const reach_ui_event_type *reach_stage_open_events(size_t *out_count);
+    const reach_ui_event_type *reach_stage_close_events(size_t *out_count);
     typedef struct reach_stage_render_context
     {
         const reach_theme *theme;
