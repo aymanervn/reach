@@ -53,7 +53,7 @@ static void render_nav_selection_indicator(const reach_settings_render_input *in
     group.bounds = indicator;
     group.y = reach_motion_affine(&input->model->nav_selection, pitch, 0.0f);
 
-    reach_color color = input->theme->accent_tint;
+    reach_color color = input->theme->accent_tint_overlay;
     if (reach_render_command_buffer_begin_group(commands, &group) != REACH_OK)
     {
         return;
@@ -222,7 +222,7 @@ static void render_account_page(const reach_settings_render_input *input,
         }
         state.text_color = input->theme->settings_text;
         state.placeholder_color = input->theme->settings_tertiary_text;
-        state.selection_color = input->theme->accent_selection;
+        state.selection_color = input->theme->accent_selection_overlay;
         float text_inset = reach_settings_scale(input, 13.0f);
         reach_rect_f32 text_rect = {field_rect.x + text_inset, field_rect.y,
                                     field_rect.width - text_inset * 2.0f, field_rect.height};
@@ -363,7 +363,7 @@ static void render_power_page(const reach_settings_render_input *input,
                     state.text_color_to = accent;
                     state.text_color_id = id + 2 + field;
                     state.placeholder_color = input->theme->settings_tertiary_text;
-                    state.selection_color = input->theme->accent_selection;
+                    state.selection_color = input->theme->accent_selection_overlay;
                     state.suffix_color = input->theme->settings_secondary_text;
                     reach_ui_textbox_render(commands, layout->power_custom_fields[timer][field],
                                             &custom_style, 0, &state);
@@ -1342,7 +1342,7 @@ static void render_widgets_page(const reach_settings_render_input *input,
     const bool reset_hover = input->model->hovered_button == REACH_SETTINGS_HIT_WIDGET_RESET;
     reach_settings_push_rect(
         commands, layout->widget_reset, reach_settings_scale(input, theme->radius_small),
-        reset_hover ? theme->accent_tint : theme->settings_icon_box_background);
+        reset_hover ? theme->accent_tint_overlay : theme->settings_icon_box_background);
     reach_settings_push_text(commands, layout->widget_reset, (const uint16_t *)u"Reset positions",
                              reach_settings_scale(input, REACH_TEXT_SIZE_MEDIUM),
                              REACH_TEXT_WEIGHT_SEMIBOLD, REACH_TEXT_ALIGNMENT_CENTER,
@@ -1429,7 +1429,7 @@ reach_result reach_settings_build_render_commands(const reach_settings_render_in
         const int32_t selected = item->page == input->model->selected_page;
         reach_settings_push_rect(commands, item_layout->icon_background,
                                  reach_settings_scale(input, input->theme->radius_small),
-                                 selected ? input->theme->accent_tint
+                                 selected ? input->theme->accent_tint_overlay
                                           : input->theme->settings_icon_box_background);
         reach_settings_push_icon(commands, item_layout->icon,
                                  selected ? input->theme->accent_text

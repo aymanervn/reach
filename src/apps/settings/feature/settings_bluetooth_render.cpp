@@ -20,8 +20,8 @@ static void reach_settings_bluetooth_render_row(const reach_settings_render_inpu
     const reach_bluetooth_device *device = &model->bluetooth.devices.devices[index];
     const reach_rect_f32 row = layout->bluetooth_rows[row_index];
 
-    reach_color background =
-        device->connected ? input->theme->accent_tint : input->theme->settings_card_background;
+    reach_color background = device->connected ? input->theme->accent_tint_overlay
+                                               : input->theme->settings_card_background;
     reach_settings_push_rect(commands, row, reach_settings_scale(input, input->theme->radius_small),
                              background);
 

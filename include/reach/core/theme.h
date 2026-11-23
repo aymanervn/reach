@@ -153,6 +153,7 @@ extern "C"
         reach_color quick_settings_pressed_overlay;
 
         reach_color now_playing_background;
+        reach_color system_hud_artwork_overlay;
         reach_color now_playing_title_text;
         reach_color now_playing_control_glyph;
         reach_color now_playing_control_disabled_glyph;
@@ -173,6 +174,7 @@ extern "C"
         reach_color switcher_label_text;
 
         reach_color context_menu_text;
+        reach_color context_menu_preview_background;
         reach_color context_menu_close_background;
         reach_color context_menu_close_glyph;
 
@@ -228,8 +230,8 @@ extern "C"
         reach_color settings_scrollbar_thumb;
         reach_color accent_fill;
         reach_color accent_text;
-        reach_color accent_tint;
-        reach_color accent_selection;
+        reach_color accent_tint_overlay;
+        reach_color accent_selection_overlay;
         reach_color widgets_accent_background;
         reach_color widgets_decoration_fill;
         reach_color widgets_ribbon_fill;

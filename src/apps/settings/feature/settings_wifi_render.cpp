@@ -39,7 +39,7 @@ static void reach_settings_wifi_render_key_field(const reach_settings_render_inp
     }
     state.text_color = input->theme->settings_text;
     state.placeholder_color = input->theme->settings_tertiary_text;
-    state.selection_color = input->theme->accent_selection;
+    state.selection_color = input->theme->accent_selection_overlay;
     float inset = reach_settings_scale(input, 13.0f);
     reach_rect_f32 text_rect = {field.x + inset, field.y, field.width - inset * 2.0f, field.height};
     reach_ui_textbox_render(commands, text_rect, &style, focused ? 1.0f : 0.0f, &state);
@@ -98,7 +98,7 @@ static void reach_settings_wifi_render_add_row(const reach_settings_render_input
     }
     name_state.text_color = input->theme->settings_text;
     name_state.placeholder_color = input->theme->settings_tertiary_text;
-    name_state.selection_color = input->theme->accent_selection;
+    name_state.selection_color = input->theme->accent_selection_overlay;
     float name_inset = reach_settings_scale(input, 13.0f);
     reach_rect_f32 name_rect = {
         layout->wifi_add_name_field.x + name_inset, layout->wifi_add_name_field.y,
@@ -169,8 +169,8 @@ static void reach_settings_wifi_render_row(const reach_settings_render_input *in
     const reach_wifi_network *network = &model->wifi.networks.networks[index];
     const reach_rect_f32 row = layout->wifi_rows[row_index];
 
-    reach_color background =
-        network->connected ? input->theme->accent_tint : input->theme->settings_card_background;
+    reach_color background = network->connected ? input->theme->accent_tint_overlay
+                                                : input->theme->settings_card_background;
     reach_settings_push_rect(commands, row, reach_settings_scale(input, input->theme->radius_small),
                              background);
 

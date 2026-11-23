@@ -1036,7 +1036,7 @@ static void reach_quick_settings_push_wifi_key(const reach_quick_settings_render
     reach_text_edit_selection_range(&edit, &state.selection_start, &state.selection_end);
     state.text_color = theme.shared_text;
     state.placeholder_color = theme.quick_settings_secondary_text;
-    state.selection_color = theme.accent_selection;
+    state.selection_color = theme.accent_selection_overlay;
     float inset = field.height * 0.5f;
     reach_rect_f32 text_rect = {field.x + inset, field.y, field.width - inset * 2.0f, field.height};
     uint64_t parent = commands->current_group_id;

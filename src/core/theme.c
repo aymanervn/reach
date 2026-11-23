@@ -114,6 +114,7 @@ static const reach_theme reach_theme_dark = {
     .quick_settings_pressed_overlay = REACH_PURE_BLACK(0.12f),
 
     .now_playing_background = REACH_DARK_SURFACE_BASE(0.35f),
+    .system_hud_artwork_overlay = REACH_DARK_SURFACE_BASE(0.35f),
     .now_playing_title_text = REACH_DARK_TEXT(REACH_TEXT_PRIMARY),
     .now_playing_control_glyph = REACH_DARK_TEXT(REACH_TEXT_PRIMARY),
     .now_playing_control_disabled_glyph = REACH_DARK_TEXT(REACH_TEXT_TERTIARY),
@@ -134,6 +135,7 @@ static const reach_theme reach_theme_dark = {
     .switcher_label_text = REACH_DARK_TEXT(REACH_TEXT_PRIMARY),
 
     .context_menu_text = REACH_DARK_TEXT(REACH_TEXT_PRIMARY),
+    .context_menu_preview_background = REACH_DARK_SURFACE_BASE(1.0f),
     .context_menu_close_background = REACH_RED_DEEP(1.0f),
     .context_menu_close_glyph = REACH_PURE_WHITE(1.0f),
 
@@ -189,8 +191,8 @@ static const reach_theme reach_theme_dark = {
     .settings_scrollbar_thumb = REACH_DARK_TEXT(REACH_TEXT_SECONDARY),
     .accent_fill = REACH_BLUE_DEEP(1.0f),
     .accent_text = REACH_BLUE_BRIGHT(1.0f),
-    .accent_tint = REACH_BLUE_DEEP(REACH_ACCENT_TINT),
-    .accent_selection = REACH_BLUE_DEEP(REACH_ACCENT_SELECTION),
+    .accent_tint_overlay = REACH_BLUE_DEEP(REACH_ACCENT_TINT),
+    .accent_selection_overlay = REACH_BLUE_DEEP(REACH_ACCENT_SELECTION),
     .widgets_decoration_fill = REACH_BLUE_DEEP(REACH_ACCENT_TINT),
     .widgets_ribbon_fill = REACH_BLUE_DEEP(REACH_ACCENT_FAINT),
     .widgets_meter_empty_fill = REACH_BLUE_BRIGHT(REACH_ACCENT_TINT),
@@ -274,6 +276,7 @@ static const reach_theme reach_theme_light = {
     .quick_settings_pressed_overlay = REACH_PURE_BLACK(0.12f),
 
     .now_playing_background = REACH_LIGHT_SURFACE_RAISED(0.35f),
+    .system_hud_artwork_overlay = REACH_LIGHT_SURFACE_RAISED(0.35f),
     .now_playing_title_text = REACH_LIGHT_TEXT(REACH_TEXT_PRIMARY),
     .now_playing_control_glyph = REACH_LIGHT_TEXT(REACH_TEXT_PRIMARY),
     .now_playing_control_disabled_glyph = REACH_LIGHT_TEXT(REACH_TEXT_TERTIARY),
@@ -294,6 +297,7 @@ static const reach_theme reach_theme_light = {
     .switcher_label_text = REACH_LIGHT_TEXT(REACH_TEXT_PRIMARY),
 
     .context_menu_text = REACH_LIGHT_TEXT(REACH_TEXT_PRIMARY),
+    .context_menu_preview_background = REACH_LIGHT_SURFACE_BASE(1.0f),
     .context_menu_close_background = REACH_RED_DEEP(1.0f),
     .context_menu_close_glyph = REACH_PURE_WHITE(1.0f),
 
@@ -349,8 +353,8 @@ static const reach_theme reach_theme_light = {
     .settings_scrollbar_thumb = REACH_LIGHT_TEXT(REACH_TEXT_SECONDARY),
     .accent_fill = REACH_BLUE_BRIGHT(1.0f),
     .accent_text = REACH_BLUE_DEEP(1.0f),
-    .accent_tint = REACH_BLUE_BRIGHT(REACH_ACCENT_TINT),
-    .accent_selection = REACH_BLUE_BRIGHT(REACH_ACCENT_SELECTION),
+    .accent_tint_overlay = REACH_BLUE_BRIGHT(REACH_ACCENT_TINT),
+    .accent_selection_overlay = REACH_BLUE_BRIGHT(REACH_ACCENT_SELECTION),
     .widgets_decoration_fill = REACH_BLUE_BRIGHT(REACH_ACCENT_TINT),
     .widgets_ribbon_fill = REACH_BLUE_BRIGHT(REACH_ACCENT_FAINT),
     .widgets_meter_empty_fill = REACH_BLUE_DEEP(REACH_ACCENT_TINT),
@@ -533,8 +537,8 @@ void reach_theme_resolve(reach_theme_mode mode, const reach_accent_pair *accent,
     out_theme->accent_text =
         reach_theme_meet_contrast(light ? pair.deep : pair.bright, surface, light ? black : white);
     const reach_color text = out_theme->accent_text;
-    out_theme->accent_tint = reach_theme_color_alpha(fill, REACH_ACCENT_TINT);
-    out_theme->accent_selection = reach_theme_color_alpha(fill, REACH_ACCENT_SELECTION);
+    out_theme->accent_tint_overlay = reach_theme_color_alpha(fill, REACH_ACCENT_TINT);
+    out_theme->accent_selection_overlay = reach_theme_color_alpha(fill, REACH_ACCENT_SELECTION);
     out_theme->widgets_accent_background =
         reach_theme_color_mix(out_theme->widgets_background, fill, REACH_ACCENT_FAINT);
     out_theme->widgets_decoration_fill = reach_theme_color_alpha(fill, REACH_ACCENT_TINT);
@@ -558,8 +562,9 @@ void reach_theme_resolve(reach_theme_mode mode, const reach_accent_pair *accent,
         !reach_theme_color_close(pair.bright, blue.bright) ||
         (reach_theme_color_close(out_theme->accent_fill, base->accent_fill) &&
          reach_theme_color_close(out_theme->accent_text, base->accent_text) &&
-         reach_theme_color_close(out_theme->accent_tint, base->accent_tint) &&
-         reach_theme_color_close(out_theme->accent_selection, base->accent_selection) &&
+         reach_theme_color_close(out_theme->accent_tint_overlay, base->accent_tint_overlay) &&
+         reach_theme_color_close(out_theme->accent_selection_overlay,
+                                 base->accent_selection_overlay) &&
          reach_theme_color_close(out_theme->widgets_meter_muted_fill,
                                  base->widgets_meter_muted_fill) &&
          reach_theme_color_close(out_theme->widgets_drag_overlay, base->widgets_drag_overlay)));

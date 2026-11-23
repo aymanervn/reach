@@ -104,7 +104,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
         command.text_alignment = input->text_alignment_leading;
         command.text_color = theme->launcher_search_text;
         command.placeholder_color = theme->launcher_search_placeholder_text;
-        command.selection_color = theme->accent_selection;
+        command.selection_color = theme->accent_selection_overlay;
         command.caret_index = input->caret_index;
         command.caret_visible = input->caret_visible;
         command.selection_start = input->selection_start;

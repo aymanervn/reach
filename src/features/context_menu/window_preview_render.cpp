@@ -87,7 +87,7 @@ reach_result reach_context_menu_render_previews(reach_context_menu *menu,
     popup.notch_side = reach_popup_notch_side(state.drop_direction);
     popup.dpi_scale = scale;
     popup.hide_notch = 1;
-    popup.background_color_override = theme->dock_background;
+    popup.background_color_override = theme->context_menu_preview_background;
     popup.has_background_color_override = 1;
     popup.glass = theme->glass;
     if (result == REACH_OK)

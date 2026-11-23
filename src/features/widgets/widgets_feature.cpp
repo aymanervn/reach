@@ -1170,7 +1170,8 @@ static void reach_widgets_footer_button(reach_render_command_buffer *commands,
                                         const reach_theme *theme, reach_rect_f32 bounds,
                                         const wchar_t *label, float scale)
 {
-    reach_widgets_rect(commands, bounds, widget_control_radius_dp * scale, theme->accent_tint);
+    reach_widgets_rect(commands, bounds, widget_control_radius_dp * scale,
+                       theme->accent_tint_overlay);
     reach_widgets_title(commands, theme, bounds, reinterpret_cast<const uint16_t *>(label), scale,
                         REACH_TEXT_ALIGNMENT_CENTER);
 }

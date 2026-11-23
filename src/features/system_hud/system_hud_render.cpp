@@ -85,7 +85,7 @@ static reach_result reach_system_hud_render_media(const reach_system_hud_state *
     artwork.cover_bounds = state->layout.media_cover;
     artwork.cover_image_id = state->media.cover_image_id;
     artwork.base_background = theme->system_hud_background;
-    artwork.overlay = theme->now_playing_background;
+    artwork.overlay = theme->system_hud_artwork_overlay;
     artwork.glass = theme->glass;
     artwork.radius = artwork_bounds.height * 0.5f;
     artwork.blur = REACH_SYSTEM_HUD_ARTWORK_BLUR;
