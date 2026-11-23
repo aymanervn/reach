@@ -347,11 +347,8 @@ reach_top_bar_now_playing_build_render_commands(const reach_top_bar_now_playing_
             icon.rect.x += icon_size * 0.06f;
         }
         icon.icon_id = icons[index];
-        icon.color = theme->now_playing_control_text;
-        if (!enabled[index])
-        {
-            icon.color.a *= 0.30f;
-        }
+        icon.color = enabled[index] ? theme->now_playing_control_text
+                                    : theme->now_playing_control_disabled_text;
         (void)reach_render_command_buffer_push(out_commands, &icon);
         reach_render_command_buffer_end_group(out_commands);
     }

@@ -153,6 +153,7 @@ extern "C"
         reach_color now_playing_background;
         reach_color now_playing_title;
         reach_color now_playing_control_text;
+        reach_color now_playing_control_disabled_text;
 
         reach_color launcher_search_background;
         reach_color launcher_search_text;

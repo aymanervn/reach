@@ -114,6 +114,7 @@ static const reach_theme reach_theme_dark = {
     .now_playing_background = REACH_DARK_DEEP(0.35f),
     .now_playing_title = REACH_DARK_HIGH_CONTRAST_WHITE(1.0f),
     .now_playing_control_text = REACH_DARK_HIGH_CONTRAST_WHITE(1.0f),
+    .now_playing_control_disabled_text = REACH_DARK_HIGH_CONTRAST_WHITE(0.30f),
 
     .launcher_search_background = REACH_DARK_DEEP(1.0f),
     .launcher_search_text = REACH_DARK_HIGH_CONTRAST_WHITE(1.0f),
@@ -256,6 +257,7 @@ static const reach_theme reach_theme_light = {
     .now_playing_background = REACH_LIGHT_RAISED(0.35f),
     .now_playing_title = REACH_LIGHT_HIGH_CONTRAST_BLACK(1.0f),
     .now_playing_control_text = REACH_LIGHT_HIGH_CONTRAST_BLACK(1.0f),
+    .now_playing_control_disabled_text = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.30f),
 
     .launcher_search_background = REACH_LIGHT_BASE(1.0f),
     .launcher_search_text = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.95f),
