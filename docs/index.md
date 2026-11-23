@@ -47,6 +47,7 @@ core ← protocol ← ports ← services ← features
 - Never make a check pass by exempting a file or path in `tools/check_architecture.py`; fix the code or ask. Delete checker entries whose files or symbols no longer exist.
 - Never fix an unrelated finding during a task. Record it in `docs/pending-work.md` for its own task and commit.
 - Current phase is stabilization: fix the scoped bug and record architectural violations. Start repo-wide cleanup only when the user starts that phase.
+- The user has opened a theme redesign phase: surfaces, text strengths, fills, hues and accent roles. It is limited to the palette, theme tokens and their consumers; each step lands only after the user picks it on a before/after page and confirms it live.
 - When evidence conflicts or a choice would materially change the architecture, explain it and ask the user.
 - For a visual bug, get an exact repro and live evidence before fixing. Never call it fixed until the user confirms.
 - Comment only a hack, workaround or temporary code, or what is needed to understand the code: a non-obvious reason, an invariant, or a contract's coordinate space, units or calling thread. Never restate what names and code already say.

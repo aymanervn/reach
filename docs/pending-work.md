@@ -4,9 +4,8 @@ Open items only.
 
 ## Needs the user's decision
 
-- Palette merges (`tools/theme_palette.py`): `PURE_WHITE` = `LIGHT_BASE`; near-identical `DARK_RAISED`/`DARK_STRUCTURE`, `DARK_MID_CONTRAST_GRAY`/`LIGHT_EDGE_ON_BASE`, `DARK_EDGE_ON_BASE`/`LIGHT_MID_CONTRAST_GRAY`; neutral tint drifts (dark surfaces green, edges gray, `LIGHT_EDGE_ON_BASE` blue); deep/bright hues drift by 3-7°; 14 overlay and text alpha strengths.
+- Theme redesign phases (`tools/theme_palette.py`): 1 neutral tint, surfaces and opaque separators; 2 text strengths; 3 fill strengths; 4 hue families shared by accents, battery, stats and status; 5 accent roles.
 - Accent ladder: accent-derived strengths are still literals in features (`widgets_feature.cpp:892,905,962,964,1071,1491`, `ui_controls.cpp:449-450`, `settings_render.cpp:122`). Choose a few accent roles derived in `reach_theme_resolve`, then tokenize them.
-- Glass contrast tiers: primary text 4.5:1, secondary text 3:1 against the glass bound (`REACH_THEME_GLASS_*_CONTRAST`, `reach_theme_glass_limit` in `theme.c`). Secondary at 4.5:1 would stop light glass at gray 241 (nearly opaque).
 
 ## Bugs
 
