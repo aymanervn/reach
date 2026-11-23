@@ -196,17 +196,6 @@ reach_result reach_ui_motion_background_render(reach_render_command_buffer *comm
         shape.rect = reach_render_pixel_aligned_rect(reach_rect_motion_value_at(bounds, 0));
         shape.radius = radius;
         shape.glass = glass;
-        if (result == REACH_OK && casts && glass.intensity != 0 && shape.rect.width > 0.0f &&
-            shape.rect.height > 0.0f)
-        {
-            result = reach_render_push_shadow(commands, &shape, shadow, dpi_scale);
-            reach_render_command_buffer_end_group(commands);
-            background_source.id = first_id + 3;
-            background_source.bounds = shape.rect;
-            if (result == REACH_OK)
-                result = reach_render_command_buffer_begin_group(commands, &background_source);
-            shadow = nullptr;
-        }
         if (result == REACH_OK)
             result = reach_render_push_bordered_background(commands, &shape, background, outline,
                                                            border, shadow, dpi_scale);
@@ -240,8 +229,16 @@ reach_result reach_ui_motion_background_render(reach_render_command_buffer *comm
             result = reach_render_push_rect_motion(commands, &source, bounds, radius, {1, 1, 1, 1});
     }
     reach_rect_motion paint = *bounds;
-    auto aligned = reach_render_pixel_aligned_rect(reach_rect_motion_value_at(bounds, 0));
-    auto align_axis = [](reach_motion &position, reach_motion &extent, float near, float size)
+    auto settled = [](const reach_motion &motion)
+    { return reach_motion_value_at(&motion, reach_motion_deadline(&motion)); };
+    reach_rect_f32 rest = {settled(bounds->x), settled(bounds->y), settled(bounds->width),
+                           settled(bounds->height)};
+    auto aligned = reach_render_pixel_aligned_rect(rest);
+    // The resting card is drawn pixel-aligned. A moving edge is shifted by the sub-pixel difference
+    // so its last animated frame already matches it; otherwise each clip rounds its fractional
+    // edge on its own and the border briefly shows thicker until the resting card replaces it.
+    auto align_axis = [](reach_motion &position, reach_motion &extent, float near, float size,
+                         float rest_near, float rest_size)
     {
         float near_minimum = 0, near_maximum = 0, size_minimum = 0, size_maximum = 0;
         if (reach_motion_range(&position, &near_minimum, &near_maximum) == REACH_OK &&
@@ -250,10 +247,13 @@ reach_result reach_ui_motion_background_render(reach_render_command_buffer *comm
         {
             reach_motion_set(&position, near);
             reach_motion_set(&extent, size);
+            return;
         }
+        position = reach_motion_affine(&position, 1, near - rest_near);
+        extent = reach_motion_affine(&extent, 1, size - rest_size);
     };
-    align_axis(paint.x, paint.width, aligned.x, aligned.width);
-    align_axis(paint.y, paint.height, aligned.y, aligned.height);
+    align_axis(paint.x, paint.width, aligned.x, aligned.width, rest.x, rest.width);
+    align_axis(paint.y, paint.height, aligned.y, aligned.height, rest.y, rest.height);
     float paint_width = 0, paint_height = 0;
     (void)reach_motion_range(&paint.width, &minimum, &paint_width);
     (void)reach_motion_range(&paint.height, &minimum, &paint_height);
@@ -263,10 +263,13 @@ reach_result reach_ui_motion_background_render(reach_render_command_buffer *comm
     background.a = outline.a = 1;
     source.id = first_id + 3;
     source.parent_id = parent_id;
-    size_t first_paint = commands->count;
+    size_t glass_paint = commands->count;
     if (result == REACH_OK)
         result = reach_render_push_rect_motion(commands, &source, &paint, radius,
                                                bordered ? outline : background);
+    // Glass belongs to the fill; the border layer stays exact theme paint under it.
+    if (bordered)
+        glass_paint = commands->count;
     if (result == REACH_OK && bordered && paint_width > border * 2 && paint_height > border * 2)
     {
         reach_rect_motion inner = paint;
@@ -282,7 +285,7 @@ reach_result reach_ui_motion_background_render(reach_render_command_buffer *comm
         result = reach_render_push_rect_motion(commands, &source, &inner, fmaxf(0, radius - border),
                                                background);
     }
-    for (size_t index = first_paint; index < commands->count; ++index)
+    for (size_t index = glass_paint; index < commands->count; ++index)
         commands->commands[index].glass = glass;
     commands->has_scissor = scissored;
     if (result != REACH_OK)

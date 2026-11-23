@@ -931,8 +931,10 @@ size_t reach_render_bordered_background_shapes(const reach_render_command *shape
     }
     border_color.a = 1;
     outer.color = border_color;
-    out_shapes[0] = outer;
     inner = reach_render_inset_shape(&outer, border_thickness);
+    // Glass belongs to the fill; the border stays exact theme paint under it.
+    outer.glass = (reach_glass){0};
+    out_shapes[0] = outer;
     if (inner.rect.width <= 0 || inner.rect.height <= 0)
         return 1;
     inner.color = background_color;
