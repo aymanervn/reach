@@ -16,6 +16,7 @@ HEADER = ROOT / "src" / "core" / "theme_palette.h"
 # (name, L, C, h): OKLCH lightness 0-1, chroma, hue in degrees.
 PALETTE = [
     ("PURE_WHITE", 1.000, 0.000, 0),
+    ("PURE_BLACK", 0.000, 0.000, 0),
     ("CRITICAL_RED", 0.592, 0.193, 25.3),
     ("DARK_DEEP", 0.181, 0.003, 145),
     ("DARK_BASE", 0.238, 0.002, 145),
@@ -55,6 +56,8 @@ PALETTE = [
     ("DEEP_ORANGE", 0.598, 0.147, 51.7),
     ("DEEP_YELLOW", 0.6097, 0.1221, 81.1),
     ("DEEP_RED", 0.560, 0.177, 30),
+    # DEEP_BLUE as reach_theme_resolve darkens it for dark mode.
+    ("DARK_ACCENT_BLUE", 0.461, 0.161, 260.4),
     ("LIGHT_STATS_CPU", 0.368, 0.077, 238),
     ("LIGHT_STATS_MEMORY", 0.384, 0.148, 292),
     ("LIGHT_STATS_DOWNLOAD", 0.358, 0.088, 151),

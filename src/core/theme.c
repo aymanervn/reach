@@ -1,5 +1,6 @@
 #include "reach/core/theme.h"
 #include "reach/core/config.h"
+#include "reach/support/util.h"
 #include "theme_palette.h"
 
 #include <math.h>
@@ -10,7 +11,7 @@
 #define REACH_THEME_GLASS_SECONDARY_CONTRAST 3.0f
 
 #define REACH_SHADOW_AMBIENT(blur_px)                                                              \
-    {.offset_x = 0.0f, .offset_y = 0.0f, .blur = (blur_px), .color = REACH_RGB8(0, 0, 0, 0.3f)}
+    {.offset_x = 0.0f, .offset_y = 0.0f, .blur = (blur_px), .color = REACH_PURE_BLACK(0.3f)}
 
 #define REACH_THEME_SHADOWS                                                                        \
     .bar_shadow = REACH_SHADOW_AMBIENT(5.0f), .popup_shadow = REACH_SHADOW_AMBIENT(5.0f),          \
@@ -54,7 +55,7 @@ static const reach_theme reach_theme_dark = {
 
     .dock_background = REACH_DARK_DEEP(1.0f),
     .top_bar_background = REACH_DARK_DEEP(1.0f),
-    .top_bar_scrim = REACH_RGB8(0, 0, 0, 0.65f),
+    .top_bar_scrim = REACH_PURE_BLACK(0.65f),
     .switcher_background = REACH_DARK_DEEP(1.0f),
     .bar_border = REACH_DARK_EDGE_ON_DEEP(1.0f),
     .popup_background = REACH_DARK_BASE(1.0f),
@@ -145,7 +146,7 @@ static const reach_theme reach_theme_dark = {
     .clipboard_scrollbar_track = REACH_DARK_STRUCTURE(1.0f),
     .clipboard_scrollbar_thumb = REACH_DARK_MID_CONTRAST_GRAY(1.0f),
 
-    .screenshot_scrim = REACH_RGB8(0, 0, 0, 0.45f),
+    .screenshot_scrim = REACH_PURE_BLACK(0.45f),
     .screenshot_selection_border = REACH_PURE_WHITE(1.0f),
     .screenshot_label_background = REACH_DARK_DEEP(0.92f),
     .screenshot_label_text = REACH_DARK_HIGH_CONTRAST_WHITE(1.0f),
@@ -172,10 +173,10 @@ static const reach_theme reach_theme_dark = {
     .settings_window_minimize_hover = REACH_BRIGHT_YELLOW(1.0f),
     .settings_scrollbar_track = REACH_DARK_STRUCTURE(1.0f),
     .settings_scrollbar_thumb = REACH_DARK_MID_CONTRAST_GRAY(1.0f),
-    .accent = REACH_RGB8(26, 82, 176, 1.0f),
+    .accent = REACH_DARK_ACCENT_BLUE(1.0f),
     .accent_text = REACH_BRIGHT_BLUE(1.0f),
-    .accent_tint = REACH_RGB8(26, 82, 176, 0.20f),
-    .accent_selection = REACH_RGB8(26, 82, 176, 0.30f),
+    .accent_tint = REACH_DARK_ACCENT_BLUE(0.20f),
+    .accent_selection = REACH_DARK_ACCENT_BLUE(0.30f),
 
     REACH_THEME_SHADOWS,
     REACH_THEME_METRICS,
@@ -188,7 +189,7 @@ static const reach_theme reach_theme_light = {
 
     .dock_background = REACH_LIGHT_BASE(1.0f),
     .top_bar_background = REACH_LIGHT_BASE(1.0f),
-    .top_bar_scrim = REACH_RGB8(255, 255, 255, 0.65f),
+    .top_bar_scrim = REACH_PURE_WHITE(0.65f),
     .switcher_background = REACH_LIGHT_BASE(1.0f),
     .bar_border = REACH_LIGHT_EDGE_ON_BASE(1.0f),
     .popup_background = REACH_LIGHT_BASE(1.0f),
@@ -197,7 +198,7 @@ static const reach_theme reach_theme_light = {
     .widget_background = REACH_LIGHT_BASE(1.0f),
     .widget_border = REACH_LIGHT_EDGE_ON_BASE(1.0f),
     .popup_separator = REACH_LIGHT_STRUCTURE(1.0f),
-    .glass_popup_separator = REACH_RGB8(0, 0, 0, 0.18f),
+    .glass_popup_separator = REACH_PURE_BLACK(0.18f),
     .system_hud_background = REACH_LIGHT_BASE(1.0f),
     .system_hud_border = REACH_LIGHT_EDGE_ON_BASE(1.0f),
     .system_hud_primary_text = REACH_LIGHT_HIGH_CONTRAST_BLACK(1.0f),
@@ -279,7 +280,7 @@ static const reach_theme reach_theme_light = {
     .clipboard_scrollbar_track = REACH_LIGHT_MIDTONE(1.0f),
     .clipboard_scrollbar_thumb = REACH_LIGHT_MID_CONTRAST_GRAY(1.0f),
 
-    .screenshot_scrim = REACH_RGB8(0, 0, 0, 0.45f),
+    .screenshot_scrim = REACH_PURE_BLACK(0.45f),
     .screenshot_selection_border = REACH_PURE_WHITE(1.0f),
     .screenshot_label_background = REACH_LIGHT_BASE(0.92f),
     .screenshot_label_text = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.90f),
@@ -454,6 +455,13 @@ static float reach_theme_glass_limit(const reach_theme *theme, int32_t light)
     return readable;
 }
 
+static int32_t reach_theme_color_close(reach_color a, reach_color b)
+{
+    const float tolerance = 0.5f / 255.0f;
+    return fabsf(a.r - b.r) <= tolerance && fabsf(a.g - b.g) <= tolerance &&
+           fabsf(a.b - b.b) <= tolerance && fabsf(a.a - b.a) <= tolerance;
+}
+
 void reach_theme_resolve(reach_theme_mode mode, const reach_accent_pair *accent,
                          reach_theme *out_theme)
 {
@@ -464,7 +472,7 @@ void reach_theme_resolve(reach_theme_mode mode, const reach_accent_pair *accent,
     *out_theme = *reach_theme_for_mode(mode);
     reach_accent_pair pair =
         accent != 0 ? *accent : reach_accent_preset_pair(REACH_ACCENT_PRESET_BLUE);
-    const reach_color black = REACH_RGB8(0, 0, 0, 1.0f);
+    const reach_color black = REACH_PURE_BLACK(1.0f);
     const reach_color white = REACH_PURE_WHITE(1.0f);
     const int32_t light = mode == REACH_THEME_MODE_LIGHT;
     const reach_color surface =
@@ -476,6 +484,15 @@ void reach_theme_resolve(reach_theme_mode mode, const reach_accent_pair *accent,
         reach_theme_meet_contrast(light ? pair.deep : pair.bright, surface, light ? black : white);
     out_theme->accent_tint = reach_theme_color_alpha(fill, out_theme->accent_tint_alpha);
     out_theme->accent_selection = reach_theme_color_alpha(fill, 0.30f);
+    // The static tables hold the blue preset already resolved, so an unresolved theme matches.
+    const reach_accent_pair blue = reach_accent_preset_pair(REACH_ACCENT_PRESET_BLUE);
+    const reach_theme *base = reach_theme_for_mode(mode);
+    REACH_ASSERT(!reach_theme_color_close(pair.deep, blue.deep) ||
+                 !reach_theme_color_close(pair.bright, blue.bright) ||
+                 (reach_theme_color_close(out_theme->accent, base->accent) &&
+                  reach_theme_color_close(out_theme->accent_text, base->accent_text) &&
+                  reach_theme_color_close(out_theme->accent_tint, base->accent_tint) &&
+                  reach_theme_color_close(out_theme->accent_selection, base->accent_selection)));
     float limit = reach_theme_glass_limit(out_theme, light);
     out_theme->glass.floor = light ? limit : 0.0f;
     out_theme->glass.ceiling = light ? 1.0f : limit;
