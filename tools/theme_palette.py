@@ -51,43 +51,26 @@ FILL_STRENGTHS = [
     ("QUATERNARY", 0.18, 0.08),
 ]
 
+# (family, hue, deep (L, C), bright (L, C), ink (L, C)). Fills use deep in dark mode and bright in
+# light mode; colored marks the reverse; small colored text in light mode uses ink.
+HUE_FAMILIES = [
+    ("BLUE", 258.0, (0.52, 0.185), (0.667, 0.178), (0.37, 0.12)),
+    ("CYAN", 236.4, (0.571, 0.123), (0.7396, 0.1404), (0.37, 0.077)),
+    ("TEAL", 210.2, (0.552, 0.089), (0.77, 0.109), (0.37, 0.058)),
+    ("GREEN", 150.5, (0.572, 0.146), (0.7602, 0.1875), (0.37, 0.088)),
+    ("PURPLE", 305.3, (0.492, 0.204), (0.651, 0.214), (0.37, 0.133)),
+    ("LAVENDER", 296.6, (0.52, 0.175), (0.717, 0.149), (0.37, 0.148)),
+    ("ORANGE", 53.8, (0.598, 0.147), (0.736, 0.156), (0.37, 0.09)),
+    ("YELLOW", 83.0, (0.6097, 0.1221), (0.834, 0.155), (0.37, 0.076)),
+    ("RED", 31.5, (0.56, 0.177), (0.705, 0.165), (0.37, 0.115)),
+]
+
 # (name, L, C, h): OKLCH lightness 0-1, chroma, hue in degrees.
 PALETTE = [
     ("PURE_WHITE", 1.000, 0.000, 0),
     ("PURE_BLACK", 0.000, 0.000, 0),
-    ("CRITICAL_RED", 0.592, 0.193, 25.3),
     ("DARK_HIGH_CONTRAST_WHITE", 0.842, 0.000, 0),
-    ("BRIGHT_BLUE", 0.667, 0.179, 255.5),
-    ("BRIGHT_CYAN", 0.7396, 0.1404, 233.9),
-    ("BRIGHT_TEAL", 0.770, 0.109, 210.4),
-    ("BRIGHT_GREEN", 0.7602, 0.1875, 150.4),
-    ("BRIGHT_PURPLE", 0.651, 0.214, 307.6),
-    ("BRIGHT_LAVENDER", 0.717, 0.149, 300.3),
-    ("BRIGHT_ORANGE", 0.736, 0.156, 55.9),
-    ("BRIGHT_YELLOW", 0.834, 0.155, 85),
-    ("BRIGHT_RED", 0.705, 0.165, 33),
-    ("DARK_BATTERY_BLUE", 0.504, 0.123, 252),
-    ("DARK_BATTERY_GREEN", 0.530, 0.130, 151),
-    ("DARK_BATTERY_YELLOW", 0.5211, 0.1057, 79.7),
-    ("DARK_BATTERY_RED", 0.512, 0.155, 24.5),
     ("LIGHT_HIGH_CONTRAST_BLACK", 0.197, 0.012, 145),
-    ("DEEP_BLUE", 0.520, 0.185, 260.5),
-    ("DEEP_CYAN", 0.571, 0.123, 239),
-    ("DEEP_TEAL", 0.552, 0.089, 210),
-    ("DEEP_GREEN", 0.572, 0.146, 150.6),
-    ("DEEP_PURPLE", 0.492, 0.204, 303),
-    ("DEEP_LAVENDER", 0.520, 0.175, 293),
-    ("DEEP_ORANGE", 0.598, 0.147, 51.7),
-    ("DEEP_YELLOW", 0.6097, 0.1221, 81.1),
-    ("DEEP_RED", 0.560, 0.177, 30),
-    ("LIGHT_STATS_CPU", 0.368, 0.077, 238),
-    ("LIGHT_STATS_MEMORY", 0.384, 0.148, 292),
-    ("LIGHT_STATS_DOWNLOAD", 0.358, 0.088, 151),
-    ("LIGHT_STATS_UPLOAD", 0.376, 0.090, 52.5),
-    ("LIGHT_BATTERY_BLUE", 0.779, 0.103, 246),
-    ("LIGHT_BATTERY_GREEN", 0.794, 0.143, 153),
-    ("LIGHT_BATTERY_YELLOW", 0.864, 0.133, 91.6),
-    ("LIGHT_BATTERY_RED", 0.770, 0.113, 26),
 ]
 
 
@@ -125,7 +108,12 @@ def render() -> str:
     ]
     chroma, hue = NEUTRAL_TINT
     neutrals = [(name, lightness, chroma if 0 < lightness < 1 else 0, hue) for name, lightness in NEUTRALS]
-    for name, lightness, chroma, hue in neutrals + PALETTE:
+    families = [
+        (f"{family}_{level}", lightness, chroma, hue)
+        for family, hue, *levels in HUE_FAMILIES
+        for level, (lightness, chroma) in zip(("DEEP", "BRIGHT", "INK"), levels)
+    ]
+    for name, lightness, chroma, hue in neutrals + PALETTE + families:
         r, g, b = oklch_to_rgb8(name, lightness, chroma, hue)
         lines.append(f"#define REACH_{name}(a) REACH_RGB8({r}, {g}, {b}, a)")
     lines.append("")
