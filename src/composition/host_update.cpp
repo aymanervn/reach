@@ -368,9 +368,9 @@ void reach_host_set_theme(reach_host *host, reach_theme_mode mode, const reach_a
     if (current != nullptr)
         resolved.glass.intensity = current->glass.intensity;
     if (current == &host->theme_storage && current->mode == resolved.mode &&
-        current->accent_fill.r == resolved.accent_fill.r &&
-        current->accent_fill.g == resolved.accent_fill.g &&
-        current->accent_fill.b == resolved.accent_fill.b)
+        current->accent.fill.r == resolved.accent.fill.r &&
+        current->accent.fill.g == resolved.accent.fill.g &&
+        current->accent.fill.b == resolved.accent.fill.b)
     {
         return;
     }

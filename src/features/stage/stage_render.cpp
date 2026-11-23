@@ -45,7 +45,7 @@ static reach_result reach_stage_push_tile_background(const reach_stage_render_co
     width *= 2.0f;
     shape.rect = {item.x - width, item.y - width, item.width + width * 2.0f,
                   item.height + width * 2.0f};
-    reach_color border = reach_theme_color_mix(background, ctx->theme->accent_text, alpha);
+    reach_color border = reach_theme_color_mix(background, ctx->theme->accent.text, alpha);
     return reach_render_push_bordered_background(commands, &shape, background, border, width,
                                                  nullptr, ctx->dpi_scale);
 }
@@ -58,7 +58,7 @@ static reach_result reach_stage_push_tile_placeholder(const reach_stage_render_c
     reach_render_command plate = {};
     plate.type = REACH_RENDER_COMMAND_RECT;
     plate.rect = rect;
-    plate.color = reach_theme_color_alpha(ctx->theme->stage_tile_placeholder_background, alpha);
+    plate.color = reach_theme_color_alpha(ctx->theme->surface.item, alpha);
     reach_result result = reach_render_command_buffer_push(out_commands, &plate);
     if (result != REACH_OK || tile->icon_id == 0)
     {
@@ -117,8 +117,8 @@ static reach_result reach_stage_push_close_button(reach_stage *stage,
     backing.type = REACH_RENDER_COMMAND_RECT;
     backing.rect = button;
     backing.radius = button.width * 0.5f;
-    reach_color background = theme->stage_close_background;
-    reach_color hover_background = theme->stage_close_hover_background;
+    reach_color background = theme->text.secondary;
+    reach_color hover_background = theme->danger;
     background.a *= alpha;
     hover_background.a *= alpha;
     int32_t retained = reach_ui_color_feedback_begin(out_commands, tile->window, button, background,
@@ -141,7 +141,7 @@ static reach_result reach_stage_push_close_button(reach_stage *stage,
     glyph.rect.width = button.width - inset * 2.0f;
     glyph.rect.height = button.height - inset * 2.0f;
     reach_color foreground = theme->stage_close_glyph;
-    reach_color hover_foreground = theme->stage_close_hover_glyph;
+    reach_color hover_foreground = theme->on_color;
     foreground.a *= alpha;
     hover_foreground.a *= alpha;
     retained =
@@ -200,7 +200,7 @@ static reach_result reach_stage_push_tile_header(reach_stage *stage,
         label.text_weight = REACH_TEXT_WEIGHT_SEMIBOLD;
         label.text_alignment = REACH_TEXT_ALIGNMENT_LEADING;
         label.text_ellipsis = 1;
-        label.color = ctx->theme->stage_tile_text;
+        label.color = ctx->theme->text.primary;
         label.color.a *= alpha;
         label.text_color = label.color;
         (void)reach_copy_utf16(label.text, 260, tile->label);

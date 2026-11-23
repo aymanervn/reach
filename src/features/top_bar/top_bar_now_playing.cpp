@@ -257,12 +257,12 @@ reach_top_bar_now_playing_build_render_commands(const reach_top_bar_now_playing_
     if (!input->model->visible)
     {
         reach_top_bar_now_playing_push_rect(out_commands, input->layout->bounds,
-                                            theme->shared_button_background, radius);
+                                            theme->fill.secondary, radius);
         reach_render_command glyph = {};
         glyph.type = REACH_RENDER_COMMAND_VECTOR_ICON;
         glyph.rect = input->layout->cover;
         glyph.icon_id = REACH_VECTOR_ICON_MUSIC_NOTE;
-        glyph.color = theme->shared_glyph;
+        glyph.color = theme->text.primary;
         return reach_render_command_buffer_push(out_commands, &glyph);
     }
 
@@ -273,8 +273,8 @@ reach_top_bar_now_playing_build_render_commands(const reach_top_bar_now_playing_
     artwork.bounds = input->layout->bounds;
     artwork.cover_bounds = input->layout->cover;
     artwork.cover_image_id = input->model->cover_image_id;
-    artwork.base_background = theme->shared_button_background;
-    artwork.overlay = theme->now_playing_background;
+    artwork.base_background = theme->fill.secondary;
+    artwork.overlay = theme->artwork_scrim;
     artwork.radius = radius;
     artwork.blur = REACH_NOW_PLAYING_ARTWORK_BLUR;
     artwork.cover_radius = radius;
@@ -299,7 +299,7 @@ reach_top_bar_now_playing_build_render_commands(const reach_top_bar_now_playing_
         input->layout->text_advance > text.width ? input->layout->text_advance : text.width;
     reach_top_bar_now_playing_push_text(
         out_commands, text, input->model->line, REACH_TEXT_SIZE_MEDIUM * dpi_scale,
-        REACH_TEXT_WEIGHT_BOLD, REACH_TEXT_ALIGNMENT_LEADING, theme->now_playing_title_text,
+        REACH_TEXT_WEIGHT_BOLD, REACH_TEXT_ALIGNMENT_LEADING, theme->text.primary,
         input->layout->text, input->animate_text ? &input->marquee : nullptr);
 
     reach_vector_icon_id icons[3] = {REACH_VECTOR_ICON_PREVIOUS,
@@ -347,8 +347,7 @@ reach_top_bar_now_playing_build_render_commands(const reach_top_bar_now_playing_
             icon.rect.x += icon_size * 0.06f;
         }
         icon.icon_id = icons[index];
-        icon.color = enabled[index] ? theme->now_playing_control_glyph
-                                    : theme->now_playing_control_disabled_glyph;
+        icon.color = enabled[index] ? theme->text.primary : theme->text.tertiary;
         (void)reach_render_command_buffer_push(out_commands, &icon);
         reach_render_command_buffer_end_group(out_commands);
     }

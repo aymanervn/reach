@@ -105,9 +105,8 @@ static reach_result reach_top_bar_push_pill_background(const reach_theme *theme,
     shape.radius = radius;
     shape.glass = theme->glass;
     return reach_render_push_bordered_background(
-        commands, &shape, theme->top_bar_background, theme->shared_border,
-        border ? reach_theme_border_thickness(theme, dpi_scale) : 0.0f, &theme->bar_shadow,
-        dpi_scale);
+        commands, &shape, theme->surface.base, theme->border,
+        border ? reach_theme_border_thickness(theme, dpi_scale) : 0.0f, &theme->shadow, dpi_scale);
 }
 
 static reach_result reach_top_bar_push_transparent_scrim(const reach_theme *theme,
@@ -152,19 +151,17 @@ static void reach_top_bar_push_power_button(const reach_top_bar_render_input *in
         return;
     }
 
-    reach_top_bar_push_rect(commands, power_box, theme->shared_button_background,
-                            power_box.height * 0.5f);
+    reach_top_bar_push_rect(commands, power_box, theme->fill.secondary, power_box.height * 0.5f);
     reach_top_bar_push_text(commands, power_box, (const uint16_t *)L"Reach",
                             metrics.reach_label_text_size * input->dpi_scale,
                             metrics.reach_label_text_weight, REACH_TEXT_ALIGNMENT_CENTER,
-                            theme->top_bar_text);
+                            theme->text.primary);
 
     if (input->click_feedback_index == REACH_TOP_BAR_FEEDBACK_POWER_BUTTON)
     {
-        (void)reach_ui_feedback_render(commands, REACH_TOP_BAR_FEEDBACK_GROUP_ID, power_box,
-                                       power_box.height * 0.5f,
-                                       reach_theme_color_alpha(theme->bar_pressed_background, 1.0f),
-                                       input->click_feedback, nullptr);
+        (void)reach_ui_feedback_render(
+            commands, REACH_TOP_BAR_FEEDBACK_GROUP_ID, power_box, power_box.height * 0.5f,
+            reach_theme_color_alpha(theme->surface.item, 1.0f), input->click_feedback, nullptr);
     }
 }
 
@@ -177,11 +174,11 @@ static void reach_top_bar_push_clock(const reach_top_bar_render_input *input,
     reach_top_bar_push_text(commands, layout->clock_time, input->time_text,
                             metrics.clock_time_text_size * input->dpi_scale,
                             metrics.clock_time_text_weight, REACH_TEXT_ALIGNMENT_LEADING,
-                            input->theme->top_bar_text);
+                            input->theme->text.primary);
     reach_top_bar_push_text(commands, layout->clock_date, input->date_text,
                             metrics.clock_date_text_size * input->dpi_scale,
                             metrics.clock_date_text_weight, REACH_TEXT_ALIGNMENT_LEADING,
-                            input->theme->top_bar_text);
+                            input->theme->text.primary);
 }
 
 static void reach_top_bar_push_button_feedback_colored(const reach_top_bar_render_input *input,
@@ -202,7 +199,7 @@ static void reach_top_bar_push_button_feedback(const reach_top_bar_render_input 
                                                reach_rect_f32 button, size_t feedback_slot)
 {
     reach_top_bar_push_button_feedback_colored(input, commands, button, feedback_slot,
-                                               input->theme->bar_pressed_background);
+                                               input->theme->surface.item);
 }
 
 static void reach_top_bar_push_separator_dot(const reach_top_bar_render_input *input,
@@ -213,7 +210,7 @@ static void reach_top_bar_push_separator_dot(const reach_top_bar_render_input *i
     {
         return;
     }
-    reach_top_bar_push_rect(commands, dot, input->theme->top_bar_separator_fill, dot.height * 0.5f);
+    reach_top_bar_push_rect(commands, dot, input->theme->text.secondary, dot.height * 0.5f);
 }
 
 static void reach_top_bar_push_current_app(const reach_top_bar_render_input *input,
@@ -241,7 +238,7 @@ static void reach_top_bar_push_current_app(const reach_top_bar_render_input *inp
         reach_top_bar_push_text(commands, text, input->current_app_name,
                                 metrics.current_app_name_text_size * input->dpi_scale,
                                 metrics.current_app_name_text_weight, REACH_TEXT_ALIGNMENT_LEADING,
-                                input->theme->top_bar_text);
+                                input->theme->text.primary);
     }
 }
 
@@ -269,8 +266,8 @@ static void reach_top_bar_push_tray_item(const reach_top_bar_render_input *input
     if (input->click_feedback_index == REACH_TOP_BAR_FEEDBACK_TRAY_BASE + index)
         (void)reach_push_icon_press_feedback_motion(
             commands, REACH_TOP_BAR_FEEDBACK_GROUP_ID, slot, slot.height * 0.5f,
-            input->tray_items[index].icon_id, input->theme->bar_pressed_background,
-            input->click_feedback, &group);
+            input->tray_items[index].icon_id, input->theme->surface.item, input->click_feedback,
+            &group);
 }
 
 static void reach_top_bar_push_tray(const reach_top_bar_render_input *input,
@@ -281,8 +278,7 @@ static void reach_top_bar_push_tray(const reach_top_bar_render_input *input,
 
     if (layout->tray_background.width > 0.0f)
     {
-        reach_top_bar_push_rect(commands, layout->tray_background,
-                                input->theme->top_bar_tray_background,
+        reach_top_bar_push_rect(commands, layout->tray_background, input->theme->fill.secondary,
                                 layout->tray_background.height * 0.5f);
     }
 
@@ -312,12 +308,12 @@ static void reach_top_bar_push_tray(const reach_top_bar_render_input *input,
     int32_t feedback =
         input->click_feedback_index == REACH_TOP_BAR_FEEDBACK_TRAY_OVERFLOW &&
         reach_ui_color_feedback_begin(commands, REACH_TOP_BAR_FEEDBACK_GROUP_ID, glyph,
-                                      input->theme->shared_glyph,
-                                      input->theme->bar_pressed_background, input->click_feedback);
+                                      input->theme->text.primary, input->theme->surface.item,
+                                      input->click_feedback);
     reach_top_bar_push_vector_icon(commands, glyph,
                                    input->tray_popup_open ? REACH_VECTOR_ICON_ARROW_UP
                                                           : REACH_VECTOR_ICON_ARROW_DOWN,
-                                   feedback ? reach_color{1, 1, 1, 1} : input->theme->shared_glyph);
+                                   feedback ? reach_color{1, 1, 1, 1} : input->theme->text.primary);
     if (feedback)
         reach_render_command_buffer_end_group(commands);
 }
@@ -362,11 +358,10 @@ static void reach_top_bar_push_language(const reach_top_bar_render_input *input,
         return;
     }
 
-    reach_top_bar_push_rect(commands, button, input->theme->shared_button_background,
-                            button.height * 0.5f);
+    reach_top_bar_push_rect(commands, button, input->theme->fill.secondary, button.height * 0.5f);
     reach_top_bar_push_text(
         commands, button, input->language_code, metrics.language_text_size * input->dpi_scale,
-        metrics.language_text_weight, REACH_TEXT_ALIGNMENT_CENTER, input->theme->top_bar_text);
+        metrics.language_text_weight, REACH_TEXT_ALIGNMENT_CENTER, input->theme->text.primary);
     reach_top_bar_push_button_feedback(input, commands, button,
                                        REACH_TOP_BAR_FEEDBACK_LANGUAGE_BUTTON);
 }
@@ -393,7 +388,7 @@ static void reach_top_bar_push_battery(const reach_top_bar_render_input *input,
     }
 
     float shell_radius = shell.height * 0.5f;
-    reach_top_bar_push_rect(commands, shell, theme->top_bar_battery_background, shell_radius);
+    reach_top_bar_push_rect(commands, shell, theme->fill.secondary, shell_radius);
 
     reach_color fill_color = theme->top_bar_battery_fill;
     if (input->battery_charging)
@@ -440,7 +435,7 @@ static void reach_top_bar_push_battery(const reach_top_bar_render_input *input,
     percentage[digit] = '%';
     reach_top_bar_push_text(commands, shell, percentage,
                             metrics.volume_text_size * input->dpi_scale, metrics.volume_text_weight,
-                            REACH_TEXT_ALIGNMENT_CENTER, theme->top_bar_text);
+                            REACH_TEXT_ALIGNMENT_CENTER, theme->text.primary);
 
     reach_top_bar_push_button_feedback(input, commands, input->layout->battery_button,
                                        REACH_TOP_BAR_FEEDBACK_BATTERY_BUTTON);
@@ -449,7 +444,7 @@ static void reach_top_bar_push_battery(const reach_top_bar_render_input *input,
 static reach_color reach_top_bar_status_glyph_color(const reach_top_bar_render_input *input,
                                                     int32_t active)
 {
-    return active ? input->theme->accent_text : input->theme->shared_glyph;
+    return active ? input->theme->accent.text : input->theme->text.primary;
 }
 
 static void reach_top_bar_push_quick_settings(const reach_top_bar_render_input *input,
@@ -463,8 +458,7 @@ static void reach_top_bar_push_quick_settings(const reach_top_bar_render_input *
         return;
     }
 
-    reach_top_bar_push_rect(commands, button, input->theme->shared_button_background,
-                            button.height * 0.5f);
+    reach_top_bar_push_rect(commands, button, input->theme->fill.secondary, button.height * 0.5f);
     reach_top_bar_push_vector_icon(
         commands, layout->network_icon, input->network_icon_id,
         reach_top_bar_status_glyph_color(input, input->network_connected));
@@ -473,7 +467,7 @@ static void reach_top_bar_push_quick_settings(const reach_top_bar_render_input *
         reach_top_bar_push_text(commands, layout->network_label, input->network_name,
                                 metrics.network_name_text_size * input->dpi_scale,
                                 metrics.network_name_text_weight, REACH_TEXT_ALIGNMENT_LEADING,
-                                input->theme->top_bar_text);
+                                input->theme->text.primary);
     }
     if (input->bluetooth_icon_id != REACH_VECTOR_ICON_NONE)
     {
@@ -486,8 +480,8 @@ static void reach_top_bar_push_quick_settings(const reach_top_bar_render_input *
         reach_top_bar_push_text(commands, layout->volume_label, input->volume_text,
                                 metrics.volume_text_size * input->dpi_scale,
                                 metrics.volume_text_weight, REACH_TEXT_ALIGNMENT_LEADING,
-                                input->volume_muted ? input->theme->top_bar_secondary_text
-                                                    : input->theme->top_bar_text);
+                                input->volume_muted ? input->theme->text.secondary
+                                                    : input->theme->text.primary);
     }
     reach_top_bar_push_button_feedback(input, commands, button,
                                        REACH_TOP_BAR_FEEDBACK_QUICK_SETTINGS_BUTTON);

@@ -31,7 +31,7 @@ reach_result reach_context_menu_build_render_commands(const reach_context_menu_r
     popup.glass = input->theme->glass;
     if (input->top_bar_dropdown)
     {
-        popup.background_color_override = input->theme->bar_popup_background;
+        popup.background_color_override = input->theme->surface.base;
         popup.has_background_color_override = 1;
         popup.hide_notch = 1;
     }
@@ -41,8 +41,8 @@ reach_result reach_context_menu_build_render_commands(const reach_context_menu_r
         return popup_result;
     }
 
-    const reach_color separator = popup.glass.intensity != 0 ? input->theme->popup_glass_divider
-                                                             : input->theme->popup_divider;
+    const reach_color separator =
+        popup.glass.intensity != 0 ? input->theme->text.quaternary : input->theme->divider;
     reach_render_command_buffer_set_scissor(out_commands, input->item_viewport);
     float hover_radius =
         reach_nested_radius(reach_popup_radius_scaled(input->theme, input->dpi_scale),
@@ -61,14 +61,14 @@ reach_result reach_context_menu_build_render_commands(const reach_context_menu_r
             (void)reach_ui_horizontal_separator_render(
                 out_commands, reach_render_pixel_aligned_rect(line), separator);
         }
-        reach_color foreground = input->theme->context_menu_text;
+        reach_color foreground = input->theme->text.primary;
 
         if (input->hovered_index == index)
         {
             command = {};
             command.type = REACH_RENDER_COMMAND_RECT;
             command.rect = item;
-            command.color = input->theme->accent_fill;
+            command.color = input->theme->accent.fill;
             command.radius = hover_radius;
             reach_render_command_buffer_push(out_commands, &command);
         }

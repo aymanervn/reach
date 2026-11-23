@@ -64,11 +64,11 @@ static void reach_system_hud_push_media_button(const reach_system_hud_state *sta
         reach_system_hud_push_circle(
             commands,
             reach_system_hud_centered_glyph(rect, rect.height * REACH_SYSTEM_HUD_MEDIA_BUTTON_FILL),
-            theme->shared_button_background);
+            theme->fill.secondary);
     }
-    reach_system_hud_push_vector_icon(
-        commands, reach_system_hud_centered_glyph(rect, rect.height * 0.5f), icon,
-        active ? theme->system_hud_glyph : theme->system_hud_secondary_text);
+    reach_system_hud_push_vector_icon(commands,
+                                      reach_system_hud_centered_glyph(rect, rect.height * 0.5f),
+                                      icon, active ? theme->text.primary : theme->text.secondary);
 }
 
 static reach_result reach_system_hud_render_media(const reach_system_hud_state *state,
@@ -84,8 +84,8 @@ static reach_result reach_system_hud_render_media(const reach_system_hud_state *
     artwork.bounds = artwork_bounds;
     artwork.cover_bounds = state->layout.media_cover;
     artwork.cover_image_id = state->media.cover_image_id;
-    artwork.base_background = theme->system_hud_background;
-    artwork.overlay = theme->system_hud_artwork_overlay;
+    artwork.base_background = theme->surface.raised;
+    artwork.overlay = theme->artwork_scrim;
     artwork.glass = theme->glass;
     artwork.radius = artwork_bounds.height * 0.5f;
     artwork.blur = REACH_SYSTEM_HUD_ARTWORK_BLUR;
@@ -99,23 +99,22 @@ static reach_result reach_system_hud_render_media(const reach_system_hud_state *
 
     if (state->media.cover_image_id == 0)
     {
-        reach_system_hud_push_circle(commands, state->layout.media_cover,
-                                     theme->system_hud_icon_background);
+        reach_system_hud_push_circle(commands, state->layout.media_cover, theme->surface.well);
         reach_system_hud_push_vector_icon(
             commands,
             reach_system_hud_centered_glyph(state->layout.media_cover,
                                             state->layout.media_cover.height * 0.42f),
-            REACH_VECTOR_ICON_MUSIC_NOTE, theme->system_hud_glyph);
+            REACH_VECTOR_ICON_MUSIC_NOTE, theme->text.primary);
     }
 
     static const uint16_t fallback_title[] = {'M', 'e', 'd', 'i', 'a', 0};
     const uint16_t *title = state->media.title[0] != 0 ? state->media.title : fallback_title;
     reach_system_hud_push_text(commands, state->layout.title, title,
                                REACH_TEXT_SIZE_MEDIUM * ctx->dpi_scale, REACH_TEXT_WEIGHT_BOLD,
-                               REACH_TEXT_ALIGNMENT_LEADING, theme->system_hud_text);
+                               REACH_TEXT_ALIGNMENT_LEADING, theme->text.primary);
     reach_system_hud_push_text(commands, state->layout.subtitle, state->media.artist,
                                REACH_TEXT_SIZE_SMALL * ctx->dpi_scale, REACH_TEXT_WEIGHT_NORMAL,
-                               REACH_TEXT_ALIGNMENT_LEADING, theme->system_hud_text);
+                               REACH_TEXT_ALIGNMENT_LEADING, theme->text.primary);
 
     reach_system_hud_push_media_button(state, theme, commands, state->layout.media_previous,
                                        REACH_VECTOR_ICON_PREVIOUS,
@@ -139,33 +138,32 @@ static void reach_system_hud_render_level(const reach_system_hud_state *state,
     float level = volume ? state->volume.level : state->brightness.level;
     int32_t muted = volume && state->volume.muted;
 
-    reach_system_hud_push_circle(commands, state->layout.icon, theme->system_hud_icon_background);
+    reach_system_hud_push_circle(commands, state->layout.icon, theme->surface.well);
     reach_vector_icon_id icon =
         volume ? reach_volume_level_icon(level, muted) : REACH_VECTOR_ICON_BRIGHTNESS;
     reach_system_hud_push_vector_icon(
         commands,
         reach_system_hud_centered_glyph(state->layout.icon, state->layout.icon.height * 0.56f),
-        icon, muted ? theme->system_hud_secondary_text : theme->system_hud_glyph);
+        icon, muted ? theme->text.secondary : theme->text.primary);
 
-    reach_color fill = muted ? theme->system_hud_muted_fill : theme->accent_fill;
+    reach_color fill = muted ? theme->text.tertiary : theme->accent.fill;
     reach_rect_f32 origin = {};
     (void)reach_progress_bar_build_render_commands(state->layout.track, state->layout.fill, origin,
-                                                   theme->system_hud_track, fill, commands);
+                                                   theme->fill.primary, fill, commands);
 
     if (muted)
     {
         static const uint16_t muted_label[] = {'M', 'u', 't', 'e', 'd', 0};
-        reach_system_hud_push_text(commands, state->layout.value, muted_label,
-                                   REACH_TEXT_SIZE_MEDIUM * ctx->dpi_scale,
-                                   REACH_TEXT_WEIGHT_NORMAL, REACH_TEXT_ALIGNMENT_TRAILING,
-                                   theme->system_hud_secondary_text);
+        reach_system_hud_push_text(
+            commands, state->layout.value, muted_label, REACH_TEXT_SIZE_MEDIUM * ctx->dpi_scale,
+            REACH_TEXT_WEIGHT_NORMAL, REACH_TEXT_ALIGNMENT_TRAILING, theme->text.secondary);
         return;
     }
     uint16_t value[8] = {};
     reach_level_format_whole_percent(value, 8, level);
     reach_system_hud_push_text(commands, state->layout.value, value,
                                REACH_TEXT_SIZE_MEDIUM * ctx->dpi_scale, REACH_TEXT_WEIGHT_DEMIBOLD,
-                               REACH_TEXT_ALIGNMENT_TRAILING, theme->system_hud_text);
+                               REACH_TEXT_ALIGNMENT_TRAILING, theme->text.primary);
 }
 
 static size_t reach_system_hud_append_text(uint16_t *destination, size_t capacity, size_t offset,
@@ -210,7 +208,7 @@ static void reach_system_hud_render_app_removed(const reach_system_hud_state *st
     reach_system_hud_append_text(message, REACH_APPLICATION_TEXT_CAPACITY, offset, suffix);
     reach_system_hud_push_text(commands, state->layout.title, message,
                                REACH_TEXT_SIZE_MEDIUM * ctx->dpi_scale, REACH_TEXT_WEIGHT_NORMAL,
-                               REACH_TEXT_ALIGNMENT_CENTER, ctx->theme->system_hud_text);
+                               REACH_TEXT_ALIGNMENT_CENTER, ctx->theme->text.primary);
 }
 
 static void reach_system_hud_render_screenshot_copied(const reach_system_hud_state *state,
@@ -221,7 +219,7 @@ static void reach_system_hud_render_screenshot_copied(const reach_system_hud_sta
                                        't', ' ', 'c', 'o', 'p', 'i', 'e', 'd', 0};
     reach_system_hud_push_text(commands, state->layout.title, message,
                                REACH_TEXT_SIZE_MEDIUM * ctx->dpi_scale, REACH_TEXT_WEIGHT_NORMAL,
-                               REACH_TEXT_ALIGNMENT_CENTER, ctx->theme->system_hud_text);
+                               REACH_TEXT_ALIGNMENT_CENTER, ctx->theme->text.primary);
 }
 
 reach_result reach_system_hud_append_render_commands(const reach_system_hud *hud,
@@ -252,14 +250,14 @@ reach_result reach_system_hud_append_render_commands(const reach_system_hud *hud
     shape.glass = render_ctx->theme->glass;
     reach_render_command shapes[2] = {};
     size_t shape_count = reach_render_bordered_background_shapes(
-        &shape, render_ctx->theme->system_hud_background, render_ctx->theme->system_hud_border,
+        &shape, render_ctx->theme->surface.raised, render_ctx->theme->border,
         reach_theme_border_thickness(render_ctx->theme, render_ctx->dpi_scale), shapes);
     if (shape_count == 0)
     {
         return REACH_OK;
     }
     reach_result result = reach_render_push_shadow(
-        out_commands, &shapes[0], &render_ctx->theme->popup_shadow, render_ctx->dpi_scale);
+        out_commands, &shapes[0], &render_ctx->theme->shadow, render_ctx->dpi_scale);
     if (result != REACH_OK)
     {
         return result;

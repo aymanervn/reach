@@ -1352,7 +1352,7 @@ static void test_width_text_source_ownership(void)
     shadow.id = 99;
     shadow.bounds = text.rect;
     shadow.has_shadow = 1;
-    shadow.shadow = reach_theme_default()->popup_shadow;
+    shadow.shadow = reach_theme_default()->shadow;
     expect_true(reach_render_command_buffer_begin_group(buffer.get(), &shadow) == REACH_OK,
                 "width text preflight starts from a valid shadow owner");
     reach_render_command_buffer_end_group(buffer.get());
@@ -1438,7 +1438,7 @@ static void test_popup_width_background_preflight(void)
     parent.id = 99;
     parent.bounds = {0, 0, 220, 160};
     parent.has_shadow = 1;
-    parent.shadow = input.theme->popup_shadow;
+    parent.shadow = input.theme->shadow;
     expect_true(reach_render_command_buffer_begin_group(&buffer, &parent) == REACH_OK,
                 "shadow parent is valid before attaching compact chrome");
     reach_render_command_buffer_end_group(&buffer);
@@ -1448,7 +1448,7 @@ static void test_popup_width_background_preflight(void)
                 "nested shadow rejects the entire width background append");
     reach_render_command_buffer_clear(&buffer);
     auto theme = *input.theme;
-    theme.popup_shadow.color.a = 0;
+    theme.shadow.color.a = 0;
     input.theme = &theme;
     expect_true(reach_popup_push_width_background(&input, &width, nullptr, &notch, 0, 100,
                                                   &buffer) == REACH_OK &&

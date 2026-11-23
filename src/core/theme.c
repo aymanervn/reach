@@ -13,20 +13,15 @@
 #define REACH_SHADOW_AMBIENT(blur_px)                                                              \
     {.offset_x = 0.0f, .offset_y = 0.0f, .blur = (blur_px), .color = REACH_PURE_BLACK(0.3f)}
 
-#define REACH_THEME_SHADOWS                                                                        \
-    .bar_shadow = REACH_SHADOW_AMBIENT(5.0f), .popup_shadow = REACH_SHADOW_AMBIENT(5.0f),          \
-    .widgets_shadow = REACH_SHADOW_AMBIENT(5.0f)
-
 #define REACH_THEME_METRICS                                                                        \
     .radius_small = 12.0f, .radius_large = 20.0f, .button_pressed_darken = 0.65f,                  \
-    .settings_pill_selected_tint = REACH_ACCENT_TINT, .dock_corner_radius_ratio = 0.5f,            \
-    .border_thickness = 1.0f, .icon_box_height_ratio = 0.60f, .icon_max_box_ratio = 0.76f,         \
-    .icon_box_corner_radius_ratio = 0.28f, .icon_box_corner_radius_max = 14.0f,                    \
-    .tray_slot_size_ratio = 0.605f, .bar_separator_dot_size = 4.0f, .bar_separator_dot_gap = 9.0f, \
-    .now_playing_width = 220.0f, .now_playing_padding = 9.0f, .now_playing_gap = 6.0f,             \
-    .now_playing_control_gap = 8.0f, .now_playing_play_button_width = 20.0f,                       \
-    .now_playing_prev_next_button_width = 13.2f, .stage_animation_seconds = 0.30f,                 \
-    .popup_rise_distance = 10.0f, .popup_rise_scale = 0.97f
+    .dock_corner_radius_ratio = 0.5f, .border_thickness = 1.0f, .icon_box_height_ratio = 0.60f,    \
+    .icon_max_box_ratio = 0.76f, .icon_box_corner_radius_ratio = 0.28f,                            \
+    .icon_box_corner_radius_max = 14.0f, .tray_slot_size_ratio = 0.605f,                           \
+    .bar_separator_dot_size = 4.0f, .bar_separator_dot_gap = 9.0f, .now_playing_width = 220.0f,    \
+    .now_playing_padding = 9.0f, .now_playing_gap = 6.0f, .now_playing_control_gap = 8.0f,         \
+    .now_playing_play_button_width = 20.0f, .now_playing_prev_next_button_width = 13.2f,           \
+    .stage_animation_seconds = 0.30f, .popup_rise_distance = 10.0f, .popup_rise_scale = 0.97f
 
 #define REACH_THEME_SPRING(response, damping) {REACH_EASING_SPRING, (response), (damping), 0.0}
 #define REACH_THEME_FADE(seconds) {REACH_EASING_EASE_OUT, 0.0f, 0.0f, (seconds)}
@@ -53,160 +48,59 @@ static const reach_theme reach_theme_dark = {
     .mode = REACH_THEME_MODE_DARK,
     .glass = {.intensity = REACH_CONFIG_GLASS_INTENSITY_DEFAULT, .floor = 0.0f, .ceiling = 1.0f},
 
-    .dock_background = REACH_DARK_SURFACE_BASE(1.0f),
-    .top_bar_background = REACH_DARK_SURFACE_BASE(1.0f),
+    .text = {.primary = REACH_DARK_TEXT(REACH_TEXT_PRIMARY),
+             .secondary = REACH_DARK_TEXT(REACH_TEXT_SECONDARY),
+             .tertiary = REACH_DARK_TEXT(REACH_TEXT_TERTIARY),
+             .quaternary = REACH_DARK_TEXT(REACH_TEXT_QUATERNARY),
+             .inverse = REACH_LIGHT_TEXT(REACH_TEXT_PRIMARY)},
+    .surface = {.base = REACH_DARK_SURFACE_BASE(1.0f),
+                .raised = REACH_DARK_SURFACE_RAISED(1.0f),
+                .card = REACH_DARK_SURFACE_ELEVATED(1.0f),
+                .item = REACH_DARK_SURFACE_ELEVATED(1.0f),
+                .well = REACH_DARK_SURFACE_ELEVATED(1.0f)},
+    .fill = {.primary = REACH_FILL(REACH_DARK_FILL_PRIMARY),
+             .secondary = REACH_FILL(REACH_DARK_FILL_SECONDARY),
+             .tertiary = REACH_FILL(REACH_DARK_FILL_TERTIARY)},
+    .status = {.success = REACH_GREEN_BRIGHT(1.0f), .error = REACH_RED_BRIGHT(1.0f)},
+    .accent = {.fill = REACH_BLUE_DEEP(1.0f),
+               .text = REACH_BLUE_BRIGHT(1.0f),
+               .tint = REACH_BLUE_DEEP(REACH_ACCENT_TINT),
+               .selection = REACH_BLUE_DEEP(REACH_ACCENT_SELECTION),
+               .faint = REACH_BLUE_DEEP(REACH_ACCENT_FAINT),
+               .text_tint = REACH_BLUE_BRIGHT(REACH_ACCENT_TINT),
+               .text_muted = REACH_BLUE_BRIGHT(REACH_ACCENT_MUTED),
+               .tint_amount = REACH_ACCENT_TINT},
+    .border = REACH_DARK_BORDER(1.0f),
+    .divider = REACH_DARK_DIVIDER(1.0f),
+    .on_color = REACH_PURE_WHITE(1.0f),
+    .danger = REACH_RED_DEEP(1.0f),
+    .pressed_overlay = REACH_PURE_BLACK(0.12f),
+    .artwork_scrim = REACH_DARK_SURFACE_BASE(0.35f),
+    .shadow = REACH_SHADOW_AMBIENT(5.0f),
+
     .top_bar_scrim = REACH_PURE_BLACK(0.65f),
-    .switcher_background = REACH_DARK_SURFACE_BASE(1.0f),
-    .shared_border = REACH_DARK_BORDER(1.0f),
-    .popup_background = REACH_DARK_SURFACE_RAISED(1.0f),
-    .bar_popup_background = REACH_DARK_SURFACE_BASE(1.0f),
-    .popup_border = REACH_DARK_BORDER(1.0f),
-    .widgets_background = REACH_DARK_SURFACE_RAISED(1.0f),
-    .widgets_border = REACH_DARK_BORDER(1.0f),
-    .widgets_unavailable_text = REACH_DARK_TEXT(REACH_TEXT_SECONDARY),
-    .widgets_resize_grip_fill = REACH_DARK_TEXT(REACH_TEXT_TERTIARY),
-    .widgets_artwork_overlay = REACH_DARK_SURFACE_RAISED(0.48f),
-    .popup_divider = REACH_DARK_DIVIDER(1.0f),
-    .popup_glass_divider = REACH_DARK_TEXT(REACH_TEXT_QUATERNARY),
-    .system_hud_background = REACH_DARK_SURFACE_RAISED(1.0f),
-    .system_hud_border = REACH_DARK_BORDER(1.0f),
-    .system_hud_text = REACH_DARK_TEXT(REACH_TEXT_PRIMARY),
-    .system_hud_secondary_text = REACH_DARK_TEXT(REACH_TEXT_SECONDARY),
-    .system_hud_icon_background = REACH_DARK_SURFACE_ELEVATED(1.0f),
-    .system_hud_glyph = REACH_DARK_TEXT(REACH_TEXT_PRIMARY),
-    .system_hud_track = REACH_FILL(REACH_DARK_FILL_SECONDARY),
-    .system_hud_muted_fill = REACH_DARK_TEXT(REACH_TEXT_TERTIARY),
-    .toggle_off_track = REACH_DARK_TEXT(REACH_TEXT_TERTIARY),
-    .toggle_knob = REACH_PURE_WHITE(1.0f),
-
-    .shared_text = REACH_DARK_TEXT(REACH_TEXT_PRIMARY),
-    .settings_window_button_glyph = REACH_LIGHT_TEXT(REACH_TEXT_PRIMARY),
-
-    .dock_fallback_icon_background = REACH_PURE_WHITE(0.80f),
-    .shared_glyph = REACH_DARK_TEXT(REACH_TEXT_PRIMARY),
-    .bar_fallback_icon_text = REACH_LIGHT_TEXT(REACH_TEXT_PRIMARY),
-    .top_bar_text = REACH_DARK_TEXT(REACH_TEXT_PRIMARY),
-    .top_bar_secondary_text = REACH_DARK_TEXT(REACH_TEXT_SECONDARY),
-    .shared_button_background = REACH_FILL(REACH_DARK_FILL_TERTIARY),
-    .top_bar_tray_background = REACH_FILL(REACH_DARK_FILL_TERTIARY),
-    .top_bar_battery_background = REACH_FILL(REACH_DARK_FILL_TERTIARY),
     .top_bar_battery_fill = REACH_GREEN_DEEP(1.0f),
     .top_bar_battery_low_fill = REACH_RED_DEEP(1.0f),
     .top_bar_battery_saver_fill = REACH_YELLOW_DEEP(1.0f),
     .top_bar_battery_charging_fill = REACH_BLUE_DEEP(1.0f),
-    .battery_pressed_overlay = REACH_PURE_BLACK(0.12f),
     .top_bar_cpu_text = REACH_CYAN_BRIGHT(1.0f),
     .top_bar_memory_text = REACH_LAVENDER_BRIGHT(1.0f),
     .top_bar_download_text = REACH_GREEN_BRIGHT(1.0f),
     .top_bar_upload_text = REACH_ORANGE_BRIGHT(1.0f),
-    .bar_pressed_background = REACH_DARK_SURFACE_ELEVATED(1.0f),
-    .top_bar_separator_fill = REACH_DARK_TEXT(REACH_TEXT_SECONDARY),
-
-    .quick_settings_slider_track = REACH_FILL(REACH_DARK_FILL_SECONDARY),
-    .quick_settings_slider_muted_fill = REACH_DARK_TEXT(REACH_TEXT_TERTIARY),
-    .quick_settings_button_background = REACH_FILL(REACH_DARK_FILL_TERTIARY),
-    .quick_settings_secondary_text = REACH_DARK_TEXT(REACH_TEXT_SECONDARY),
-    .quick_settings_toggle_off_track = REACH_DARK_TEXT(REACH_TEXT_TERTIARY),
-    .quick_settings_scrollbar_track = REACH_FILL(REACH_DARK_FILL_SECONDARY),
-    .quick_settings_scrollbar_thumb = REACH_DARK_TEXT(REACH_TEXT_SECONDARY),
-    .quick_settings_section_text = REACH_DARK_TEXT(REACH_TEXT_SECONDARY),
-    .quick_settings_toggle_divider = REACH_DARK_TEXT(REACH_TEXT_QUATERNARY),
-    .quick_settings_pressed_overlay = REACH_PURE_BLACK(0.12f),
-
-    .now_playing_background = REACH_DARK_SURFACE_BASE(0.35f),
-    .system_hud_artwork_overlay = REACH_DARK_SURFACE_BASE(0.35f),
-    .now_playing_title_text = REACH_DARK_TEXT(REACH_TEXT_PRIMARY),
-    .now_playing_control_glyph = REACH_DARK_TEXT(REACH_TEXT_PRIMARY),
-    .now_playing_control_disabled_glyph = REACH_DARK_TEXT(REACH_TEXT_TERTIARY),
-
-    .launcher_search_background = REACH_DARK_SURFACE_BASE(1.0f),
-    .launcher_search_text = REACH_DARK_TEXT(REACH_TEXT_PRIMARY),
-    .launcher_search_placeholder_text = REACH_DARK_TEXT(REACH_TEXT_TERTIARY),
-    .launcher_border = REACH_DARK_BORDER(1.0f),
-    .launcher_scrollbar_track = REACH_FILL(REACH_DARK_FILL_SECONDARY),
-    .launcher_scrollbar_thumb = REACH_DARK_TEXT(REACH_TEXT_SECONDARY),
-    .launcher_row_icon_background = REACH_DARK_SURFACE_ELEVATED(1.0f),
-    .launcher_row_icon_glyph = REACH_DARK_TEXT(REACH_TEXT_SECONDARY),
-    .launcher_row_text = REACH_DARK_TEXT(REACH_TEXT_PRIMARY),
-    .launcher_row_selected_text = REACH_DARK_TEXT(REACH_TEXT_PRIMARY),
-    .launcher_row_secondary_text = REACH_DARK_TEXT(REACH_TEXT_SECONDARY),
-    .launcher_pressed_overlay = REACH_PURE_BLACK(0.12f),
-
-    .switcher_label_text = REACH_DARK_TEXT(REACH_TEXT_PRIMARY),
-
-    .context_menu_text = REACH_DARK_TEXT(REACH_TEXT_PRIMARY),
-    .context_menu_preview_background = REACH_DARK_SURFACE_BASE(1.0f),
-    .context_menu_close_background = REACH_RED_DEEP(1.0f),
-    .context_menu_close_glyph = REACH_PURE_WHITE(1.0f),
-
-    .stage_background = REACH_DARK_SURFACE_BASE(REACH_THEME_STAGE_BACKDROP_ALPHA),
-    .stage_tile_placeholder_background = REACH_DARK_SURFACE_ELEVATED(1.0f),
-    .stage_tile_text = REACH_DARK_TEXT(REACH_TEXT_PRIMARY),
-    .stage_tile_header_background = REACH_DARK_SURFACE_ELEVATED(0.45f),
-    .stage_close_background = REACH_DARK_TEXT(REACH_TEXT_SECONDARY),
-    .stage_close_hover_background = REACH_RED_DEEP(1.0f),
-    .stage_close_glyph = REACH_PURE_WHITE(0.80f),
-    .stage_close_hover_glyph = REACH_PURE_WHITE(1.0f),
-
-    .clipboard_background = REACH_DARK_SURFACE_BASE(1.0f),
-    .clipboard_border = REACH_DARK_BORDER(1.0f),
-    .clipboard_text = REACH_DARK_TEXT(REACH_TEXT_PRIMARY),
-    .clipboard_secondary_text = REACH_DARK_TEXT(REACH_TEXT_SECONDARY),
-    .clipboard_disabled_text = REACH_DARK_TEXT(REACH_TEXT_TERTIARY),
-    .clipboard_empty_text = REACH_DARK_TEXT(REACH_TEXT_SECONDARY),
-    .clipboard_item_background = REACH_DARK_SURFACE_ELEVATED(1.0f),
-    .clipboard_clear_button_background = REACH_FILL(REACH_DARK_FILL_TERTIARY),
-    .clipboard_clear_button_disabled_background = REACH_FILL(REACH_DARK_FILL_QUATERNARY),
-    .clipboard_scrollbar_track = REACH_FILL(REACH_DARK_FILL_SECONDARY),
-    .clipboard_scrollbar_thumb = REACH_DARK_TEXT(REACH_TEXT_SECONDARY),
-
-    .screenshot_scrim = REACH_PURE_BLACK(0.45f),
-    .screenshot_selection_border = REACH_PURE_WHITE(1.0f),
-    .screenshot_label_background = REACH_DARK_SURFACE_BASE(0.92f),
-    .screenshot_label_text = REACH_DARK_TEXT(REACH_TEXT_PRIMARY),
-
-    .settings_background = REACH_DARK_SURFACE_BASE(1.0f),
-    .settings_nav_background = REACH_DARK_SURFACE_RAISED(1.0f),
-    .settings_text = REACH_DARK_TEXT(REACH_TEXT_PRIMARY),
-    .settings_secondary_text = REACH_DARK_TEXT(REACH_TEXT_SECONDARY),
-    .settings_tertiary_text = REACH_DARK_TEXT(REACH_TEXT_TERTIARY),
-    .settings_card_background = REACH_DARK_SURFACE_ELEVATED(1.0f),
-    .settings_pill_background = REACH_DARK_SURFACE_ELEVATED(1.0f),
-    .settings_icon_box_background = REACH_DARK_SURFACE_ELEVATED(1.0f),
-    .settings_segmented_control_background = REACH_FILL(REACH_DARK_FILL_TERTIARY),
-    .settings_input_background = REACH_FILL(REACH_DARK_FILL_TERTIARY),
-    .settings_divider = REACH_DARK_DIVIDER(1.0f),
-    .settings_toggle_off_track = REACH_DARK_TEXT(REACH_TEXT_TERTIARY),
-    .settings_toggle_knob = REACH_PURE_WHITE(1.0f),
-    .settings_button_text = REACH_DARK_TEXT(REACH_TEXT_PRIMARY),
-    .settings_button_danger_text = REACH_PURE_WHITE(1.0f),
-    .settings_button_danger_background = REACH_RED_DEEP(1.0f),
-    .settings_button_disabled_background = REACH_DARK_SURFACE_ELEVATED(1.0f),
-    .settings_success_text = REACH_GREEN_BRIGHT(1.0f),
-    .settings_error_text = REACH_RED_BRIGHT(1.0f),
-    .settings_window_button_background = REACH_DARK_TEXT(REACH_TEXT_SECONDARY),
-    .settings_window_close_hover_background = REACH_RED_DEEP(1.0f),
-    .settings_window_minimize_hover_background = REACH_YELLOW_BRIGHT(1.0f),
-    .settings_scrollbar_track = REACH_FILL(REACH_DARK_FILL_SECONDARY),
-    .settings_scrollbar_thumb = REACH_DARK_TEXT(REACH_TEXT_SECONDARY),
-    .accent_fill = REACH_BLUE_DEEP(1.0f),
-    .accent_text = REACH_BLUE_BRIGHT(1.0f),
-    .accent_tint_overlay = REACH_BLUE_DEEP(REACH_ACCENT_TINT),
-    .accent_selection_overlay = REACH_BLUE_DEEP(REACH_ACCENT_SELECTION),
-    .widgets_decoration_fill = REACH_BLUE_DEEP(REACH_ACCENT_TINT),
-    .widgets_ribbon_fill = REACH_BLUE_DEEP(REACH_ACCENT_FAINT),
-    .widgets_meter_empty_fill = REACH_BLUE_BRIGHT(REACH_ACCENT_TINT),
-    .widgets_meter_muted_fill = REACH_BLUE_BRIGHT(REACH_ACCENT_MUTED),
-    .widgets_section_divider = REACH_BLUE_BRIGHT(REACH_ACCENT_TINT),
-    .widgets_drag_overlay = REACH_BLUE_DEEP(REACH_ACCENT_SELECTION),
-    .widgets_primary_control_background = REACH_BLUE_DEEP(REACH_ACCENT_TINT),
-    .widgets_control_background = REACH_BLUE_DEEP(REACH_ACCENT_FAINT),
-    .settings_avatar_placeholder_background = REACH_BLUE_BRIGHT(REACH_ACCENT_TINT),
+    .dock_fallback_icon_background = REACH_PURE_WHITE(0.80f),
+    .bar_fallback_icon_text = REACH_LIGHT_TEXT(REACH_TEXT_PRIMARY),
+    .widgets_artwork_overlay = REACH_DARK_SURFACE_RAISED(0.48f),
     // Opaque accent blends exist only once resolved; unresolved tables keep the plain surface.
     .widgets_accent_background = REACH_DARK_SURFACE_RAISED(1.0f),
+    .stage_background = REACH_DARK_SURFACE_BASE(REACH_THEME_STAGE_BACKDROP_ALPHA),
+    .stage_tile_header_background = REACH_DARK_SURFACE_ELEVATED(0.45f),
+    .stage_close_glyph = REACH_PURE_WHITE(0.80f),
+    .screenshot_scrim = REACH_PURE_BLACK(0.45f),
+    .screenshot_label_background = REACH_DARK_SURFACE_BASE(0.92f),
+    .settings_background = REACH_DARK_SURFACE_BASE(1.0f),
+    .settings_window_minimize_hover_background = REACH_YELLOW_BRIGHT(1.0f),
     .settings_avatar_border = REACH_DARK_SURFACE_ELEVATED(1.0f),
 
-    REACH_THEME_SHADOWS,
     REACH_THEME_METRICS,
     REACH_THEME_MOTION,
 };
@@ -215,160 +109,59 @@ static const reach_theme reach_theme_light = {
     .mode = REACH_THEME_MODE_LIGHT,
     .glass = {.intensity = REACH_CONFIG_GLASS_INTENSITY_DEFAULT, .floor = 0.0f, .ceiling = 1.0f},
 
-    .dock_background = REACH_LIGHT_SURFACE_BASE(1.0f),
-    .top_bar_background = REACH_LIGHT_SURFACE_BASE(1.0f),
+    .text = {.primary = REACH_LIGHT_TEXT(REACH_TEXT_PRIMARY),
+             .secondary = REACH_LIGHT_TEXT(REACH_TEXT_SECONDARY),
+             .tertiary = REACH_LIGHT_TEXT(REACH_TEXT_TERTIARY),
+             .quaternary = REACH_LIGHT_TEXT(REACH_TEXT_QUATERNARY),
+             .inverse = REACH_DARK_TEXT(REACH_TEXT_PRIMARY)},
+    .surface = {.base = REACH_LIGHT_SURFACE_BASE(1.0f),
+                .raised = REACH_LIGHT_SURFACE_BASE(1.0f),
+                .card = REACH_LIGHT_SURFACE_BASE(1.0f),
+                .item = REACH_LIGHT_SURFACE_RAISED(1.0f),
+                .well = REACH_LIGHT_SURFACE_ELEVATED(1.0f)},
+    .fill = {.primary = REACH_FILL(REACH_LIGHT_FILL_PRIMARY),
+             .secondary = REACH_FILL(REACH_LIGHT_FILL_SECONDARY),
+             .tertiary = REACH_FILL(REACH_LIGHT_FILL_TERTIARY)},
+    .status = {.success = REACH_GREEN_INK(1.0f), .error = REACH_RED_INK(1.0f)},
+    .accent = {.fill = REACH_BLUE_BRIGHT(1.0f),
+               .text = REACH_BLUE_DEEP(1.0f),
+               .tint = REACH_BLUE_BRIGHT(REACH_ACCENT_TINT),
+               .selection = REACH_BLUE_BRIGHT(REACH_ACCENT_SELECTION),
+               .faint = REACH_BLUE_BRIGHT(REACH_ACCENT_FAINT),
+               .text_tint = REACH_BLUE_DEEP(REACH_ACCENT_TINT),
+               .text_muted = REACH_BLUE_DEEP(REACH_ACCENT_MUTED),
+               .tint_amount = REACH_ACCENT_TINT},
+    .border = REACH_LIGHT_BORDER(1.0f),
+    .divider = REACH_LIGHT_DIVIDER(1.0f),
+    .on_color = REACH_PURE_WHITE(1.0f),
+    .danger = REACH_RED_DEEP(1.0f),
+    .pressed_overlay = REACH_PURE_BLACK(0.12f),
+    .artwork_scrim = REACH_LIGHT_SURFACE_RAISED(0.35f),
+    .shadow = REACH_SHADOW_AMBIENT(5.0f),
+
     .top_bar_scrim = REACH_PURE_WHITE(0.65f),
-    .switcher_background = REACH_LIGHT_SURFACE_BASE(1.0f),
-    .shared_border = REACH_LIGHT_BORDER(1.0f),
-    .popup_background = REACH_LIGHT_SURFACE_BASE(1.0f),
-    .bar_popup_background = REACH_LIGHT_SURFACE_BASE(1.0f),
-    .popup_border = REACH_LIGHT_BORDER(1.0f),
-    .widgets_background = REACH_LIGHT_SURFACE_BASE(1.0f),
-    .widgets_border = REACH_LIGHT_BORDER(1.0f),
-    .widgets_unavailable_text = REACH_LIGHT_TEXT(REACH_TEXT_SECONDARY),
-    .widgets_resize_grip_fill = REACH_LIGHT_TEXT(REACH_TEXT_TERTIARY),
-    .widgets_artwork_overlay = REACH_LIGHT_SURFACE_BASE(0.48f),
-    .popup_divider = REACH_LIGHT_DIVIDER(1.0f),
-    .popup_glass_divider = REACH_LIGHT_TEXT(REACH_TEXT_QUATERNARY),
-    .system_hud_background = REACH_LIGHT_SURFACE_BASE(1.0f),
-    .system_hud_border = REACH_LIGHT_BORDER(1.0f),
-    .system_hud_text = REACH_LIGHT_TEXT(REACH_TEXT_PRIMARY),
-    .system_hud_secondary_text = REACH_LIGHT_TEXT(REACH_TEXT_SECONDARY),
-    .system_hud_icon_background = REACH_LIGHT_SURFACE_ELEVATED(1.0f),
-    .system_hud_glyph = REACH_LIGHT_TEXT(REACH_TEXT_PRIMARY),
-    .system_hud_track = REACH_FILL(REACH_LIGHT_FILL_SECONDARY),
-    .system_hud_muted_fill = REACH_LIGHT_TEXT(REACH_TEXT_TERTIARY),
-    .toggle_off_track = REACH_LIGHT_TEXT(REACH_TEXT_TERTIARY),
-    .toggle_knob = REACH_PURE_WHITE(1.0f),
-
-    .shared_text = REACH_LIGHT_TEXT(REACH_TEXT_PRIMARY),
-    .settings_window_button_glyph = REACH_DARK_TEXT(REACH_TEXT_PRIMARY),
-
-    .dock_fallback_icon_background = REACH_LIGHT_SURFACE_RAISED(0.80f),
-    .shared_glyph = REACH_LIGHT_TEXT(REACH_TEXT_PRIMARY),
-    .bar_fallback_icon_text = REACH_LIGHT_TEXT(REACH_TEXT_PRIMARY),
-    .top_bar_text = REACH_LIGHT_TEXT(REACH_TEXT_PRIMARY),
-    .top_bar_secondary_text = REACH_LIGHT_TEXT(REACH_TEXT_SECONDARY),
-    .shared_button_background = REACH_FILL(REACH_LIGHT_FILL_TERTIARY),
-    .top_bar_tray_background = REACH_FILL(REACH_LIGHT_FILL_TERTIARY),
-    .top_bar_battery_background = REACH_FILL(REACH_LIGHT_FILL_TERTIARY),
     .top_bar_battery_fill = REACH_GREEN_BRIGHT(1.0f),
     .top_bar_battery_low_fill = REACH_RED_BRIGHT(1.0f),
     .top_bar_battery_saver_fill = REACH_YELLOW_BRIGHT(1.0f),
     .top_bar_battery_charging_fill = REACH_BLUE_BRIGHT(1.0f),
-    .battery_pressed_overlay = REACH_PURE_BLACK(0.12f),
     .top_bar_cpu_text = REACH_CYAN_INK(1.0f),
     .top_bar_memory_text = REACH_LAVENDER_INK(1.0f),
     .top_bar_download_text = REACH_GREEN_INK(1.0f),
     .top_bar_upload_text = REACH_ORANGE_INK(1.0f),
-    .bar_pressed_background = REACH_LIGHT_SURFACE_RAISED(1.0f),
-    .top_bar_separator_fill = REACH_LIGHT_TEXT(REACH_TEXT_SECONDARY),
-
-    .quick_settings_slider_track = REACH_FILL(REACH_LIGHT_FILL_SECONDARY),
-    .quick_settings_slider_muted_fill = REACH_LIGHT_TEXT(REACH_TEXT_TERTIARY),
-    .quick_settings_button_background = REACH_FILL(REACH_LIGHT_FILL_TERTIARY),
-    .quick_settings_secondary_text = REACH_LIGHT_TEXT(REACH_TEXT_SECONDARY),
-    .quick_settings_toggle_off_track = REACH_LIGHT_TEXT(REACH_TEXT_TERTIARY),
-    .quick_settings_scrollbar_track = REACH_FILL(REACH_LIGHT_FILL_SECONDARY),
-    .quick_settings_scrollbar_thumb = REACH_LIGHT_TEXT(REACH_TEXT_SECONDARY),
-    .quick_settings_section_text = REACH_LIGHT_TEXT(REACH_TEXT_SECONDARY),
-    .quick_settings_toggle_divider = REACH_LIGHT_TEXT(REACH_TEXT_QUATERNARY),
-    .quick_settings_pressed_overlay = REACH_PURE_BLACK(0.12f),
-
-    .now_playing_background = REACH_LIGHT_SURFACE_RAISED(0.35f),
-    .system_hud_artwork_overlay = REACH_LIGHT_SURFACE_RAISED(0.35f),
-    .now_playing_title_text = REACH_LIGHT_TEXT(REACH_TEXT_PRIMARY),
-    .now_playing_control_glyph = REACH_LIGHT_TEXT(REACH_TEXT_PRIMARY),
-    .now_playing_control_disabled_glyph = REACH_LIGHT_TEXT(REACH_TEXT_TERTIARY),
-
-    .launcher_search_background = REACH_LIGHT_SURFACE_BASE(1.0f),
-    .launcher_search_text = REACH_LIGHT_TEXT(REACH_TEXT_PRIMARY),
-    .launcher_search_placeholder_text = REACH_LIGHT_TEXT(REACH_TEXT_TERTIARY),
-    .launcher_border = REACH_LIGHT_BORDER(1.0f),
-    .launcher_scrollbar_track = REACH_FILL(REACH_LIGHT_FILL_SECONDARY),
-    .launcher_scrollbar_thumb = REACH_LIGHT_TEXT(REACH_TEXT_SECONDARY),
-    .launcher_row_icon_background = REACH_LIGHT_SURFACE_RAISED(1.0f),
-    .launcher_row_icon_glyph = REACH_LIGHT_TEXT(REACH_TEXT_SECONDARY),
-    .launcher_row_text = REACH_LIGHT_TEXT(REACH_TEXT_PRIMARY),
-    .launcher_row_selected_text = REACH_LIGHT_TEXT(REACH_TEXT_PRIMARY),
-    .launcher_row_secondary_text = REACH_LIGHT_TEXT(REACH_TEXT_SECONDARY),
-    .launcher_pressed_overlay = REACH_PURE_BLACK(0.12f),
-
-    .switcher_label_text = REACH_LIGHT_TEXT(REACH_TEXT_PRIMARY),
-
-    .context_menu_text = REACH_LIGHT_TEXT(REACH_TEXT_PRIMARY),
-    .context_menu_preview_background = REACH_LIGHT_SURFACE_BASE(1.0f),
-    .context_menu_close_background = REACH_RED_DEEP(1.0f),
-    .context_menu_close_glyph = REACH_PURE_WHITE(1.0f),
-
-    .stage_background = REACH_LIGHT_SURFACE_BASE(REACH_THEME_STAGE_BACKDROP_ALPHA),
-    .stage_tile_placeholder_background = REACH_LIGHT_SURFACE_RAISED(1.0f),
-    .stage_tile_text = REACH_LIGHT_TEXT(REACH_TEXT_PRIMARY),
-    .stage_tile_header_background = REACH_LIGHT_SURFACE_ELEVATED(1.0f),
-    .stage_close_background = REACH_LIGHT_TEXT(REACH_TEXT_SECONDARY),
-    .stage_close_hover_background = REACH_RED_DEEP(1.0f),
-    .stage_close_glyph = REACH_PURE_WHITE(0.80f),
-    .stage_close_hover_glyph = REACH_PURE_WHITE(1.0f),
-
-    .clipboard_background = REACH_LIGHT_SURFACE_BASE(1.0f),
-    .clipboard_border = REACH_LIGHT_BORDER(1.0f),
-    .clipboard_text = REACH_LIGHT_TEXT(REACH_TEXT_PRIMARY),
-    .clipboard_secondary_text = REACH_LIGHT_TEXT(REACH_TEXT_SECONDARY),
-    .clipboard_disabled_text = REACH_LIGHT_TEXT(REACH_TEXT_TERTIARY),
-    .clipboard_empty_text = REACH_LIGHT_TEXT(REACH_TEXT_SECONDARY),
-    .clipboard_item_background = REACH_LIGHT_SURFACE_RAISED(1.0f),
-    .clipboard_clear_button_background = REACH_FILL(REACH_LIGHT_FILL_TERTIARY),
-    .clipboard_clear_button_disabled_background = REACH_FILL(REACH_LIGHT_FILL_QUATERNARY),
-    .clipboard_scrollbar_track = REACH_FILL(REACH_LIGHT_FILL_SECONDARY),
-    .clipboard_scrollbar_thumb = REACH_LIGHT_TEXT(REACH_TEXT_SECONDARY),
-
-    .screenshot_scrim = REACH_PURE_BLACK(0.45f),
-    .screenshot_selection_border = REACH_PURE_WHITE(1.0f),
-    .screenshot_label_background = REACH_LIGHT_SURFACE_BASE(0.92f),
-    .screenshot_label_text = REACH_LIGHT_TEXT(REACH_TEXT_PRIMARY),
-
-    .settings_background = REACH_LIGHT_SURFACE_RAISED(1.0f),
-    .settings_nav_background = REACH_LIGHT_SURFACE_BASE(1.0f),
-    .settings_text = REACH_LIGHT_TEXT(REACH_TEXT_PRIMARY),
-    .settings_secondary_text = REACH_LIGHT_TEXT(REACH_TEXT_SECONDARY),
-    .settings_tertiary_text = REACH_LIGHT_TEXT(REACH_TEXT_TERTIARY),
-    .settings_card_background = REACH_LIGHT_SURFACE_BASE(1.0f),
-    .settings_pill_background = REACH_LIGHT_SURFACE_RAISED(1.0f),
-    .settings_icon_box_background = REACH_LIGHT_SURFACE_ELEVATED(1.0f),
-    .settings_segmented_control_background = REACH_FILL(REACH_LIGHT_FILL_TERTIARY),
-    .settings_input_background = REACH_FILL(REACH_LIGHT_FILL_TERTIARY),
-    .settings_divider = REACH_LIGHT_DIVIDER(1.0f),
-    .settings_toggle_off_track = REACH_LIGHT_TEXT(REACH_TEXT_TERTIARY),
-    .settings_toggle_knob = REACH_PURE_WHITE(1.0f),
-    .settings_button_text = REACH_LIGHT_TEXT(REACH_TEXT_PRIMARY),
-    .settings_button_danger_text = REACH_PURE_WHITE(1.0f),
-    .settings_button_danger_background = REACH_RED_DEEP(1.0f),
-    .settings_button_disabled_background = REACH_LIGHT_SURFACE_ELEVATED(1.0f),
-    .settings_success_text = REACH_GREEN_INK(1.0f),
-    .settings_error_text = REACH_RED_INK(1.0f),
-    .settings_window_button_background = REACH_LIGHT_TEXT(REACH_TEXT_SECONDARY),
-    .settings_window_close_hover_background = REACH_RED_DEEP(1.0f),
-    .settings_window_minimize_hover_background = REACH_YELLOW_DEEP(1.0f),
-    .settings_scrollbar_track = REACH_FILL(REACH_LIGHT_FILL_SECONDARY),
-    .settings_scrollbar_thumb = REACH_LIGHT_TEXT(REACH_TEXT_SECONDARY),
-    .accent_fill = REACH_BLUE_BRIGHT(1.0f),
-    .accent_text = REACH_BLUE_DEEP(1.0f),
-    .accent_tint_overlay = REACH_BLUE_BRIGHT(REACH_ACCENT_TINT),
-    .accent_selection_overlay = REACH_BLUE_BRIGHT(REACH_ACCENT_SELECTION),
-    .widgets_decoration_fill = REACH_BLUE_BRIGHT(REACH_ACCENT_TINT),
-    .widgets_ribbon_fill = REACH_BLUE_BRIGHT(REACH_ACCENT_FAINT),
-    .widgets_meter_empty_fill = REACH_BLUE_DEEP(REACH_ACCENT_TINT),
-    .widgets_meter_muted_fill = REACH_BLUE_DEEP(REACH_ACCENT_MUTED),
-    .widgets_section_divider = REACH_BLUE_DEEP(REACH_ACCENT_TINT),
-    .widgets_drag_overlay = REACH_BLUE_BRIGHT(REACH_ACCENT_SELECTION),
-    .widgets_primary_control_background = REACH_BLUE_BRIGHT(REACH_ACCENT_TINT),
-    .widgets_control_background = REACH_BLUE_BRIGHT(REACH_ACCENT_FAINT),
-    .settings_avatar_placeholder_background = REACH_BLUE_DEEP(REACH_ACCENT_TINT),
+    .dock_fallback_icon_background = REACH_LIGHT_SURFACE_RAISED(0.80f),
+    .bar_fallback_icon_text = REACH_LIGHT_TEXT(REACH_TEXT_PRIMARY),
+    .widgets_artwork_overlay = REACH_LIGHT_SURFACE_BASE(0.48f),
     // Opaque accent blends exist only once resolved; unresolved tables keep the plain surface.
     .widgets_accent_background = REACH_LIGHT_SURFACE_BASE(1.0f),
+    .stage_background = REACH_LIGHT_SURFACE_BASE(REACH_THEME_STAGE_BACKDROP_ALPHA),
+    .stage_tile_header_background = REACH_LIGHT_SURFACE_ELEVATED(1.0f),
+    .stage_close_glyph = REACH_PURE_WHITE(0.80f),
+    .screenshot_scrim = REACH_PURE_BLACK(0.45f),
+    .screenshot_label_background = REACH_LIGHT_SURFACE_BASE(0.92f),
+    .settings_background = REACH_LIGHT_SURFACE_RAISED(1.0f),
+    .settings_window_minimize_hover_background = REACH_YELLOW_DEEP(1.0f),
     .settings_avatar_border = REACH_LIGHT_SURFACE_BASE(1.0f),
 
-    REACH_THEME_SHADOWS,
     REACH_THEME_METRICS,
     REACH_THEME_MOTION,
 };
@@ -464,33 +257,15 @@ static reach_color reach_theme_meet_contrast(reach_color color, reach_color refe
 static int32_t reach_theme_glass_surface_readable(const reach_theme *theme, float level)
 {
     const reach_color surface = {level, level, level, 1.0f};
-    const reach_color primary[] = {
-        theme->shared_text,          theme->top_bar_text,
-        theme->context_menu_text,    theme->switcher_label_text,
-        theme->launcher_search_text, theme->clipboard_text,
-        theme->system_hud_text,      theme->now_playing_control_glyph,
-    };
-    const reach_color secondary[] = {
-        theme->top_bar_secondary_text,      theme->quick_settings_secondary_text,
-        theme->quick_settings_section_text, theme->launcher_row_secondary_text,
-        theme->clipboard_secondary_text,    theme->system_hud_secondary_text,
-    };
-    for (size_t index = 0; index < sizeof(primary) / sizeof(primary[0]); ++index)
-    {
-        reach_color text = reach_theme_color_mix(surface, primary[index], primary[index].a);
-        if (reach_theme_contrast(text, surface) < REACH_THEME_GLASS_PRIMARY_CONTRAST)
-            return 0;
-    }
-    for (size_t index = 0; index < sizeof(secondary) / sizeof(secondary[0]); ++index)
-    {
-        reach_color text = reach_theme_color_mix(surface, secondary[index], secondary[index].a);
-        if (reach_theme_contrast(text, surface) < REACH_THEME_GLASS_SECONDARY_CONTRAST)
-            return 0;
-    }
-    return 1;
+    const reach_color primary =
+        reach_theme_color_mix(surface, theme->text.primary, theme->text.primary.a);
+    const reach_color secondary =
+        reach_theme_color_mix(surface, theme->text.secondary, theme->text.secondary.a);
+    return reach_theme_contrast(primary, surface) >= REACH_THEME_GLASS_PRIMARY_CONTRAST &&
+           reach_theme_contrast(secondary, surface) >= REACH_THEME_GLASS_SECONDARY_CONTRAST;
 }
 
-// The furthest gray level from the theme's own surfaces that keeps every glass text token
+// The furthest gray level from the theme's own surfaces that keeps primary and secondary text
 // readable. Dark themes bound how light glass gets, light themes how dark.
 static float reach_theme_glass_limit(const reach_theme *theme, int32_t light)
 {
@@ -532,42 +307,33 @@ void reach_theme_resolve(reach_theme_mode mode, const reach_accent_pair *accent,
     const reach_color surface = light ? (reach_color)REACH_LIGHT_SURFACE_ELEVATED(1.0f)
                                       : (reach_color)REACH_DARK_SURFACE_ELEVATED(1.0f);
     reach_color fill = reach_theme_meet_contrast(light ? pair.bright : pair.deep,
-                                                 out_theme->shared_text, light ? white : black);
-    out_theme->accent_fill = fill;
-    out_theme->accent_text =
+                                                 out_theme->text.primary, light ? white : black);
+    reach_color text =
         reach_theme_meet_contrast(light ? pair.deep : pair.bright, surface, light ? black : white);
-    const reach_color text = out_theme->accent_text;
-    out_theme->accent_tint_overlay = reach_theme_color_alpha(fill, REACH_ACCENT_TINT);
-    out_theme->accent_selection_overlay = reach_theme_color_alpha(fill, REACH_ACCENT_SELECTION);
+    reach_theme_accent *resolved = &out_theme->accent;
+    resolved->fill = fill;
+    resolved->text = text;
+    resolved->tint = reach_theme_color_alpha(fill, REACH_ACCENT_TINT);
+    resolved->selection = reach_theme_color_alpha(fill, REACH_ACCENT_SELECTION);
+    resolved->faint = reach_theme_color_alpha(fill, REACH_ACCENT_FAINT);
+    resolved->text_tint = reach_theme_color_alpha(text, REACH_ACCENT_TINT);
+    resolved->text_muted = reach_theme_color_alpha(text, REACH_ACCENT_MUTED);
     out_theme->widgets_accent_background =
-        reach_theme_color_mix(out_theme->widgets_background, fill, REACH_ACCENT_FAINT);
-    out_theme->widgets_decoration_fill = reach_theme_color_alpha(fill, REACH_ACCENT_TINT);
-    out_theme->widgets_ribbon_fill = reach_theme_color_alpha(fill, REACH_ACCENT_FAINT);
-    out_theme->widgets_meter_empty_fill = reach_theme_color_alpha(text, REACH_ACCENT_TINT);
-    out_theme->widgets_meter_muted_fill = reach_theme_color_alpha(text, REACH_ACCENT_MUTED);
-    out_theme->widgets_section_divider = reach_theme_color_alpha(text, REACH_ACCENT_TINT);
-    out_theme->widgets_drag_overlay = reach_theme_color_alpha(fill, REACH_ACCENT_SELECTION);
-    out_theme->widgets_primary_control_background =
-        reach_theme_color_alpha(fill, REACH_ACCENT_TINT);
-    out_theme->widgets_control_background = reach_theme_color_alpha(fill, REACH_ACCENT_FAINT);
+        reach_theme_color_mix(out_theme->surface.raised, fill, REACH_ACCENT_FAINT);
     out_theme->settings_avatar_border =
-        reach_theme_color_mix(out_theme->settings_card_background, text, REACH_ACCENT_MUTED);
-    out_theme->settings_avatar_placeholder_background =
-        reach_theme_color_alpha(text, REACH_ACCENT_TINT);
+        reach_theme_color_mix(out_theme->surface.card, text, REACH_ACCENT_MUTED);
     // The static tables hold the blue preset already resolved, so an unresolved theme matches.
     const reach_accent_pair blue = reach_accent_preset_pair(REACH_ACCENT_PRESET_BLUE);
-    const reach_theme *base = reach_theme_for_mode(mode);
-    REACH_ASSERT(
-        !reach_theme_color_close(pair.deep, blue.deep) ||
-        !reach_theme_color_close(pair.bright, blue.bright) ||
-        (reach_theme_color_close(out_theme->accent_fill, base->accent_fill) &&
-         reach_theme_color_close(out_theme->accent_text, base->accent_text) &&
-         reach_theme_color_close(out_theme->accent_tint_overlay, base->accent_tint_overlay) &&
-         reach_theme_color_close(out_theme->accent_selection_overlay,
-                                 base->accent_selection_overlay) &&
-         reach_theme_color_close(out_theme->widgets_meter_muted_fill,
-                                 base->widgets_meter_muted_fill) &&
-         reach_theme_color_close(out_theme->widgets_drag_overlay, base->widgets_drag_overlay)));
+    const reach_theme_accent *base = &reach_theme_for_mode(mode)->accent;
+    REACH_ASSERT(!reach_theme_color_close(pair.deep, blue.deep) ||
+                 !reach_theme_color_close(pair.bright, blue.bright) ||
+                 (reach_theme_color_close(resolved->fill, base->fill) &&
+                  reach_theme_color_close(resolved->text, base->text) &&
+                  reach_theme_color_close(resolved->tint, base->tint) &&
+                  reach_theme_color_close(resolved->selection, base->selection) &&
+                  reach_theme_color_close(resolved->faint, base->faint) &&
+                  reach_theme_color_close(resolved->text_tint, base->text_tint) &&
+                  reach_theme_color_close(resolved->text_muted, base->text_muted)));
     float limit = reach_theme_glass_limit(out_theme, light);
     out_theme->glass.floor = light ? limit : 0.0f;
     out_theme->glass.ceiling = light ? 1.0f : limit;

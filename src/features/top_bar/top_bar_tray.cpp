@@ -701,7 +701,7 @@ reach_result reach_top_bar_append_tray_render_commands(reach_top_bar *top_bar,
     popup.notch_center_x = popup_state->placement.notch_anchor_x - ctx->bounds.x;
     popup.notch_side = popup_state->placement.notch_side;
     popup.dpi_scale = ctx->dpi_scale;
-    popup.background_color_override = ctx->theme->bar_popup_background;
+    popup.background_color_override = ctx->theme->surface.base;
     popup.has_background_color_override = 1;
     popup.hide_notch = 1;
     popup.glass = ctx->theme->glass;
@@ -752,8 +752,8 @@ reach_result reach_top_bar_append_tray_render_commands(reach_top_bar *top_bar,
         {
             result = reach_push_icon_press_feedback_motion(
                 out_commands, 1, item != nullptr && item->icon_id != 0 ? icon_rect : slot,
-                icon_box_radius, item != nullptr ? item->icon_id : 0,
-                ctx->theme->bar_pressed_background, &popup_state->press_feedback, nullptr);
+                icon_box_radius, item != nullptr ? item->icon_id : 0, ctx->theme->surface.item,
+                &popup_state->press_feedback, nullptr);
             if (result != REACH_OK)
                 return result;
         }

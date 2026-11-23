@@ -94,7 +94,7 @@ static void reach_dock_push_running_indicator(const reach_dock_render_input *inp
     }
 
     reach_color color =
-        reach_theme_color_alpha(input->theme->accent_text, metrics.running_indicator_alpha);
+        reach_theme_color_alpha(input->theme->accent.text, metrics.running_indicator_alpha);
 
     reach_dock_push_rect(commands,
                          reach_dock_rect(icon_box.x + (icon_box.width - indicator_size) * 0.5f,
@@ -181,7 +181,7 @@ static void reach_dock_push_item(const reach_dock_render_input *input,
     if (input->click_feedback_index == index)
         (void)reach_push_icon_press_feedback_motion(
             commands, REACH_DOCK_FEEDBACK_GROUP_ID, icon_box, icon_box_radius, icon.id,
-            theme->dock_background, input->click_feedback,
+            theme->surface.base, input->click_feedback,
             input->item_motion != nullptr ? &group : nullptr);
 }
 
@@ -198,10 +198,10 @@ static reach_result reach_dock_push_background(const reach_dock_render_input *in
     shape.radius = dock_radius;
     shape.glass = theme->glass;
     return reach_render_push_bordered_background(
-        commands, &shape, theme->dock_background, theme->shared_border,
+        commands, &shape, theme->surface.base, theme->border,
         reach_line_thickness(reach_theme_border_thickness(theme, input->dpi_scale) *
                              layout->content_scale),
-        &theme->bar_shadow, input->dpi_scale);
+        &theme->shadow, input->dpi_scale);
 }
 
 static void reach_dock_push_trigger_button(const reach_dock_render_input *input,
@@ -213,11 +213,11 @@ static void reach_dock_push_trigger_button(const reach_dock_render_input *input,
         reach_dock_icon_box_for_slot(input->layout->trigger_button, icon_box_size);
 
     int32_t feedback = input->click_feedback_index == input->trigger_feedback_index &&
-                       reach_ui_color_feedback_begin(
-                           commands, REACH_DOCK_FEEDBACK_GROUP_ID, trigger_box, theme->shared_glyph,
-                           theme->bar_pressed_background, input->click_feedback);
+                       reach_ui_color_feedback_begin(commands, REACH_DOCK_FEEDBACK_GROUP_ID,
+                                                     trigger_box, theme->text.primary,
+                                                     theme->surface.item, input->click_feedback);
     reach_dock_push_vector_icon(commands, trigger_box, REACH_VECTOR_ICON_MENU,
-                                feedback ? reach_color{1, 1, 1, 1} : theme->shared_glyph);
+                                feedback ? reach_color{1, 1, 1, 1} : theme->text.primary);
     if (feedback)
         reach_render_command_buffer_end_group(commands);
 }

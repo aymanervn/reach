@@ -79,9 +79,9 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
     int32_t results_attached = model->result_count > 0 || error_row_visible || rows_held ? 1 : 0;
     auto bounds = reach_launcher_body_motion(layout, &input->body_height);
     reach_result result = reach_ui_motion_background_render(
-        out_commands, &bounds, launcher_radius, border_thickness, theme->launcher_search_background,
-        theme->launcher_border, &theme->popup_shadow, input->dpi_scale,
-        UINT64_C(0x2900000000040000), 0, theme->glass);
+        out_commands, &bounds, launcher_radius, border_thickness, theme->surface.base,
+        theme->border, &theme->shadow, input->dpi_scale, UINT64_C(0x2900000000040000), 0,
+        theme->glass);
     reach_render_command command = {};
     if (result != REACH_OK)
     {
@@ -102,9 +102,9 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
         command.text_weight =
             model->query[0] == 0 ? REACH_TEXT_WEIGHT_SEMIBOLD : REACH_TEXT_WEIGHT_NORMAL;
         command.text_alignment = input->text_alignment_leading;
-        command.text_color = theme->launcher_search_text;
-        command.placeholder_color = theme->launcher_search_placeholder_text;
-        command.selection_color = theme->accent_selection_overlay;
+        command.text_color = theme->text.primary;
+        command.placeholder_color = theme->text.tertiary;
+        command.selection_color = theme->accent.selection;
         command.caret_index = input->caret_index;
         command.caret_visible = input->caret_visible;
         command.selection_start = input->selection_start;
@@ -125,7 +125,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
     command.rect.width = layout->search_icon.width;
     command.rect.height = layout->search_icon.height;
     command.icon_id = REACH_VECTOR_ICON_SEARCH;
-    command.color = theme->launcher_search_text;
+    command.color = theme->text.primary;
     reach_render_command_buffer_push(out_commands, &command);
 
     if (results_attached)
@@ -174,8 +174,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
         scrollbar.parent_id = viewport.id;
         scrollbar.opacity = &opacity;
         result = reach_scroll_view_push_scrollbar(
-            input->scroll, layout->bounds,
-            {theme->launcher_scrollbar_track, theme->launcher_scrollbar_thumb}, &scrollbar,
+            input->scroll, layout->bounds, {theme->fill.primary, theme->text.secondary}, &scrollbar,
             reach_motion_now_seconds(), out_commands);
         if (result != REACH_OK)
             return result;
@@ -192,7 +191,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
             pill.bounds = {0, 0, fmaxf(1, ceilf(width)), fmaxf(1, ceilf(height))};
             pill.opacity = opacity;
             result = reach_render_push_rect_motion(out_commands, &pill, &input->selection,
-                                                   row_selected_radius, theme->accent_fill);
+                                                   row_selected_radius, theme->accent.fill);
             if (result != REACH_OK)
                 return result;
         }
@@ -212,7 +211,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
             placement.bounds = hover;
             placement.parent_id = content_id;
             result = reach_ui_feedback_render(out_commands, UINT64_C(0x2900000000060030), hover,
-                                              row_selected_radius, theme->accent_fill,
+                                              row_selected_radius, theme->accent.fill,
                                               &input->hover_opacity, &placement);
             if (result != REACH_OK)
                 return result;
@@ -260,7 +259,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
                 command.rect.y = icon_y - row_fallback_icon_padding;
                 command.rect.width = icon_size + row_fallback_icon_padding * 2.0f;
                 command.rect.height = icon_size + row_fallback_icon_padding * 2.0f;
-                command.color = theme->launcher_row_icon_background;
+                command.color = theme->surface.item;
                 command.radius = row_fallback_icon_radius;
                 reach_render_command_buffer_push(out_commands, &command);
 
@@ -270,7 +269,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
                 command.rect.y = icon_y;
                 command.rect.width = icon_size;
                 command.rect.height = icon_size;
-                command.color = theme->launcher_row_icon_glyph;
+                command.color = theme->text.secondary;
                 command.icon_id = reach_launcher_fallback_icon(row_result.visual_kind);
                 reach_render_command_buffer_push(out_commands, &command);
             }
@@ -281,7 +280,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
             command.rect.y = row_y + row_title_y;
             command.rect.width = row_width - row_text_x - row_text_right_padding;
             command.rect.height = row_title_height;
-            command.color = selected ? theme->launcher_row_selected_text : theme->launcher_row_text;
+            command.color = selected ? theme->text.primary : theme->text.primary;
             command.text_size = row_title_size;
             command.text_weight = REACH_TEXT_WEIGHT_SEMIBOLD;
             command.text_alignment = input->text_alignment_leading;
@@ -297,8 +296,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
                     return REACH_INVALID_ARGUMENT;
                 title.opacity = row.opacity;
                 title.y = offset;
-                reach_ui_color_feedback_apply(&title, theme->launcher_row_text,
-                                              theme->launcher_row_selected_text,
+                reach_ui_color_feedback_apply(&title, theme->text.primary, theme->text.primary,
                                               &input->row_selected[slot]);
                 command.color = {1.0f, 1.0f, 1.0f, 1.0f};
                 result = reach_render_retain_commands(out_commands, first, row_id + 1, content_id,
@@ -321,7 +319,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
             command.rect.y = row_y + row_path_y;
             command.rect.width = row_width - row_text_x - row_text_right_padding;
             command.rect.height = row_path_height;
-            command.color = theme->launcher_row_secondary_text;
+            command.color = theme->text.secondary;
             command.text_size = row_path_size;
             command.text_alignment = input->text_alignment_leading;
             command.text_ellipsis = 1;
@@ -342,7 +340,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
             placement.bounds = press;
             placement.parent_id = content_id;
             result = reach_ui_feedback_render(out_commands, UINT64_C(0x2900000000060031), press,
-                                              row_selected_radius, theme->launcher_pressed_overlay,
+                                              row_selected_radius, theme->pressed_overlay,
                                               &input->press_feedback, &placement);
             if (result != REACH_OK)
                 return result;
@@ -361,7 +359,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
             command.rect.y = row_y + row_title_y;
             command.rect.width = row_width;
             command.rect.height = row_title_height;
-            command.color = theme->launcher_row_text;
+            command.color = theme->text.primary;
             command.text_size = row_title_size;
             command.text_weight = REACH_TEXT_WEIGHT_SEMIBOLD;
             command.text_alignment = REACH_TEXT_ALIGNMENT_CENTER;
@@ -375,7 +373,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
             command.rect.y = row_y + row_path_y;
             command.rect.width = row_width;
             command.rect.height = row_path_height;
-            command.color = theme->launcher_row_secondary_text;
+            command.color = theme->text.secondary;
             command.text_size = row_path_size;
             command.text_alignment = REACH_TEXT_ALIGNMENT_CENTER;
             command.text_ellipsis = 1;

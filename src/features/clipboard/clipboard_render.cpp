@@ -475,8 +475,8 @@ static reach_result reach_clipboard_push_row(const reach_clipboard_render_input 
     reach_motion_set(&card_bounds.height, card.height);
     commands->current_group_id = id;
     result = reach_ui_bordered_motion_color_feedback_render(
-        commands, id + 1, &card_bounds, item_radius, border_thickness,
-        theme->clipboard_item_background, theme->accent_fill, theme->accent_fill, &hover);
+        commands, id + 1, &card_bounds, item_radius, border_thickness, theme->surface.item,
+        theme->accent.fill, theme->accent.fill, &hover);
     commands->current_group_id = 0;
     if (result != REACH_OK)
         return result;
@@ -499,7 +499,7 @@ static reach_result reach_clipboard_push_row(const reach_clipboard_render_input 
     reach_render_command command = {};
     command.type = REACH_RENDER_COMMAND_RECT;
     command.rect = close_rect;
-    command.color = theme->clipboard_secondary_text;
+    command.color = theme->text.secondary;
     command.color.a = 1;
     command.radius = item_radius;
     reach_motion close_opacity = reach_motion_affine(&hover, metrics.close_button_hover_alpha, 0);
@@ -522,10 +522,10 @@ static reach_result reach_clipboard_push_row(const reach_clipboard_render_input 
                     fmaxf(0.0f, close_rect.width - inset * 2.0f),
                     fmaxf(0.0f, close_rect.height - inset * 2.0f)};
     command.icon_id = REACH_VECTOR_ICON_CLOSE;
-    command.color = theme->clipboard_secondary_text;
+    command.color = theme->text.secondary;
     command.color.a = 1;
-    reach_motion glyph_opacity = reach_motion_affine(
-        &hover, theme->clipboard_secondary_text.a * 0.5f, theme->clipboard_secondary_text.a * 0.5f);
+    reach_motion glyph_opacity =
+        reach_motion_affine(&hover, theme->text.secondary.a * 0.5f, theme->text.secondary.a * 0.5f);
     if (!reach_render_retained_command_bounds(&command, &placement.bounds))
         return REACH_ERROR;
     result =
@@ -542,7 +542,7 @@ static reach_result reach_clipboard_push_row(const reach_clipboard_render_input 
     const float text_right =
         content.x + content.width - metrics.close_button_size - metrics.close_button_margin * 2.0f;
     float text_x = content.x + padding;
-    reach_color text_color = theme->clipboard_text;
+    reach_color text_color = theme->text.primary;
     if (item_data->kind == REACH_CLIPBOARD_ITEM_IMAGE && item_data->thumbnail_id != 0)
     {
         const float thumbnail_height = fminf(metrics.thumbnail_height, content.height);
@@ -575,7 +575,7 @@ static reach_result reach_clipboard_push_row(const reach_clipboard_render_input 
                 return result;
         }
         text_x = image.x + image.width + metrics.thumbnail_text_gap;
-        text_color = theme->clipboard_secondary_text;
+        text_color = theme->text.secondary;
     }
 
     reach_rect_f32 text_rect = {text_x, content.y + padding, fmaxf(0.0f, text_right - text_x),
@@ -635,9 +635,8 @@ reach_result reach_clipboard_build_render_commands(const reach_clipboard_render_
     reach_rect_motion background = frame.panel;
     reach_motion_set(&background.y, 0.0f);
     result = reach_ui_motion_background_render(
-        commands, &background, radius, border_thickness, theme->clipboard_background,
-        theme->clipboard_border, &theme->popup_shadow, input->dpi_scale,
-        UINT64_C(0x7200000000000000), anchor.id, theme->glass);
+        commands, &background, radius, border_thickness, theme->surface.base, theme->border,
+        &theme->shadow, input->dpi_scale, UINT64_C(0x7200000000000000), anchor.id, theme->glass);
     if (result != REACH_OK)
         return result;
     reach_render_group interior = {};
@@ -678,7 +677,7 @@ reach_result reach_clipboard_build_render_commands(const reach_clipboard_render_
     reach_render_command command = {};
     command.type = REACH_RENDER_COMMAND_TEXT;
     command.rect = reach_clipboard_local(layout->title, origin);
-    command.color = theme->clipboard_text;
+    command.color = theme->text.primary;
     command.text_size = metrics.title_font_size;
     command.text_weight = metrics.title_font_weight;
     command.text_alignment = input->text_alignment_leading;
@@ -696,7 +695,7 @@ reach_result reach_clipboard_build_render_commands(const reach_clipboard_render_
         command = {};
         command.type = REACH_RENDER_COMMAND_TEXT;
         command.rect = reach_clipboard_local(empty_text_rect, origin);
-        command.color = theme->clipboard_empty_text;
+        command.color = theme->text.secondary;
         command.text_size = metrics.items_font_size;
         command.text_alignment = REACH_TEXT_ALIGNMENT_CENTER;
         reach_copy_utf16(command.text, 260, (const uint16_t *)L"Nothing in the clipboard");
@@ -710,16 +709,14 @@ reach_result reach_clipboard_build_render_commands(const reach_clipboard_render_
         command = {};
         command.type = REACH_RENDER_COMMAND_RECT;
         command.rect = clear_button;
-        command.color = clear_enabled ? theme->clipboard_clear_button_background
-                                      : theme->clipboard_clear_button_disabled_background;
+        command.color = clear_enabled ? theme->fill.secondary : theme->fill.tertiary;
         command.radius = metrics.clear_button_radius;
         result = reach_render_command_buffer_push(commands, &command);
 
         command = {};
         command.type = REACH_RENDER_COMMAND_TEXT;
         command.rect = clear_button;
-        command.color =
-            clear_enabled ? theme->clipboard_secondary_text : theme->clipboard_disabled_text;
+        command.color = clear_enabled ? theme->text.secondary : theme->text.tertiary;
         command.text_size = metrics.items_font_size;
         command.text_alignment = REACH_TEXT_ALIGNMENT_CENTER;
         reach_copy_utf16(command.text, 260, (const uint16_t *)L"Clear");
@@ -748,10 +745,9 @@ reach_result reach_clipboard_build_render_commands(const reach_clipboard_render_
     scrollbar.id = UINT64_C(0x7200000000000028);
     scrollbar.parent_id = viewport.id;
     scrollbar.opacity = &opaque;
-    result = reach_scroll_view_push_scrollbar(
-        &model->scroll, origin,
-        {theme->clipboard_scrollbar_track, theme->clipboard_scrollbar_thumb}, &scrollbar,
-        reach_motion_now_seconds(), commands);
+    result = reach_scroll_view_push_scrollbar(&model->scroll, origin,
+                                              {theme->fill.primary, theme->text.secondary},
+                                              &scrollbar, reach_motion_now_seconds(), commands);
     if (result != REACH_OK)
         return result;
 

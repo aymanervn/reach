@@ -120,7 +120,7 @@ static reach_result reach_screenshot_push_size_label(reach_render_command_buffer
     text.text_size = REACH_TEXT_SIZE_SMALL * scale;
     text.text_weight = REACH_TEXT_WEIGHT_NORMAL;
     text.text_alignment = REACH_TEXT_ALIGNMENT_CENTER;
-    text.color = theme->screenshot_label_text;
+    text.color = theme->text.primary;
     return reach_render_command_buffer_push(commands, &text);
 }
 
@@ -166,7 +166,7 @@ reach_result reach_screenshot_append_render_commands(const reach_screenshot *scr
         return result;
     }
     result = reach_screenshot_push_outline(out_commands, selection, fmaxf(1.0f, roundf(scale)),
-                                           theme->screenshot_selection_border);
+                                           theme->on_color);
     if (result != REACH_OK)
     {
         return result;

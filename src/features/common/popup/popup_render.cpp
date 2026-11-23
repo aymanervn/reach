@@ -331,7 +331,7 @@ static reach_render_command reach_popup_shape(const reach_popup_background_input
 static reach_color reach_popup_background_color(const reach_popup_background_input *input)
 {
     return input->has_background_color_override ? input->background_color_override
-                                                : input->theme->popup_background;
+                                                : input->theme->surface.raised;
 }
 
 static int32_t reach_popup_render_input_valid(const reach_popup_background_input *input,
@@ -353,8 +353,8 @@ reach_result reach_popup_push_background(const reach_popup_background_input *inp
     shape.glass = input->glass;
     reach_color background = reach_popup_background_color(input);
     return reach_render_push_bordered_background(
-        out_commands, &shape, background, input->theme->popup_border,
-        reach_theme_border_thickness(input->theme, input->dpi_scale), &input->theme->popup_shadow,
+        out_commands, &shape, background, input->theme->border,
+        reach_theme_border_thickness(input->theme, input->dpi_scale), &input->theme->shadow,
         input->dpi_scale);
 }
 
@@ -366,7 +366,7 @@ reach_result reach_popup_push_height_background(const reach_popup_background_inp
     if (!reach_popup_render_input_valid(input, out_commands) || height == nullptr ||
         height->generation == 0)
         return REACH_INVALID_ARGUMENT;
-    reach_shadow_pad pad = reach_theme_shadow_pad(&input->theme->popup_shadow, input->dpi_scale);
+    reach_shadow_pad pad = reach_theme_shadow_pad(&input->theme->shadow, input->dpi_scale);
     pad.left = ceilf(pad.left);
     pad.right = ceilf(pad.right);
     pad.top = ceilf(pad.top);
@@ -390,8 +390,8 @@ reach_result reach_popup_push_height_background(const reach_popup_background_inp
         return reach_ui_motion_background_render(
             out_commands, &bounds, shape.radius,
             reach_theme_border_thickness(input->theme, input->dpi_scale), background,
-            input->theme->popup_border, &input->theme->popup_shadow, input->dpi_scale,
-            first_group_id, parent_id, input->glass);
+            input->theme->border, &input->theme->shadow, input->dpi_scale, first_group_id,
+            parent_id, input->glass);
     }
     auto commands = std::unique_ptr<reach_render_command_buffer>(new (std::nothrow)
                                                                      reach_render_command_buffer());
@@ -403,7 +403,7 @@ reach_result reach_popup_push_height_background(const reach_popup_background_inp
     source.bounds = {-pad.left, -pad.top, ceilf(input->bounds.width + pad.left + pad.right), 0};
     reach_popup_background_input shape = *input;
     float radius = reach_popup_radius_scaled(input->theme, input->dpi_scale);
-    float extent = reach_theme_shadow_extent(&input->theme->popup_shadow, input->dpi_scale);
+    float extent = reach_theme_shadow_extent(&input->theme->shadow, input->dpi_scale);
     float notch = reach_popup_notch_height_scaled(input->dpi_scale);
     reach_render_stretch stretch = {};
     stretch.top =
@@ -569,14 +569,14 @@ reach_result reach_popup_push_width_background(const reach_popup_background_inpu
         return reach_ui_motion_background_render(
             out_commands, &bounds, fmaxf(0, fminf(radius, fminf(rest_width, rest_height) * .5f)),
             reach_theme_border_thickness(input->theme, input->dpi_scale), background,
-            input->theme->popup_border, &input->theme->popup_shadow, input->dpi_scale,
-            first_group_id, parent_id, input->glass);
+            input->theme->border, &input->theme->shadow, input->dpi_scale, first_group_id,
+            parent_id, input->glass);
     }
     auto batch = std::unique_ptr<reach_render_command_buffer>(new (std::nothrow)
                                                                   reach_render_command_buffer());
     if (!batch)
         return REACH_ERROR;
-    float extent = reach_theme_shadow_extent(&input->theme->popup_shadow, input->dpi_scale);
+    float extent = reach_theme_shadow_extent(&input->theme->shadow, input->dpi_scale);
     float notch_width = reach_popup_notch_width_scaled(input->dpi_scale);
     float shape_notch_width = input->hide_notch ? 0.0f : notch_width;
     float clearance =
@@ -588,7 +588,7 @@ reach_result reach_popup_push_width_background(const reach_popup_background_inpu
         reach_motion_max(&center, &near_limit, &center) != REACH_OK ||
         reach_motion_min(&center, &far_limit, &center) != REACH_OK)
         return REACH_INVALID_ARGUMENT;
-    auto pad = reach_theme_shadow_pad(&input->theme->popup_shadow, input->dpi_scale);
+    auto pad = reach_theme_shadow_pad(&input->theme->shadow, input->dpi_scale);
     pad.left = ceilf(pad.left);
     pad.right = ceilf(pad.right);
     pad.top = ceilf(pad.top);
@@ -664,10 +664,10 @@ reach_result reach_popup_push_width_background(const reach_popup_background_inpu
         else
         {
             source.bounds.width = ceilf(fmaxf(maximum, input->bounds.width) + pad.left + pad.right);
-            if (input->theme->popup_shadow.blur > 0 && input->theme->popup_shadow.color.a > 0)
+            if (input->theme->shadow.blur > 0 && input->theme->shadow.color.a > 0)
             {
                 source.has_shadow = 1;
-                source.shadow = input->theme->popup_shadow;
+                source.shadow = input->theme->shadow;
                 source.shadow.offset_x *= input->dpi_scale;
                 source.shadow.offset_y *= input->dpi_scale;
                 source.shadow.blur *= input->dpi_scale;
@@ -684,16 +684,15 @@ reach_result reach_popup_push_width_background(const reach_popup_background_inpu
             float border = reach_theme_border_thickness(input->theme, input->dpi_scale);
             reach_color background = reach_popup_background_color(input);
             background.a = 1;
-            reach_color outer = border > 0 && input->theme->popup_border.a > 0
-                                    ? input->theme->popup_border
-                                    : background;
+            reach_color outer =
+                border > 0 && input->theme->border.a > 0 ? input->theme->border : background;
             outer.a = 1;
             if (result == REACH_OK)
                 result = reach_popup_motion_shape(batch.get(), 0, first_group_id + 4, *width,
                                                   center, input->bounds.height, 0, radius,
                                                   shape_notch_width, notch_height,
                                                   input->notch_side, outer, input->bounds.width);
-            if (result == REACH_OK && border > 0 && input->theme->popup_border.a > 0)
+            if (result == REACH_OK && border > 0 && input->theme->border.a > 0)
                 result = reach_popup_motion_shape(
                     batch.get(), 0, first_group_id + 7, *width, center, input->bounds.height,
                     border, radius, shape_notch_width, notch_height, input->notch_side, background,

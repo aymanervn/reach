@@ -81,9 +81,9 @@ const reach_shadow *reach_host_surface_shadow(const reach_host *host, reach_surf
     switch (runtime->definition->surface.shadow)
     {
     case REACH_SURFACE_SHADOW_BAR:
-        return &theme->bar_shadow;
+        return &theme->shadow;
     case REACH_SURFACE_SHADOW_POPUP:
-        return &theme->popup_shadow;
+        return &theme->shadow;
     default:
         return nullptr;
     }

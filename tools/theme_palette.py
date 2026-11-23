@@ -51,9 +51,9 @@ ACCENT_STRENGTHS = [
 
 # (name, dark opacity, light opacity): fill strengths applied to FILL behind content.
 FILL_STRENGTHS = [
-    ("SECONDARY", 0.32, 0.16),
-    ("TERTIARY", 0.24, 0.12),
-    ("QUATERNARY", 0.18, 0.08),
+    ("PRIMARY", 0.32, 0.16),
+    ("SECONDARY", 0.24, 0.12),
+    ("TERTIARY", 0.18, 0.08),
 ]
 
 # (family, hue, deep (L, C), bright (L, C), ink (L, C)). Fills use deep in dark mode and bright in

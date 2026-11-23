@@ -84,170 +84,100 @@ extern "C"
         float ceiling;
     } reach_glass;
 
+    // Panels by elevation, each with its own dark and light value.
+    typedef struct reach_theme_surfaces
+    {
+        reach_color base;
+        reach_color raised;
+        reach_color card;
+        reach_color item;
+        reach_color well;
+    } reach_theme_surfaces;
+
+    // Text strengths; shapes that read like glyphs use them too. inverse is the other mode's
+    // primary.
+    typedef struct reach_theme_text
+    {
+        reach_color primary;
+        reach_color secondary;
+        reach_color tertiary;
+        reach_color quaternary;
+        reach_color inverse;
+    } reach_theme_text;
+
+    // Areas behind content: tracks (primary), controls (secondary), disabled controls (tertiary).
+    typedef struct reach_theme_fills
+    {
+        reach_color primary;
+        reach_color secondary;
+        reach_color tertiary;
+    } reach_theme_fills;
+
+    typedef struct reach_theme_status
+    {
+        reach_color success;
+        reach_color error;
+    } reach_theme_status;
+
+    // Resolved from the chosen preset by reach_theme_resolve. tint_amount is the share of accent
+    // text a selected control blends into its background.
+    typedef struct reach_theme_accent
+    {
+        reach_color fill;
+        reach_color text;
+        reach_color tint;
+        reach_color selection;
+        reach_color faint;
+        reach_color text_tint;
+        reach_color text_muted;
+        float tint_amount;
+    } reach_theme_accent;
+
     typedef struct reach_theme
     {
         reach_theme_mode mode;
         reach_glass glass;
 
-        reach_color dock_background;
-        reach_color top_bar_background;
+        reach_theme_surfaces surface;
+        reach_theme_text text;
+        reach_theme_fills fill;
+        reach_color border;
+        reach_color divider;
+        // Glyphs, knobs and text drawn on colored or dimmed fills.
+        reach_color on_color;
+        reach_color danger;
+        reach_color pressed_overlay;
+        reach_color artwork_scrim;
+        reach_theme_status status;
+        reach_theme_accent accent;
+        reach_shadow shadow;
+
+        // Consumer exceptions: values no semantic role covers.
         reach_color top_bar_scrim;
-        reach_color switcher_background;
-        reach_color shared_border;
-        reach_shadow bar_shadow;
-        reach_color popup_background;
-        reach_color bar_popup_background;
-        reach_color popup_border;
-        reach_color widgets_background;
-        reach_color widgets_border;
-        reach_color widgets_unavailable_text;
-        reach_color widgets_resize_grip_fill;
-        reach_color widgets_artwork_overlay;
-        reach_color popup_divider;
-        reach_color popup_glass_divider;
-        reach_color system_hud_background;
-        reach_color system_hud_border;
-        reach_color system_hud_text;
-        reach_color system_hud_secondary_text;
-        reach_color system_hud_icon_background;
-        reach_color system_hud_glyph;
-        reach_color system_hud_track;
-        reach_color system_hud_muted_fill;
-        reach_color toggle_off_track;
-        reach_color toggle_knob;
-        reach_shadow popup_shadow;
-        reach_shadow widgets_shadow;
-
-        reach_color shared_text;
-        reach_color settings_window_button_glyph;
-
-        reach_color dock_fallback_icon_background;
-        reach_color shared_glyph;
-        reach_color bar_fallback_icon_text;
-        reach_color top_bar_text;
-        reach_color top_bar_secondary_text;
-        reach_color shared_button_background;
-        reach_color top_bar_tray_background;
-        reach_color top_bar_battery_background;
         reach_color top_bar_battery_fill;
         reach_color top_bar_battery_low_fill;
         reach_color top_bar_battery_saver_fill;
         reach_color top_bar_battery_charging_fill;
-        reach_color battery_pressed_overlay;
         reach_color top_bar_cpu_text;
         reach_color top_bar_memory_text;
         reach_color top_bar_download_text;
         reach_color top_bar_upload_text;
-        reach_color bar_pressed_background;
-        reach_color top_bar_separator_fill;
-
-        reach_color quick_settings_slider_track;
-        reach_color quick_settings_slider_muted_fill;
-        reach_color quick_settings_button_background;
-        reach_color quick_settings_secondary_text;
-        reach_color quick_settings_toggle_off_track;
-        reach_color quick_settings_scrollbar_track;
-        reach_color quick_settings_scrollbar_thumb;
-        reach_color quick_settings_section_text;
-        reach_color quick_settings_toggle_divider;
-        reach_color quick_settings_pressed_overlay;
-
-        reach_color now_playing_background;
-        reach_color system_hud_artwork_overlay;
-        reach_color now_playing_title_text;
-        reach_color now_playing_control_glyph;
-        reach_color now_playing_control_disabled_glyph;
-
-        reach_color launcher_search_background;
-        reach_color launcher_search_text;
-        reach_color launcher_search_placeholder_text;
-        reach_color launcher_border;
-        reach_color launcher_scrollbar_track;
-        reach_color launcher_scrollbar_thumb;
-        reach_color launcher_row_icon_background;
-        reach_color launcher_row_icon_glyph;
-        reach_color launcher_row_text;
-        reach_color launcher_row_selected_text;
-        reach_color launcher_row_secondary_text;
-        reach_color launcher_pressed_overlay;
-
-        reach_color switcher_label_text;
-
-        reach_color context_menu_text;
-        reach_color context_menu_preview_background;
-        reach_color context_menu_close_background;
-        reach_color context_menu_close_glyph;
-
-        reach_color stage_background;
-        reach_color stage_tile_placeholder_background;
-        reach_color stage_tile_text;
-        reach_color stage_tile_header_background;
-        reach_color stage_close_background;
-        reach_color stage_close_hover_background;
-        reach_color stage_close_glyph;
-        reach_color stage_close_hover_glyph;
-
-        reach_color clipboard_background;
-        reach_color clipboard_border;
-        reach_color clipboard_text;
-        reach_color clipboard_secondary_text;
-        reach_color clipboard_disabled_text;
-        reach_color clipboard_empty_text;
-        reach_color clipboard_item_background;
-        reach_color clipboard_clear_button_background;
-        reach_color clipboard_clear_button_disabled_background;
-        reach_color clipboard_scrollbar_track;
-        reach_color clipboard_scrollbar_thumb;
-
-        reach_color screenshot_scrim;
-        reach_color screenshot_selection_border;
-        reach_color screenshot_label_background;
-        reach_color screenshot_label_text;
-
-        reach_color settings_background;
-        reach_color settings_nav_background;
-        reach_color settings_text;
-        reach_color settings_secondary_text;
-        reach_color settings_tertiary_text;
-        reach_color settings_card_background;
-        reach_color settings_pill_background;
-        reach_color settings_icon_box_background;
-        reach_color settings_segmented_control_background;
-        reach_color settings_input_background;
-        reach_color settings_divider;
-        reach_color settings_toggle_off_track;
-        reach_color settings_toggle_knob;
-        reach_color settings_button_text;
-        reach_color settings_button_danger_text;
-        reach_color settings_button_danger_background;
-        reach_color settings_button_disabled_background;
-        reach_color settings_success_text;
-        reach_color settings_error_text;
-        reach_color settings_window_button_background;
-        reach_color settings_window_close_hover_background;
-        reach_color settings_window_minimize_hover_background;
-        reach_color settings_scrollbar_track;
-        reach_color settings_scrollbar_thumb;
-        reach_color accent_fill;
-        reach_color accent_text;
-        reach_color accent_tint_overlay;
-        reach_color accent_selection_overlay;
+        reach_color dock_fallback_icon_background;
+        reach_color bar_fallback_icon_text;
+        reach_color widgets_artwork_overlay;
         reach_color widgets_accent_background;
-        reach_color widgets_decoration_fill;
-        reach_color widgets_ribbon_fill;
-        reach_color widgets_meter_empty_fill;
-        reach_color widgets_meter_muted_fill;
-        reach_color widgets_section_divider;
-        reach_color widgets_drag_overlay;
-        reach_color widgets_primary_control_background;
-        reach_color widgets_control_background;
+        reach_color stage_background;
+        reach_color stage_tile_header_background;
+        reach_color stage_close_glyph;
+        reach_color screenshot_scrim;
+        reach_color screenshot_label_background;
+        reach_color settings_background;
+        reach_color settings_window_minimize_hover_background;
         reach_color settings_avatar_border;
-        reach_color settings_avatar_placeholder_background;
 
         float radius_small;
         float radius_large;
         float button_pressed_darken;
-        float settings_pill_selected_tint;
         float dock_corner_radius_ratio;
         float border_thickness;
         float icon_box_height_ratio;

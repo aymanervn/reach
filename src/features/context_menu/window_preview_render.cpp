@@ -87,7 +87,7 @@ reach_result reach_context_menu_render_previews(reach_context_menu *menu,
     popup.notch_side = reach_popup_notch_side(state.drop_direction);
     popup.dpi_scale = scale;
     popup.hide_notch = 1;
-    popup.background_color_override = theme->context_menu_preview_background;
+    popup.background_color_override = theme->surface.base;
     popup.has_background_color_override = 1;
     popup.glass = theme->glass;
     if (result == REACH_OK)
@@ -108,7 +108,7 @@ reach_result reach_context_menu_render_previews(reach_context_menu *menu,
         reach_render_command text = {};
         text.type = REACH_RENDER_COMMAND_TEXT;
         text.rect = {0, 0, ceilf(layout.label_width) + 1, layout.label_height};
-        text.color = theme->context_menu_text;
+        text.color = theme->text.primary;
         text.text_size = REACH_TEXT_SIZE_XSMALL * scale;
         text.text_weight = REACH_TEXT_WEIGHT_NORMAL;
         text.text_alignment = REACH_TEXT_ALIGNMENT_CENTER;
@@ -185,7 +185,7 @@ reach_result reach_context_menu_render_previews(reach_context_menu *menu,
             reach_render_command text = {};
             text.type = REACH_RENDER_COMMAND_TEXT;
             text.rect = {8 * card_scale, 0, title_maximum, header};
-            text.color = theme->context_menu_text;
+            text.color = theme->text.primary;
             text.text_size = REACH_TEXT_SIZE_XSMALL * card_scale;
             text.text_weight = REACH_TEXT_WEIGHT_NORMAL;
             text.text_alignment = REACH_TEXT_ALIGNMENT_LEADING;
@@ -218,10 +218,9 @@ reach_result reach_context_menu_render_previews(reach_context_menu *menu,
         reach_motion_set(&close.y, close_rect.y);
         reach_motion_set(&close.width, close_rect.width);
         reach_motion_set(&close.height, close_rect.height);
-        result = reach_preview_fill(
-            out, card.render_id + 8, reveal.id, close, close_rect.width, close_rect.height,
-            close_radius, reach_theme_color_alpha(theme->context_menu_close_background, 1),
-            &opacity);
+        result = reach_preview_fill(out, card.render_id + 8, reveal.id, close, close_rect.width,
+                                    close_rect.height, close_radius,
+                                    reach_theme_color_alpha(theme->danger, 1), &opacity);
         reach_motion glyph_x = {}, glyph_y = {}, glyph_size = {};
         reach_motion_set(&glyph_x, glyph_rect.x);
         reach_motion_set(&glyph_y, glyph_rect.y);
@@ -229,7 +228,7 @@ reach_result reach_context_menu_render_previews(reach_context_menu *menu,
         if (result == REACH_OK)
             result = reach_preview_icon(out, card.render_id + 10, reveal.id, glyph_x, glyph_y,
                                         glyph_size, glyph, REACH_RENDER_COMMAND_VECTOR_ICON,
-                                        REACH_VECTOR_ICON_CLOSE, theme->context_menu_close_glyph);
+                                        REACH_VECTOR_ICON_CLOSE, theme->on_color);
         if (result != REACH_OK)
             return result;
     }

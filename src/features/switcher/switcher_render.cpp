@@ -51,8 +51,8 @@ reach_result reach_switcher_append_render_commands(reach_switcher *switcher,
     reach_motion_set(&chrome.y, 0);
     if (result == REACH_OK)
         result = reach_ui_motion_background_render(
-            out_commands, &chrome, theme->radius_large * scale, border, theme->switcher_background,
-            theme->shared_border, &theme->popup_shadow, scale, 8, body.id, theme->glass);
+            out_commands, &chrome, theme->radius_large * scale, border, theme->surface.base,
+            theme->border, &theme->shadow, scale, 8, body.id, theme->glass);
     if (result != REACH_OK)
         return result;
     float card_scale = layout.card_scale > 0 ? layout.card_scale : scale;
@@ -91,7 +91,7 @@ reach_result reach_switcher_append_render_commands(reach_switcher *switcher,
         pill.bounds = {0, 0, fmaxf(1, ceilf(width)), fmaxf(1, ceilf(height))};
         if (result == REACH_OK)
             result = reach_render_push_rect_motion(out_commands, &pill, &layout.selection,
-                                                   pill_radius, theme->accent_fill);
+                                                   pill_radius, theme->accent.fill);
         if (result != REACH_OK)
             return result;
     }
@@ -180,7 +180,7 @@ reach_result reach_switcher_append_render_commands(reach_switcher *switcher,
         reach_render_command text = {};
         text.type = REACH_RENDER_COMMAND_TEXT;
         text.rect = viewport.bounds;
-        text.color = theme->switcher_label_text;
+        text.color = theme->text.primary;
         text.text_weight = REACH_TEXT_WEIGHT_DEMIBOLD;
         text.text_alignment = REACH_TEXT_ALIGNMENT_CENTER;
         text.text_ellipsis = 1;
