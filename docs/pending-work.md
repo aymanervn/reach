@@ -4,6 +4,8 @@ Open items only.
 
 ## Needs the user's decision
 
+- Palette merges (`tools/theme_palette.py`): `PURE_WHITE` = `LIGHT_BASE`; near-identical `DARK_RAISED`/`DARK_STRUCTURE`, `DARK_MID_CONTRAST_GRAY`/`LIGHT_EDGE_ON_BASE`, `DARK_EDGE_ON_BASE`/`LIGHT_MID_CONTRAST_GRAY`; neutral tint drifts (dark surfaces green, edges gray, `LIGHT_EDGE_ON_BASE` blue); deep/bright hues drift by 3-7°; 14 overlay and text alpha strengths.
+- Accent ladder: accent-derived strengths are still literals in features (`widgets_feature.cpp:892,905,962,964,1071,1491`, `ui_controls.cpp:449-450`, `settings_render.cpp:122`). Choose a few accent roles derived in `reach_theme_resolve`, then tokenize them.
 - Glass contrast tiers: primary text 4.5:1, secondary text 3:1 against the glass bound (`REACH_THEME_GLASS_*_CONTRAST`, `reach_theme_glass_limit` in `theme.c`). Secondary at 4.5:1 would stop light glass at gray 241 (nearly opaque).
 
 ## Bugs
@@ -82,7 +84,9 @@ Open items only.
 - A copy-pasted "push a text command" helper in five features; shell-thumbnail and string-copy helpers duplicated across adapters.
 - `take` means opposite things on two adjacently named services.
 - Quick Settings copies about 20 KB by value per frame for its render input.
-- Accent preset follow-ups, until wallpaper accent work starts.
+- Accent preset follow-ups, until wallpaper accent work starts. The album-art accent keeps its own sRGB lightness clamp and alphas (`media_controls_win32.cpp:256-274`, `top_bar_now_playing.cpp:331`); move it to OKLCH with that work.
+- Clipboard's close glyph hover opacity range is a literal (`clipboard_render.cpp:528`).
+- Window thumbnails fall back to literal black when no background is set (`window_thumbnail_dwm.cpp:69`).
 - Color feedback ignores the ambient parent group (harmless today).
 - Screenshot: GDI capture is not HDR-aware, freezes all monitors in memory, and puts only `CF_DIB` on the clipboard.
 - Bluetooth "connect" for an already-paired device is not implemented (accepted scope).
