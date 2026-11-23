@@ -1019,8 +1019,7 @@ static void reach_widgets_meter(reach_render_command_buffer *commands, const rea
     if (!available && detail != nullptr && !show_labeled_percentage)
     {
         reach_widgets_text(commands, track, (const uint16_t *)u"—", REACH_TEXT_SIZE_SMALL * scale,
-                           REACH_TEXT_WEIGHT_SEMIBOLD,
-                           reach_theme_color_alpha(theme->primary_text, 0.55f),
+                           REACH_TEXT_WEIGHT_SEMIBOLD, theme->widget_unavailable_text,
                            REACH_TEXT_ALIGNMENT_CENTER);
         return;
     }
@@ -1168,7 +1167,7 @@ static void reach_widgets_resize_grip(reach_render_command_buffer *commands,
 {
     reach_widgets_rect(commands,
                        {grip.x + 4.0f * scale, grip.y + 10.0f * scale, 11.0f * scale, 2.0f * scale},
-                       scale, reach_theme_color_alpha(theme->primary_text, 0.28f));
+                       scale, theme->widget_resize_grip);
 }
 
 static void reach_widgets_footer_button(reach_render_command_buffer *commands,
@@ -1515,8 +1514,7 @@ reach_result reach_widgets_render_desktop(const reach_widgets *widgets, const re
             artwork.radius = inner_radius;
             artwork.blur = REACH_NOW_PLAYING_ARTWORK_BLUR;
             artwork.cover_image_id = widgets->media_snapshot.cover_image_id;
-            artwork.overlay = actual->widget_background;
-            artwork.overlay.a = 0.48f;
+            artwork.overlay = actual->widget_artwork_overlay;
             (void)reach_now_playing_artwork_build_render_commands(&artwork, commands);
         }
         reach_widgets_decorate(commands, inner, inner_radius, actual->accent);

@@ -100,6 +100,9 @@ extern "C"
         reach_color popup_border;
         reach_color widget_background;
         reach_color widget_border;
+        reach_color widget_unavailable_text;
+        reach_color widget_resize_grip;
+        reach_color widget_artwork_overlay;
         reach_color popup_separator;
         reach_color glass_popup_separator;
         reach_color system_hud_background;
