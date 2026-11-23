@@ -60,7 +60,6 @@ Open items only.
 - The tray capsule still exists. Move tray data into a tray service owned by the Top Bar.
 - The tray menu cancellation contract is unused.
 - Nested corners are not migrated in Battery saver rows, Clipboard, Switcher and Settings cards. `launcher_state.cpp:183` repeats the highlight inset.
-- Every scroll surface owns an identical pair of scrollbar theme tokens.
 - Consumers that read `.to` on composed motions need review.
 - Clipboard preview keeps its own line splitter until the render port supports wrapping (`render_d2d_text.cpp:187`).
 

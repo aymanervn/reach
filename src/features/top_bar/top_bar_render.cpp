@@ -159,9 +159,9 @@ static void reach_top_bar_push_power_button(const reach_top_bar_render_input *in
 
     if (input->click_feedback_index == REACH_TOP_BAR_FEEDBACK_POWER_BUTTON)
     {
-        (void)reach_ui_feedback_render(
-            commands, REACH_TOP_BAR_FEEDBACK_GROUP_ID, power_box, power_box.height * 0.5f,
-            reach_theme_color_alpha(theme->surface.item, 1.0f), input->click_feedback, nullptr);
+        (void)reach_ui_feedback_render(commands, REACH_TOP_BAR_FEEDBACK_GROUP_ID, power_box,
+                                       power_box.height * 0.5f, theme->surface.item,
+                                       input->click_feedback, nullptr);
     }
 }
 
