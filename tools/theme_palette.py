@@ -1,7 +1,7 @@
 """Reach color palette, authored in OKLCH.
 
 Writes src/core/theme_palette.h, the sRGB macros that the theme tables in theme.c use.
-Edit PALETTE, then run this script. `--check` only reports whether the header is stale.
+Edit NEUTRAL_TINT, NEUTRALS or PALETTE, then run this script. `--check` only reports whether the header is stale.
 """
 
 from __future__ import annotations
@@ -13,20 +13,32 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 HEADER = ROOT / "src" / "core" / "theme_palette.h"
 
+# Chroma and hue shared by every neutral step. White stays untinted to remain inside sRGB.
+NEUTRAL_TINT = (0.004, 285)
+
+# (name, L): neutral steps by OKLCH lightness, tuned by eye.
+NEUTRALS = [
+    ("DARK_SURFACE_BASE", 0.181),
+    ("DARK_SURFACE_RAISED", 0.238),
+    ("DARK_SURFACE_ELEVATED", 0.262),
+    ("DARK_SURFACE_CONTROL", 0.296),
+    ("DARK_DIVIDER", 0.267),
+    ("DARK_BORDER", 0.519),
+    ("LIGHT_SURFACE_BASE", 1.000),
+    ("LIGHT_SURFACE_RAISED", 0.970),
+    ("LIGHT_SURFACE_ELEVATED", 0.952),
+    ("LIGHT_SURFACE_CONTROL", 0.894),
+    ("LIGHT_DIVIDER", 0.952),
+    ("LIGHT_BORDER", 0.675),
+]
+
 # (name, L, C, h): OKLCH lightness 0-1, chroma, hue in degrees.
 PALETTE = [
     ("PURE_WHITE", 1.000, 0.000, 0),
     ("PURE_BLACK", 0.000, 0.000, 0),
     ("CRITICAL_RED", 0.592, 0.193, 25.3),
-    ("DARK_DEEP", 0.181, 0.003, 145),
-    ("DARK_BASE", 0.238, 0.002, 145),
-    ("DARK_RAISED", 0.257, 0.005, 145),
-    ("DARK_STRUCTURE", 0.267, 0.002, 146),
-    ("DARK_MIDTONE", 0.296, 0.002, 146),
     ("DARK_MID_CONTRAST_GRAY", 0.671, 0.004, 146),
     ("DARK_HIGH_CONTRAST_WHITE", 0.842, 0.000, 0),
-    ("DARK_EDGE_ON_DEEP", 0.507, 0.000, 0),
-    ("DARK_EDGE_ON_BASE", 0.531, 0.000, 0),
     ("BRIGHT_BLUE", 0.667, 0.179, 255.5),
     ("BRIGHT_CYAN", 0.7396, 0.1404, 233.9),
     ("BRIGHT_TEAL", 0.770, 0.109, 210.4),
@@ -40,13 +52,8 @@ PALETTE = [
     ("DARK_BATTERY_GREEN", 0.530, 0.130, 151),
     ("DARK_BATTERY_YELLOW", 0.5211, 0.1057, 79.7),
     ("DARK_BATTERY_RED", 0.512, 0.155, 24.5),
-    ("LIGHT_BASE", 1.000, 0.000, 0),
-    ("LIGHT_RAISED", 0.970, 0.001, 106),
-    ("LIGHT_STRUCTURE", 0.952, 0.001, 106),
-    ("LIGHT_MIDTONE", 0.894, 0.000, 0),
     ("LIGHT_MID_CONTRAST_GRAY", 0.540, 0.003, 129),
     ("LIGHT_HIGH_CONTRAST_BLACK", 0.197, 0.012, 145),
-    ("LIGHT_EDGE_ON_BASE", 0.675, 0.006, 248),
     ("DEEP_BLUE", 0.520, 0.185, 260.5),
     ("DEEP_CYAN", 0.571, 0.123, 239),
     ("DEEP_TEAL", 0.552, 0.089, 210),
@@ -101,7 +108,9 @@ def render() -> str:
         "#define REACH_RGB8(r, g, b, a) {(r) / 255.0f, (g) / 255.0f, (b) / 255.0f, (a)}",
         "",
     ]
-    for name, lightness, chroma, hue in PALETTE:
+    chroma, hue = NEUTRAL_TINT
+    neutrals = [(name, lightness, chroma if lightness < 1 else 0, hue) for name, lightness in NEUTRALS]
+    for name, lightness, chroma, hue in neutrals + PALETTE:
         r, g, b = oklch_to_rgb8(name, lightness, chroma, hue)
         lines.append(f"#define REACH_{name}(a) REACH_RGB8({r}, {g}, {b}, a)")
     lines += ["", "#endif", ""]
