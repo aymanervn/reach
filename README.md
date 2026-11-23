@@ -35,7 +35,7 @@ Reach replaces Windows Explorer, nothing gets deleted, only an entry in the regi
 - Animations run at your screen's max refresh rate and drop to 60fps when battery saver is on
 - Keyboard language switch button
 - Hovering the top of the screen pulls down the topbar and moves full screen window further below in a smooth animation
-- Built to never visibly break: if the GPU driver resets, Reach recovers in place and stays on the GPU. If Reach itself crashes, a watchdog quietly restarts it, and only falls back to Explorer if it keeps crashing
+- Built to never visibly break: if the GPU driver resets, Reach recovers in place and stays on the GPU. If Reach itself crashes, Windows restarts it right away, and Reach falls back to Explorer only if a version keeps crashing on start
 - No idle CPU usage, and very low usage overrall. base memory usage depends on the number of monitors, clipboard size and the number of apps on dock
 
 
@@ -63,12 +63,7 @@ Run as admin:
 ./reachctl --install
 ```
 
-This configures Windows to launch Reach instead of Explorer, effective starting from the next Windows session.
-Then, to start Reach immediately for your current session, run:
-
-```powershell
-./reachctl --start
-```
+This configures Windows to launch Reach instead of Explorer. Sign out and back in to start Reach.
 
 You also need the retriever service installed and running to use the launcher feature.
 

@@ -13,96 +13,56 @@ static void expect(int condition, const char *message)
     }
 }
 
-static void test_restart_delays_then_fallback_on_the_third_exit(void)
+static void test_third_start_inside_the_window_is_a_loop(void)
 {
     reach_crash_loop loop = {};
-    reach_crash_loop_decision first = reach_crash_loop_record_exit(&loop, 1000);
-    expect(first.action == REACH_CRASH_LOOP_RESTART && first.delay_ms == 0 &&
-               first.window_count == 1,
-           "the first unexpected exit restarts immediately");
-
-    reach_crash_loop_decision second = reach_crash_loop_record_exit(&loop, 2000);
-    expect(second.action == REACH_CRASH_LOOP_RESTART && second.delay_ms == 1000 &&
-               second.window_count == 2,
-           "the second unexpected exit restarts after one second");
-
-    reach_crash_loop_decision third = reach_crash_loop_record_exit(&loop, 3000);
-    expect(third.action == REACH_CRASH_LOOP_FALLBACK && third.window_count == 3,
-           "the third unexpected exit inside the window falls back");
+    expect(!reach_crash_loop_record_start(&loop, 1000), "the first start is never a loop");
+    expect(!reach_crash_loop_record_start(&loop, 2000), "the second start is never a loop");
+    expect(reach_crash_loop_record_start(&loop, 3000), "three starts inside the window loop");
 }
 
-static void test_exits_outside_the_window_drop_out(void)
+static void test_a_long_run_breaks_the_loop(void)
 {
     reach_crash_loop loop = {};
-    reach_crash_loop_record_exit(&loop, 0);
-    reach_crash_loop_record_exit(&loop, 10000);
-    reach_crash_loop_decision late = reach_crash_loop_record_exit(&loop, 190000);
-    expect(late.action == REACH_CRASH_LOOP_RESTART && late.window_count == 2 &&
-               late.delay_ms == 1000,
-           "the first exit expired and the other two still count");
-
-    reach_crash_loop_decision spaced = reach_crash_loop_record_exit(&loop, 400000);
-    expect(spaced.action == REACH_CRASH_LOOP_RESTART && spaced.window_count == 1 &&
-               spaced.delay_ms == 0,
-           "isolated exits never accumulate into a fallback");
+    reach_crash_loop_record_start(&loop, 1000);
+    reach_crash_loop_record_start(&loop, 2000);
+    expect(!reach_crash_loop_record_start(&loop, 70000), "a start after a long run is not a loop");
+    expect(!reach_crash_loop_record_start(&loop, 71000),
+           "the oldest kept start is still outside the window");
 }
 
 static void test_window_boundary_is_inclusive(void)
 {
     reach_crash_loop loop = {};
-    reach_crash_loop_record_exit(&loop, 0);
-    reach_crash_loop_record_exit(&loop, 90000);
-    reach_crash_loop_decision edge = reach_crash_loop_record_exit(&loop, 180000);
-    expect(edge.action == REACH_CRASH_LOOP_FALLBACK && edge.window_count == 3,
-           "an exit exactly 180 seconds old still counts");
+    reach_crash_loop_record_start(&loop, 1000);
+    reach_crash_loop_record_start(&loop, 30000);
+    expect(reach_crash_loop_record_start(&loop, 61000), "starts exactly 60 s apart still loop");
 
     reach_crash_loop other = {};
-    reach_crash_loop_record_exit(&other, 0);
-    reach_crash_loop_record_exit(&other, 90000);
-    reach_crash_loop_decision past = reach_crash_loop_record_exit(&other, 180001);
-    expect(past.action == REACH_CRASH_LOOP_RESTART && past.window_count == 2,
-           "an exit older than 180 seconds drops out");
+    reach_crash_loop_record_start(&other, 1000);
+    reach_crash_loop_record_start(&other, 30000);
+    expect(!reach_crash_loop_record_start(&other, 61001), "starts past 60 s do not loop");
 }
 
-static void test_fast_startup_failures_share_the_window(void)
+static void test_clock_moving_back_is_not_a_loop(void)
 {
     reach_crash_loop loop = {};
-    reach_crash_loop_record_exit(&loop, 100);
-    reach_crash_loop_record_exit(&loop, 400);
-    reach_crash_loop_decision decision = reach_crash_loop_record_exit(&loop, 120000);
-    expect(decision.action == REACH_CRASH_LOOP_FALLBACK,
-           "startup and runtime exits use one window");
+    reach_crash_loop_record_start(&loop, 500000);
+    reach_crash_loop_record_start(&loop, 500100);
+    expect(!reach_crash_loop_record_start(&loop, 1000), "a clock set back never trips");
 }
 
-static void test_null_loop_is_refused(void)
+static void test_null_loop_is_not_a_loop(void)
 {
-    expect(reach_crash_loop_record_exit(nullptr, 0).action == REACH_CRASH_LOOP_FALLBACK,
-           "a missing policy state never loops forever");
-}
-
-static void test_exit_disposition(void)
-{
-    expect(reach_crash_loop_classify_exit(0, 0, 1) == REACH_EXIT_DISPOSITION_ATTACH,
-           "a clean exit with a surviving reach attaches to it");
-    expect(reach_crash_loop_classify_exit(0, 0, 0) == REACH_EXIT_DISPOSITION_RETURN,
-           "a clean exit with no other reach stops the watchdog");
-    expect(reach_crash_loop_classify_exit(1, 0, 1) == REACH_EXIT_DISPOSITION_RECORD,
-           "a crash is recorded even when another reach exists");
-    expect(reach_crash_loop_classify_exit(0xC0000005u, 0, 0) == REACH_EXIT_DISPOSITION_RECORD,
-           "a crash without another reach is recorded");
-    expect(reach_crash_loop_classify_exit(1, 1, 0) == REACH_EXIT_DISPOSITION_RETURN,
-           "a crash during shutdown stops the watchdog");
-    expect(reach_crash_loop_classify_exit(0, 1, 1) == REACH_EXIT_DISPOSITION_RETURN,
-           "a clean exit during shutdown stops the watchdog");
+    expect(!reach_crash_loop_record_start(nullptr, 0), "missing history never falls back");
 }
 
 int main(void)
 {
-    test_restart_delays_then_fallback_on_the_third_exit();
-    test_exits_outside_the_window_drop_out();
+    test_third_start_inside_the_window_is_a_loop();
+    test_a_long_run_breaks_the_loop();
     test_window_boundary_is_inclusive();
-    test_fast_startup_failures_share_the_window();
-    test_null_loop_is_refused();
-    test_exit_disposition();
+    test_clock_moving_back_is_not_a_loop();
+    test_null_loop_is_not_a_loop();
     return failed == 0 ? 0 : 1;
 }

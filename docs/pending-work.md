@@ -24,7 +24,6 @@ Open items only.
 - Graphics-device loss is fatal for Reach surfaces; device-loss and fence recovery is unimplemented.
 - Display settings has no overflow policy at short window heights.
 - The Launcher window is seven times taller than what it draws.
-- Self-update after a fixed wait: the root cause of the restart report is unconfirmed (mitigated 2026-11-17).
 - Editing an embedded SVG does not rebuild `reach.exe` resources.
 - Product-composed opacity motions fail render validation; worked around in the Dock window list.
 - A capsule tick's `request_update` does not keep frames running (`host_update.cpp:158`). Audit CPU animations that rely on it.
@@ -36,7 +35,9 @@ Open items only.
 - WUC root completion callback is missing in repeated native diagnostics.
 - Validate startup and shutdown, bar stacking and focused popup keyboard input on a deployed surface registry build.
 - `RoActivateInstance(Compositor)` failed with `E_ACCESSDENIED` in Reach and Settings on every start until Explorer had run once (events.log, up to 2026-11-22 17:14). Not reproduced on a cold boot straight into Reach after the transparency-policy fix (2026-11-22 20:29). Cause unknown; reopen if it returns.
-- The compat host skips `SetShellWindow` when another shell window exists at that moment; after `reachctl --start` Reach was seen owning no shell window (`explorer_desktop_compat_host_win32.cpp`, `reach_explorer_desktop_compat_register_shell_window`).
+- Validate on a deployed build: Windows restarts Reach after a crash or a kill; three short runs within 60 s fall back to Explorer with the tray notice; apps launched from Reach survive ending Reach; the first start of a newer version shows one UAC prompt only while the watchdog task exists, and never again after a decline.
+- Folder opens duplicate the launcher's ShellExecute and foreground handover (`explorer_service_win32.cpp:36`, `diagnostics_log_win32.cpp:314`); move them into `app_launcher_win32.cpp`.
+- Launched apps inherit Reach's start-time environment; environment variable changes reach new apps only after Reach restarts.
 - Idle Watch starts during host creation. A full host stop ends its worker until the host is recreated (`host_lifecycle.cpp`, `idle_watch.cpp`).
 
 ## Architecture debt (cleanup phase)

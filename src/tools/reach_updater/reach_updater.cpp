@@ -423,12 +423,10 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, wchar_t *, int)
         return 3;
     }
 
-    reach_updater_run_wait(L"C:\\Windows\\System32\\schtasks.exe", L"/End /TN \"ReachWatchdog\"");
+    // Reach and reachService keep running: their files are renamed aside below, and ending
+    // Reach afterwards makes Windows start the new build.
     reach_updater_terminate(L"reachSetting.exe");
-    reach_updater_terminate(L"reach.exe");
-    reach_updater_terminate(L"reachService.exe");
-    const wchar_t *const exiting[] = {L"reachWatchdog.exe", L"reachService.exe",
-                                      L"reachSetting.exe"};
+    const wchar_t *const exiting[] = {L"reachSetting.exe"};
     reach_updater_wait_for_exit(exiting, ARRAYSIZE(exiting));
 
     std::wstring backup_dir = target_dir + L"\\" + reach_updater_backup_name;

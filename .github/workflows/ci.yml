@@ -131,7 +131,6 @@ jobs:
             "reach/reachService.exe",
             "reach/reachSetting.exe",
             "reach/reachUpdater.exe",
-            "reach/reachWatchdog.exe",
             "reach/reach_update_helper.exe"
           )
           $missing = $required | Where-Object { $entries -notcontains $_ }

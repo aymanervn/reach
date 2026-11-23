@@ -37,7 +37,8 @@ enum reach_config_operation_type
     REACH_CONFIG_OPERATION_SET_DOCK_SIZE,
     REACH_CONFIG_OPERATION_SET_DOCK_AUTO_HIDE,
     REACH_CONFIG_OPERATION_SET_WALLPAPERS,
-    REACH_CONFIG_OPERATION_SET_MONITOR_WALLPAPER
+    REACH_CONFIG_OPERATION_SET_MONITOR_WALLPAPER,
+    REACH_CONFIG_OPERATION_SET_VERSION
 };
 
 struct reach_config_operation
@@ -214,6 +215,10 @@ static reach_result reach_config_apply_operation(reach_config_snapshot *snapshot
             snapshot->monitor_wallpaper_paths[operation->target_index], operation->path);
         (void)reach_copy_utf16(snapshot->monitor_wallpaper_paths[operation->target_index], 260,
                                operation->path);
+        return REACH_OK;
+    case REACH_CONFIG_OPERATION_SET_VERSION:
+        *out_changed = !reach_path_equals(snapshot->version, operation->path);
+        (void)reach_copy_utf16(snapshot->version, 32, operation->path);
         return REACH_OK;
     default:
         return REACH_INVALID_ARGUMENT;
@@ -607,6 +612,19 @@ reach_result reach_config_service_ensure_defaults(reach_config_service *service)
 {
     reach_config_operation operation = {};
     operation.type = REACH_CONFIG_OPERATION_ENSURE_DEFAULTS;
+    return reach_config_service_commit(service, &operation);
+}
+
+reach_result reach_config_service_set_version(reach_config_service *service,
+                                              const uint16_t *version)
+{
+    if (version == nullptr || version[0] == 0)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    reach_config_operation operation = {};
+    operation.type = REACH_CONFIG_OPERATION_SET_VERSION;
+    (void)reach_copy_utf16(operation.path, 32, version);
     return reach_config_service_commit(service, &operation);
 }
 

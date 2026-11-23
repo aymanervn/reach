@@ -13,9 +13,6 @@
 #include <tlhelp32.h>
 #include <shellapi.h>
 #include <cwchar>
-#include <sddl.h>
-#include <string>
-#include <vector>
 
 struct reachctl_monitor_list_state
 {
@@ -191,206 +188,6 @@ static reach_result reachctl_terminate_processes_by_name(const wchar_t *process_
     return result;
 }
 
-static reach_result reachctl_watchdog_exe(uint16_t *path, DWORD path_count)
-{
-    if (path == nullptr || path_count == 0)
-    {
-        return REACH_INVALID_ARGUMENT;
-    }
-
-    DWORD length = GetModuleFileNameW(nullptr, reinterpret_cast<wchar_t *>(path), path_count);
-    if (length == 0 || length >= path_count)
-    {
-        return REACH_ERROR;
-    }
-
-    wchar_t *path_w = reinterpret_cast<wchar_t *>(path);
-    if (!PathRemoveFileSpecW(path_w))
-    {
-        return REACH_ERROR;
-    }
-
-    if (!PathAppendW(path_w, L"reachWatchdog.exe"))
-    {
-        return REACH_ERROR;
-    }
-
-    return REACH_OK;
-}
-
-static bool reachctl_current_user_sid(std::wstring &sid_text)
-{
-    HANDLE token = nullptr;
-    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token))
-    {
-        return false;
-    }
-
-    DWORD size = 0;
-    (void)GetTokenInformation(token, TokenUser, nullptr, 0, &size);
-    std::vector<BYTE> buffer(size);
-    bool ok = size != 0 && GetTokenInformation(token, TokenUser, buffer.data(), size, &size);
-    CloseHandle(token);
-    if (!ok)
-    {
-        return false;
-    }
-
-    LPWSTR sid_string = nullptr;
-    if (!ConvertSidToStringSidW(reinterpret_cast<TOKEN_USER *>(buffer.data())->User.Sid,
-                                &sid_string))
-    {
-        return false;
-    }
-
-    sid_text = sid_string;
-    LocalFree(sid_string);
-    return true;
-}
-
-static std::wstring reachctl_xml_escape(const wchar_t *text)
-{
-    std::wstring escaped;
-    for (; *text != 0; ++text)
-    {
-        switch (*text)
-        {
-        case L'&':
-            escaped += L"&amp;";
-            break;
-        case L'<':
-            escaped += L"&lt;";
-            break;
-        case L'>':
-            escaped += L"&gt;";
-            break;
-        case L'"':
-            escaped += L"&quot;";
-            break;
-        default:
-            escaped += *text;
-            break;
-        }
-    }
-    return escaped;
-}
-
-static std::wstring reachctl_watchdog_task_xml(const wchar_t *watchdog_path, const wchar_t *sid)
-{
-    SYSTEMTIME now = {};
-    GetLocalTime(&now);
-    wchar_t start_boundary[32] = {};
-    swprintf_s(start_boundary, L"%04u-%02u-%02uT%02u:%02u:%02u", now.wYear, now.wMonth, now.wDay,
-               now.wHour, now.wMinute, now.wSecond);
-
-    std::wstring xml;
-    xml += L"<?xml version=\"1.0\" encoding=\"UTF-16\"?>\n";
-    xml += L"<Task version=\"1.2\" "
-           L"xmlns=\"http://schemas.microsoft.com/windows/2004/02/mit/task\">\n";
-    xml += L"  <Principals>\n";
-    xml += L"    <Principal id=\"Author\">\n";
-    xml += L"      <UserId>" + reachctl_xml_escape(sid) + L"</UserId>\n";
-    xml += L"      <LogonType>InteractiveToken</LogonType>\n";
-    xml += L"    </Principal>\n";
-    xml += L"  </Principals>\n";
-    xml += L"  <Settings>\n";
-    xml += L"    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>\n";
-    xml += L"    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>\n";
-    xml += L"    <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>\n";
-    xml += L"    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>\n";
-    xml += L"    <IdleSettings>\n";
-    xml += L"      <Duration>PT10M</Duration>\n";
-    xml += L"      <WaitTimeout>PT1H</WaitTimeout>\n";
-    xml += L"      <StopOnIdleEnd>true</StopOnIdleEnd>\n";
-    xml += L"      <RestartOnIdle>false</RestartOnIdle>\n";
-    xml += L"    </IdleSettings>\n";
-    xml += L"  </Settings>\n";
-    xml += L"  <Triggers>\n";
-    xml += L"    <LogonTrigger>\n";
-    xml += L"      <StartBoundary>" + std::wstring(start_boundary) + L"</StartBoundary>\n";
-    xml += L"    </LogonTrigger>\n";
-    xml += L"  </Triggers>\n";
-    xml += L"  <Actions Context=\"Author\">\n";
-    xml += L"    <Exec>\n";
-    xml += L"      <Command>&quot;" + reachctl_xml_escape(watchdog_path) + L"&quot;</Command>\n";
-    xml += L"    </Exec>\n";
-    xml += L"  </Actions>\n";
-    xml += L"</Task>\n";
-    return xml;
-}
-
-static bool reachctl_write_utf16_file(const wchar_t *path, const std::wstring &text)
-{
-    HANDLE file = CreateFileW(path, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
-                              FILE_ATTRIBUTE_TEMPORARY, nullptr);
-    if (file == INVALID_HANDLE_VALUE)
-    {
-        return false;
-    }
-
-    const wchar_t bom = 0xFEFF;
-    DWORD written = 0;
-    bool ok = WriteFile(file, &bom, sizeof(bom), &written, nullptr) &&
-              WriteFile(file, text.data(), static_cast<DWORD>(text.size() * sizeof(wchar_t)),
-                        &written, nullptr);
-    CloseHandle(file);
-    return ok;
-}
-
-static reach_result reachctl_register_watchdog_task(void)
-{
-    uint16_t watchdog_path_u16[260] = {};
-    reach_result path_result = reachctl_watchdog_exe(watchdog_path_u16, 260);
-    if (path_result != REACH_OK)
-    {
-        return path_result;
-    }
-
-    const wchar_t *watchdog_path = reinterpret_cast<const wchar_t *>(watchdog_path_u16);
-
-    std::wstring sid;
-    if (!reachctl_current_user_sid(sid))
-    {
-        return REACH_ERROR;
-    }
-
-    wchar_t temp_dir[MAX_PATH] = {};
-    wchar_t xml_path[MAX_PATH] = {};
-    DWORD temp_length = GetTempPathW(MAX_PATH, temp_dir);
-    if (temp_length == 0 || temp_length >= MAX_PATH ||
-        GetTempFileNameW(temp_dir, L"rwd", 0, xml_path) == 0)
-    {
-        return REACH_ERROR;
-    }
-
-    if (!reachctl_write_utf16_file(xml_path,
-                                   reachctl_watchdog_task_xml(watchdog_path, sid.c_str())))
-    {
-        DeleteFileW(xml_path);
-        return REACH_ERROR;
-    }
-
-    wchar_t arguments[1024] = {};
-    swprintf_s(arguments, L"/Create /F /TN \"ReachWatchdog\" /XML \"%ls\"", xml_path);
-
-    reach_result result =
-        reachctl_run_process_wait(L"C:\\Windows\\System32\\schtasks.exe", arguments, nullptr);
-    DeleteFileW(xml_path);
-    return result;
-}
-
-static reach_result reachctl_unregister_watchdog_task(void)
-{
-    return reachctl_run_process_wait(L"C:\\Windows\\System32\\schtasks.exe",
-                                     L"/Delete /F /TN \"ReachWatchdog\"", nullptr);
-}
-
-static int32_t reachctl_watchdog_task_is_registered(void)
-{
-    return reachctl_run_process_wait(L"C:\\Windows\\System32\\schtasks.exe",
-                                     L"/Query /TN \"ReachWatchdog\"", nullptr) == REACH_OK;
-}
-
 static reach_result reachctl_reset_monitor_work_areas(void)
 {
     reach_monitor_port monitors = {};
@@ -452,37 +249,64 @@ static reach_result reachctl_start_userinit(void)
     return reachctl_start_process(userinit_path, nullptr, system_dir);
 }
 
-static reach_result reachctl_run_watchdog_task(void)
+static int32_t reachctl_process_running(const wchar_t *process_name)
 {
-    HINSTANCE result = ShellExecuteW(nullptr, L"open", L"C:\\Windows\\System32\\schtasks.exe",
-                                     L"/Run /TN \"ReachWatchdog\"", nullptr, SW_HIDE);
+    HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (snapshot == INVALID_HANDLE_VALUE)
+    {
+        return 0;
+    }
 
-    return reinterpret_cast<intptr_t>(result) > 32 ? REACH_OK : REACH_ERROR;
+    int32_t found = 0;
+    PROCESSENTRY32W entry = {};
+    entry.dwSize = sizeof(entry);
+    for (BOOL more = Process32FirstW(snapshot, &entry); more && !found;
+         more = Process32NextW(snapshot, &entry))
+    {
+        found = lstrcmpiW(entry.szExeFile, process_name) == 0;
+    }
+
+    CloseHandle(snapshot);
+    return found;
 }
 
+int32_t reachctl_reach_is_running(void)
+{
+    return reachctl_process_running(L"reach.exe");
+}
+
+int32_t reachctl_other_shell_running(void)
+{
+    return !reachctl_reach_is_running() && GetShellWindow() != nullptr;
+}
+
+// Windows restarts the session shell with the command it read at logon, so ending a running Reach
+// is the whole restart. With no shell at all, the Reach started here claims the shell window and
+// Windows supervises it from then on.
 reach_result reachctl_start_reach_session(const uint16_t *reach_exe)
 {
-    (void)reach_exe;
-
-    reach_result kill_reach_result = reachctl_terminate_processes_by_name(L"reach.exe");
-
-    reach_result kill_explorer_result = reachctl_terminate_processes_by_name(L"explorer.exe");
-
     reach_result work_area_result = REACH_OK;
     if (reachctl_consume_first_start_repair_pending())
     {
         work_area_result = reachctl_reset_monitor_work_areas();
     }
 
-    reach_result start_result = reachctl_run_watchdog_task();
-
-    if (kill_reach_result != REACH_OK || kill_explorer_result != REACH_OK ||
-        work_area_result != REACH_OK || start_result != REACH_OK)
+    reach_result start_result = REACH_ERROR;
+    if (reachctl_reach_is_running())
     {
-        return REACH_ERROR;
+        start_result = reachctl_terminate_processes_by_name(L"reach.exe");
     }
-
-    return REACH_OK;
+    else
+    {
+        wchar_t install_dir[MAX_PATH] = {};
+        if (wcscpy_s(install_dir, reinterpret_cast<const wchar_t *>(reach_exe)) == 0 &&
+            PathRemoveFileSpecW(install_dir))
+        {
+            start_result = reachctl_start_process(reinterpret_cast<const wchar_t *>(reach_exe),
+                                                  L"--launch", install_dir);
+        }
+    }
+    return work_area_result == REACH_OK && start_result == REACH_OK ? REACH_OK : REACH_ERROR;
 }
 
 static BOOL CALLBACK reachctl_print_monitor_proc(HMONITOR monitor, HDC dc, LPRECT rect,
@@ -545,19 +369,6 @@ int32_t reachctl_is_reach_installed(void)
         return 0;
     }
 
-    uint16_t watchdog_exe[260] = {};
-    if (reachctl_watchdog_exe(watchdog_exe, 260) != REACH_OK)
-    {
-        return 0;
-    }
-
-    const wchar_t *watchdog_exe_w = reinterpret_cast<const wchar_t *>(watchdog_exe);
-    attributes = GetFileAttributesW(watchdog_exe_w);
-    if (attributes == INVALID_FILE_ATTRIBUTES || (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0)
-    {
-        return 0;
-    }
-
     reach_shell_registration_status shell_status = {};
     if (reach_windows_shell_query_current_user(reach_exe, &shell_status) != REACH_OK ||
         !shell_status.reach_is_shell)
@@ -565,19 +376,17 @@ int32_t reachctl_is_reach_installed(void)
         return 0;
     }
 
-    return reachctl_watchdog_task_is_registered();
+    return 1;
 }
 
 reach_result reachctl_reset_to_windows_shell(void)
 {
     reach_result restore_result = reach_windows_shell_restore_current_user();
 
-    (void)reachctl_unregister_watchdog_task();
     (void)reachctl_unregister_service();
     (void)reachctl_remove_context_menus();
 
     (void)reachctl_terminate_processes_by_name(L"reach.exe");
-    (void)reachctl_terminate_processes_by_name(L"reachWatchdog.exe");
     (void)reachctl_terminate_processes_by_name(L"reachService.exe");
     (void)reachctl_terminate_processes_by_name(L"explorer.exe");
 
@@ -595,7 +404,7 @@ reach_result reachctl_reset_to_windows_shell(void)
     return REACH_OK;
 }
 
-reach_result reachctl_install_reach_shell_and_watchdog(const uint16_t *reach_exe)
+reach_result reachctl_install_reach_shell(const uint16_t *reach_exe)
 {
     if (reach_exe == nullptr || reach_exe[0] == 0)
     {
@@ -611,12 +420,6 @@ reach_result reachctl_install_reach_shell_and_watchdog(const uint16_t *reach_exe
     if (config_result != REACH_OK)
     {
         return config_result;
-    }
-
-    reach_result task_result = reachctl_register_watchdog_task();
-    if (task_result != REACH_OK)
-    {
-        return task_result;
     }
 
     uint16_t reachctl_exe[260] = {};

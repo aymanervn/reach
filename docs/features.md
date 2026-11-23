@@ -22,6 +22,15 @@
 - On an app-click handoff, the activated window is published as a presentation-only front source and stays above the other relationships through teardown, with its tile chrome drawn last. This must not fork close geometry, timing or teardown.
 - Stage thumbnails are best-effort during presentation: retry missing relationships without aborting the frame. Close boundaries stay strict.
 
+## Shell lifecycle
+
+- Windows starts and restarts `reach.exe`: it reruns the logon-time shell command whenever the first process to register a shell window exits, whatever the exit code. Reach never starts Reach, so Reach and every app it launches stay outside any job.
+- Reach claims the shell window before anything that can fail and hands it to the desktop host later (`reach_windows_shell_session_claim`, `reach_windows_shell_session_register`).
+- Three starts within 60 s mean the installed version is broken: Reach falls back to Explorer permanently (shell value, direct start, tray notice) and exits without claiming, so Windows stops restarting it (`reach_crash_loop_record_start`, `reach_windows_shell_session_fall_back`).
+- Switching to Reach from another shell needs a sign-out. `reachctl --start` restarts a running Reach, or starts one when no shell runs at all.
+- An update only swaps files (running ones are renamed aside), closes Settings and restarts Reach through `reachctl --start`.
+- The first start of a newer version stamps it in `reach.ini`, then cleans up once in the background: the watchdog exe is renamed aside and the watchdog ended unless Reach lives in its job, and, only while the task exists, a notice explains the coming prompt before one `reachElevate` prompt deletes the task. A declined prompt is never repeated. This cleanup is the only watchdog removal and stays in every release by the owner's decision; `reachctl` no longer knows the watchdog (`reach_app_run_install_cleanup_once`, `reach_windows_start_install_cleanup`).
+
 ## Touchpad gestures
 
 - Three-finger swipes on a precision touchpad are read and recognized in the elevated `reachService` helper, which keeps receiving every contact while an elevated window has focus. Recognized swipes reach `reach.exe` as gesture records in the shared hotkey queue. Swipes need the helper, like Alt+Tab and Win+D.

@@ -9,11 +9,14 @@
 #include "reach/adapters/windows/diagnostics_log.h"
 #include "reach/adapters/windows/frame_wait.h"
 #include "reach/adapters/windows/install_check.h"
+#include "reach/adapters/windows/shell_session.h"
 #include "reach/protocol/reach_service_protocol.h"
+#include "reach/support/util.h"
 
 static const wchar_t *REACH_LAUNCH_ARG = L"--launch";
 static const int REACH_EXIT_FAILURE = 1;
 static const int REACH_EXIT_DEVICE_LOST = 3;
+static const DWORD REACH_INSTANCE_WAIT_MS = 2000;
 
 static int32_t reach_arg_present(int argc, wchar_t **argv, const wchar_t *arg)
 {
@@ -33,15 +36,18 @@ static int32_t reach_arg_present(int argc, wchar_t **argv, const wchar_t *arg)
     return 0;
 }
 
+// reachService keeps a handle to this mutex and briefly owns it while it notices the previous
+// Reach exit, so a restarted Reach waits for ownership instead of trusting ERROR_ALREADY_EXISTS.
 static HANDLE reach_acquire_instance_mutex(void)
 {
-    HANDLE mutex = CreateMutexW(nullptr, TRUE, REACH_SHELL_INSTANCE_MUTEX_NAME);
+    HANDLE mutex = CreateMutexW(nullptr, FALSE, REACH_SHELL_INSTANCE_MUTEX_NAME);
     if (mutex == nullptr)
     {
         return nullptr;
     }
 
-    if (GetLastError() == ERROR_ALREADY_EXISTS)
+    DWORD wait = WaitForSingleObject(mutex, REACH_INSTANCE_WAIT_MS);
+    if (wait != WAIT_OBJECT_0 && wait != WAIT_ABANDONED)
     {
         CloseHandle(mutex);
         return nullptr;
@@ -72,8 +78,8 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
     if (!launch_allowed)
     {
         MessageBoxW(nullptr,
-                    L"Reach cannot be launched directly. Run reachctl --start, or run "
-                    L"reachctl --install first if Reach is not installed.",
+                    L"Reach cannot be launched directly. Run reachctl --install, then sign "
+                    L"out and back in.",
                     L"Reach", MB_OK | MB_ICONINFORMATION);
         return 0;
     }
@@ -90,6 +96,18 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
     {
         return 0;
     }
+
+    // Not claiming the shell window before exiting keeps Windows from restarting this build.
+    if (reach_windows_shell_session_record_start())
+    {
+        reach_log_error("crash loop detected action=fallback_explorer");
+        reach_windows_shell_session_fall_back();
+        CloseHandle(instance_mutex);
+        return 0;
+    }
+
+    (void)reach_windows_shell_session_claim();
+    reach_crash_dump_prune();
 
     reach_workload_session workload("reach");
     HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);

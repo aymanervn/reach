@@ -1,3 +1,5 @@
+#include "reach/adapters/windows/watchdog_retirement.h"
+
 #include <windows.h>
 #include <shellapi.h>
 #include <shlobj.h>
@@ -114,6 +116,10 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, wchar_t *, int)
     if (argc == 5 && lstrcmpW(argv[1], L"startup-set-enabled") == 0)
     {
         result = reach_elevate_startup_set_enabled(argv[2], argv[3], argv[4]);
+    }
+    else if (argc == 2 && lstrcmpW(argv[1], L"retire-watchdog") == 0)
+    {
+        result = reach_windows_delete_watchdog_task() == REACH_OK ? 0 : 5;
     }
 
     LocalFree(argv);

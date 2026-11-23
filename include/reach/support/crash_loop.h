@@ -8,40 +8,18 @@ extern "C"
 {
 #endif
 
-#define REACH_CRASH_LOOP_WINDOW_MS 180000ull
-#define REACH_CRASH_LOOP_FALLBACK_COUNT 3u
-#define REACH_CRASH_LOOP_SECOND_RESTART_DELAY_MS 1000u
+#define REACH_CRASH_LOOP_STARTS 3u
+#define REACH_CRASH_LOOP_WINDOW_MS 60000ull
 
-    typedef enum reach_crash_loop_action
-    {
-        REACH_CRASH_LOOP_RESTART = 0,
-        REACH_CRASH_LOOP_FALLBACK = 1
-    } reach_crash_loop_action;
-
+    // Start times in wall-clock milliseconds, oldest first; 0 marks an empty slot.
     typedef struct reach_crash_loop
     {
-        uint64_t exit_ms[REACH_CRASH_LOOP_FALLBACK_COUNT];
-        uint32_t count;
+        uint64_t start_ms[REACH_CRASH_LOOP_STARTS];
     } reach_crash_loop;
 
-    typedef struct reach_crash_loop_decision
-    {
-        reach_crash_loop_action action;
-        uint32_t delay_ms;
-        uint32_t window_count;
-    } reach_crash_loop_decision;
-
-    typedef enum reach_exit_disposition
-    {
-        REACH_EXIT_DISPOSITION_RECORD = 0,
-        REACH_EXIT_DISPOSITION_ATTACH = 1,
-        REACH_EXIT_DISPOSITION_RETURN = 2
-    } reach_exit_disposition;
-
-    reach_exit_disposition reach_crash_loop_classify_exit(uint32_t exit_code, int32_t shutting_down,
-                                                          int32_t other_reach_alive);
-
-    reach_crash_loop_decision reach_crash_loop_record_exit(reach_crash_loop *loop, uint64_t now_ms);
+    // Records a start and reports whether the last REACH_CRASH_LOOP_STARTS starts all fall
+    // inside REACH_CRASH_LOOP_WINDOW_MS, meaning the runs between them died young.
+    int32_t reach_crash_loop_record_start(reach_crash_loop *loop, uint64_t now_ms);
 
 #ifdef __cplusplus
 }

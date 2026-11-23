@@ -1,5 +1,7 @@
 #include "windows_adapters_internal.h"
 
+#include "reach/adapters/windows/shell_session.h"
+
 #include <windows.h>
 
 #include <atomic>
@@ -608,26 +610,6 @@ static void reach_explorer_desktop_compat_resize_host(void)
     reach_explorer_desktop_compat_resize_wallpaper_children();
 }
 
-// SetShellWindow is undocumented but is what Explorer uses for the real Progman:
-// win32k then keeps the window bottom-most and activates it as fallback when the
-// foreground window is minimized. Failure is tolerated — the WM_WINDOWPOSCHANGING
-// pin covers the ordering on its own.
-static void reach_explorer_desktop_compat_register_shell_window(HWND hwnd)
-{
-    if (hwnd == nullptr || GetShellWindow() != nullptr)
-    {
-        return;
-    }
-
-    typedef BOOL(WINAPI * reach_set_shell_window_fn)(HWND);
-    reach_set_shell_window_fn set_shell_window = reinterpret_cast<reach_set_shell_window_fn>(
-        GetProcAddress(GetModuleHandleW(L"user32.dll"), "SetShellWindow"));
-    if (set_shell_window != nullptr)
-    {
-        (void)set_shell_window(hwnd);
-    }
-}
-
 static reach_result reach_explorer_desktop_compat_create_host_windows(void)
 {
     HINSTANCE instance = GetModuleHandleW(nullptr);
@@ -675,7 +657,10 @@ static reach_result reach_explorer_desktop_compat_create_host_windows(void)
     ShowWindow(g_progmanHwnd, SW_SHOWNOACTIVATE);
 
     SetWindowPos(g_progmanHwnd, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
-    reach_explorer_desktop_compat_register_shell_window(g_progmanHwnd);
+    // SetShellWindow on the fake Progman is what Explorer does for the real one: win32k keeps
+    // it bottom-most and activates it when the foreground window is minimized. Failure is
+    // tolerated here; the WM_WINDOWPOSCHANGING pin covers the ordering on its own.
+    (void)reach_windows_shell_session_register(g_progmanHwnd);
     g_powerSavingNotify = RegisterPowerSettingNotification(g_progmanHwnd, &GUID_POWER_SAVING_STATUS,
                                                            DEVICE_NOTIFY_WINDOW_HANDLE);
     reach_explorer_desktop_compat_publish_transparency_policy();

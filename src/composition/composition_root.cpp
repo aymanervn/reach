@@ -1,7 +1,10 @@
 #include "reach/composition/composition_root.h"
 
 #include "host_internal.h"
+#include "reach/adapters/windows/watchdog_retirement.h"
+#include "reach/core/app_update.h"
 #include "reach/platform/windows_adapters.h"
+#include "reach/protocol/version.h"
 
 #include <new>
 
@@ -330,6 +333,34 @@ reach_result reach_app_create(const reach_host_desc *desc, reach_app **out_app)
     return REACH_OK;
 }
 
+// The version is stamped before the cleanup starts, so a declined prompt or a restart caused by
+// the cleanup never runs it twice for the same version.
+static void reach_app_run_install_cleanup_once(reach_app *app)
+{
+    char previous[32] = {};
+    for (size_t index = 0; index + 1 < sizeof(previous); ++index)
+    {
+        uint16_t c = app->host->config_version_at_start[index];
+        if (c == 0)
+        {
+            break;
+        }
+        previous[index] = c < 0x80 ? (char)c : '?';
+    }
+    if (reach_app_version_compare(previous, REACH_VERSION_STRING) >= 0)
+    {
+        return;
+    }
+
+    uint16_t current[32] = {};
+    for (size_t index = 0; index + 1 < 32 && REACH_VERSION_STRING[index] != 0; ++index)
+    {
+        current[index] = (uint16_t)(unsigned char)REACH_VERSION_STRING[index];
+    }
+    (void)reach_config_service_set_version(app->host->config_service, current);
+    reach_windows_start_install_cleanup();
+}
+
 reach_result reach_app_start(reach_app *app)
 {
     REACH_ASSERT(app != nullptr);
@@ -370,6 +401,8 @@ reach_result reach_app_start(reach_app *app)
     {
         (void)reach_host_schedule_app_launch(app->host, &startup_requests[index]);
     }
+
+    reach_app_run_install_cleanup_once(app);
     return REACH_OK;
 }
 

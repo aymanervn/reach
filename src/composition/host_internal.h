@@ -741,6 +741,8 @@ struct reach_host
     reach_monitor_refresh_retry monitor_refresh_retry;
     reach_monitor_topology monitor_topology;
     reach_config_service *config_service;
+    // Version stamped in the config by the last Reach that ran, read before anything can save.
+    uint16_t config_version_at_start[32];
     reach_wallpaper *wallpaper;
     reach_host_window_manipulation_state window_manipulation;
     reach_host_pointer_move_state pointer_move;

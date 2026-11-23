@@ -3,9 +3,6 @@
 #include "windows_adapters_internal.h"
 
 #include <windows.h>
-#include <shlwapi.h>
-
-#include <wchar.h>
 
 static int32_t reach_install_file_exists(const wchar_t *path)
 {
@@ -18,14 +15,6 @@ int32_t reach_windows_reach_is_installed(void)
     wchar_t reach_exe[MAX_PATH] = {};
     DWORD length = GetModuleFileNameW(nullptr, reach_exe, MAX_PATH);
     if (length == 0 || length >= MAX_PATH || !reach_install_file_exists(reach_exe))
-    {
-        return 0;
-    }
-
-    wchar_t watchdog_exe[MAX_PATH] = {};
-    wcscpy_s(watchdog_exe, reach_exe);
-    if (!PathRemoveFileSpecW(watchdog_exe) || !PathAppendW(watchdog_exe, L"reachWatchdog.exe") ||
-        !reach_install_file_exists(watchdog_exe))
     {
         return 0;
     }

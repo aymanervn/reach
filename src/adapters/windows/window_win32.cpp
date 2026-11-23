@@ -67,8 +67,8 @@ static int32_t reach_platform_window_point_in_caption(const reach_platform_windo
 // window, minimized windows are parked as visible caption rectangles on the
 // desktop instead of being moved off-screen. SetTaskmanWindow is undocumented
 // but is what Explorer uses to flip that policy. Skip only when another process
-// owns the shell window (a real Explorer is running); reach's own desktop compat
-// host registers its fake Progman as shell window before this runs.
+// owns the shell window (a real Explorer is running); reach claims the shell
+// window at startup, before this runs.
 static void reach_platform_window_register_taskman(reach_platform_window *window)
 {
     if (window == nullptr || window->hwnd == nullptr)

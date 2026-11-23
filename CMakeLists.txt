@@ -249,6 +249,8 @@ add_library(reach_windows_adapters STATIC
     src/adapters/windows/crash_dump_win32.cpp
     src/adapters/windows/diagnostics_log_win32.cpp
     src/adapters/windows/install_check_win32.cpp
+    src/adapters/windows/shell_session_win32.cpp
+    src/adapters/windows/watchdog_retirement_win32.cpp
     src/adapters/windows/window_win32.cpp
     src/adapters/windows/frame_wait_win32.cpp
     src/adapters/windows/explorer_desktop_compat_host_win32.cpp
@@ -573,33 +575,6 @@ target_link_libraries(reachctl PRIVATE
     uuid
 )
 
-add_executable(reachWatchdog WIN32
-    src/tools/reach_watchdog/reach_watchdog.cpp
-    src/tools/reach_watchdog/fallback_notice.cpp
-    src/adapters/windows/crash_dump_prune_win32.cpp
-    src/adapters/windows/diagnostics_log_win32.cpp
-    src/support/crash_dump_prune.cpp
-    src/support/diagnostics_log.cpp
-    src/support/crash_loop.cpp
-    src/support/util.cpp
-)
-
-set_target_properties(reachWatchdog PROPERTIES OUTPUT_NAME "reachWatchdog")
-
-reach_configure_common(reachWatchdog)
-reach_release_symbols(reachWatchdog)
-reach_configure_windows(reachWatchdog)
-target_compile_features(reachWatchdog PRIVATE
-    cxx_std_17
-)
-target_link_libraries(reachWatchdog PRIVATE
-    ole32
-    shell32
-    shlwapi
-    user32
-    advapi32
-)
-
 add_executable(reach_service WIN32
     src/tools/reach_service/reach_service.cpp
     src/tools/reach_service/hotkeys.cpp
@@ -690,6 +665,8 @@ target_link_libraries(reach_updater PRIVATE
 
 add_executable(reach_elevate WIN32
     src/tools/reach_elevate/reach_elevate.cpp
+    src/adapters/windows/watchdog_retirement_win32.cpp
+    src/support/util.cpp
 )
 set_target_properties(reach_elevate PROPERTIES OUTPUT_NAME "reachElevate")
 
@@ -719,7 +696,6 @@ set(REACH_RELEASE_TARGETS
     reach
     reach_settings
     reachctl
-    reachWatchdog
     reach_service
     reach_update_helper
     reach_updater
@@ -734,7 +710,6 @@ add_custom_target(reach_release_zip
         "$<TARGET_FILE:reach>"
         "$<TARGET_FILE:reach_settings>"
         "$<TARGET_FILE:reachctl>"
-        "$<TARGET_FILE:reachWatchdog>"
         "$<TARGET_FILE:reach_service>"
         "$<TARGET_FILE:reach_update_helper>"
         "$<TARGET_FILE:reach_updater>"

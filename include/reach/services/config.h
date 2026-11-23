@@ -65,6 +65,9 @@ extern "C"
 
     reach_result reach_config_service_reload(reach_config_service *service);
     reach_result reach_config_service_ensure_defaults(reach_config_service *service);
+    // Records which Reach version last ran against this config; saving persists it.
+    reach_result reach_config_service_set_version(reach_config_service *service,
+                                                  const uint16_t *version);
     reach_result reach_config_service_pin_path(reach_config_service *service, const uint16_t *path);
     reach_result reach_config_service_pin_app(reach_config_service *service,
                                               const reach_pinned_app_model *app);

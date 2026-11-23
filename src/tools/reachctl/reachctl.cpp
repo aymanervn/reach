@@ -21,18 +21,18 @@ int wmain(int argc, wchar_t **argv)
             if (!reachctl_is_process_elevated())
             {
                 reachctl_print(L"Reach install requires Administrator privileges to "
-                               L"create the watchdog scheduled task. "
+                               L"create the reach service scheduled task. "
                                L"Open PowerShell as Administrator and run reachctl "
                                L"--install again.");
                 return 1;
             }
 
-            reach_result shell_result = reachctl_install_reach_shell_and_watchdog(reach_exe);
+            reach_result shell_result = reachctl_install_reach_shell(reach_exe);
             reach_result helper_result = reachctl_install_service(nullptr);
             int ok = shell_result == REACH_OK && helper_result == REACH_OK;
-            reachctl_print(ok ? L"Reach installed. Shell registry, watchdog task, "
-                                L"reach service task, and Explorer context menus "
-                                L"configured."
+            reachctl_print(ok ? L"Reach installed. Shell registry, reach service task, and "
+                                L"Explorer context menus configured. If Reach is not running "
+                                L"yet, sign out and back in to start it."
                               : L"Reach install failed.");
             return ok ? 0 : 1;
         }
@@ -46,8 +46,18 @@ int wmain(int argc, wchar_t **argv)
                 return 1;
             }
 
+            if (reachctl_other_shell_running())
+            {
+                reachctl_print(L"Another shell is running in this session. Sign out and back in "
+                               L"to start Reach.");
+                return 1;
+            }
+
+            int32_t was_running = reachctl_reach_is_running();
             int ok = reachctl_start_reach_session(reach_exe) == REACH_OK;
-            reachctl_print(ok ? L"Reach started for current session." : L"Reach start failed.");
+            reachctl_print(!ok           ? L"Reach start failed."
+                           : was_running ? L"Reach restarted."
+                                         : L"Reach started.");
             return ok ? 0 : 1;
         }
 
@@ -74,7 +84,7 @@ int wmain(int argc, wchar_t **argv)
             if (!reachctl_is_process_elevated())
             {
                 reachctl_print(L"Reach reset requires Administrator privileges to "
-                               L"remove the watchdog scheduled task."
+                               L"remove the reach service scheduled task. "
                                L"Open PowerShell as Administrator and run reachctl "
                                L"--reset again.");
                 return 1;

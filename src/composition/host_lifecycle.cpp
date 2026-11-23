@@ -482,6 +482,12 @@ reach_result reach_host_create_with_dependencies(const reach_host_desc *desc,
     }
     else
     {
+        std::unique_ptr<reach_config_snapshot> loaded(new (std::nothrow) reach_config_snapshot{});
+        if (loaded != nullptr &&
+            reach_config_service_snapshot(host->config_service, loaded.get()) == REACH_OK)
+        {
+            (void)reach_copy_utf16(host->config_version_at_start, 32, loaded->version);
+        }
         (void)reach_config_service_ensure_defaults(host->config_service);
     }
     host->tray_service = nullptr;
