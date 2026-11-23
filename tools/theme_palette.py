@@ -1,7 +1,7 @@
 """Reach color palette, authored in OKLCH.
 
 Writes src/core/theme_palette.h, the sRGB macros that the theme tables in theme.c use.
-Edit NEUTRAL_TINT, NEUTRALS or PALETTE, then run this script. `--check` only reports whether the header is stale.
+Edit the tables below, then run this script. `--check` only reports whether the header is stale.
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 HEADER = ROOT / "src" / "core" / "theme_palette.h"
 
-# Chroma and hue shared by every neutral step. White stays untinted to remain inside sRGB.
+# Chroma and hue shared by every neutral step. White and black stay untinted to remain inside sRGB.
 NEUTRAL_TINT = (0.004, 285)
 
 # (name, L): neutral steps by OKLCH lightness, tuned by eye.
@@ -30,6 +30,16 @@ NEUTRALS = [
     ("LIGHT_SURFACE_CONTROL", 0.894),
     ("LIGHT_DIVIDER", 0.952),
     ("LIGHT_BORDER", 0.675),
+    ("DARK_TEXT", 1.000),
+    ("LIGHT_TEXT", 0.000),
+]
+
+# (name, opacity): text strengths applied to the per-mode text base.
+TEXT_STRENGTHS = [
+    ("PRIMARY", 0.85),
+    ("SECONDARY", 0.55),
+    ("TERTIARY", 0.30),
+    ("QUATERNARY", 0.18),
 ]
 
 # (name, L, C, h): OKLCH lightness 0-1, chroma, hue in degrees.
@@ -63,8 +73,6 @@ PALETTE = [
     ("DEEP_ORANGE", 0.598, 0.147, 51.7),
     ("DEEP_YELLOW", 0.6097, 0.1221, 81.1),
     ("DEEP_RED", 0.560, 0.177, 30),
-    # DEEP_BLUE as reach_theme_resolve darkens it for dark mode.
-    ("DARK_ACCENT_BLUE", 0.461, 0.161, 260.4),
     ("LIGHT_STATS_CPU", 0.368, 0.077, 238),
     ("LIGHT_STATS_MEMORY", 0.384, 0.148, 292),
     ("LIGHT_STATS_DOWNLOAD", 0.358, 0.088, 151),
@@ -109,10 +117,13 @@ def render() -> str:
         "",
     ]
     chroma, hue = NEUTRAL_TINT
-    neutrals = [(name, lightness, chroma if lightness < 1 else 0, hue) for name, lightness in NEUTRALS]
+    neutrals = [(name, lightness, chroma if 0 < lightness < 1 else 0, hue) for name, lightness in NEUTRALS]
     for name, lightness, chroma, hue in neutrals + PALETTE:
         r, g, b = oklch_to_rgb8(name, lightness, chroma, hue)
         lines.append(f"#define REACH_{name}(a) REACH_RGB8({r}, {g}, {b}, a)")
+    lines.append("")
+    for name, opacity in TEXT_STRENGTHS:
+        lines.append(f"#define REACH_TEXT_{name} {opacity:.2f}f")
     lines += ["", "#endif", ""]
     return "\n".join(lines)
 
