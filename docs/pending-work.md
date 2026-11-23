@@ -4,6 +4,8 @@ Open items only.
 
 ## Needs the user's decision
 
+- Reach tracks at most 96 open windows (`REACH_MAX_OPEN_WINDOWS`, `include/reach/core/limits.h`); later windows are likely missing from Stage and the Dock. Raising it also raises the render group budget, which Stage's static assert in `stage_render.cpp` enforces.
+
 
 ## Bugs
 
@@ -14,6 +16,7 @@ Open items only.
 - Cross-app activation sometimes leaves the previous app active; a direct click restores focus. Unresolved since 2026-09-07.
 - Stage minimized placeholders expand toward restore bounds on close (reopened 2026-09-19).
 - Stage held input about 500ms after its motion looked finished. The fix is waiting for live validation.
+- Compositor-driven Stage needs live validation of the paths the benchmark did not drive: activating a tile, a tile's close button and its hover colour, reopening while closing, a window appearing while open, and the classic-thumbnail fallback without ordinal 147.
 - Launcher fast scroll can leave the last page's items unloaded. Suspect: the icon prefetch range in `launcher_render.cpp`.
 - Clipboard wheel scrolling sometimes stopped. Not confirmed fixed.
 - Trails behind a shadow-casting background whose y and height both move. Worked around in Clipboard and Switcher; deferred.
@@ -70,7 +73,7 @@ Open items only.
 - Repeatable baseline measurements, and final comparable performance acceptance. Windows profiling policy blocks system trace collection.
 - Dock to GPU: size fit and slot insertion/removal (`dock_feature.cpp`, `size_scale` and `slot_motions`). Reveal and reorder are done.
 - Top Bar pill widths to GPU: Now Playing, current app, tray (`top_bar_feature.cpp:505`). The reveal slide stays on the CPU.
-- Remaining consumers: Launcher results and resize, Settings expandable rows, Stage movement, backdrop and feedback.
+- Remaining consumers: Launcher results and resize, Settings expandable rows.
 - Separate bar visuals from HWND movement and window push on one physical timeline.
 - Live visual and total-workload acceptance for the migrated consumers: Quick Settings, Dock, Switcher, Clipboard, Settings controls, caret, loaders, marquee.
 - Remove obsolete APIs, tracks, timers and sampled render state as each consumer completes.

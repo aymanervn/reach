@@ -23,8 +23,8 @@ static reach_result reach_app_create_surface_ports(void *user, uint32_t window_f
 {
     auto *app = static_cast<reach_app *>(user);
     const reach_result result = reach_windows_create_platform_window(window_flags, window);
-    return result == REACH_OK ? reach_windows_create_dcomp_render_backend(app->render_device,
-                                                                          window->window, renderer)
+    return result == REACH_OK ? reach_windows_create_dcomp_render_backend(
+                                    app->render_device, window->window, window_flags, renderer)
                               : result;
 }
 

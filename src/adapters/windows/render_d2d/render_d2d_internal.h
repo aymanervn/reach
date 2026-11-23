@@ -147,6 +147,19 @@ struct reach_d2d_fit_owner
     uint64_t prefix;
 };
 
+struct reach_d2d_window_thumbnail
+{
+    HTHUMBNAIL handle = nullptr;
+    ComPtr<IDCompositionVisual2> visual;
+    ComPtr<IDCompositionVisual2> parent;
+    uint64_t window = 0;
+    UINT width = 0;
+    UINT height = 0;
+    RECT source = {};
+    bool has_source = false;
+    ~reach_d2d_window_thumbnail();
+};
+
 struct reach_d2d_retained_layer
 {
     uint64_t id = 0;
@@ -186,6 +199,7 @@ struct reach_d2d_retained_layer
     float text_raster_phase_y = 0.0f;
     float text_presentation_phase_y = 0.0f;
     reach_point_f32 parent_origin = {};
+    std::shared_ptr<reach_d2d_window_thumbnail> thumbnail;
 };
 
 struct reach_d2d_retained_attachment
@@ -334,6 +348,10 @@ struct reach_render_backend
 ID2D1RenderTarget *reach_d2d_target(reach_render_backend *backend);
 int32_t reach_d2d_retained_supported(const reach_render_backend *backend);
 int32_t reach_d2d_content_sampling_required(const reach_render_backend *backend);
+int32_t reach_d2d_window_thumbnails_supported(const reach_render_backend *backend);
+HRESULT reach_d2d_sync_window_thumbnail(reach_render_backend *backend,
+                                        reach_d2d_retained_layer &layer,
+                                        const reach_render_command &command);
 reach_result reach_d2d_sample_content(reach_render_backend *backend);
 reach_result reach_d2d_text_fit_bounds(reach_render_backend *backend,
                                        const reach_render_command *command,

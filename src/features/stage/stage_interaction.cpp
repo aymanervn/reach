@@ -149,6 +149,7 @@ void reach_stage_handle_pointer(void *capsule, const reach_pointer_event *event,
         return;
     }
 
+    reach_stage_sync_compositor(stage);
     reach_stage_state *state = &stage->state;
     reach_point_f32 point = {(float)event->x, (float)event->y};
 

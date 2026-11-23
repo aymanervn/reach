@@ -5,7 +5,8 @@
 - Every surface defaults to retained GPU-composited presentation (`retained_presentation` in `include/reach/composition/surface_runtime.h`). A surface stays on the CPU path only for a measured performance reason or a confirmed bug; record that reason in `docs/pending-work.md`, plus a workaround comment for a bug.
 - Prefer compositor-driven visual animation when appearance holds and total cost, latency, power and memory do not regress. Small gains count when the change is simple or helps several consumers.
 - Layout decisions, input policy and native operations stay on the CPU. Each CPU-driven visual animation needs an explicit reason.
-- A CPU path chosen for sync with CPU-placed content, exact pixels or rarity is design, not debt. Stage tiles are the model case. The Top Bar reveal slide is the same case: it moves pushed app windows each frame (`reach_top_bar_bar_position_frame`), so it stays one CPU path even when nothing is pushed. Top Bar pill widths and all Dock motion have no such reason and belong on the GPU.
+- A CPU path chosen for sync with CPU-placed content, exact pixels or rarity is design, not debt. The Top Bar reveal slide is the model case: it moves pushed app windows each frame (`reach_top_bar_bar_position_frame`), so it stays one CPU path even when nothing is pushed. Top Bar pill widths and all Dock motion have no such reason and belong on the GPU.
+- Stage tiles and their live window thumbnails move on the compositor, expressed from Stage's own springs (`stage_motion.cpp`, `REACH_RENDER_COMMAND_WINDOW_THUMBNAIL`). Stage samples per frame only while one tile is driven by two moving tracks, or when the renderer cannot host thumbnails.
 - Reuse `reach_motion`, retained render groups and the presentation/native-overlay contracts. Never add a parallel animation mechanism.
 
 ## Motion

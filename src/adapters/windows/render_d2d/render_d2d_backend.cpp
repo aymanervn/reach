@@ -199,6 +199,7 @@ reach_result reach_d2d_backend_sync_device(reach_render_backend *backend)
 
 reach_result reach_windows_create_dcomp_render_backend(reach_render_device *device,
                                                        reach_platform_window *window,
+                                                       uint32_t window_flags,
                                                        reach_render_backend_port *out_port)
 {
     REACH_ASSERT(device != nullptr);
@@ -227,7 +228,12 @@ reach_result reach_windows_create_dcomp_render_backend(reach_render_device *devi
     backend->device = device;
     backend->device_generation = device->generation;
 
-    HRESULT hr = reach_wuc_create_target(backend) == REACH_OK ? S_OK : E_FAIL;
+    // Live window thumbnails can only join a DirectComposition tree, so such a surface skips the
+    // shared compositor and owns a DirectComposition device.
+    HRESULT hr = (window_flags & REACH_WINDOW_HOSTS_WINDOW_THUMBNAILS) == 0 &&
+                         reach_wuc_create_target(backend) == REACH_OK
+                     ? S_OK
+                     : E_FAIL;
 
     if (FAILED(hr))
     {
@@ -250,6 +256,7 @@ reach_result reach_windows_create_dcomp_render_backend(reach_render_device *devi
     out_port->ops.suspend = reach_d2d_suspend;
     out_port->ops.content_sampling_required = reach_d2d_content_sampling_required;
     out_port->ops.sample_content = reach_d2d_sample_content;
+    out_port->ops.window_thumbnails_supported = reach_d2d_window_thumbnails_supported;
     out_port->ops.execute = reach_d2d_execute;
     out_port->ops.release_icon = reach_d2d_release_icon_cache_entry;
     out_port->ops.set_ui_font = reach_d2d_set_ui_font;

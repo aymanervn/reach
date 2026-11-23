@@ -181,6 +181,7 @@ int32_t reach_stage_set_desktop_bounds(reach_stage *stage, reach_rect_f32 bounds
         return 0;
     }
 
+    reach_stage_sync_compositor(stage);
     stage->state.desktop_bounds = bounds;
     if (!stage->state.open)
     {
@@ -189,6 +190,28 @@ int32_t reach_stage_set_desktop_bounds(reach_stage *stage, reach_rect_f32 bounds
 
     if (stage->state.progress <= 0.0f)
     {
+        reach_stage_rebuild_layout(stage);
+        for (size_t index = 0; index < stage->state.tile_count; ++index)
+        {
+            stage->state.tiles[index].reflow_from = stage->state.tiles[index].target_rect;
+        }
+        reach_stage_apply_progress(stage);
+    }
+    else if (reach_stage_compositor_active(stage) &&
+             (reach_stage_track_active(stage, REACH_STAGE_ANIMATION_PROGRESS) ||
+              reach_stage_track_active(stage, REACH_STAGE_ANIMATION_DESKTOP_PROGRESS)) &&
+             !reach_stage_track_active(stage, REACH_STAGE_ANIMATION_REFLOW))
+    {
+        // While opening, a second reflow spring would stop compositor motion. Re-anchor the open
+        // instead: each tile continues on the progress spring from where it is to its new slot.
+        for (size_t index = 0; index < stage->state.tile_count; ++index)
+        {
+            reach_stage_tile *tile = &stage->state.tiles[index];
+            tile->open_from_rect = tile->current_rect;
+            tile->open_from_progress =
+                tile->desktop ? stage->state.desktop_progress : stage->state.progress;
+            tile->reopening = 1;
+        }
         reach_stage_rebuild_layout(stage);
         for (size_t index = 0; index < stage->state.tile_count; ++index)
         {
@@ -664,7 +687,19 @@ void reach_stage_refresh_tile_frames(reach_stage *stage, const reach_stage_open_
 
 size_t reach_stage_thumbnail_count(const reach_stage *stage)
 {
-    return stage != nullptr ? stage->state.tile_count : 0;
+    // Compositor-driven tiles draw their thumbnails in the surface itself.
+    return stage != nullptr && !reach_stage_compositor_active(stage) ? stage->state.tile_count : 0;
+}
+
+int32_t reach_stage_set_compositor_motion(reach_stage *stage, int32_t enabled)
+{
+    if (stage == nullptr || stage->compositor_motion == (enabled ? 1 : 0))
+        return 0;
+    reach_stage_sync_compositor(stage);
+    stage->compositor_motion = enabled ? 1 : 0;
+    stage->compositor_sampled = 0;
+    stage->compositor_event_seconds = 0.0;
+    return 1;
 }
 
 reach_result reach_stage_thumbnail_at(const reach_stage *stage, size_t index,
@@ -771,6 +806,19 @@ static void reach_stage_sample_tracks(reach_stage *stage)
     state->reflow = reach_stage_track_value(stage, REACH_STAGE_ANIMATION_REFLOW);
     state->departure_progress = reach_stage_track_value(stage, REACH_STAGE_ANIMATION_DEPARTURE);
     state->retarget_progress = reach_stage_track_value(stage, REACH_STAGE_ANIMATION_RETARGET);
+}
+
+void reach_stage_sample_at(reach_stage *stage, double now)
+{
+    stage->sampled_seconds = now;
+    reach_stage_sample_tracks(stage);
+    reach_stage_apply_progress(stage);
+}
+
+void reach_stage_sync_compositor(reach_stage *stage)
+{
+    if (stage != nullptr && stage->state.open && reach_stage_compositor_active(stage))
+        reach_stage_sample_at(stage, reach_motion_now_seconds());
 }
 
 static void reach_stage_finish_settled_springs(reach_stage *stage)
@@ -897,11 +945,14 @@ static int32_t reach_stage_capsule_needs_frame(const void *capsule)
     {
         return 0;
     }
-    if (reach_stage_animation_active(stage))
+    int32_t compositor = reach_stage_compositor_active(stage) && !stage->compositor_sampled;
+    if (!compositor && reach_stage_animation_active(stage))
     {
         return 1;
     }
-    return stage->state.close_phase == REACH_STAGE_CLOSE_MOVING ||
+    // Compositor motion wakes Stage at its next event through the geometry deadline instead.
+    return (stage->state.close_phase == REACH_STAGE_CLOSE_MOVING &&
+            (!compositor || stage->compositor_event_seconds <= 0.0)) ||
                    (stage->state.close_phase == REACH_STAGE_CLOSE_ALIGNED &&
                     !stage->state.close_aligned_committed) ||
                    stage->state.close_phase == REACH_STAGE_CLOSE_TRANSPARENT ||
@@ -936,6 +987,8 @@ static void reach_stage_capsule_surface_geometry(const void *capsule,
         out->synchronize_presentation = (stage->state.close_phase == REACH_STAGE_CLOSE_ALIGNED &&
                                          !stage->state.close_aligned_committed) ||
                                         stage->state.close_phase == REACH_STAGE_CLOSE_TRANSPARENT;
+        if (stage->state.open && reach_stage_compositor_active(stage) && !stage->compositor_sampled)
+            out->deadline_seconds = stage->compositor_event_seconds;
     }
 }
 
@@ -1079,6 +1132,7 @@ int32_t reach_stage_set_open(reach_stage *stage, int32_t open)
         return 0;
     }
 
+    reach_stage_sync_compositor(stage);
     reach_stage_open_window windows[REACH_STAGE_MAX_TILES] = {};
     size_t count = reach_stage_collect_windows(stage, windows, REACH_STAGE_MAX_TILES);
 
@@ -1111,6 +1165,7 @@ int32_t reach_stage_sync_windows(reach_stage *stage)
     {
         return 0;
     }
+    reach_stage_sync_compositor(stage);
     reach_stage_open_window windows[REACH_STAGE_MAX_TILES] = {};
     size_t count = reach_stage_collect_windows(stage, windows, REACH_STAGE_MAX_TILES);
     return reach_stage_update_windows(stage, windows, count);

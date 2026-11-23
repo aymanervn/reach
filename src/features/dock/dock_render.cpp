@@ -10,6 +10,9 @@
 static const uint64_t REACH_DOCK_FEEDBACK_GROUP_ID = UINT64_C(0x4000000000000000);
 #include "reach/core/typography.h"
 
+static_assert(REACH_MAX_DOCK_ITEMS + 128 <= REACH_MAX_RENDER_GROUPS,
+              "the render group budget covers every dock item with room for its chrome");
+
 static uint16_t reach_dock_item_fallback_initial(const reach_dock_item_model *item)
 {
     if (item == nullptr)

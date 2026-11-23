@@ -124,6 +124,9 @@ extern "C"
                                      reach_icon_service *icons, reach_app_control *apps);
     void reach_stage_set_display(reach_stage *stage, const reach_display_environment *display);
     int32_t reach_stage_set_desktop_bounds(reach_stage *stage, reach_rect_f32 bounds);
+    // Enabled when the surface renderer composes live window thumbnails: tiles then move on the
+    // compositor instead of being resampled every frame. Returns whether the mode changed.
+    int32_t reach_stage_set_compositor_motion(reach_stage *stage, int32_t enabled);
     int32_t reach_stage_set_open(reach_stage *stage, int32_t open);
     int32_t reach_stage_sync_windows(reach_stage *stage);
     int32_t reach_stage_animation_active(const reach_stage *stage);

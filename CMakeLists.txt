@@ -218,6 +218,7 @@ add_library(reach_features STATIC
     src/features/stage/stage_interaction.cpp
     src/features/stage/stage_layout.cpp
     src/features/stage/stage_render.cpp
+    src/features/stage/stage_motion.cpp
     src/features/system_hud/system_hud_feature.cpp
     src/features/system_hud/system_hud_render.cpp
     src/features/screenshot/screenshot_feature.cpp
@@ -271,6 +272,7 @@ add_library(reach_windows_adapters STATIC
     src/adapters/windows/render_d2d/render_d2d_commands.cpp
     src/adapters/windows/render_d2d/render_d2d_retained.cpp
     src/adapters/windows/render_d2d/render_d2d_retained_policy.cpp
+    src/adapters/windows/render_d2d/render_d2d_thumbnail.cpp
     src/adapters/windows/search_retriever_win32.cpp
     src/adapters/windows/search_catalog_win32.cpp
     src/adapters/windows/app_launcher_win32.cpp

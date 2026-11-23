@@ -1383,7 +1383,25 @@ static HRESULT sync_layer(reach_render_backend *backend, reach_d2d_retained_laye
                                   local.size() * sizeof(reach_render_command)) != 0);
     bool surface_recreated = false;
     HRESULT hr = S_OK;
-    if (content_changed && count != 0)
+    bool thumbnail = count == 1 && local[0].type == REACH_RENDER_COMMAND_WINDOW_THUMBNAIL;
+    if (content_changed && !thumbnail)
+        layer.thumbnail.reset();
+    if (content_changed && thumbnail)
+    {
+        layer.surface.Reset();
+        layer.surface_brush.Reset();
+        layer.dcomp_surface.Reset();
+        layer.capacity_width = layer.capacity_height = 0;
+        hr = reach_d2d_sync_window_thumbnail(backend, layer, local[0]);
+        if (SUCCEEDED(hr))
+        {
+            layer.commands = local;
+            layer.width = width;
+            layer.height = height;
+            record_retained_bytes(backend);
+        }
+    }
+    else if (content_changed && count != 0)
     {
         hr = draw_layer(backend, layer, local, width, height, &surface_recreated);
         if (SUCCEEDED(hr) && backend->compositor != nullptr)

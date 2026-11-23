@@ -222,6 +222,10 @@ static void reach_host_fill_surface_context(reach_host *host, const reach_featur
     out->retained_supported =
         desc->surface->renderer.ops.retained_supported != nullptr &&
         desc->surface->renderer.ops.retained_supported(desc->surface->renderer.backend);
+    out->window_thumbnails_supported =
+        out->retained_supported &&
+        desc->surface->renderer.ops.window_thumbnails_supported != nullptr &&
+        desc->surface->renderer.ops.window_thumbnails_supported(desc->surface->renderer.backend);
     out->preferred_front_source = desc->native_overlay_front_source;
 }
 
@@ -693,6 +697,7 @@ static int32_t reach_host_surface_layout_context_equal(const reach_feature_surfa
            a->anchor_bar_edge_y == b->anchor_bar_edge_y &&
            a->anchor_bar_height == b->anchor_bar_height &&
            a->anchor_direction == b->anchor_direction && a->anchor_valid == b->anchor_valid &&
+           a->window_thumbnails_supported == b->window_thumbnails_supported &&
            a->preferred_front_source == b->preferred_front_source;
 }
 

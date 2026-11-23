@@ -1160,8 +1160,9 @@ static reach_result reach_stage_native_overlay_item(const void *capsule, size_t 
 
 static int32_t reach_stage_surface_arrange(void *capsule, const reach_feature_surface_context *ctx)
 {
-    return reach_stage_set_desktop_bounds(static_cast<reach_stage *>(capsule),
-                                          ctx->available_bounds);
+    reach_stage *stage = static_cast<reach_stage *>(capsule);
+    int32_t changed = reach_stage_set_compositor_motion(stage, ctx->window_thumbnails_supported);
+    return reach_stage_set_desktop_bounds(stage, ctx->available_bounds) || changed;
 }
 
 static const reach_feature_native_overlay_ops reach_stage_native_overlay_ops = {
@@ -1870,6 +1871,8 @@ reach_result reach_host_init_feature_registry(reach_host *host)
                                               {REACH_EDGE_REVEAL_ANCHOR_TOP_LEFT, 4.0f, 4.0f, 1},
                                               1};
             definition.surface.cls = REACH_SURFACE_CLASS_TRANSIENT;
+            definition.surface.window_flags =
+                REACH_WINDOW_COMPOSITION_BACKED | REACH_WINDOW_HOSTS_WINDOW_THUMBNAILS;
             definition.layout.priority = 65;
             definition.layout.uses_reserved_bounds = 1;
             return definition;

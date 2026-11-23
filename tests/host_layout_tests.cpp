@@ -474,8 +474,8 @@ static void initialize_host(reach_host *host)
                   REACH_WINDOW_COMPOSITION_BACKED | REACH_WINDOW_SESSION_EVENTS |
                       REACH_WINDOW_DESKTOP_MINIMIZE_SUPPORT,
                   102, 110);
-    attach_window(host, reach_host_find_surface<reach_stage>(host), REACH_WINDOW_COMPOSITION_BACKED,
-                  103, 50);
+    attach_window(host, reach_host_find_surface<reach_stage>(host),
+                  REACH_WINDOW_COMPOSITION_BACKED | REACH_WINDOW_HOSTS_WINDOW_THUMBNAILS, 103, 50);
     reach_layout_register_override(&host->layout_manager, host->surface_participants[top_bar_id],
                                    REACH_LAYOUT_CONDITION_BARS_FORCED, 130);
     reach_layout_set_condition(&host->layout_manager, REACH_LAYOUT_CONDITION_BARS_FORCED, 1);
@@ -3857,6 +3857,98 @@ static void test_work_area_claims_merge_per_monitor(void)
                 "no claims leave the whole monitor");
 }
 
+static reach_host stage_render_host;
+
+static void test_stage_compositor_tiles_render_worst_case(void)
+{
+    reach_host *host = &stage_render_host;
+    reach_host_init_feature_registry(host);
+    expect_true(reach_host_create_registered_features(host) == REACH_OK,
+                "registered features are available for Stage tiles");
+    reach_host_init_layout(host);
+    const reach_surface_id id = reach_host_find_surface<reach_stage>(host);
+    reach_feature_runtime *runtime = &host->feature_runtimes[id];
+    const reach_feature_definition *definition = runtime->definition;
+    reach_stage *stage = reach_host_feature_capsule<reach_stage>(host, id);
+
+    static uint16_t title[260];
+    for (size_t at = 0; at + 1 < 260; ++at)
+        title[at] = (uint16_t)('a' + at % 26);
+    static reach_stage_open_window windows[REACH_STAGE_MAX_TILES];
+    const size_t count = REACH_STAGE_MAX_TILES;
+    const char *label = "Stage renders every tracked window on the compositor within budget";
+    const float dpis[] = {1.0f, 2.0f};
+    const reach_rect_f32 monitors[] = {{0.0f, 0.0f, 3840.0f, 2160.0f},
+                                       {0.0f, 0.0f, 1280.0f, 720.0f}};
+    for (float dpi : dpis)
+    {
+        for (reach_rect_f32 monitor : monitors)
+        {
+            for (size_t index = 0; index < count; ++index)
+            {
+                reach_stage_open_window *window = &windows[index];
+                *window = {};
+                window->window = 0x1000 + index * 4;
+                window->label = title;
+                window->icon_id = 7000 + index;
+                window->minimized = index % 3 == 0;
+                window->desktop = index + 1 == count;
+                window->frame = window->desktop
+                                    ? monitor
+                                    : reach_rect_f32{monitor.x + (float)(index % 7) * 40.0f,
+                                                     monitor.y + (float)(index % 5) * 30.0f,
+                                                     monitor.width * 0.6f, monitor.height * 0.6f};
+            }
+            reach_feature_surface_context ctx = make_presentation_contexts(dpi, monitor).base;
+            ctx.visible_bounds = monitor;
+            ctx.retained_supported = 1;
+            ctx.window_thumbnails_supported = 1;
+            size_t thumbnails = 0;
+            auto render = [&]
+            {
+                (void)definition->surface_ops->arrange(runtime->capsule, &ctx);
+                auto storage = std::make_unique<reach_render_command_buffer>();
+                reach_render_command_buffer *commands = storage.get();
+                reach_render_command_buffer_clear(commands);
+                expect_true(definition->surface_ops->append_render_commands(runtime->capsule, &ctx,
+                                                                            commands) == REACH_OK,
+                            label);
+                expect_true(commands->group_count <= REACH_MAX_RENDER_GROUPS &&
+                                commands->count <= REACH_MAX_RENDER_COMMANDS &&
+                                reach_render_command_buffer_validate_groups(commands) == REACH_OK,
+                            label);
+                for (size_t index = 0; index < commands->count; ++index)
+                    thumbnails +=
+                        commands->commands[index].type == REACH_RENDER_COMMAND_WINDOW_THUMBNAIL;
+            };
+            auto step = [&](double seconds)
+            {
+                tick_presented_surface(host, id, seconds);
+                render();
+            };
+
+            expect_true(reach_stage_open(stage, monitor, dpi, windows, count) == REACH_OK, label);
+            render();
+            step(0.05);
+            step(0.6);
+            reach_rect_f32 close = reach_stage_tile_close_button_rect(stage, 1);
+            send_pointer(
+                definition->capsule_ops, runtime->capsule,
+                make_pointer_event(REACH_POINTER_EVENT_MOVE, REACH_POINTER_COORDINATE_SCREEN,
+                                   close.x + close.width * 0.5f, close.y + close.height * 0.5f));
+            step(0.02);
+            expect_true(reach_stage_update_windows(stage, &windows[count - 1], 1), label);
+            render();
+            step(0.05);
+            reach_stage_begin_close(stage);
+            render();
+            step(0.05);
+            reach_stage_force_close(stage);
+            expect_true(thumbnails > 0, label);
+        }
+    }
+}
+
 int main(void)
 {
     test_work_area_claims_merge_per_monitor();
@@ -3902,6 +3994,7 @@ int main(void)
     test_launcher_result_motion_renders_worst_case();
     test_clipboard_card_motion_renders_worst_case();
     test_desktop_widgets_render_worst_case();
+    test_stage_compositor_tiles_render_worst_case();
 
     if (failures != 0)
     {

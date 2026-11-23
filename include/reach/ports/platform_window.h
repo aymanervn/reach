@@ -28,7 +28,10 @@ extern "C"
         REACH_WINDOW_FOCUS_LOST_EVENT = 1u << 7,
         REACH_WINDOW_CROSSHAIR_CURSOR = 1u << 8,
         REACH_WINDOW_TEXT_INPUT = 1u << 9,
-        REACH_WINDOW_STACK_ABOVE_DESKTOP = 1u << 10
+        REACH_WINDOW_STACK_ABOVE_DESKTOP = 1u << 10,
+        // The surface draws live window thumbnails, so its renderer must host them in its own
+        // composition tree.
+        REACH_WINDOW_HOSTS_WINDOW_THUMBNAILS = 1u << 11
     } reach_platform_window_flag;
 
 #define REACH_PLATFORM_WINDOW_MAX_CAPTION_EXCLUSIONS 4

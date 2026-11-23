@@ -88,6 +88,7 @@ extern "C"
                                           reach_render_device_port *out_port);
     reach_result reach_windows_create_dcomp_render_backend(reach_render_device *device,
                                                            reach_platform_window *window,
+                                                           uint32_t window_flags,
                                                            reach_render_backend_port *out_port);
     reach_result reach_windows_create_search_provider(reach_search_provider_port *out_port);
     reach_result reach_windows_create_wifi(reach_wifi_port *out_port);

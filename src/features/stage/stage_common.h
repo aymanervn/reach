@@ -8,6 +8,7 @@
 #include "reach/support/motion.h"
 
 #define REACH_STAGE_DESKTOP_ANIMATION_FACTOR 0.35
+#define REACH_STAGE_PRESENCE_MIN_SCALE 0.88f
 
 static inline float reach_stage_animation_seconds_default(void)
 {
@@ -51,7 +52,38 @@ struct reach_stage
     reach_icon_service *icons;
     reach_app_control *apps;
     reach_display_environment display;
+
+    // Set when the surface's renderer composes live window thumbnails, so tiles move on the
+    // compositor and Stage only wakes at motion events.
+    int32_t compositor_motion;
+    // The last render could not express a tile as compositor motion and samples every frame.
+    int32_t compositor_sampled;
+    double compositor_event_seconds;
 };
+
+typedef struct reach_stage_tile_motion
+{
+    reach_rect_motion rect;
+    reach_motion bar;
+    reach_motion alpha;
+    reach_motion presence;
+    uint32_t tracks;
+} reach_stage_tile_motion;
+
+// Returns 0 when the tile needs more than one moving track or would not match the CPU sample at
+// now; the state must already be sampled at now.
+int32_t reach_stage_tile_motion_at(const reach_stage *stage, size_t index, double now,
+                                   reach_stage_tile_motion *out);
+// The next moment Stage logic must run while its tiles move on the compositor: the earliest
+// spring snap or the end of another moving track; 0 when nothing moves.
+double reach_stage_motion_event_seconds(const reach_stage *stage,
+                                        const reach_stage_tile_motion *motions, double now);
+// Samples every track at now and lays tiles out from it, without snapping settled springs.
+void reach_stage_sample_at(reach_stage *stage, double now);
+int32_t reach_stage_compositor_active(const reach_stage *stage);
+// Between compositor events the sampled state is stale; every entry point that reads or changes
+// tile geometry brings it to now first.
+void reach_stage_sync_compositor(reach_stage *stage);
 
 reach_rect_f32 reach_stage_interpolate_rect(reach_rect_f32 from, reach_rect_f32 to, float factor);
 reach_rect_f32 reach_stage_minimized_offscreen_rect(const reach_stage_state *state,

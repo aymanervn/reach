@@ -12,7 +12,9 @@ extern "C"
 #endif
 
 #define REACH_MAX_RENDER_COMMANDS 2048
-#define REACH_MAX_RENDER_GROUPS (REACH_MAX_DOCK_ITEMS + 128)
+// Sized for the largest consumer, Stage tiling every tracked window; each consumer that can reach
+// it asserts its worst case against it (stage_render.cpp, dock_render.cpp).
+#define REACH_MAX_RENDER_GROUPS 600
 
     typedef enum reach_render_clip_edge
     {
@@ -86,7 +88,10 @@ extern "C"
         REACH_RENDER_COMMAND_TEXTBOX = 15,
         REACH_RENDER_COMMAND_ARC_STROKE = 16,
         REACH_RENDER_COMMAND_SHADOW = 17,
-        REACH_RENDER_COMMAND_LINE = 18
+        REACH_RENDER_COMMAND_LINE = 18,
+        // A live image of another top-level window (window_id) filling rect. It must be the only
+        // command of its group; only backends reporting window_thumbnails_supported draw it.
+        REACH_RENDER_COMMAND_WINDOW_THUMBNAIL = 19
     } reach_render_command_type;
 
     typedef enum reach_render_corner_mask
@@ -236,6 +241,9 @@ extern "C"
         int32_t selection_start;
         int32_t selection_end;
         uint16_t placeholder[128];
+        uint64_t window_id;
+        // Screen-space part of the source window to show; zero size means its visible frame.
+        reach_rect_f32 source_screen;
     } reach_render_command;
 
     typedef struct reach_render_command_buffer

@@ -2914,7 +2914,7 @@ reach_result reach_settings_app_create(reach_settings_app **out_app,
     if (result == REACH_OK)
     {
         result = reach_windows_create_dcomp_render_backend(app->render_device, app->window.window,
-                                                           &app->renderer);
+                                                           0, &app->renderer);
     }
     if (result == REACH_OK)
     {

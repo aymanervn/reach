@@ -510,6 +510,18 @@ reach_result reach_render_command_buffer_validate_groups(const reach_render_comm
     for (index = 0; index < buffer->count; ++index)
     {
         const reach_render_command *command = &buffer->commands[index];
+        if (command->type == REACH_RENDER_COMMAND_WINDOW_THUMBNAIL)
+        {
+            if (command->group_id == 0 || command->window_id == 0 || command->rect_fit_to_clip ||
+                command->text_fit_to_clip || command->has_scissor)
+                return REACH_INVALID_ARGUMENT;
+            for (other = 0; other < buffer->count; ++other)
+                if (other != index && buffer->commands[other].group_id == command->group_id)
+                    return REACH_INVALID_ARGUMENT;
+            for (other = 0; other < buffer->group_count; ++other)
+                if (buffer->groups[other].parent_id == command->group_id)
+                    return REACH_INVALID_ARGUMENT;
+        }
         if (command->rect_fit_to_clip != 0 && command->rect_fit_to_clip != 1)
             return REACH_INVALID_ARGUMENT;
         if (command->fill_gradient != REACH_RENDER_FILL_SOLID &&
