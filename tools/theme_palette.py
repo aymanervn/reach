@@ -32,6 +32,7 @@ NEUTRALS = [
     ("LIGHT_BORDER", 0.675),
     ("DARK_TEXT", 1.000),
     ("LIGHT_TEXT", 0.000),
+    ("FILL", 0.570),
 ]
 
 # (name, opacity): text strengths applied to the per-mode text base.
@@ -42,12 +43,19 @@ TEXT_STRENGTHS = [
     ("QUATERNARY", 0.18),
 ]
 
+# (name, dark opacity, light opacity): fill strengths applied to FILL behind content.
+FILL_STRENGTHS = [
+    ("PRIMARY", 0.36, 0.20),
+    ("SECONDARY", 0.32, 0.16),
+    ("TERTIARY", 0.24, 0.12),
+    ("QUATERNARY", 0.18, 0.08),
+]
+
 # (name, L, C, h): OKLCH lightness 0-1, chroma, hue in degrees.
 PALETTE = [
     ("PURE_WHITE", 1.000, 0.000, 0),
     ("PURE_BLACK", 0.000, 0.000, 0),
     ("CRITICAL_RED", 0.592, 0.193, 25.3),
-    ("DARK_MID_CONTRAST_GRAY", 0.671, 0.004, 146),
     ("DARK_HIGH_CONTRAST_WHITE", 0.842, 0.000, 0),
     ("BRIGHT_BLUE", 0.667, 0.179, 255.5),
     ("BRIGHT_CYAN", 0.7396, 0.1404, 233.9),
@@ -62,7 +70,6 @@ PALETTE = [
     ("DARK_BATTERY_GREEN", 0.530, 0.130, 151),
     ("DARK_BATTERY_YELLOW", 0.5211, 0.1057, 79.7),
     ("DARK_BATTERY_RED", 0.512, 0.155, 24.5),
-    ("LIGHT_MID_CONTRAST_GRAY", 0.540, 0.003, 129),
     ("LIGHT_HIGH_CONTRAST_BLACK", 0.197, 0.012, 145),
     ("DEEP_BLUE", 0.520, 0.185, 260.5),
     ("DEEP_CYAN", 0.571, 0.123, 239),
@@ -124,6 +131,9 @@ def render() -> str:
     lines.append("")
     for name, opacity in TEXT_STRENGTHS:
         lines.append(f"#define REACH_TEXT_{name} {opacity:.2f}f")
+    for name, dark, light in FILL_STRENGTHS:
+        lines.append(f"#define REACH_DARK_FILL_{name} {dark:.2f}f")
+        lines.append(f"#define REACH_LIGHT_FILL_{name} {light:.2f}f")
     lines += ["", "#endif", ""]
     return "\n".join(lines)
 
