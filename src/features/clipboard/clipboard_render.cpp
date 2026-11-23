@@ -718,8 +718,8 @@ reach_result reach_clipboard_build_render_commands(const reach_clipboard_render_
         command = {};
         command.type = REACH_RENDER_COMMAND_TEXT;
         command.rect = clear_button;
-        command.color = theme->clipboard_secondary_text;
-        command.color.a *= clear_enabled ? 0.90f : 0.35f;
+        command.color =
+            clear_enabled ? theme->clipboard_secondary_text : theme->clipboard_disabled_text;
         command.text_size = metrics.items_font_size;
         command.text_alignment = REACH_TEXT_ALIGNMENT_CENTER;
         reach_copy_utf16(command.text, 260, (const uint16_t *)L"Clear");

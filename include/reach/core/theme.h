@@ -190,6 +190,7 @@ extern "C"
         reach_color clipboard_border;
         reach_color clipboard_primary_text;
         reach_color clipboard_secondary_text;
+        reach_color clipboard_disabled_text;
         reach_color clipboard_empty_text;
         reach_color clipboard_item_background;
         reach_color clipboard_clear_button_background;
@@ -206,6 +207,7 @@ extern "C"
         reach_color settings_nav_background;
         reach_color settings_text;
         reach_color settings_secondary_text;
+        reach_color settings_tertiary_text;
         reach_color settings_card_background;
         reach_color settings_pill_background;
         reach_color settings_icon_box_background;

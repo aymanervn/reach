@@ -12,12 +12,6 @@ float reach_settings_scale(const reach_settings_render_input *input, float value
     return value * (input->dpi_scale > 0.0f ? input->dpi_scale : 1.0f);
 }
 
-reach_color reach_settings_color_with_alpha(reach_color color, float alpha)
-{
-    color.a = alpha;
-    return color;
-}
-
 void reach_settings_push_rect(reach_render_command_buffer *commands, reach_rect_f32 rect,
                               float radius, reach_color color)
 {

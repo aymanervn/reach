@@ -221,8 +221,7 @@ static void render_account_page(const reach_settings_render_input *input,
             state.selection_end = 0;
         }
         state.text_color = input->theme->settings_text;
-        state.placeholder_color =
-            reach_settings_color_with_alpha(input->theme->settings_secondary_text, 0.55f);
+        state.placeholder_color = input->theme->settings_tertiary_text;
         state.selection_color = input->theme->accent_selection;
         float text_inset = reach_settings_scale(input, 13.0f);
         reach_rect_f32 text_rect = {field_rect.x + text_inset, field_rect.y,
@@ -274,18 +273,17 @@ static void render_power_page(const reach_settings_render_input *input,
             const reach_motion *motion = &model->power_wait_toggles[timer];
             int32_t retained = reach_ui_color_feedback_begin(
                 commands, id + 3, layout->power_wait_labels[timer],
-                reach_settings_color_with_alpha(input->theme->settings_secondary_text, 0.7f),
-                reach_settings_color_with_alpha(input->theme->settings_secondary_text, 1.0f),
-                motion);
-            reach_settings_push_text(commands, layout->power_wait_labels[timer],
-                                     (const uint16_t *)L"Wait for apps keeping the PC awake",
-                                     reach_settings_scale(input, REACH_TEXT_SIZE_XSMALL),
-                                     REACH_TEXT_WEIGHT_NORMAL, REACH_TEXT_ALIGNMENT_TRAILING,
-                                     retained ? reach_color{1, 1, 1, 1}
-                                              : reach_settings_color_with_alpha(
-                                                    input->theme->settings_secondary_text,
-                                                    0.7f + 0.3f * reach_motion_value(motion)),
-                                     1);
+                input->theme->settings_secondary_text, input->theme->settings_text, motion);
+            reach_settings_push_text(
+                commands, layout->power_wait_labels[timer],
+                (const uint16_t *)L"Wait for apps keeping the PC awake",
+                reach_settings_scale(input, REACH_TEXT_SIZE_XSMALL), REACH_TEXT_WEIGHT_NORMAL,
+                REACH_TEXT_ALIGNMENT_TRAILING,
+                retained ? reach_color{1, 1, 1, 1}
+                         : reach_theme_color_mix(input->theme->settings_secondary_text,
+                                                 input->theme->settings_text,
+                                                 reach_motion_value(motion)),
+                1);
             if (retained)
                 reach_render_command_buffer_end_group(commands);
             reach_ui_toggle_style toggle_style = {};
@@ -364,11 +362,9 @@ static void render_power_page(const reach_settings_render_input *input,
                     state.text_color_motion = &selection;
                     state.text_color_to = accent;
                     state.text_color_id = id + 2 + field;
-                    state.placeholder_color = reach_settings_color_with_alpha(
-                        input->theme->settings_secondary_text, 0.55f);
+                    state.placeholder_color = input->theme->settings_tertiary_text;
                     state.selection_color = input->theme->accent_selection;
-                    state.suffix_color = reach_settings_color_with_alpha(
-                        input->theme->settings_secondary_text, 0.65f);
+                    state.suffix_color = input->theme->settings_secondary_text;
                     reach_ui_textbox_render(commands, layout->power_custom_fields[timer][field],
                                             &custom_style, 0, &state);
                 }
@@ -1447,11 +1443,10 @@ reach_result reach_settings_build_render_commands(const reach_settings_render_in
     append_text(footer_text, 64,
                 input->model->reach_current_version[0] != 0 ? input->model->reach_current_version
                                                             : (const uint16_t *)u"?");
-    reach_settings_push_text(
-        commands, input->layout->nav_footer, footer_text,
-        reach_settings_scale(input, REACH_TEXT_SIZE_XSMALL), REACH_TEXT_WEIGHT_NORMAL,
-        input->text_alignment_leading,
-        reach_settings_color_with_alpha(input->theme->settings_secondary_text, 0.7f), 1);
+    reach_settings_push_text(commands, input->layout->nav_footer, footer_text,
+                             reach_settings_scale(input, REACH_TEXT_SIZE_XSMALL),
+                             REACH_TEXT_WEIGHT_NORMAL, input->text_alignment_leading,
+                             input->theme->settings_secondary_text, 1);
 
     reach_settings_push_text(commands, input->layout->content_title,
                              reach_settings_page_title(input->model->selected_page),

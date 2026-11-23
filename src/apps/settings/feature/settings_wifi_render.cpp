@@ -38,8 +38,7 @@ static void reach_settings_wifi_render_key_field(const reach_settings_render_inp
         state.selection_end = 0;
     }
     state.text_color = input->theme->settings_text;
-    state.placeholder_color =
-        reach_settings_color_with_alpha(input->theme->settings_secondary_text, 0.55f);
+    state.placeholder_color = input->theme->settings_tertiary_text;
     state.selection_color = input->theme->accent_selection;
     float inset = reach_settings_scale(input, 13.0f);
     reach_rect_f32 text_rect = {field.x + inset, field.y, field.width - inset * 2.0f, field.height};
@@ -98,8 +97,7 @@ static void reach_settings_wifi_render_add_row(const reach_settings_render_input
         name_state.selection_end = 0;
     }
     name_state.text_color = input->theme->settings_text;
-    name_state.placeholder_color =
-        reach_settings_color_with_alpha(input->theme->settings_secondary_text, 0.55f);
+    name_state.placeholder_color = input->theme->settings_tertiary_text;
     name_state.selection_color = input->theme->accent_selection;
     float name_inset = reach_settings_scale(input, 13.0f);
     reach_rect_f32 name_rect = {
@@ -180,10 +178,8 @@ static void reach_settings_wifi_render_row(const reach_settings_render_input *in
     float header_height = reach_settings_scale(input, 58.0f);
     reach_rect_f32 icon = {row.x + reach_settings_scale(input, 15.0f),
                            row.y + (header_height - icon_size) * 0.5f, icon_size, icon_size};
-    reach_color icon_color =
-        network->in_range
-            ? input->theme->settings_secondary_text
-            : reach_settings_color_with_alpha(input->theme->settings_secondary_text, 0.6f);
+    reach_color icon_color = network->in_range ? input->theme->settings_secondary_text
+                                               : input->theme->settings_tertiary_text;
     reach_settings_push_icon(commands, icon, icon_color, REACH_VECTOR_ICON_WIFI_HIGH, 0.0f);
     reach_settings_push_icon(commands, icon, accent,
                              reach_wifi_signal_icon(network->signal_strength), 0.0f);
