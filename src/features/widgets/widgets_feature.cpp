@@ -889,20 +889,19 @@ static void reach_widgets_card(reach_render_command_buffer *commands, const reac
     shape.type = REACH_RENDER_COMMAND_RECT;
     shape.rect = rect;
     shape.radius = radius;
-    const auto background = reach_theme_color_mix(theme->widget_background, theme->accent, 0.12f);
-    (void)reach_render_push_bordered_background(commands, &shape, background, theme->widget_border,
-                                                border, &theme->widget_shadow, scale);
+    (void)reach_render_push_bordered_background(commands, &shape, theme->widget_accent_background,
+                                                theme->widget_border, border, &theme->widget_shadow,
+                                                scale);
 }
 
 static void reach_widgets_decorate(reach_render_command_buffer *commands, reach_rect_f32 inner,
-                                   float radius, reach_color accent)
+                                   float radius, reach_color decoration, reach_color ribbon_color)
 {
     reach_render_command tint = {};
     tint.type = REACH_RENDER_COMMAND_RECT;
     tint.rect = inner;
     tint.radius = radius;
-    tint.color = accent;
-    tint.color.a = 0.16f;
+    tint.color = decoration;
     tint.fill_gradient = REACH_RENDER_FILL_EASED_FADE_DOWN;
     (void)reach_render_command_buffer_push(commands, &tint);
 
@@ -914,8 +913,7 @@ static void reach_widgets_decorate(reach_render_command_buffer *commands, reach_
         ribbon.rect = {inner.x + inner.width * (wave == 0 ? -0.55f : 0.16f),
                        inner.y + inner.height * (wave == 0 ? 0.64f : 0.76f), span, span};
         ribbon.radius = span * 0.5f;
-        ribbon.color = accent;
-        ribbon.color.a = wave == 0 ? 0.09f : 0.08f;
+        ribbon.color = ribbon_color;
         ribbon.clip_rect = inner;
         ribbon.clip_radius = radius;
         (void)reach_render_command_buffer_push(commands, &ribbon);
@@ -958,10 +956,8 @@ static void reach_widgets_segments(reach_render_command_buffer *commands, const 
     const float meter_x = track.x + track.width - meter_width;
     const float amount_filled =
         available ? std::clamp(value / 100.0f, 0.0f, 1.0f) * segments : 0.0f;
-    auto empty = theme->accent_text;
-    empty.a = 0.18f;
-    auto muted = theme->accent_text;
-    muted.a = 0.55f;
+    const reach_color empty = theme->widget_meter_empty;
+    const reach_color muted = theme->widget_meter_muted;
     for (int32_t segment = 0; segment < segments; ++segment)
     {
         const reach_rect_f32 pill = {meter_x + segment * (pill_width + gap),
@@ -1068,7 +1064,7 @@ static void reach_widgets_section_header(reach_render_command_buffer *commands,
         reach_widgets_rect(commands,
                            reach_ui_horizontal_separator_bounds(
                                divider_x, section.y + section.height * 0.5f, divider_width, scale),
-                           0.0f, reach_theme_color_alpha(theme->accent_text, 0.25f));
+                           0.0f, theme->widget_section_divider);
     }
 }
 
@@ -1400,9 +1396,9 @@ static void reach_widgets_render_body(const reach_widgets *widgets, size_t index
             {
                 const auto button =
                     reach_widgets_control_bounds(chrome, (int32_t)index, control, scale);
-                reach_color wash = actual->accent;
-                wash.a = control == 1 ? 0.22f : 0.08f;
-                reach_widgets_rect(commands, button, button.height * 0.5f, wash);
+                reach_widgets_rect(commands, button, button.height * 0.5f,
+                                   control == 1 ? actual->widget_primary_control_wash
+                                                : actual->widget_control_wash);
                 reach_render_command icon = {};
                 icon.type = REACH_RENDER_COMMAND_VECTOR_ICON;
                 icon.icon_id = controls[control];
@@ -1487,9 +1483,8 @@ reach_result reach_widgets_render_desktop(const reach_widgets *widgets, const re
             {
                 return result;
             }
-            auto marker = actual->accent;
-            marker.a = 0.28f;
-            reach_widgets_rect(commands, {0, 0, target.width, target.height}, card_radius, marker);
+            reach_widgets_rect(commands, {0, 0, target.width, target.height}, card_radius,
+                               actual->widget_drag_marker);
             reach_render_command_buffer_end_group(commands);
         }
         reach_result result =
@@ -1517,7 +1512,8 @@ reach_result reach_widgets_render_desktop(const reach_widgets *widgets, const re
             artwork.overlay = actual->widget_artwork_overlay;
             (void)reach_now_playing_artwork_build_render_commands(&artwork, commands);
         }
-        reach_widgets_decorate(commands, inner, inner_radius, actual->accent);
+        reach_widgets_decorate(commands, inner, inner_radius, actual->widget_decoration,
+                               actual->widget_decoration_ribbon);
         const auto chrome =
             reach_widgets_chrome(rect, scale, reach_widgets_has_footer((int32_t)index));
         reach_widgets_render_body(widgets, index, chrome, actual, scale, text_measure, commands);

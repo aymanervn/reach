@@ -43,6 +43,14 @@ TEXT_STRENGTHS = [
     ("QUATERNARY", 0.18),
 ]
 
+# (name, opacity): accent strengths applied to the resolved accent fill or accent text.
+ACCENT_STRENGTHS = [
+    ("FAINT", 0.12),
+    ("TINT", 0.20),
+    ("SELECTION", 0.30),
+    ("MUTED", 0.55),
+]
+
 # (name, dark opacity, light opacity): fill strengths applied to FILL behind content.
 FILL_STRENGTHS = [
     ("PRIMARY", 0.36, 0.20),
@@ -69,8 +77,6 @@ HUE_FAMILIES = [
 PALETTE = [
     ("PURE_WHITE", 1.000, 0.000, 0),
     ("PURE_BLACK", 0.000, 0.000, 0),
-    ("DARK_HIGH_CONTRAST_WHITE", 0.842, 0.000, 0),
-    ("LIGHT_HIGH_CONTRAST_BLACK", 0.197, 0.012, 145),
 ]
 
 
@@ -119,6 +125,8 @@ def render() -> str:
     lines.append("")
     for name, opacity in TEXT_STRENGTHS:
         lines.append(f"#define REACH_TEXT_{name} {opacity:.2f}f")
+    for name, opacity in ACCENT_STRENGTHS:
+        lines.append(f"#define REACH_ACCENT_{name} {opacity:.2f}f")
     for name, dark, light in FILL_STRENGTHS:
         lines.append(f"#define REACH_DARK_FILL_{name} {dark:.2f}f")
         lines.append(f"#define REACH_LIGHT_FILL_{name} {light:.2f}f")

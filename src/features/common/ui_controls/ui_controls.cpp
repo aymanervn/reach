@@ -446,8 +446,8 @@ void reach_ui_selection_item_backdrop_render(reach_render_command_buffer *comman
     }
 
     reach_color background =
-        reach_theme_color_mix(style->background, style->accent, 0.22f * selection);
-    reach_color border = reach_theme_color_mix(background, style->accent, 0.85f * selection);
+        reach_theme_color_mix(style->background, style->accent, style->selected_tint * selection);
+    reach_color border = reach_theme_color_mix(background, style->accent, selection);
     reach_render_command shape = {};
     shape.type = REACH_RENDER_COMMAND_RECT;
     shape.rect = bounds;
@@ -471,11 +471,12 @@ void reach_ui_selection_item_render(reach_render_command_buffer *commands, reach
 }
 
 static reach_result reach_ui_selection_background_motion(const reach_motion &selection, float from,
-                                                         float to, float accent, reach_motion *out)
+                                                         float to, float accent, float tint,
+                                                         reach_motion *out)
 {
     if (from == to)
     {
-        *out = reach_motion_affine(&selection, .22f * (accent - from), from);
+        *out = reach_motion_affine(&selection, tint * (accent - from), from);
         return REACH_OK;
     }
     float values[9] = {};
@@ -483,7 +484,7 @@ static reach_result reach_ui_selection_background_motion(const reach_motion &sel
     {
         float progress = (float)index * .125f;
         float background = from + (to - from) * progress;
-        values[index] = background + (accent - background) * .22f * progress;
+        values[index] = background + (accent - background) * tint * progress;
     }
     float previous = (values[1] - values[0]) * 8;
     reach_motion mapped = reach_motion_affine(&selection, previous, values[0]);
@@ -536,7 +537,8 @@ reach_result reach_ui_selection_item_motion_backdrop_render(
     float accent[] = {style->accent.r, style->accent.g, style->accent.b};
     for (size_t channel = 0; channel < 3; ++channel)
         if (reach_ui_selection_background_motion(progress, start[channel], finish[channel],
-                                                 accent[channel], &ink.tint[channel]) != REACH_OK)
+                                                 accent[channel], style->selected_tint,
+                                                 &ink.tint[channel]) != REACH_OK)
             return sampled();
     reach_motion_set(&ink.tint[REACH_RENDER_COLOR_ALPHA], 1);
     reach_render_command shape = {};
@@ -560,8 +562,7 @@ reach_result reach_ui_selection_item_motion_backdrop_render(
         if (index == 0)
         {
             group.tint_rgb_target = style->accent;
-            auto mix = reach_motion_affine(&progress, .85f, 0);
-            group.tint_rgb_mix = reach_motion_clamp(&mix, 0, 1);
+            group.tint_rgb_mix = progress;
         }
         commands->current_group_id = 0;
         reach_result result = reach_render_command_buffer_begin_group(commands, &group);

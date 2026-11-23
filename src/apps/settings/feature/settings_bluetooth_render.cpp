@@ -103,10 +103,9 @@ static void reach_settings_bluetooth_render_row(const reach_settings_render_inpu
 
     if (layout->bluetooth_action_button.width > 0.0f)
     {
-        reach_ui_button_style action_style =
-            device->paired
-                ? reach_settings_button_style(input, input->theme->settings_button_danger)
-                : reach_settings_accent_button_style(input);
+        reach_ui_button_style action_style = device->paired
+                                                 ? reach_settings_danger_button_style(input)
+                                                 : reach_settings_accent_button_style(input);
         reach_ui_button_render(
             commands, layout->bluetooth_action_button,
             device->paired ? (const uint16_t *)u"Remove" : (const uint16_t *)u"Pair", &action_style,

@@ -280,8 +280,7 @@ static void reach_settings_wifi_render_row(const reach_settings_render_input *in
     }
     if (layout->wifi_forget_button.width > 0.0f)
     {
-        reach_ui_button_style forget_style =
-            reach_settings_button_style(input, input->theme->settings_button_danger);
+        reach_ui_button_style forget_style = reach_settings_danger_button_style(input);
         reach_ui_button_render(
             commands, layout->wifi_forget_button, (const uint16_t *)u"Forget", &forget_style, 1, 2,
             reach_settings_model_button_press_motion(model, REACH_SETTINGS_HIT_WIFI_FORGET));

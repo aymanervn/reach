@@ -118,11 +118,9 @@ static void render_account_page(const reach_settings_render_input *input,
                            avatar.y - reach_settings_scale(input, 3.0f),
                            avatar.width + reach_settings_scale(input, 6.0f),
                            avatar.height + reach_settings_scale(input, 6.0f)};
-    reach_color ring_color =
-        reach_theme_color_mix(input->theme->settings_card_background, accent, 0.55f);
-    reach_settings_push_bordered_background(commands, ring, ring.width * 0.5f,
-                                            reach_settings_scale(input, 1.5f),
-                                            input->theme->settings_card_background, ring_color);
+    reach_settings_push_bordered_background(
+        commands, ring, ring.width * 0.5f, reach_settings_scale(input, 1.5f),
+        input->theme->settings_card_background, input->theme->settings_avatar_ring);
     if (model->account_picture != 0)
     {
         push_avatar_image(commands, avatar, model->account_picture);
@@ -130,7 +128,7 @@ static void render_account_page(const reach_settings_render_input *input,
     else
     {
         reach_settings_push_rect(commands, avatar, avatar.width * 0.5f,
-                                 reach_settings_color_with_alpha(accent, 0.22f));
+                                 input->theme->settings_avatar_placeholder);
         uint16_t initial[2] = {reach_settings_account_initial(model), 0};
         reach_settings_push_text(
             commands, avatar, initial, reach_settings_scale(input, REACH_TEXT_SIZE_XLARGE),
@@ -1007,7 +1005,7 @@ static void render_installed_apps_page(const reach_settings_render_input *input,
         reach_ui_button_style uninstall_style = reach_settings_muted_button_style(input);
         uninstall_style.has_pressed_colors = 1;
         uninstall_style.pressed_background = input->theme->settings_button_danger;
-        uninstall_style.pressed_text = input->theme->settings_button_text;
+        uninstall_style.pressed_text = input->theme->settings_button_danger_text;
         uninstall_style.radius = layout->installed_app_uninstall_buttons[index].height * 0.5f;
         reach_ui_button_render(commands, layout->installed_app_uninstall_buttons[index],
                                (const uint16_t *)u"Uninstall", &uninstall_style,
@@ -1197,8 +1195,7 @@ static void render_update_page(const reach_settings_render_input *input,
         commands, layout->update_install_button, (const uint16_t *)u"Install selected",
         &install_style, install_enabled, 2,
         reach_settings_model_button_press_motion(model, REACH_SETTINGS_HIT_UPDATE_INSTALL));
-    reach_ui_button_style restart_style =
-        reach_settings_button_style(input, input->theme->settings_button_danger);
+    reach_ui_button_style restart_style = reach_settings_danger_button_style(input);
     reach_ui_button_render(
         commands, layout->update_restart_button, (const uint16_t *)u"Restart now", &restart_style,
         restart_enabled, 2,

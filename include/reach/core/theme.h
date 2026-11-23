@@ -215,6 +215,7 @@ extern "C"
         reach_color settings_toggle_track_off;
         reach_color settings_toggle_knob;
         reach_color settings_button_text;
+        reach_color settings_button_danger_text;
         reach_color settings_button_danger;
         reach_color settings_button_disabled_background;
         reach_color settings_status_success;
@@ -228,11 +229,22 @@ extern "C"
         reach_color accent_text;
         reach_color accent_tint;
         reach_color accent_selection;
+        reach_color widget_accent_background;
+        reach_color widget_decoration;
+        reach_color widget_decoration_ribbon;
+        reach_color widget_meter_empty;
+        reach_color widget_meter_muted;
+        reach_color widget_section_divider;
+        reach_color widget_drag_marker;
+        reach_color widget_primary_control_wash;
+        reach_color widget_control_wash;
+        reach_color settings_avatar_ring;
+        reach_color settings_avatar_placeholder;
 
         float radius_small;
         float radius_large;
         float button_pressed_darken;
-        float accent_tint_alpha;
+        float settings_pill_selected_tint;
         float dock_corner_radius_ratio;
         float border_thickness;
         float icon_box_height_ratio;

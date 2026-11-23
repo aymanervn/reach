@@ -29,6 +29,9 @@ extern "C"
         reach_color background;
         reach_color accent;
         reach_color text;
+        // Share of accent blended into the background when fully selected; the border reaches
+        // the full accent.
+        float selected_tint;
         float border_width;
         float text_size;
         int32_t text_weight;
