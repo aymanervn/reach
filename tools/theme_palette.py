@@ -51,7 +51,6 @@ ACCENT_STRENGTHS = [
 
 # (name, dark opacity, light opacity): fill strengths applied to FILL behind content.
 FILL_STRENGTHS = [
-    ("PRIMARY", 0.36, 0.20),
     ("SECONDARY", 0.32, 0.16),
     ("TERTIARY", 0.24, 0.12),
     ("QUATERNARY", 0.18, 0.08),
