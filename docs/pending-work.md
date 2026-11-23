@@ -4,7 +4,7 @@ Open items only.
 
 ## Needs the user's decision
 
-- Theme redesign phases (`tools/theme_palette.py`): 4 hue families shared by accents, battery, stats and status; 5 accent roles.
+- Theme redesign phases (`tools/theme_palette.py`): 4 hue families shared by accents, battery, stats and status (applied; validate live: accent presets, battery states, stats, Settings status text and red buttons in both modes); 5 accent roles.
 - Accent ladder: accent-derived strengths are still literals in features (`widgets_feature.cpp:892,905,962,964,1071,1491`, `ui_controls.cpp:449-450`, `settings_render.cpp:122`). Choose a few accent roles derived in `reach_theme_resolve`, then tokenize them.
 
 ## Bugs
