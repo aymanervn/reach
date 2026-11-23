@@ -80,6 +80,7 @@ static const reach_theme reach_theme_dark = {
     .inverse_text = REACH_DARK_BASE(0.92f),
 
     .icon_box_background = REACH_PURE_WHITE(1.0f),
+    .dock_fallback_icon_background = REACH_PURE_WHITE(0.80f),
     .system_glyph = REACH_DARK_HIGH_CONTRAST_WHITE(1.0f),
     .fallback_icon_text = REACH_DARK_BASE(0.92f),
     .bar_text_primary = REACH_DARK_HIGH_CONTRAST_WHITE(1.0f),
@@ -221,6 +222,7 @@ static const reach_theme reach_theme_light = {
     .inverse_text = REACH_PURE_WHITE(0.95f),
 
     .icon_box_background = REACH_LIGHT_RAISED(1.0f),
+    .dock_fallback_icon_background = REACH_LIGHT_RAISED(0.80f),
     .system_glyph = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.92f),
     .fallback_icon_text = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.92f),
     .bar_text_primary = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.94f),

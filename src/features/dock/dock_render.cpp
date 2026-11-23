@@ -154,8 +154,8 @@ static void reach_dock_push_item(const reach_dock_render_input *input,
     }
     else
     {
-        reach_color fallback_background = theme->icon_box_background;
-        fallback_background.a *= reach_dock_metrics_values.fallback_icon_background_alpha * reveal;
+        reach_color fallback_background = theme->dock_fallback_icon_background;
+        fallback_background.a *= reveal;
         reach_dock_push_rect(commands, icon_box, fallback_background, icon_box_radius);
 
         reach_render_command command = {};
