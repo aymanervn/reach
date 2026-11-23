@@ -123,6 +123,7 @@ static const reach_theme reach_theme_dark = {
     .launcher_row_title = REACH_DARK_HIGH_CONTRAST_WHITE(0.86f),
     .launcher_row_title_selected = REACH_DARK_HIGH_CONTRAST_WHITE(1.0f),
     .launcher_row_path = REACH_DARK_MID_CONTRAST_GRAY(1.0f),
+    .launcher_press_overlay = REACH_PURE_BLACK(0.12f),
 
     .switcher_label_text = REACH_DARK_HIGH_CONTRAST_WHITE(1.0f),
 
@@ -258,6 +259,7 @@ static const reach_theme reach_theme_light = {
     .launcher_row_title = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.86f),
     .launcher_row_title_selected = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.96f),
     .launcher_row_path = REACH_LIGHT_MID_CONTRAST_GRAY(1.0f),
+    .launcher_press_overlay = REACH_PURE_BLACK(0.12f),
 
     .switcher_label_text = REACH_LIGHT_HIGH_CONTRAST_BLACK(0.96f),
 

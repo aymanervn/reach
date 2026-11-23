@@ -162,6 +162,7 @@ extern "C"
         reach_color launcher_row_title;
         reach_color launcher_row_title_selected;
         reach_color launcher_row_path;
+        reach_color launcher_press_overlay;
 
         reach_color switcher_label_text;
 

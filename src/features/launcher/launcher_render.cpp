@@ -342,10 +342,9 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
             reach_render_group placement = {};
             placement.bounds = press;
             placement.parent_id = content_id;
-            reach_color overlay = {0.0f, 0.0f, 0.0f, 0.12f};
             result = reach_ui_feedback_render(out_commands, UINT64_C(0x2900000000060031), press,
-                                              row_selected_radius, overlay, &input->press_feedback,
-                                              &placement);
+                                              row_selected_radius, theme->launcher_press_overlay,
+                                              &input->press_feedback, &placement);
             if (result != REACH_OK)
                 return result;
         }
