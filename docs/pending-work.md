@@ -49,7 +49,7 @@ Open items only.
 - Capsule state structs are public and composition reads them. A third of the public feature API is internals. Per-feature action enums remain in public headers.
 - Dock and Launcher internals live in `core`.
 - Glass policy is split: `theme.c` includes `core/config.h` for the default intensity, and the intensity-to-backdrop-weight curve lives in the adapter (`reach_wuc_create_glass_factory`).
-- `glass_popup_separator` (quaternary text) is used only by the Context Menu; other glass surfaces keep `popup_separator`.
+- `popup_glass_divider` (quaternary text) is used only by the Context Menu; other glass surfaces keep `popup_divider`.
 - `reach_ui_layout` and its only consumer are dead.
 - Context Menu uses the Dock's capacity as its "no target" sentinel.
 - Point-in-rect is implemented 14 times with three semantics; `reach_rect_equal` is redefined 4 times.
