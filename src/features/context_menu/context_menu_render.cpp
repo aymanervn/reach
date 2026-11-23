@@ -28,12 +28,12 @@ reach_result reach_context_menu_build_render_commands(const reach_context_menu_r
     popup.notch_center_x = input->notch_center_x;
     popup.notch_side = input->notch_side;
     popup.dpi_scale = input->dpi_scale;
+    popup.glass = input->theme->glass;
     if (input->top_bar_dropdown)
     {
         popup.background_color_override = input->theme->top_bar_dropdown_background;
         popup.has_background_color_override = 1;
         popup.hide_notch = 1;
-        popup.glass = input->theme->glass;
     }
     reach_result popup_result = reach_popup_push_background(&popup, out_commands);
     if (popup_result != REACH_OK)
