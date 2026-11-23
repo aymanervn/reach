@@ -1,7 +1,5 @@
 #include "windows_adapters_internal.h"
 
-#include "reach/core/typography.h"
-
 #include <dwmapi.h>
 #include <dbt.h>
 #include <windows.h>
@@ -157,28 +155,6 @@ static HICON reach_load_window_icon(int resource_id, int width, int height)
                                  LR_DEFAULTCOLOR | LR_SHARED);
     }
     return icon;
-}
-
-static HFONT reach_create_windows_menu_font(HWND hwnd)
-{
-    NONCLIENTMETRICSW metrics = {};
-    metrics.cbSize = sizeof(metrics);
-    if (SystemParametersInfoW(SPI_GETNONCLIENTMETRICS, metrics.cbSize, &metrics, 0))
-    {
-        UINT dpi = GetDpiForWindow(hwnd);
-        dpi = dpi > 0 ? dpi : 96;
-        metrics.lfMenuFont.lfHeight = -MulDiv((int)REACH_TEXT_SIZE_MEDIUM, (int)dpi, 96);
-        return CreateFontIndirectW(&metrics.lfMenuFont);
-    }
-    return static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
-}
-
-static void reach_delete_menu_font(HFONT font)
-{
-    if (font != nullptr && font != GetStockObject(DEFAULT_GUI_FONT))
-    {
-        DeleteObject(font);
-    }
 }
 
 static int32_t reach_platform_window_unpresent_point(const reach_platform_window *window,
@@ -673,68 +649,6 @@ static LRESULT CALLBACK reach_window_proc(HWND hwnd, UINT message, WPARAM wparam
             reach_platform_window_queue_event(window, &event);
         }
         return DefWindowProcW(hwnd, message, wparam, lparam);
-    case WM_MEASUREITEM:
-    {
-        MEASUREITEMSTRUCT *measure = reinterpret_cast<MEASUREITEMSTRUCT *>(lparam);
-        if (measure != nullptr && measure->CtlType == ODT_MENU)
-        {
-            const wchar_t *text = reinterpret_cast<const wchar_t *>(measure->itemData);
-            SIZE size = {};
-            HDC dc = GetDC(hwnd);
-            if (dc != nullptr && text != nullptr)
-            {
-                HFONT font = reach_create_windows_menu_font(hwnd);
-                HGDIOBJ old_font = SelectObject(dc, font);
-                GetTextExtentPoint32W(dc, text, (int)wcslen(text), &size);
-                SelectObject(dc, old_font);
-                reach_delete_menu_font(font);
-                ReleaseDC(hwnd, dc);
-            }
-            UINT dpi = GetDpiForWindow(hwnd);
-
-            measure->itemWidth = (UINT)(size.cx + MulDiv(28, dpi, 96));
-            measure->itemHeight = MulDiv(30, dpi, 96);
-            return TRUE;
-        }
-        break;
-    }
-    case WM_DRAWITEM:
-    {
-        DRAWITEMSTRUCT *draw = reinterpret_cast<DRAWITEMSTRUCT *>(lparam);
-        if (draw != nullptr && draw->CtlType == ODT_MENU)
-        {
-            UINT dpi = GetDpiForWindow(hwnd);
-
-            const wchar_t *text = reinterpret_cast<const wchar_t *>(draw->itemData);
-            COLORREF background =
-                (draw->itemState & ODS_SELECTED) ? RGB(48, 45, 42) : RGB(32, 30, 28);
-            HBRUSH brush = CreateSolidBrush(background);
-            if (brush != nullptr)
-            {
-                FillRect(draw->hDC, &draw->rcItem, brush);
-                DeleteObject(brush);
-            }
-
-            SetBkMode(draw->hDC, TRANSPARENT);
-            SetTextColor(draw->hDC, RGB(218, 216, 212));
-
-            HFONT font = reach_create_windows_menu_font(hwnd);
-            HGDIOBJ old_font = SelectObject(draw->hDC, font);
-
-            RECT text_rect = draw->rcItem;
-            int padding = MulDiv(13, dpi, 96);
-            text_rect.left += padding;
-            text_rect.right -= padding;
-
-            DrawTextW(draw->hDC, text != nullptr ? text : L"", -1, &text_rect,
-                      DT_SINGLELINE | DT_VCENTER | DT_LEFT);
-
-            SelectObject(draw->hDC, old_font);
-            reach_delete_menu_font(font);
-            return TRUE;
-        }
-        break;
-    }
     case WM_ERASEBKGND:
         return 1;
     default:
