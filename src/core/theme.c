@@ -80,7 +80,7 @@ static const reach_theme reach_theme_dark = {
     .toggle_knob = REACH_PURE_WHITE(1.0f),
 
     .shared_text = REACH_DARK_TEXT(REACH_TEXT_PRIMARY),
-    .inverse_text = REACH_LIGHT_TEXT(REACH_TEXT_PRIMARY),
+    .settings_window_button_glyph = REACH_LIGHT_TEXT(REACH_TEXT_PRIMARY),
 
     .dock_fallback_icon_background = REACH_PURE_WHITE(0.80f),
     .shared_glyph = REACH_DARK_TEXT(REACH_TEXT_PRIMARY),
@@ -174,17 +174,17 @@ static const reach_theme reach_theme_dark = {
     .settings_segmented_control_background = REACH_FILL(REACH_DARK_FILL_TERTIARY),
     .settings_input_background = REACH_FILL(REACH_DARK_FILL_TERTIARY),
     .settings_divider = REACH_DARK_DIVIDER(1.0f),
-    .settings_toggle_track_off = REACH_DARK_TEXT(REACH_TEXT_TERTIARY),
+    .settings_toggle_off_track = REACH_DARK_TEXT(REACH_TEXT_TERTIARY),
     .settings_toggle_knob = REACH_PURE_WHITE(1.0f),
     .settings_button_text = REACH_DARK_TEXT(REACH_TEXT_PRIMARY),
     .settings_button_danger_text = REACH_PURE_WHITE(1.0f),
-    .settings_button_danger = REACH_RED_DEEP(1.0f),
+    .settings_button_danger_background = REACH_RED_DEEP(1.0f),
     .settings_button_disabled_background = REACH_DARK_SURFACE_ELEVATED(1.0f),
-    .settings_status_success = REACH_GREEN_BRIGHT(1.0f),
-    .settings_status_error = REACH_RED_BRIGHT(1.0f),
+    .settings_success_text = REACH_GREEN_BRIGHT(1.0f),
+    .settings_error_text = REACH_RED_BRIGHT(1.0f),
     .settings_window_button_background = REACH_DARK_TEXT(REACH_TEXT_SECONDARY),
-    .settings_window_close_hover = REACH_RED_DEEP(1.0f),
-    .settings_window_minimize_hover = REACH_YELLOW_BRIGHT(1.0f),
+    .settings_window_close_hover_background = REACH_RED_DEEP(1.0f),
+    .settings_window_minimize_hover_background = REACH_YELLOW_BRIGHT(1.0f),
     .settings_scrollbar_track = REACH_FILL(REACH_DARK_FILL_SECONDARY),
     .settings_scrollbar_thumb = REACH_DARK_TEXT(REACH_TEXT_SECONDARY),
     .accent_fill = REACH_BLUE_DEEP(1.0f),
@@ -199,10 +199,10 @@ static const reach_theme reach_theme_dark = {
     .widget_drag_marker = REACH_BLUE_DEEP(REACH_ACCENT_SELECTION),
     .widget_primary_control_wash = REACH_BLUE_DEEP(REACH_ACCENT_TINT),
     .widget_control_wash = REACH_BLUE_DEEP(REACH_ACCENT_FAINT),
-    .settings_avatar_placeholder = REACH_BLUE_BRIGHT(REACH_ACCENT_TINT),
+    .settings_avatar_placeholder_background = REACH_BLUE_BRIGHT(REACH_ACCENT_TINT),
     // Opaque accent blends exist only once resolved; unresolved tables keep the plain surface.
     .widget_accent_background = REACH_DARK_SURFACE_RAISED(1.0f),
-    .settings_avatar_ring = REACH_DARK_SURFACE_ELEVATED(1.0f),
+    .settings_avatar_border = REACH_DARK_SURFACE_ELEVATED(1.0f),
 
     REACH_THEME_SHADOWS,
     REACH_THEME_METRICS,
@@ -240,7 +240,7 @@ static const reach_theme reach_theme_light = {
     .toggle_knob = REACH_PURE_WHITE(1.0f),
 
     .shared_text = REACH_LIGHT_TEXT(REACH_TEXT_PRIMARY),
-    .inverse_text = REACH_DARK_TEXT(REACH_TEXT_PRIMARY),
+    .settings_window_button_glyph = REACH_DARK_TEXT(REACH_TEXT_PRIMARY),
 
     .dock_fallback_icon_background = REACH_LIGHT_SURFACE_RAISED(0.80f),
     .shared_glyph = REACH_LIGHT_TEXT(REACH_TEXT_PRIMARY),
@@ -334,17 +334,17 @@ static const reach_theme reach_theme_light = {
     .settings_segmented_control_background = REACH_FILL(REACH_LIGHT_FILL_TERTIARY),
     .settings_input_background = REACH_FILL(REACH_LIGHT_FILL_TERTIARY),
     .settings_divider = REACH_LIGHT_DIVIDER(1.0f),
-    .settings_toggle_track_off = REACH_LIGHT_TEXT(REACH_TEXT_TERTIARY),
+    .settings_toggle_off_track = REACH_LIGHT_TEXT(REACH_TEXT_TERTIARY),
     .settings_toggle_knob = REACH_PURE_WHITE(1.0f),
     .settings_button_text = REACH_LIGHT_TEXT(REACH_TEXT_PRIMARY),
     .settings_button_danger_text = REACH_PURE_WHITE(1.0f),
-    .settings_button_danger = REACH_RED_DEEP(1.0f),
+    .settings_button_danger_background = REACH_RED_DEEP(1.0f),
     .settings_button_disabled_background = REACH_LIGHT_SURFACE_ELEVATED(1.0f),
-    .settings_status_success = REACH_GREEN_INK(1.0f),
-    .settings_status_error = REACH_RED_INK(1.0f),
+    .settings_success_text = REACH_GREEN_INK(1.0f),
+    .settings_error_text = REACH_RED_INK(1.0f),
     .settings_window_button_background = REACH_LIGHT_TEXT(REACH_TEXT_SECONDARY),
-    .settings_window_close_hover = REACH_RED_DEEP(1.0f),
-    .settings_window_minimize_hover = REACH_YELLOW_DEEP(1.0f),
+    .settings_window_close_hover_background = REACH_RED_DEEP(1.0f),
+    .settings_window_minimize_hover_background = REACH_YELLOW_DEEP(1.0f),
     .settings_scrollbar_track = REACH_FILL(REACH_LIGHT_FILL_SECONDARY),
     .settings_scrollbar_thumb = REACH_LIGHT_TEXT(REACH_TEXT_SECONDARY),
     .accent_fill = REACH_BLUE_BRIGHT(1.0f),
@@ -359,10 +359,10 @@ static const reach_theme reach_theme_light = {
     .widget_drag_marker = REACH_BLUE_BRIGHT(REACH_ACCENT_SELECTION),
     .widget_primary_control_wash = REACH_BLUE_BRIGHT(REACH_ACCENT_TINT),
     .widget_control_wash = REACH_BLUE_BRIGHT(REACH_ACCENT_FAINT),
-    .settings_avatar_placeholder = REACH_BLUE_DEEP(REACH_ACCENT_TINT),
+    .settings_avatar_placeholder_background = REACH_BLUE_DEEP(REACH_ACCENT_TINT),
     // Opaque accent blends exist only once resolved; unresolved tables keep the plain surface.
     .widget_accent_background = REACH_LIGHT_SURFACE_BASE(1.0f),
-    .settings_avatar_ring = REACH_LIGHT_SURFACE_BASE(1.0f),
+    .settings_avatar_border = REACH_LIGHT_SURFACE_BASE(1.0f),
 
     REACH_THEME_SHADOWS,
     REACH_THEME_METRICS,
@@ -545,9 +545,10 @@ void reach_theme_resolve(reach_theme_mode mode, const reach_accent_pair *accent,
     out_theme->widget_drag_marker = reach_theme_color_alpha(fill, REACH_ACCENT_SELECTION);
     out_theme->widget_primary_control_wash = reach_theme_color_alpha(fill, REACH_ACCENT_TINT);
     out_theme->widget_control_wash = reach_theme_color_alpha(fill, REACH_ACCENT_FAINT);
-    out_theme->settings_avatar_ring =
+    out_theme->settings_avatar_border =
         reach_theme_color_mix(out_theme->settings_card_background, text, REACH_ACCENT_MUTED);
-    out_theme->settings_avatar_placeholder = reach_theme_color_alpha(text, REACH_ACCENT_TINT);
+    out_theme->settings_avatar_placeholder_background =
+        reach_theme_color_alpha(text, REACH_ACCENT_TINT);
     // The static tables hold the blue preset already resolved, so an unresolved theme matches.
     const reach_accent_pair blue = reach_accent_preset_pair(REACH_ACCENT_PRESET_BLUE);
     const reach_theme *base = reach_theme_for_mode(mode);

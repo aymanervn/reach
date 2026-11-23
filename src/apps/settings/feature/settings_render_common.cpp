@@ -112,7 +112,7 @@ reach_ui_button_style reach_settings_accent_button_style(const reach_settings_re
 reach_ui_button_style reach_settings_danger_button_style(const reach_settings_render_input *input)
 {
     reach_ui_button_style style =
-        reach_settings_button_style(input, input->theme->settings_button_danger);
+        reach_settings_button_style(input, input->theme->settings_button_danger_background);
     style.text = input->theme->settings_button_danger_text;
     return style;
 }

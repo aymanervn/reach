@@ -119,7 +119,7 @@ extern "C"
         reach_shadow widget_shadow;
 
         reach_color shared_text;
-        reach_color inverse_text;
+        reach_color settings_window_button_glyph;
 
         reach_color dock_fallback_icon_background;
         reach_color shared_glyph;
@@ -213,17 +213,17 @@ extern "C"
         reach_color settings_segmented_control_background;
         reach_color settings_input_background;
         reach_color settings_divider;
-        reach_color settings_toggle_track_off;
+        reach_color settings_toggle_off_track;
         reach_color settings_toggle_knob;
         reach_color settings_button_text;
         reach_color settings_button_danger_text;
-        reach_color settings_button_danger;
+        reach_color settings_button_danger_background;
         reach_color settings_button_disabled_background;
-        reach_color settings_status_success;
-        reach_color settings_status_error;
+        reach_color settings_success_text;
+        reach_color settings_error_text;
         reach_color settings_window_button_background;
-        reach_color settings_window_close_hover;
-        reach_color settings_window_minimize_hover;
+        reach_color settings_window_close_hover_background;
+        reach_color settings_window_minimize_hover_background;
         reach_color settings_scrollbar_track;
         reach_color settings_scrollbar_thumb;
         reach_color accent_fill;
@@ -239,8 +239,8 @@ extern "C"
         reach_color widget_drag_marker;
         reach_color widget_primary_control_wash;
         reach_color widget_control_wash;
-        reach_color settings_avatar_ring;
-        reach_color settings_avatar_placeholder;
+        reach_color settings_avatar_border;
+        reach_color settings_avatar_placeholder_background;
 
         float radius_small;
         float radius_large;

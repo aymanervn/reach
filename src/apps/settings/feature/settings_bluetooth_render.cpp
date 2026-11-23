@@ -63,10 +63,10 @@ static void reach_settings_bluetooth_render_row(const reach_settings_render_inpu
     {
         detail = reach_bluetooth_session_status_message(model->bluetooth.status);
         detail_color = model->bluetooth.status == REACH_BLUETOOTH_SESSION_STATUS_PAIRED
-                           ? input->theme->settings_status_success
+                           ? input->theme->settings_success_text
                        : model->bluetooth.status == REACH_BLUETOOTH_SESSION_STATUS_FAILED ||
                                model->bluetooth.status == REACH_BLUETOOTH_SESSION_STATUS_REJECTED
-                           ? input->theme->settings_status_error
+                           ? input->theme->settings_error_text
                            : input->theme->settings_secondary_text;
     }
     reach_settings_push_text(commands,
@@ -153,7 +153,7 @@ void reach_settings_render_bluetooth_page(const reach_settings_render_input *inp
                              input->theme->settings_secondary_text, 1);
 
     reach_ui_toggle_style toggle_style = {};
-    toggle_style.track_off = input->theme->settings_toggle_track_off;
+    toggle_style.track_off = input->theme->settings_toggle_off_track;
     toggle_style.track_on = input->theme->accent_fill;
     toggle_style.knob = input->theme->settings_toggle_knob;
     reach_ui_toggle_motion_render(

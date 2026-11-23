@@ -120,7 +120,7 @@ static void render_account_page(const reach_settings_render_input *input,
                            avatar.height + reach_settings_scale(input, 6.0f)};
     reach_settings_push_bordered_background(
         commands, ring, ring.width * 0.5f, reach_settings_scale(input, 1.5f),
-        input->theme->settings_card_background, input->theme->settings_avatar_ring);
+        input->theme->settings_card_background, input->theme->settings_avatar_border);
     if (model->account_picture != 0)
     {
         push_avatar_image(commands, avatar, model->account_picture);
@@ -128,7 +128,7 @@ static void render_account_page(const reach_settings_render_input *input,
     else
     {
         reach_settings_push_rect(commands, avatar, avatar.width * 0.5f,
-                                 input->theme->settings_avatar_placeholder);
+                                 input->theme->settings_avatar_placeholder_background);
         uint16_t initial[2] = {reach_settings_account_initial(model), 0};
         reach_settings_push_text(
             commands, avatar, initial, reach_settings_scale(input, REACH_TEXT_SIZE_XLARGE),
@@ -175,8 +175,8 @@ static void render_account_page(const reach_settings_render_input *input,
     if (model->account_status != REACH_SETTINGS_ACCOUNT_STATUS_NONE)
     {
         reach_color status_color = model->account_status == REACH_SETTINGS_ACCOUNT_STATUS_SUCCESS
-                                       ? input->theme->settings_status_success
-                                       : input->theme->settings_status_error;
+                                       ? input->theme->settings_success_text
+                                       : input->theme->settings_error_text;
         reach_settings_push_text(commands, layout->account_password_status,
                                  reach_settings_account_status_message(model->account_status),
                                  reach_settings_scale(input, REACH_TEXT_SIZE_XSMALL),
@@ -287,7 +287,7 @@ static void render_power_page(const reach_settings_render_input *input,
             if (retained)
                 reach_render_command_buffer_end_group(commands);
             reach_ui_toggle_style toggle_style = {};
-            toggle_style.track_off = input->theme->settings_toggle_track_off;
+            toggle_style.track_off = input->theme->settings_toggle_off_track;
             toggle_style.track_on = input->theme->accent_fill;
             toggle_style.knob = input->theme->settings_toggle_knob;
             reach_ui_toggle_motion_render(commands, layout->power_wait_toggles[timer],
@@ -598,7 +598,7 @@ static void render_theme_page(const reach_settings_render_input *input,
     reach_render_command_buffer_set_scissor(commands, layout->theme_viewport);
 
     reach_ui_toggle_style toggle_style = {};
-    toggle_style.track_off = input->theme->settings_toggle_track_off;
+    toggle_style.track_off = input->theme->settings_toggle_off_track;
     toggle_style.track_on = input->theme->accent_fill;
     toggle_style.knob = input->theme->settings_toggle_knob;
 
@@ -776,7 +776,7 @@ static void render_startup_apps_page(const reach_settings_render_input *input,
     if (model->startup_status != REACH_SETTINGS_STARTUP_STATUS_NONE)
     {
         reach_color status_color = model->startup_status == REACH_SETTINGS_STARTUP_STATUS_FAILED
-                                       ? input->theme->settings_status_error
+                                       ? input->theme->settings_error_text
                                        : input->theme->settings_secondary_text;
         reach_settings_push_text(commands, layout->startup_summary,
                                  reach_settings_startup_status_message(model->startup_status),
@@ -866,7 +866,7 @@ static void render_startup_apps_page(const reach_settings_render_input *input,
                                  input->theme->settings_secondary_text, 1);
 
         reach_ui_toggle_style toggle_style = {};
-        toggle_style.track_off = input->theme->settings_toggle_track_off;
+        toggle_style.track_off = input->theme->settings_toggle_off_track;
         toggle_style.track_on = input->theme->accent_fill;
         toggle_style.knob = input->theme->settings_toggle_knob;
         reach_ui_toggle_motion_render(
@@ -905,7 +905,7 @@ static void render_installed_apps_page(const reach_settings_render_input *input,
     {
         reach_color color =
             model->installed_apps_status >= REACH_SETTINGS_APPLICATIONS_STATUS_FAILED
-                ? input->theme->settings_status_error
+                ? input->theme->settings_error_text
                 : input->theme->settings_secondary_text;
         reach_settings_push_text(
             commands, layout->installed_apps_summary,
@@ -1000,7 +1000,7 @@ static void render_installed_apps_page(const reach_settings_render_input *input,
             model, REACH_SETTINGS_HIT_APPLICATION_UNINSTALL, index);
         reach_ui_button_style uninstall_style = reach_settings_muted_button_style(input);
         uninstall_style.has_pressed_colors = 1;
-        uninstall_style.pressed_background = input->theme->settings_button_danger;
+        uninstall_style.pressed_background = input->theme->settings_button_danger_background;
         uninstall_style.pressed_text = input->theme->settings_button_danger_text;
         uninstall_style.radius = layout->installed_app_uninstall_buttons[index].height * 0.5f;
         reach_ui_button_render(commands, layout->installed_app_uninstall_buttons[index],
@@ -1236,7 +1236,7 @@ static void render_update_page(const reach_settings_render_input *input,
                                  (const uint16_t *)u"Unable to refresh Windows updates",
                                  reach_settings_scale(input, REACH_TEXT_SIZE_MEDIUM),
                                  REACH_TEXT_WEIGHT_NORMAL, input->text_alignment_leading,
-                                 input->theme->settings_status_error, 1);
+                                 input->theme->settings_error_text, 1);
     else if (model->update_scan_completed && layout->update_row_count == 0)
         reach_settings_push_text(
             commands, update_status_message, (const uint16_t *)u"Windows is up to date",
@@ -1273,10 +1273,10 @@ static void render_update_page(const reach_settings_render_input *input,
         reach_settings_push_rect(
             commands, row, reach_settings_scale(input, input->theme->radius_small), row_color);
         if (update->state == REACH_WINDOWS_UPDATE_INSTALLED_REBOOT_REQUIRED)
-            reach_settings_push_icon(commands, checkbox, input->theme->settings_status_success,
+            reach_settings_push_icon(commands, checkbox, input->theme->settings_success_text,
                                      REACH_VECTOR_ICON_CHECK, 0.06f);
         else if (update->state == REACH_WINDOWS_UPDATE_FAILED)
-            reach_settings_push_icon(commands, checkbox, input->theme->settings_status_error,
+            reach_settings_push_icon(commands, checkbox, input->theme->settings_error_text,
                                      REACH_VECTOR_ICON_CLOSE, 0.06f);
         else
         {
@@ -1337,7 +1337,7 @@ static void render_widgets_page(const reach_settings_render_input *input,
 {
     const auto *theme = input->theme;
     const auto *layout = input->layout;
-    const reach_ui_toggle_style style = {theme->settings_toggle_track_off, theme->accent_fill,
+    const reach_ui_toggle_style style = {theme->settings_toggle_off_track, theme->accent_fill,
                                          theme->settings_toggle_knob};
     const bool reset_hover = input->model->hovered_button == REACH_SETTINGS_HIT_WIDGET_RESET;
     reach_settings_push_rect(
@@ -1405,17 +1405,19 @@ reach_result reach_settings_build_render_commands(const reach_settings_render_in
     reach_settings_push_rect(commands, input->layout->close_button,
                              input->layout->close_button.width * 0.5f,
                              input->model->hovered_button == REACH_SETTINGS_HIT_CLOSE
-                                 ? input->theme->settings_window_close_hover
+                                 ? input->theme->settings_window_close_hover_background
                                  : input->theme->settings_window_button_background);
     reach_settings_push_rect(commands, input->layout->minimize_button,
                              input->layout->minimize_button.width * 0.5f,
                              input->model->hovered_button == REACH_SETTINGS_HIT_MINIMIZE
-                                 ? input->theme->settings_window_minimize_hover
+                                 ? input->theme->settings_window_minimize_hover_background
                                  : input->theme->settings_window_button_background);
-    reach_settings_push_icon(commands, input->layout->close_button, input->theme->inverse_text,
-                             REACH_VECTOR_ICON_CLOSE, 0.24f);
-    reach_settings_push_icon(commands, input->layout->minimize_button, input->theme->inverse_text,
-                             REACH_VECTOR_ICON_MINIMIZE, 0.24f);
+    reach_settings_push_icon(commands, input->layout->close_button,
+                             input->theme->settings_window_button_glyph, REACH_VECTOR_ICON_CLOSE,
+                             0.24f);
+    reach_settings_push_icon(commands, input->layout->minimize_button,
+                             input->theme->settings_window_button_glyph, REACH_VECTOR_ICON_MINIMIZE,
+                             0.24f);
 
     size_t nav_count = 0;
     const reach_settings_nav_item *items = reach_settings_nav_items(&nav_count);

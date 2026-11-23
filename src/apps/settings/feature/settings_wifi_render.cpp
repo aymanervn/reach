@@ -133,7 +133,7 @@ static void reach_settings_wifi_render_add_row(const reach_settings_render_input
     }
 
     reach_ui_toggle_style toggle_style = {};
-    toggle_style.track_off = input->theme->settings_toggle_track_off;
+    toggle_style.track_off = input->theme->settings_toggle_off_track;
     toggle_style.track_on = input->theme->accent_fill;
     toggle_style.knob = input->theme->settings_toggle_knob;
     reach_ui_toggle_render(commands, layout->wifi_add_auto_toggle, &toggle_style,
@@ -212,10 +212,10 @@ static void reach_settings_wifi_render_row(const reach_settings_render_input *in
     {
         detail = reach_wifi_session_status_message(model->wifi.status);
         detail_color = model->wifi.status == REACH_WIFI_SESSION_STATUS_CONNECTED
-                           ? input->theme->settings_status_success
+                           ? input->theme->settings_success_text
                        : model->wifi.status == REACH_WIFI_SESSION_STATUS_CONNECTING
                            ? input->theme->settings_secondary_text
-                           : input->theme->settings_status_error;
+                           : input->theme->settings_error_text;
     }
     reach_settings_push_text(commands,
                              {text_x, row.y + reach_settings_scale(input, 33.0f),
@@ -240,7 +240,7 @@ static void reach_settings_wifi_render_row(const reach_settings_render_input *in
             reach_settings_model_button_press_motion(model, REACH_SETTINGS_HIT_WIFI_SHOW_KEY));
 
         reach_ui_toggle_style toggle_style = {};
-        toggle_style.track_off = input->theme->settings_toggle_track_off;
+        toggle_style.track_off = input->theme->settings_toggle_off_track;
         toggle_style.track_on = input->theme->accent_fill;
         toggle_style.knob = input->theme->settings_toggle_knob;
         reach_ui_toggle_render(commands, layout->wifi_auto_toggle, &toggle_style,
@@ -339,7 +339,7 @@ void reach_settings_render_wifi_page(const reach_settings_render_input *input,
                                  input->theme->settings_secondary_text, 1);
 
         reach_ui_toggle_style toggle_style = {};
-        toggle_style.track_off = input->theme->settings_toggle_track_off;
+        toggle_style.track_off = input->theme->settings_toggle_off_track;
         toggle_style.track_on = input->theme->accent_fill;
         toggle_style.knob = input->theme->settings_toggle_knob;
         reach_ui_toggle_motion_render(
