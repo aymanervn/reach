@@ -7,7 +7,6 @@ Open items only.
 
 ## Bugs
 
-- Glass bled into the other theme (light glass darkened to gray 133 over black, dark glass lightened to 101 over white). Clamped by `GLASS_BANDS` to 198 and 73 (`reach_theme_resolve`); validate live in both modes over black and white wallpapers, then record the band as a rule.
 - Switcher DP height test fails on master ("retains its nominal DP height", 3 cases). Either the test or the layout is stale.
 - Settings toggle-animation test is timing-sensitive under Idle priority. Drive it from explicit timestamps.
 - App Control worker test assumes a queued job has not started.
