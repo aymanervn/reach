@@ -2126,9 +2126,13 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
             reach_d2d_surface_size capacity = {};
             if (existing != backend->retained_layers.end() && existing->surface != nullptr)
                 capacity = {existing->capacity_width, existing->capacity_height};
+            // A window thumbnail shows DWM's own image and allocates no surface.
+            bool raster = plan.count != 0 &&
+                          !(plan.count == 1 &&
+                            plan.commands[0].type == REACH_RENDER_COMMAND_WINDOW_THUMBNAIL);
             bytes +=
                 reach_d2d_planned_layer_bytes(plan.group.bounds.width, plan.group.bounds.height,
-                                              plan.count != 0, plan.group.has_shadow, capacity);
+                                              raster, plan.group.has_shadow, capacity);
         }
         return bytes;
     };

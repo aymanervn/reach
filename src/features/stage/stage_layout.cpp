@@ -403,11 +403,12 @@ reach_rect_f32 reach_stage_interpolate_rect(reach_rect_f32 from, reach_rect_f32 
     return out;
 }
 
+// Minimized windows rise from and sink back below the bottom edge, centred under the Dock.
 reach_rect_f32 reach_stage_minimized_offscreen_rect(const reach_stage_state *state,
                                                     reach_rect_f32 rect)
 {
-    rect.x = state->bounds.x - rect.width;
-    rect.y = state->bounds.y - rect.height;
+    rect.x = state->bounds.x + (state->bounds.width - rect.width) * 0.5f;
+    rect.y = state->bounds.y + state->bounds.height;
     return rect;
 }
 

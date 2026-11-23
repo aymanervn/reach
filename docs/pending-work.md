@@ -5,6 +5,7 @@ Open items only.
 ## Needs the user's decision
 
 - Reach tracks at most 96 open windows (`REACH_MAX_OPEN_WINDOWS`, `include/reach/core/limits.h`); later windows are likely missing from Stage and the Dock. Raising it also raises the render group budget, which Stage's static assert in `stage_render.cpp` enforces.
+- Stage covers only the primary monitor, so windows on other monitors stay in place while it is open. Low priority.
 
 
 ## Bugs
@@ -16,7 +17,8 @@ Open items only.
 - Cross-app activation sometimes leaves the previous app active; a direct click restores focus. Unresolved since 2026-09-07.
 - Stage minimized placeholders expand toward restore bounds on close (reopened 2026-09-19).
 - Stage held input about 500ms after its motion looked finished. The fix is waiting for live validation.
-- Compositor-driven Stage needs live validation of the paths the benchmark did not drive: activating a tile, a tile's close button and its hover colour, reopening while closing, a window appearing while open, and the classic-thumbnail fallback without ordinal 147.
+- Compositor-driven Stage needs live validation: thumbnail stacking with the focused window on top, Dock restore/minimize closing Stage, minimized windows rising from the bottom centre, about 50 windows, and the classic-thumbnail fallback without ordinal 147.
+- Any surface's failed frame ends `reach.exe` without a dump or log line (`update_result` in `reach_main.cpp`); renderer failures other than device loss are not logged either (`reach_d2d_device_check`). The DirectComposition branch of `draw_layer` (`render_d2d_retained.cpp`) also has no surface memory budget.
 - Launcher fast scroll can leave the last page's items unloaded. Suspect: the icon prefetch range in `launcher_render.cpp`.
 - Clipboard wheel scrolling sometimes stopped. Not confirmed fixed.
 - Trails behind a shadow-casting background whose y and height both move. Worked around in Clipboard and Switcher; deferred.

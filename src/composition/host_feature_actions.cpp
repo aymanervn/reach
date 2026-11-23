@@ -68,7 +68,14 @@ reach_result reach_host_apply_feature_action(reach_host *host, reach_feature_run
         return reach_host_focus_window(host, action->window, 0);
 
     case REACH_FEATURE_ACTION_TOGGLE_WINDOW_FOCUS:
-        return reach_host_focus_window(host, action->window, 1);
+    {
+        // Like opening a target, restoring or minimizing an app closes transient surfaces so the
+        // app never animates over them.
+        reach_result focus_result = reach_host_focus_window(host, action->window, 1);
+        if (focus_result == REACH_OK)
+            reach_host_close_transient_surfaces(host, 0);
+        return focus_result;
+    }
 
     case REACH_FEATURE_ACTION_ACTIVATE_WINDOW:
     {

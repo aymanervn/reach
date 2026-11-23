@@ -163,8 +163,9 @@ int32_t reach_stage_tile_motion_at(const reach_stage *stage, size_t index, doubl
     {
         reach_rect_motion from = reach_stage_constant_rect(tile->source_rect);
         if (tile->minimized && !tile->desktop)
-            from = {reach_motion_affine(&resolved.width, -1.0f, state->bounds.x),
-                    reach_motion_affine(&resolved.height, -1.0f, state->bounds.y), resolved.width,
+            from = {reach_motion_affine(&resolved.width, -0.5f,
+                                        state->bounds.x + state->bounds.width * 0.5f),
+                    reach_stage_constant(state->bounds.y + state->bounds.height), resolved.width,
                     resolved.height};
         rect = reach_stage_lerp_rect(&expression, from, resolved, progress);
     }

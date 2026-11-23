@@ -247,6 +247,11 @@ static uint64_t reach_stage_group_id(uint32_t role, uintptr_t window)
     return ((uint64_t)role << 52) | ((uint64_t)window & UINT64_C(0xfffffffffffff));
 }
 
+// Solid fills are rasterized tiny and stretched by the compositor: a solid colour scales exactly
+// and keeps sharp edges, while a surface the size of every animated tile would exhaust GPU memory
+// with many windows.
+static const reach_rect_f32 reach_stage_fill_base = {0.0f, 0.0f, 8.0f, 8.0f};
+
 static float reach_stage_motion_extent(const reach_motion *motion, double now)
 {
     float rest = reach_motion_value_at(motion, reach_motion_deadline(motion));
@@ -377,8 +382,7 @@ static reach_result reach_stage_push_compositor_placeholder(const reach_stage_re
                                                             double now,
                                                             reach_render_command_buffer *commands)
 {
-    reach_rect_f32 base = {0.0f, 0.0f, reach_stage_motion_extent(&rect->width, now),
-                           reach_stage_motion_extent(&rect->height, now)};
+    reach_rect_f32 base = reach_stage_fill_base;
     reach_render_command plate = {};
     plate.type = REACH_RENDER_COMMAND_RECT;
     plate.rect = base;
@@ -461,8 +465,9 @@ reach_stage_push_compositor_chrome(reach_stage *stage, const reach_stage_render_
     }
     else
     {
+        shape.rect = reach_stage_fill_base;
         reach_render_group group =
-            reach_stage_scaled_group(background_id, &item, base, &motion->alpha);
+            reach_stage_scaled_group(background_id, &item, reach_stage_fill_base, &motion->alpha);
         result = reach_stage_push_grouped(commands, &group, &shape);
     }
     if (result != REACH_OK)
@@ -472,8 +477,7 @@ reach_stage_push_compositor_chrome(reach_stage *stage, const reach_stage_render_
     if (reach_stage_motion_visible(&motion->bar))
     {
         reach_rect_motion header = {rect.x, item.y, rect.width, motion->bar};
-        reach_rect_f32 header_base = {0.0f, 0.0f, reach_stage_motion_extent(&rect.width, now),
-                                      bar_rest};
+        reach_rect_f32 header_base = reach_stage_fill_base;
         shape = {};
         shape.type = REACH_RENDER_COMMAND_RECT;
         shape.rect = header_base;
@@ -556,6 +560,78 @@ int32_t reach_stage_compositor_active(const reach_stage *stage)
     return stage != nullptr && stage->compositor_motion;
 }
 
+// Every tile at this moment's sample, as constant motions: the CPU state presented as it is.
+static void reach_stage_sampled_motions(const reach_stage *stage, reach_stage_tile_motion *motions)
+{
+    const reach_stage_state *state = &stage->state;
+    for (size_t index = 0; index < state->tile_count; ++index)
+    {
+        const reach_stage_tile *tile = &state->tiles[index];
+        reach_stage_tile_motion *motion = &motions[index];
+        *motion = {};
+        reach_motion_set(&motion->rect.x, tile->current_rect.x);
+        reach_motion_set(&motion->rect.y, tile->current_rect.y);
+        reach_motion_set(&motion->rect.width, tile->current_rect.width);
+        reach_motion_set(&motion->rect.height, tile->current_rect.height);
+        reach_motion_set(&motion->bar, tile->current_bar.height);
+        reach_motion_set(&motion->alpha, state->progress * tile->presence);
+        reach_motion_set(&motion->presence, tile->presence);
+    }
+}
+
+static reach_result reach_stage_push_compositor_scene(reach_stage *stage,
+                                                      const reach_stage_render_context *ctx,
+                                                      const reach_stage_tile_motion *motions,
+                                                      double now,
+                                                      reach_render_command_buffer *commands)
+{
+    const reach_stage_state *state = &stage->state;
+    reach_result result = REACH_OK;
+    for (size_t index = 0; index < state->tile_count && result == REACH_OK; ++index)
+    {
+        const reach_stage_tile *tile = &state->tiles[index];
+        if (!tile->desktop)
+            continue;
+        // The desktop tile sits on the Stage backdrop, below every tile's chrome.
+        reach_render_command backdrop = {};
+        backdrop.type = REACH_RENDER_COMMAND_RECT;
+        backdrop.rect = reach_stage_fill_base;
+        backdrop.color = ctx->theme->stage_background;
+        backdrop.color.a = state->backdrop_opacity;
+        reach_render_group group = {};
+        group.id = reach_stage_group_id(REACH_STAGE_GROUP_BACKDROP, tile->window);
+        group.bounds = backdrop.rect;
+        reach_motion_set(&group.scale, ctx->bounds.width / reach_stage_fill_base.width);
+        reach_motion_set(&group.scale_y, ctx->bounds.height / reach_stage_fill_base.height);
+        result = reach_stage_push_grouped(commands, &group, &backdrop);
+        if (result == REACH_OK)
+            result = reach_stage_push_compositor_thumbnail(ctx, tile, &motions[index], commands);
+    }
+    for (size_t pass = 0; pass < 4 && result == REACH_OK; ++pass)
+    {
+        // Passes 0-1 draw tile chrome and 2-3 the thumbnails above all of it, each with the
+        // preferred window last, matching thumbnails stacked above the surface content.
+        for (size_t at = 0; at < state->tile_count && result == REACH_OK; ++at)
+        {
+            // Tiles run front to back; thumbnails stack the front window last, on top, as the
+            // native overlays did by registering in reverse.
+            size_t index = pass >= 2 ? state->tile_count - 1 - at : at;
+            const reach_stage_tile *tile = &state->tiles[index];
+            int32_t preferred =
+                ctx->preferred_front_window != 0 && tile->window == ctx->preferred_front_window;
+            if (tile->desktop || preferred != (int32_t)(pass & 1))
+                continue;
+            if (pass >= 2)
+                result =
+                    reach_stage_push_compositor_thumbnail(ctx, tile, &motions[index], commands);
+            else if (reach_stage_motion_visible(&motions[index].alpha))
+                result = reach_stage_push_compositor_chrome(stage, ctx, index, &motions[index], now,
+                                                            commands);
+        }
+    }
+    return result;
+}
+
 static reach_result reach_stage_append_compositor_commands(reach_stage *stage,
                                                            const reach_stage_render_context *ctx,
                                                            reach_render_command_buffer *commands)
@@ -572,72 +648,23 @@ static reach_result reach_stage_append_compositor_commands(reach_stage *stage,
     int32_t sampled = 0;
     for (size_t index = 0; index < state->tile_count && !sampled; ++index)
         sampled = !reach_stage_tile_motion_at(stage, index, now, &motions[index]);
-    if (sampled)
+    if (!sampled)
     {
-        // A tile needs two moving tracks at once: present this sample and redraw every frame
-        // until the tracks settle.
-        for (size_t index = 0; index < state->tile_count; ++index)
+        if (reach_stage_push_compositor_scene(stage, ctx, motions, now, commands) == REACH_OK)
         {
-            const reach_stage_tile *tile = &state->tiles[index];
-            reach_stage_tile_motion *motion = &motions[index];
-            *motion = {};
-            reach_motion_set(&motion->rect.x, tile->current_rect.x);
-            reach_motion_set(&motion->rect.y, tile->current_rect.y);
-            reach_motion_set(&motion->rect.width, tile->current_rect.width);
-            reach_motion_set(&motion->rect.height, tile->current_rect.height);
-            reach_motion_set(&motion->bar, tile->current_bar.height);
-            reach_motion_set(&motion->alpha, state->progress * tile->presence);
-            reach_motion_set(&motion->presence, tile->presence);
+            double event = reach_stage_motion_event_seconds(stage, motions, now);
+            // Never schedule into the past: a prediction the tick does not confirm retries at a
+            // bounded rate instead of spinning.
+            stage->compositor_event_seconds = event > 0.0 ? fmax(event, now + 1.0 / 120.0) : 0.0;
+            return REACH_OK;
         }
-        stage->compositor_sampled = 1;
+        reach_render_command_buffer_clear(commands);
     }
-    else
-    {
-        double event = reach_stage_motion_event_seconds(stage, motions, now);
-        // Never schedule into the past: a prediction the tick does not confirm retries at a
-        // bounded rate instead of spinning.
-        stage->compositor_event_seconds = event > 0.0 ? fmax(event, now + 1.0 / 120.0) : 0.0;
-    }
-
-    reach_result result = REACH_OK;
-    for (size_t index = 0; index < state->tile_count && result == REACH_OK; ++index)
-    {
-        const reach_stage_tile *tile = &state->tiles[index];
-        if (!tile->desktop)
-            continue;
-        // The desktop tile sits on the Stage backdrop, below every tile's chrome.
-        reach_render_command backdrop = {};
-        backdrop.type = REACH_RENDER_COMMAND_RECT;
-        backdrop.rect = {0.0f, 0.0f, ctx->bounds.width, ctx->bounds.height};
-        backdrop.color = ctx->theme->stage_background;
-        backdrop.color.a = state->backdrop_opacity;
-        reach_render_group group = {};
-        group.id = reach_stage_group_id(REACH_STAGE_GROUP_BACKDROP, tile->window);
-        group.bounds = backdrop.rect;
-        result = reach_stage_push_grouped(commands, &group, &backdrop);
-        if (result == REACH_OK)
-            result = reach_stage_push_compositor_thumbnail(ctx, tile, &motions[index], commands);
-    }
-    for (size_t pass = 0; pass < 4 && result == REACH_OK; ++pass)
-    {
-        // Passes 0-1 draw tile chrome and 2-3 the thumbnails above all of it, each with the
-        // preferred window last, matching thumbnails stacked above the surface content.
-        for (size_t index = 0; index < state->tile_count && result == REACH_OK; ++index)
-        {
-            const reach_stage_tile *tile = &state->tiles[index];
-            int32_t preferred =
-                ctx->preferred_front_window != 0 && tile->window == ctx->preferred_front_window;
-            if (tile->desktop || preferred != (int32_t)(pass & 1))
-                continue;
-            if (pass >= 2)
-                result =
-                    reach_stage_push_compositor_thumbnail(ctx, tile, &motions[index], commands);
-            else if (reach_stage_motion_visible(&motions[index].alpha))
-                result = reach_stage_push_compositor_chrome(stage, ctx, index, &motions[index], now,
-                                                            commands);
-        }
-    }
-    return result;
+    // A tile needs two moving tracks at once, or its motion could not be drawn: present this
+    // sample and redraw every frame until the tracks settle.
+    reach_stage_sampled_motions(stage, motions);
+    stage->compositor_sampled = 1;
+    return reach_stage_push_compositor_scene(stage, ctx, motions, now, commands);
 }
 
 reach_result reach_stage_append_render_commands(reach_stage *stage,

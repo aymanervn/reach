@@ -761,10 +761,10 @@ static void test_minimized_close_exits_top_left_without_expanding(void)
     app.minimized = 1;
     reach_stage_open(stage, bounds, 1, &app, 1);
     reach_rect_f32 opening = reach_stage_state_ptr(stage)->tiles[0].current_rect;
-    expect_true(opening.x + opening.width <= bounds.x,
-                "a minimized window opens from beyond the left edge");
-    expect_true(opening.y + opening.height <= bounds.y,
-                "a minimized window opens from beyond the top edge");
+    expect_true(fabsf(opening.x + opening.width * 0.5f - (bounds.x + bounds.width * 0.5f)) < 0.5f,
+                "a minimized window opens centred under the Dock");
+    expect_true(opening.y >= bounds.y + bounds.height,
+                "a minimized window opens from beyond the bottom edge");
     advance_stage(stage, 30, 0.016);
 
     reach_rect_f32 settled = reach_stage_state_ptr(stage)->tiles[0].current_rect;
@@ -781,10 +781,11 @@ static void test_minimized_close_exits_top_left_without_expanding(void)
     reach_test_motion_clock_advance(1.0);
     reach_stage_capsule_ops()->tick(stage, 1.0, &tick);
     state = reach_stage_state_ptr(stage);
-    expect_true(state->tiles[0].current_rect.x + state->tiles[0].current_rect.width <= bounds.x,
-                "a minimized placeholder lands beyond the left edge");
-    expect_true(state->tiles[0].current_rect.y + state->tiles[0].current_rect.height <= bounds.y,
-                "a minimized placeholder lands beyond the top edge");
+    expect_true(fabsf(state->tiles[0].current_rect.x + state->tiles[0].current_rect.width * 0.5f -
+                      (bounds.x + bounds.width * 0.5f)) < 0.5f,
+                "a minimized placeholder lands centred under the Dock");
+    expect_true(state->tiles[0].current_rect.y >= bounds.y + bounds.height,
+                "a minimized placeholder lands beyond the bottom edge");
     reach_stage_destroy(stage);
 }
 
@@ -816,10 +817,11 @@ static void test_closing_stage_retargets_newly_minimized_windows(void)
     reach_test_motion_clock_advance(1.0);
     reach_stage_capsule_ops()->tick(stage, 1.0, &tick);
     state = reach_stage_state_ptr(stage);
-    expect_true(state->tiles[0].current_rect.x + state->tiles[0].current_rect.width <= bounds.x,
-                "a newly minimized placeholder lands beyond the left edge");
-    expect_true(state->tiles[0].current_rect.y + state->tiles[0].current_rect.height <= bounds.y,
-                "a newly minimized placeholder lands beyond the top edge");
+    expect_true(fabsf(state->tiles[0].current_rect.x + state->tiles[0].current_rect.width * 0.5f -
+                      (bounds.x + bounds.width * 0.5f)) < 0.5f,
+                "a newly minimized placeholder lands centred under the Dock");
+    expect_true(state->tiles[0].current_rect.y >= bounds.y + bounds.height,
+                "a newly minimized placeholder lands beyond the bottom edge");
     reach_stage_destroy(stage);
 }
 
