@@ -2133,7 +2133,7 @@ void reach_dock_build_layout(reach_dock *dock, const reach_dock_build_context *c
 
     const float icon_size = fit.icon_size;
     const float gap = fit.gap;
-    const float border_thickness = native_border_thickness * fit.scale;
+    const float border_thickness = reach_line_thickness(native_border_thickness * fit.scale);
     const float app_slot_width = icon_size + gap;
 
     const float top = (layout->bounds.height - icon_size) * 0.5f;

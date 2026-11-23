@@ -39,6 +39,7 @@ struct reach_quick_settings_metrics
     float toggle_divider_leading_gap;
     float toggle_divider_trailing_gap;
     float toggle_divider_height;
+    float toggle_divider_width;
     float toggle_title_height;
     float toggle_status_height;
 
@@ -113,6 +114,7 @@ static constexpr reach_quick_settings_metrics reach_quick_settings_make_metrics(
     metrics.toggle_divider_leading_gap = 9.0f;
     metrics.toggle_divider_trailing_gap = 6.0f;
     metrics.toggle_divider_height = 20.0f;
+    metrics.toggle_divider_width = 1.0f;
     metrics.toggle_title_height = 15.0f;
     metrics.toggle_status_height = 13.0f;
 
@@ -217,6 +219,8 @@ static inline reach_quick_settings_metrics reach_quick_settings_metrics_for_scal
         reach_quick_settings_metric_scale_value(metrics.toggle_divider_trailing_gap, dpi_scale);
     metrics.toggle_divider_height =
         reach_quick_settings_metric_scale_value(metrics.toggle_divider_height, dpi_scale);
+    metrics.toggle_divider_width = reach_line_thickness(
+        reach_quick_settings_metric_scale_value(metrics.toggle_divider_width, dpi_scale));
     metrics.toggle_title_height =
         reach_quick_settings_metric_scale_value(metrics.toggle_title_height, dpi_scale);
     metrics.toggle_status_height =

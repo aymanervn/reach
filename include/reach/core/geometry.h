@@ -44,6 +44,12 @@ extern "C"
         uint32_t count;
     } reach_rect_union;
 
+    // Line and border widths in device pixels land on whole pixels and never go below one.
+    static inline float reach_line_thickness(float pixels)
+    {
+        return pixels > 0.0f ? fmaxf(1.0f, roundf(pixels)) : 0.0f;
+    }
+
     static inline int32_t reach_rect_contains(reach_rect_f32 rect, float x, float y)
     {
         return rect.width > 0.0f && rect.height > 0.0f && x >= rect.x && x < rect.x + rect.width &&

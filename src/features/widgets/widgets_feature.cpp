@@ -5,6 +5,7 @@
 #include "reach/core/typography.h"
 #include "reach/features/common/pressable.h"
 #include "reach/features/common/now_playing_artwork.h"
+#include "reach/features/common/ui_controls.h"
 
 #include <algorithm>
 #include <cwchar>
@@ -1066,7 +1067,8 @@ static void reach_widgets_section_header(reach_render_command_buffer *commands,
     if (divider_width > 0.0f)
     {
         reach_widgets_rect(commands,
-                           {divider_x, section.y + section.height * 0.5f, divider_width, scale},
+                           reach_ui_horizontal_separator_bounds(
+                               divider_x, section.y + section.height * 0.5f, divider_width, scale),
                            0.0f, reach_theme_color_alpha(theme->accent_text, 0.25f));
     }
 }

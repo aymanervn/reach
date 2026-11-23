@@ -255,8 +255,9 @@ static void test_expansion_keeps_popup_anchor_position(void)
     ctx.theme = &wide_border_theme;
     reach_quick_settings_refresh_layout(quick_settings, &ctx);
     state = reach_quick_settings_state_ptr(quick_settings);
-    expect_near(state->bounds.width - narrow_width, 5.0f, 0.001f,
-                "quick settings outer width derives both DPI-scaled border sides");
+    expect_near(state->bounds.width - narrow_width,
+                2.0f * (reach_line_thickness(3.0f * 1.25f) - reach_line_thickness(1.25f)), 0.001f,
+                "quick settings outer width derives both whole-pixel border sides");
     expect_near(state->content_bounds.width, content_width, 0.001f,
                 "quick settings content width stays stable across border widths");
     const float initial_y = state->bounds.y;

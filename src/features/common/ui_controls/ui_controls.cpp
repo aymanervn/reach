@@ -104,7 +104,7 @@ static reach_render_group reach_ui_color_group(uint64_t id, reach_rect_f32 bound
 
 reach_rect_f32 reach_ui_horizontal_separator_bounds(float x, float y, float width, float dpi_scale)
 {
-    float thickness = fmaxf(1.0f, floorf((dpi_scale > 0.0f ? dpi_scale : 1.0f) + 0.5f));
+    float thickness = reach_line_thickness(dpi_scale > 0.0f ? dpi_scale : 1.0f);
     return {x, y, fmaxf(0.0f, width), thickness};
 }
 
