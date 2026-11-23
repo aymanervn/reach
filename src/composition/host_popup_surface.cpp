@@ -21,6 +21,7 @@ reach_result reach_host_render_popup_surface(reach_host *host, reach_surface_id 
     popup.notch_center_x = notch_anchor_x - bounds.x;
     popup.notch_side = notch_side;
     popup.dpi_scale = reach_host_layout_dpi_scale(host);
+    popup.glass = popup.theme->glass;
 
     reach_result result = reach_popup_push_background(&popup, commands);
     if (result != REACH_OK)

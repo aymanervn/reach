@@ -90,6 +90,8 @@ extern "C"
         REACH_SETTINGS_HIT_THEME_FONT_TOGGLE,
         REACH_SETTINGS_HIT_THEME_REACH,
         REACH_SETTINGS_HIT_THEME_ACCENT,
+        REACH_SETTINGS_HIT_THEME_GLASS_TOGGLE,
+        REACH_SETTINGS_HIT_THEME_GLASS_INTENSITY,
         REACH_SETTINGS_HIT_THEME_WINDOWS_SYSTEM_THEME,
         REACH_SETTINGS_HIT_THEME_WINDOWS_APP_THEME,
         REACH_SETTINGS_HIT_THEME_SCROLLBAR_TRACK,
@@ -264,6 +266,8 @@ extern "C"
         reach_motion theme_fps_toggle;
         int32_t theme_bundled_font;
         reach_motion theme_font_toggle;
+        reach_config_glass_settings glass;
+        reach_motion glass_toggle;
         int32_t theme_light;
         reach_motion theme_reach_selection;
         int32_t theme_accent;
@@ -404,6 +408,11 @@ extern "C"
         reach_rect_f32 theme_font_title;
         reach_rect_f32 theme_font_subtitle;
         reach_rect_f32 theme_font_toggle;
+        reach_rect_f32 theme_glass_card;
+        reach_rect_f32 theme_glass_title;
+        reach_rect_f32 theme_glass_subtitle;
+        reach_rect_f32 theme_glass_toggle;
+        reach_settings_slider_card_layout theme_glass_intensity;
         reach_rect_f32 theme_reach_card;
         reach_rect_f32 theme_reach_icon;
         reach_rect_f32 theme_reach_title;
@@ -637,6 +646,11 @@ extern "C"
     void reach_settings_model_set_bundled_font(reach_settings_model *model, int32_t enabled);
     int32_t reach_settings_model_bundled_font(const reach_settings_model *model);
     int32_t reach_settings_model_toggle_bundled_font(reach_settings_model *model);
+    void reach_settings_model_set_glass(reach_settings_model *model,
+                                        const reach_config_glass_settings *glass);
+    void reach_settings_model_set_glass_enabled(reach_settings_model *model, int32_t enabled);
+    int32_t reach_settings_model_set_glass_intensity(reach_settings_model *model,
+                                                     int32_t intensity);
     void reach_settings_model_set_light_theme(reach_settings_model *model, int32_t enabled);
     int32_t reach_settings_model_light_theme(const reach_settings_model *model);
     int32_t reach_settings_model_select_light_theme(reach_settings_model *model, int32_t enabled);

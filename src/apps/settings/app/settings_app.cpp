@@ -616,6 +616,7 @@ static void reach_settings_load_theme_config(reach_settings_app *app)
     reach_settings_apply_ui_font(app);
     reach_settings_model_set_light_theme(&app->model, snapshot->light_theme);
     reach_settings_model_set_accent_preset(&app->model, snapshot->accent_preset);
+    reach_settings_model_set_glass(&app->model, &snapshot->glass);
     reach_settings_model_set_windows_system_theme(&app->model, snapshot->windows_system_theme);
     reach_settings_model_set_windows_app_theme(&app->model, snapshot->windows_app_theme);
     reach_settings_apply_theme(app);
@@ -728,7 +729,9 @@ static int32_t reach_settings_model_shows_config(const reach_settings_app *app,
            reach_settings_model_top_bar_icon_only(model) == snapshot->top_bar_icon_only &&
            reach_settings_model_top_bar_overlay(model) == snapshot->top_bar_overlay &&
            reach_settings_model_dock_size(model) == snapshot->dock_size &&
-           reach_settings_model_dock_auto_hide(model) == snapshot->dock_auto_hide;
+           reach_settings_model_dock_auto_hide(model) == snapshot->dock_auto_hide &&
+           model->glass.enabled == snapshot->glass.enabled &&
+           model->glass.intensity == snapshot->glass.intensity;
 }
 
 static void reach_settings_apply_config_refresh(reach_settings_app *app)
@@ -1927,6 +1930,7 @@ static uint64_t reach_settings_pressable_target(reach_settings_hit_result hit)
     case REACH_SETTINGS_HIT_BLUETOOTH_SCROLLBAR_TRACK:
     case REACH_SETTINGS_HIT_BLUETOOTH_SCROLLBAR_THUMB:
     case REACH_SETTINGS_HIT_DOCK_SIZE:
+    case REACH_SETTINGS_HIT_THEME_GLASS_INTENSITY:
         return REACH_PRESSABLE_TARGET_NONE;
     default:
         break;
@@ -2150,6 +2154,12 @@ static void reach_settings_drag_slider(reach_settings_app *app, float x)
                              (int32_t)lroundf(ratio * (float)(REACH_CONFIG_DOCK_SIZE_MAX -
                                                               REACH_CONFIG_DOCK_SIZE_MIN)));
     }
+    else if (app->model.dragging_slider == REACH_SETTINGS_HIT_THEME_GLASS_INTENSITY)
+    {
+        float ratio = reach_settings_slider_ratio_at(&app->layout.theme_glass_intensity, x);
+        changed = reach_settings_model_set_glass_intensity(
+            &app->model, (int32_t)lroundf(ratio * REACH_CONFIG_GLASS_INTENSITY_MAX));
+    }
     if (changed)
     {
         app->dirty = 1;
@@ -2163,6 +2173,12 @@ static void reach_settings_end_slider_drag(reach_settings_app *app)
     {
         (void)reach_config_service_set_dock_size(app->config_service,
                                                  reach_settings_model_dock_size(&app->model));
+    }
+    else if (app->model.dragging_slider == REACH_SETTINGS_HIT_THEME_GLASS_INTENSITY &&
+             app->config_service != nullptr)
+    {
+        (void)reach_config_service_set_glass_intensity(app->config_service,
+                                                       app->model.glass.intensity);
     }
     app->model.dragging_slider = REACH_SETTINGS_HIT_NONE;
     if (app->window.ops.set_pointer_capture != nullptr)
@@ -2417,6 +2433,15 @@ static void reach_settings_handle_pointer_up(reach_settings_app *app, const reac
             }
             app->dirty = 1;
         }
+        else if (hit.type == REACH_SETTINGS_HIT_THEME_GLASS_TOGGLE)
+        {
+            reach_settings_model_set_glass_enabled(&app->model, !app->model.glass.enabled);
+            if (app->config_service != nullptr)
+            {
+                (void)reach_config_service_toggle_glass(app->config_service);
+            }
+            app->dirty = 1;
+        }
         else if (hit.type == REACH_SETTINGS_HIT_THEME_FPS_TOGGLE)
         {
             (void)reach_settings_model_toggle_high_refresh_rate(&app->model);
@@ -2582,7 +2607,8 @@ static void reach_settings_handle_pointer_down(reach_settings_app *app, const re
     float x = (float)event->x - app->bounds.x;
     float y = (float)event->y - app->bounds.y;
     reach_settings_hit_result hit = reach_settings_hit_test(&app->layout, x, y);
-    if (hit.type == REACH_SETTINGS_HIT_DOCK_SIZE)
+    if (hit.type == REACH_SETTINGS_HIT_DOCK_SIZE ||
+        hit.type == REACH_SETTINGS_HIT_THEME_GLASS_INTENSITY)
     {
         app->model.dragging_slider = hit.type;
         if (app->window.ops.set_pointer_capture != nullptr)

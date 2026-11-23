@@ -851,7 +851,8 @@ static int32_t reach_system_controls_read_theme_value(HKEY key, const wchar_t *n
 
 static reach_result reach_system_controls_set_theme_modes(void *userdata,
                                                           reach_theme_mode system_mode,
-                                                          reach_theme_mode app_mode)
+                                                          reach_theme_mode app_mode,
+                                                          int32_t enable_transparency)
 {
     (void)userdata;
     if ((system_mode != REACH_THEME_MODE_DARK && system_mode != REACH_THEME_MODE_LIGHT) ||
@@ -873,18 +874,22 @@ static reach_result reach_system_controls_set_theme_modes(void *userdata,
     {
         const wchar_t *name;
         DWORD target;
+        bool refresh_tray;
     } values[] = {
-        {L"SystemUsesLightTheme", system_mode == REACH_THEME_MODE_LIGHT ? 1u : 0u},
-        {L"AppsUseLightTheme", app_mode == REACH_THEME_MODE_LIGHT ? 1u : 0u},
+        {L"SystemUsesLightTheme", system_mode == REACH_THEME_MODE_LIGHT ? 1u : 0u, true},
+        {L"AppsUseLightTheme", app_mode == REACH_THEME_MODE_LIGHT ? 1u : 0u, true},
+        {enable_transparency ? L"EnableTransparency" : nullptr, 1u, false},
     };
 
-    int32_t changed = 0;
+    bool changed = false;
+    bool refresh_tray = false;
     reach_result result = REACH_OK;
     for (const reach_theme_registry_value &value : values)
     {
         DWORD current = 0;
-        if (reach_system_controls_read_theme_value(key, value.name, &current) &&
-            current == value.target)
+        if (value.name == nullptr ||
+            (reach_system_controls_read_theme_value(key, value.name, &current) &&
+             current == value.target))
         {
             continue;
         }
@@ -895,7 +900,8 @@ static reach_result reach_system_controls_set_theme_modes(void *userdata,
             result = REACH_ERROR;
             continue;
         }
-        changed = 1;
+        changed = true;
+        refresh_tray |= value.refresh_tray;
     }
     RegCloseKey(key);
 
@@ -905,10 +911,13 @@ static reach_result reach_system_controls_set_theme_modes(void *userdata,
         (void)SendMessageTimeoutW(HWND_BROADCAST, WM_SETTINGCHANGE, 0,
                                   reinterpret_cast<LPARAM>(L"ImmersiveColorSet"),
                                   SMTO_ABORTIFHUNG | SMTO_NORMAL, 2000, &broadcast_result);
+    }
+    if (refresh_tray)
+    {
         UINT taskbar_created = RegisterWindowMessageW(L"TaskbarCreated");
         if (taskbar_created != 0)
         {
-            broadcast_result = 0;
+            DWORD_PTR broadcast_result = 0;
             (void)SendMessageTimeoutW(HWND_BROADCAST, taskbar_created, 0, 0,
                                       SMTO_ABORTIFHUNG | SMTO_NORMAL, 2000, &broadcast_result);
         }

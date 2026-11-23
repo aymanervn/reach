@@ -23,46 +23,6 @@ static reach_result reach_preview_fill(reach_render_command_buffer *out, uint64_
     return reach_render_push_rect_motion(out, &source, &rect, radius, color);
 }
 
-static void reach_preview_border_geometry(const reach_render_command_buffer *commands,
-                                          uint64_t parent, float border, reach_rect_motion *outer,
-                                          reach_rect_motion *inner)
-{
-    auto fixed = [](const reach_motion &motion)
-    {
-        float minimum = 0, maximum = 0;
-        return reach_motion_range(&motion, &minimum, &maximum) == REACH_OK && minimum == maximum;
-    };
-    if (!fixed(outer->x) || !fixed(outer->y) || !fixed(outer->width) || !fixed(outer->height))
-        return;
-    const auto *group = reach_render_command_buffer_group(commands, parent);
-    while (group != nullptr)
-    {
-        if (!fixed(group->x) || !fixed(group->y))
-            return;
-        group = reach_render_command_buffer_group(commands, group->parent_id);
-    }
-    auto transform = reach_render_command_buffer_group_transform_at(commands, parent, 0);
-    reach_render_command shape = {};
-    shape.type = REACH_RENDER_COMMAND_RECT;
-    shape.rect = reach_rect_motion_value_at(outer, 0);
-    shape.rect.x += transform.offset_x;
-    shape.rect.y += transform.offset_y;
-    reach_render_command shapes[2] = {};
-    size_t count =
-        reach_render_bordered_background_shapes(&shape, {1, 1, 1, 1}, {1, 1, 1, 1}, border, shapes);
-    auto assign = [&](reach_rect_motion *motion, reach_rect_f32 rect)
-    {
-        reach_motion_set(&motion->x, rect.x - transform.offset_x);
-        reach_motion_set(&motion->y, rect.y - transform.offset_y);
-        reach_motion_set(&motion->width, rect.width);
-        reach_motion_set(&motion->height, rect.height);
-    };
-    if (count > 0)
-        assign(outer, shapes[0].rect);
-    if (count > 1)
-        assign(inner, shapes[1].rect);
-}
-
 static reach_result reach_preview_icon(reach_render_command_buffer *out, uint64_t id,
                                        uint64_t parent, const reach_motion &x,
                                        const reach_motion &y, const reach_motion &size,
@@ -129,6 +89,7 @@ reach_result reach_context_menu_render_previews(reach_context_menu *menu,
     popup.hide_notch = 1;
     popup.background_color_override = theme->dock_background;
     popup.has_background_color_override = 1;
+    popup.glass = theme->glass;
     if (result == REACH_OK)
         result = reach_popup_push_width_background(&popup, &layout.body.width, &layout.body.height,
                                                    &layout.notch, body.id, 8, out);
@@ -185,8 +146,6 @@ reach_result reach_context_menu_render_previews(reach_context_menu *menu,
                                      close_width * .8f, header * .8f};
         reach_rect_f32 glyph_rect = {card.source_width - close_width * .66f,
                                      header * .5f - close_width * .16f, glyph, glyph};
-        reach_color base = theme->dock_background;
-        base.a = 1;
 
         reach_render_group frame = {};
         frame.parent_id = body.id;
@@ -196,16 +155,6 @@ reach_result reach_context_menu_render_previews(reach_context_menu *menu,
         frame.x = card.motion.x;
         frame.y = card.header_top;
         frame.scale = card.size;
-        reach_rect_motion rect = {};
-        reach_motion_set(&rect.x, 0);
-        reach_motion_set(&rect.y, thumbnail_y);
-        reach_motion_set(&rect.width, card.source_width);
-        reach_motion_set(&rect.height, card.source_height);
-        auto outer = rect;
-        outer.x = reach_motion_affine(&outer.x, 1, -border);
-        outer.y = reach_motion_affine(&outer.y, 1, -border);
-        outer.width = reach_motion_affine(&outer.width, 1, border * 2);
-        outer.height = reach_motion_affine(&outer.height, 1, border * 2);
 
         reach_motion hover = {};
         reach_motion_set(&hover, 0);
@@ -215,19 +164,11 @@ reach_result reach_context_menu_render_previews(reach_context_menu *menu,
         result = reach_render_command_buffer_begin_group(out, &frame);
         if (result != REACH_OK)
             return result;
-        reach_preview_border_geometry(out, frame.id, border, &outer, &rect);
         auto push = [&](reach_render_command command)
         {
             if (result == REACH_OK)
                 result = reach_render_command_buffer_push(out, &command);
         };
-        reach_render_command shape = {};
-        shape.type = REACH_RENDER_COMMAND_RECT;
-        shape.color = base;
-        shape.rect = reach_rect_motion_value_at(&outer, 0);
-        push(shape);
-        shape.rect = reach_rect_motion_value_at(&rect, 0);
-        push(shape);
         if (icon != 0)
         {
             reach_render_command image = {};

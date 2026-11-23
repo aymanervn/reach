@@ -14,6 +14,7 @@ static std::vector<reach_desktop_background_slot> g_backgroundSlots;
 static int32_t g_backgroundVisible = 0;
 static HWINEVENTHOOK g_wpeCreateHook = nullptr;
 static HWINEVENTHOOK g_wpeDestroyHook = nullptr;
+static HPOWERNOTIFY g_powerSavingNotify = nullptr;
 static HANDLE g_hostThread = nullptr;
 static HANDLE g_hostReadyEvent = nullptr;
 static std::atomic<DWORD> g_hostThreadId{0};
@@ -27,6 +28,45 @@ static const UINT REACH_EXPLORER_DESKTOP_COMPAT_SHUTDOWN = WM_APP + 0x322;
 
 extern "C" void reach_windows_notify_desktop_environment_changed(void);
 extern "C" void reach_windows_request_desktop_environment_sync(void);
+
+// Explorer's immersive shell (twinui.pcshell AcrylicPolicyManager::UpdateAcrylicState) publishes
+// whether transparency effects are allowed to the session-scoped WNF state
+// WNF_IMSN_TRANSPARENCYPOLICY. DWM renders host backdrop brushes black until that state is 1,
+// and nothing else publishes it, so without Explorer it stays unset until sign-out. Explorer
+// derives it from the transparency setting, high contrast and battery saver.
+static void reach_explorer_desktop_compat_publish_transparency_policy(void)
+{
+    static const ULONGLONG wnf_imsn_transparency_policy = 0x0F950324A3BC4035ull;
+    static int32_t published = -1;
+
+    DWORD transparency = 1;
+    DWORD size = sizeof(transparency);
+    (void)RegGetValueW(HKEY_CURRENT_USER,
+                       L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
+                       L"EnableTransparency", RRF_RT_REG_DWORD, nullptr, &transparency, &size);
+    HIGHCONTRASTW high_contrast = {sizeof(high_contrast)};
+    bool high_contrast_on =
+        SystemParametersInfoW(SPI_GETHIGHCONTRAST, sizeof(high_contrast), &high_contrast, 0) &&
+        (high_contrast.dwFlags & HCF_HIGHCONTRASTON) != 0;
+    SYSTEM_POWER_STATUS power = {};
+    bool battery_saver_on = GetSystemPowerStatus(&power) && power.SystemStatusFlag != 0;
+
+    DWORD allowed = transparency != 0 && !high_contrast_on && !battery_saver_on ? 1u : 0u;
+    if (published == static_cast<int32_t>(allowed))
+    {
+        return;
+    }
+
+    typedef LONG(NTAPI * reach_publish_wnf_fn)(ULONGLONG, const void *, const void *, ULONG,
+                                               const void *);
+    reach_publish_wnf_fn publish = reinterpret_cast<reach_publish_wnf_fn>(
+        GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "RtlPublishWnfStateData"));
+    if (publish != nullptr &&
+        publish(wnf_imsn_transparency_policy, nullptr, &allowed, sizeof(allowed), nullptr) >= 0)
+    {
+        published = static_cast<int32_t>(allowed);
+    }
+}
 
 static const wchar_t *reach_explorer_desktop_compat_progman_class(void)
 {
@@ -144,6 +184,20 @@ static LRESULT CALLBACK reach_explorer_desktop_compat_host_proc(HWND hwnd, UINT 
             WINDOWPOS *position = reinterpret_cast<WINDOWPOS *>(lparam);
             position->hwndInsertAfter = HWND_BOTTOM;
             position->flags &= ~SWP_NOZORDER;
+        }
+        return DefWindowProcW(hwnd, message, wparam, lparam);
+
+    case WM_SETTINGCHANGE:
+        if (hwnd == g_progmanHwnd)
+        {
+            reach_explorer_desktop_compat_publish_transparency_policy();
+        }
+        return DefWindowProcW(hwnd, message, wparam, lparam);
+
+    case WM_POWERBROADCAST:
+        if (hwnd == g_progmanHwnd && wparam == PBT_POWERSETTINGCHANGE)
+        {
+            reach_explorer_desktop_compat_publish_transparency_policy();
         }
         return DefWindowProcW(hwnd, message, wparam, lparam);
 
@@ -622,6 +676,9 @@ static reach_result reach_explorer_desktop_compat_create_host_windows(void)
 
     SetWindowPos(g_progmanHwnd, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
     reach_explorer_desktop_compat_register_shell_window(g_progmanHwnd);
+    g_powerSavingNotify = RegisterPowerSettingNotification(g_progmanHwnd, &GUID_POWER_SAVING_STATUS,
+                                                           DEVICE_NOTIFY_WINDOW_HANDLE);
+    reach_explorer_desktop_compat_publish_transparency_policy();
 
     DWORD worker_style = WS_CHILD | WS_VISIBLE | WS_DISABLED | WS_CLIPCHILDREN | WS_CLIPSIBLINGS;
 
@@ -664,6 +721,12 @@ static void reach_explorer_desktop_compat_destroy_host_windows(void)
         KillTimer(g_progmanHwnd, REACH_EXPLORER_DESKTOP_COMPAT_SYNC_TIMER);
     }
     g_syncScheduled = 0;
+
+    if (g_powerSavingNotify != nullptr)
+    {
+        UnregisterPowerSettingNotification(g_powerSavingNotify);
+        g_powerSavingNotify = nullptr;
+    }
 
     if (g_workerwHwnd != nullptr)
     {

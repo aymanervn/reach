@@ -517,7 +517,7 @@ static void reach_quick_settings_place_toggle(reach_quick_settings_toggle_layout
                                   metrics->toggle_icon_size, metrics->toggle_icon_size);
     float divider_x =
         roundf(toggle->icon.x + toggle->icon.width + metrics->toggle_divider_leading_gap);
-    float divider_width = 1.0f;
+    float divider_width = metrics->toggle_divider_width;
     toggle->divider = reach_quick_settings_rect(
         divider_x, bounds.y + (bounds.height - metrics->toggle_divider_height) * 0.5f,
         divider_width, metrics->toggle_divider_height);

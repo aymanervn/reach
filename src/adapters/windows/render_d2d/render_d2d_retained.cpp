@@ -1384,7 +1384,11 @@ static HRESULT sync_layer(reach_render_backend *backend, reach_d2d_retained_laye
     bool surface_recreated = false;
     HRESULT hr = S_OK;
     if (content_changed && count != 0)
+    {
         hr = draw_layer(backend, layer, local, width, height, &surface_recreated);
+        if (SUCCEEDED(hr) && backend->compositor != nullptr)
+            hr = reach_wuc_sync_glass(backend, layer, local.front().glass, surface_recreated);
+    }
     else if (content_changed)
     {
         hr = backend->compositor != nullptr ? layer.visual->put_Brush(nullptr)
@@ -1393,6 +1397,7 @@ static HRESULT sync_layer(reach_render_backend *backend, reach_d2d_retained_laye
         {
             layer.surface.Reset();
             layer.surface_brush.Reset();
+            layer.glass = {};
             layer.dcomp_surface.Reset();
             layer.commands.clear();
             layer.width = layer.height = 0;
@@ -1948,9 +1953,6 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
         reach_d2d_release_retained(backend);
         return reach_d2d_device_check(backend->device, hr, L"create_scene");
     }
-    reach_result clip_result = reach_wuc_apply_content_clip(backend, commands->content_rect);
-    if (clip_result != REACH_OK)
-        return clip_result;
     const reach_transform_f32 &transform = commands->content_transform;
     const reach_transform_f32 &previous_transform = backend->scene_content_transform;
     bool transform_changed = !backend->has_scene_content_transform ||
@@ -2199,6 +2201,43 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
     };
     std::vector<reach_d2d_retained_run> runs;
     reach_d2d_retained_runs(commands, &runs);
+    // A layer carries one glass setting. Where it changes inside a group, the later commands move
+    // to child layers stacked directly above the group's own, as ungrouped runs already split.
+    auto split_glass = [&](uint64_t group_id, size_t begin, size_t end)
+    {
+        auto same_glass = [&](size_t first, size_t second)
+        {
+            return reach_glass_equal(commands->commands[first].glass,
+                                     commands->commands[second].glass);
+        };
+        size_t cut = begin + 1;
+        while (cut < end && same_glass(cut, begin))
+            ++cut;
+        auto base = plan_for(group_id);
+        if (cut == end || base == plans.end())
+            return;
+        size_t slot = (size_t)(base - plans.begin());
+        base->count = cut - begin;
+        for (uint64_t ordinal = 0; cut < end; ++ordinal)
+        {
+            size_t next = cut + 1;
+            while (next < end && same_glass(next, cut))
+                ++next;
+            retained_plan part = {};
+            part.group.id = reach_d2d_ungrouped_run_id(~group_id, ordinal);
+            while (plan_for(part.group.id) != plans.end() ||
+                   std::any_of(runs.begin(), runs.end(), [&](const reach_d2d_retained_run &other)
+                               { return other.id == part.group.id; }))
+                part.group.id = reach_d2d_ungrouped_run_id(part.group.id, ordinal);
+            part.group.parent_id = group_id;
+            part.group.bounds = run_bounds(commands->commands + cut, next - cut);
+            part.commands = commands->commands + cut;
+            part.count = next - cut;
+            if (part.group.bounds.width > 0.0f && part.group.bounds.height > 0.0f)
+                plans.insert(plans.begin() + (ptrdiff_t)(++slot), std::move(part));
+            cut = next;
+        }
+    };
     for (const reach_d2d_retained_run &run : runs)
     {
         const size_t index = run.begin;
@@ -2233,6 +2272,8 @@ reach_result reach_d2d_sync_retained(reach_render_backend *backend,
                 existing->commands = commands->commands + index;
                 existing->count = end - index;
             }
+            if (first.group_id != 0)
+                split_glass(group.id, index, end);
         }
         if (first.type == REACH_RENDER_COMMAND_VECTOR_ICON && end == index + 1)
         {

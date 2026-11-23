@@ -28,6 +28,8 @@ enum reach_config_operation_type
     REACH_CONFIG_OPERATION_MOVE_PIN,
     REACH_CONFIG_OPERATION_SET_POWER,
     REACH_CONFIG_OPERATION_SET_DISPLAY,
+    REACH_CONFIG_OPERATION_TOGGLE_GLASS,
+    REACH_CONFIG_OPERATION_SET_GLASS_INTENSITY,
     REACH_CONFIG_OPERATION_SET_TOP_BAR,
     REACH_CONFIG_OPERATION_SET_DESKTOP_WIDGET,
     REACH_CONFIG_OPERATION_RESET_WIDGET_POSITIONS,
@@ -46,6 +48,7 @@ struct reach_config_operation
     uint16_t monitor_wallpaper_paths[REACH_MAX_WALLPAPER_MONITORS][260];
     reach_config_power_settings power;
     reach_config_display_settings display;
+    int32_t glass_intensity;
     reach_config_top_bar_settings top_bar;
     int32_t dock_size;
     int32_t dock_auto_hide;
@@ -133,6 +136,14 @@ static reach_result reach_config_apply_operation(reach_config_snapshot *snapshot
         snapshot->accent_preset = operation->display.accent_preset;
         snapshot->windows_system_theme = operation->display.windows_system_theme;
         snapshot->windows_app_theme = operation->display.windows_app_theme;
+        return REACH_OK;
+    case REACH_CONFIG_OPERATION_TOGGLE_GLASS:
+        snapshot->glass.enabled = !snapshot->glass.enabled;
+        *out_changed = 1;
+        return REACH_OK;
+    case REACH_CONFIG_OPERATION_SET_GLASS_INTENSITY:
+        *out_changed = snapshot->glass.intensity != operation->glass_intensity;
+        snapshot->glass.intensity = operation->glass_intensity;
         return REACH_OK;
     case REACH_CONFIG_OPERATION_SET_TOP_BAR:
         *out_changed = snapshot->top_bar_style != operation->top_bar.style ||
@@ -690,6 +701,25 @@ reach_result reach_config_service_set_display(reach_config_service *service,
     reach_config_operation operation = {};
     operation.type = REACH_CONFIG_OPERATION_SET_DISPLAY;
     operation.display = *settings;
+    return reach_config_service_commit(service, &operation);
+}
+
+reach_result reach_config_service_toggle_glass(reach_config_service *service)
+{
+    reach_config_operation operation = {};
+    operation.type = REACH_CONFIG_OPERATION_TOGGLE_GLASS;
+    return reach_config_service_commit(service, &operation);
+}
+
+reach_result reach_config_service_set_glass_intensity(reach_config_service *service,
+                                                      int32_t intensity)
+{
+    if (intensity < 0 || intensity > REACH_CONFIG_GLASS_INTENSITY_MAX)
+        return REACH_INVALID_ARGUMENT;
+
+    reach_config_operation operation = {};
+    operation.type = REACH_CONFIG_OPERATION_SET_GLASS_INTENSITY;
+    operation.glass_intensity = intensity;
     return reach_config_service_commit(service, &operation);
 }
 

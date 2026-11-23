@@ -1,4 +1,5 @@
 #include "reach/features/common/popup.h"
+#include "reach/features/common/ui_controls.h"
 
 #include <math.h>
 #include <memory>
@@ -327,6 +328,12 @@ static reach_render_command reach_popup_shape(const reach_popup_background_input
     return shape;
 }
 
+static reach_color reach_popup_background_color(const reach_popup_background_input *input)
+{
+    return input->has_background_color_override ? input->background_color_override
+                                                : input->theme->popup_background;
+}
+
 static int32_t reach_popup_render_input_valid(const reach_popup_background_input *input,
                                               const reach_render_command_buffer *out_commands)
 {
@@ -343,8 +350,8 @@ reach_result reach_popup_push_background(const reach_popup_background_input *inp
     }
 
     reach_render_command shape = reach_popup_shape(input);
-    reach_color background = input->has_background_color_override ? input->background_color_override
-                                                                  : input->theme->popup_background;
+    shape.glass = input->glass;
+    reach_color background = reach_popup_background_color(input);
     return reach_render_push_bordered_background(
         out_commands, &shape, background, input->theme->popup_border,
         reach_theme_border_thickness(input->theme, input->dpi_scale), &input->theme->popup_shadow,
@@ -367,6 +374,25 @@ reach_result reach_popup_push_height_background(const reach_popup_background_inp
     float minimum = 0, maximum = 0;
     if (reach_motion_range(height, &minimum, &maximum) != REACH_OK)
         return REACH_INVALID_ARGUMENT;
+    // Stretched patches would seam under glass, so a glass panel is painted once at its tallest
+    // and resized by an animated clip.
+    if (input->glass.intensity != 0 && input->hide_notch)
+    {
+        reach_popup_background_input tallest = *input;
+        tallest.bounds.height = maximum;
+        reach_render_command shape = reach_popup_shape(&tallest);
+        reach_rect_motion bounds = {};
+        reach_motion_set(&bounds.x, shape.rect.x);
+        reach_motion_set(&bounds.y, shape.rect.y);
+        reach_motion_set(&bounds.width, shape.rect.width);
+        bounds.height = reach_motion_affine(height, 1, shape.rect.height - maximum);
+        reach_color background = reach_popup_background_color(input);
+        return reach_ui_motion_background_render(
+            out_commands, &bounds, shape.radius,
+            reach_theme_border_thickness(input->theme, input->dpi_scale), background,
+            input->theme->popup_border, &input->theme->popup_shadow, input->dpi_scale,
+            first_group_id, parent_id, input->glass);
+    }
     auto commands = std::unique_ptr<reach_render_command_buffer>(new (std::nothrow)
                                                                      reach_render_command_buffer());
     if (!commands)
@@ -386,32 +412,36 @@ reach_result reach_popup_push_height_background(const reach_popup_background_inp
                            (input->notch_side == REACH_NOTCH_SIDE_BOTTOM ? notch : 0));
     source.bounds.height = stretch.top + stretch.bottom + 1;
     float source_body_height = source.bounds.height - pad.top - pad.bottom;
-    if (minimum == maximum && minimum < source_body_height)
+    bool stretched = minimum != maximum || minimum >= source_body_height;
+    if (stretched)
+    {
+        shape.bounds.height = source_body_height;
+        reach_motion_set(&stretch.width, source.bounds.width);
+        reach_motion body = *height;
+        if (minimum < source_body_height)
+            body =
+                reach_motion_clamp(height, source_body_height, fmaxf(source_body_height, maximum));
+        stretch.height = reach_motion_affine(&body, 1, pad.top + pad.bottom);
+    }
+    else
     {
         shape.bounds.height = maximum;
         source.bounds.height = ceilf(maximum + pad.top + pad.bottom);
-        reach_result result = reach_popup_push_background(&shape, commands.get());
-        if (result != REACH_OK)
-            return result;
-        result = reach_render_command_buffer_begin_group(out_commands, &source);
-        if (result != REACH_OK)
-            return result;
-        for (size_t index = 0; index < commands->count && result == REACH_OK; ++index)
-            result = reach_render_command_buffer_push(out_commands, &commands->commands[index]);
-        reach_render_command_buffer_end_group(out_commands);
-        return result;
     }
-    shape.bounds.height = source.bounds.height - pad.top - pad.bottom;
+
     reach_result result = reach_popup_push_background(&shape, commands.get());
     if (result != REACH_OK)
         return result;
-    reach_motion_set(&stretch.width, source.bounds.width);
-    reach_motion body = *height;
-    if (minimum < source_body_height)
-        body = reach_motion_clamp(height, source_body_height, fmaxf(source_body_height, maximum));
-    stretch.height = reach_motion_affine(&body, 1, pad.top + pad.bottom);
-    return reach_render_push_stretched_chrome(out_commands, &source, &stretch, commands->commands,
-                                              commands->count);
+    if (stretched)
+        return reach_render_push_stretched_chrome(out_commands, &source, &stretch,
+                                                  commands->commands, commands->count);
+    result = reach_render_command_buffer_begin_group(out_commands, &source);
+    if (result != REACH_OK)
+        return result;
+    for (size_t index = 0; index < commands->count && result == REACH_OK; ++index)
+        result = reach_render_command_buffer_push(out_commands, &commands->commands[index]);
+    reach_render_command_buffer_end_group(out_commands);
+    return result;
 }
 
 static reach_result reach_popup_motion_shape(reach_render_command_buffer *out, uint64_t parent,
@@ -516,16 +546,38 @@ reach_result reach_popup_push_width_background(const reach_popup_background_inpu
          height_minimum <= 0 || height_maximum > input->bounds.height))
         return REACH_INVALID_ARGUMENT;
     bool height_changes = height_minimum != height_maximum;
+    float radius = reach_popup_radius_scaled(input->theme, input->dpi_scale);
+    float notch_height = reach_popup_notch_height_scaled(input->dpi_scale);
+    if (input->bounds.height <= notch_height)
+        return REACH_INVALID_ARGUMENT;
+    // Stretched patches would seam under glass, so a glass panel is resized by an animated clip.
+    if (input->glass.intensity != 0 && input->hide_notch)
+    {
+        reach_rect_motion bounds = {};
+        reach_motion_set(&bounds.x, 0);
+        reach_motion_set(&bounds.y, input->notch_side == REACH_NOTCH_SIDE_TOP ? notch_height : 0);
+        bounds.width = *width;
+        if (height != nullptr)
+            bounds.height = reach_motion_affine(height, 1, -notch_height);
+        else
+            reach_motion_set(&bounds.height, input->bounds.height - notch_height);
+        float rest_width =
+            reach_motion_value_at(&bounds.width, reach_motion_deadline(&bounds.width));
+        float rest_height =
+            reach_motion_value_at(&bounds.height, reach_motion_deadline(&bounds.height));
+        reach_color background = reach_popup_background_color(input);
+        return reach_ui_motion_background_render(
+            out_commands, &bounds, fmaxf(0, fminf(radius, fminf(rest_width, rest_height) * .5f)),
+            reach_theme_border_thickness(input->theme, input->dpi_scale), background,
+            input->theme->popup_border, &input->theme->popup_shadow, input->dpi_scale,
+            first_group_id, parent_id, input->glass);
+    }
     auto batch = std::unique_ptr<reach_render_command_buffer>(new (std::nothrow)
                                                                   reach_render_command_buffer());
     if (!batch)
         return REACH_ERROR;
-    float radius = reach_popup_radius_scaled(input->theme, input->dpi_scale);
     float extent = reach_theme_shadow_extent(&input->theme->popup_shadow, input->dpi_scale);
     float notch_width = reach_popup_notch_width_scaled(input->dpi_scale);
-    float notch_height = reach_popup_notch_height_scaled(input->dpi_scale);
-    if (input->bounds.height <= notch_height)
-        return REACH_INVALID_ARGUMENT;
     float shape_notch_width = input->hide_notch ? 0.0f : notch_width;
     float clearance =
         reach_popup_radius_scaled(reach_theme_default(), input->dpi_scale) + notch_width;
@@ -630,9 +682,7 @@ reach_result reach_popup_push_width_background(const reach_popup_background_inpu
             else
                 result = REACH_OK;
             float border = reach_theme_border_thickness(input->theme, input->dpi_scale);
-            reach_color background = input->has_background_color_override
-                                         ? input->background_color_override
-                                         : input->theme->popup_background;
+            reach_color background = reach_popup_background_color(input);
             background.a = 1;
             reach_color outer = border > 0 && input->theme->popup_border.a > 0
                                     ? input->theme->popup_border

@@ -28,6 +28,7 @@ reach_result reach_context_menu_build_render_commands(const reach_context_menu_r
     popup.notch_center_x = input->notch_center_x;
     popup.notch_side = input->notch_side;
     popup.dpi_scale = input->dpi_scale;
+    popup.glass = input->theme->glass;
     if (input->top_bar_dropdown)
     {
         popup.background_color_override = input->theme->top_bar_dropdown_background;
@@ -40,6 +41,8 @@ reach_result reach_context_menu_build_render_commands(const reach_context_menu_r
         return popup_result;
     }
 
+    const reach_color separator = popup.glass.intensity != 0 ? input->theme->glass_popup_separator
+                                                             : input->theme->popup_separator;
     reach_render_command_buffer_set_scissor(out_commands, input->item_viewport);
     float hover_radius =
         reach_nested_radius(reach_popup_radius_scaled(input->theme, input->dpi_scale),
@@ -55,8 +58,8 @@ reach_result reach_context_menu_build_render_commands(const reach_context_menu_r
             reach_rect_f32 line =
                 reach_ui_horizontal_separator_bounds(item.x, item.y, item.width, input->dpi_scale);
             line.y = item.y - (gap + line.height) * 0.5f;
-            (void)reach_ui_horizontal_separator_render(out_commands, line,
-                                                       input->theme->popup_separator);
+            (void)reach_ui_horizontal_separator_render(
+                out_commands, reach_render_pixel_aligned_rect(line), separator);
         }
         reach_color foreground = input->theme->context_menu_text;
 

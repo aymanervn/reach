@@ -75,9 +75,19 @@ extern "C"
         REACH_MOTION_PRESET_COUNT,
     } reach_motion_preset;
 
+    // floor and ceiling bound each sRGB-encoded channel of the composed glass surface where the
+    // backdrop pushes it past them; painted colors outside the bounds are kept.
+    typedef struct reach_glass
+    {
+        int32_t intensity;
+        float floor;
+        float ceiling;
+    } reach_glass;
+
     typedef struct reach_theme
     {
         reach_theme_mode mode;
+        reach_glass glass;
 
         reach_color dock_background;
         reach_color top_bar_background;
@@ -91,6 +101,7 @@ extern "C"
         reach_color widget_background;
         reach_color widget_border;
         reach_color popup_separator;
+        reach_color glass_popup_separator;
         reach_color system_hud_background;
         reach_color system_hud_border;
         reach_color system_hud_primary_text;
@@ -241,6 +252,11 @@ extern "C"
     void reach_theme_resolve(reach_theme_mode mode, const reach_accent_pair *accent,
                              reach_theme *out_theme);
     reach_color reach_theme_color_alpha(reach_color color, float alpha);
+    static inline int32_t reach_glass_equal(reach_glass first, reach_glass second)
+    {
+        return first.intensity == second.intensity && first.floor == second.floor &&
+               first.ceiling == second.ceiling;
+    }
     reach_color reach_theme_color_mix(reach_color from, reach_color to, float t);
     float reach_theme_border_thickness(const reach_theme *theme, float dpi_scale);
     reach_rect_f32 reach_theme_border_content_rect(const reach_theme *theme, float dpi_scale,

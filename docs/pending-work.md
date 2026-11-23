@@ -4,6 +4,7 @@ Open items only.
 
 ## Needs the user's decision
 
+- Glass contrast tiers: primary text 4.5:1, secondary text 3:1 against the glass bound (`REACH_THEME_GLASS_*_CONTRAST`, `reach_theme_glass_limit` in `theme.c`). Secondary at 4.5:1 would stop light glass at gray 241 (nearly opaque).
 
 ## Bugs
 
@@ -35,6 +36,8 @@ Open items only.
 - Concurrent config INI verification failure (2026-10-12), not yet explained.
 - WUC root completion callback is missing in repeated native diagnostics.
 - Validate startup and shutdown, bar stacking and focused popup keyboard input on a deployed surface registry build.
+- `RoActivateInstance(Compositor)` failed with `E_ACCESSDENIED` in Reach and Settings on every start until Explorer had run once (events.log, up to 2026-11-22 17:14). Not reproduced on a cold boot straight into Reach after the transparency-policy fix (2026-11-22 20:29). Cause unknown; reopen if it returns.
+- The compat host skips `SetShellWindow` when another shell window exists at that moment; after `reachctl --start` Reach was seen owning no shell window (`explorer_desktop_compat_host_win32.cpp`, `reach_explorer_desktop_compat_register_shell_window`).
 - Idle Watch starts during host creation. A full host stop ends its worker until the host is recreated (`host_lifecycle.cpp`, `idle_watch.cpp`).
 
 ## Architecture debt (cleanup phase)
@@ -42,10 +45,12 @@ Open items only.
 - `reach_feature_capsule_ops` is bound positionally with five identical signatures.
 - `interfeature_routes.cpp` holds the window-list orchestration, not just slot assignment.
 - Move feature-owned notification, control, resource and rendering adapters out of `feature_registry.cpp` during capsule cleanup. Keep the definitions and service wiring in composition.
-- Shared contracts are not enforced yet: ordering values are literals in each definition (`feature_registry.cpp:1546-1835`), duplicate event owners and duplicate ordering values are accepted, seam callbacks do not state their calling thread, and no UI-thread assertion exists.
+- Shared contracts are not enforced yet: ordering values are literals in each definition (`feature_registry.cpp:1628-1971`), duplicate event owners and duplicate ordering values are accepted, seam callbacks do not state their calling thread, and no UI-thread assertion exists.
 - Numeric surface IDs remain: composition indexes state by `reach_surface_id` (`host->surface_participants[id]` in `host_surface_frames.cpp`) instead of `reach_surface_key_for<T>()` alone.
 - Capsule state structs are public and composition reads them. A third of the public feature API is internals. Per-feature action enums remain in public headers.
 - Dock and Launcher internals live in `core`.
+- Glass policy is split: `theme.c` includes `core/config.h` for the default intensity, and the intensity-to-backdrop-weight curve lives in the adapter (`reach_wuc_create_glass_factory`).
+- `glass_popup_separator` is a raw 18% black or white used only by the Context Menu; other glass surfaces keep `popup_separator`.
 - `reach_ui_layout` and its only consumer are dead.
 - Context Menu uses the Dock's capacity as its "no target" sentinel.
 - Point-in-rect is implemented 14 times with three semantics; `reach_rect_equal` is redefined 4 times.
@@ -62,6 +67,7 @@ Open items only.
 
 ## GPU migration (remaining)
 
+- Migrate resizable cards to one modern nine-grid representation (`CompositionNineGridBrush`) used while resizing and at rest, replacing the clip/painted pair in `reach_ui_motion_background_render` and the stretched tiles (`reach_render_push_stretched_chrome`).
 - Repeatable baseline measurements, and final comparable performance acceptance. Windows profiling policy blocks system trace collection.
 - Dock to GPU: size fit and slot insertion/removal (`dock_feature.cpp`, `size_scale` and `slot_motions`). Reveal and reorder are done.
 - Top Bar pill widths to GPU: Now Playing, current app, tray (`top_bar_feature.cpp:505`). The reveal slide stays on the CPU.

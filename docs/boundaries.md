@@ -41,6 +41,7 @@
 ## Confirmed workarounds
 
 - The Quick Settings Project tile injects Win+P (`reach_system_controls_open_project_menu`); Windows has no API for that flyout.
+- DWM draws host backdrop brushes black until the shell publishes the session WNF state `WNF_IMSN_TRANSPARENCYPOLICY`, which only Explorer's immersive shell does; the compat host publishes it from the transparency, high-contrast and battery-saver state (`reach_explorer_desktop_compat_publish_transparency_policy`).
 - Focusing Reach surfaces and app windows attaches to the target and foreground input threads (`AttachThreadInput` in `window_win32.cpp`, `window_manager_win32.cpp`, `reach_service/window_actions.cpp`) to bypass the foreground lock. A hung foreground app can stall the caller; revisit only if that is seen.
 
 ## Polling

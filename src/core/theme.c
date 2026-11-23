@@ -1,4 +1,5 @@
 #include "reach/core/theme.h"
+#include "reach/core/config.h"
 
 #include <math.h>
 
@@ -6,6 +7,8 @@
 
 #define REACH_THEME_STAGE_BACKDROP_ALPHA 1.0f
 #define REACH_THEME_ACCENT_CONTRAST 4.5f
+#define REACH_THEME_GLASS_PRIMARY_CONTRAST 4.5f
+#define REACH_THEME_GLASS_SECONDARY_CONTRAST 3.0f
 
 #define REACH_PURE_WHITE(a) REACH_RGB8(255, 255, 255, a)
 #define REACH_CRITICAL_RED(a) REACH_RGB8(217, 61, 61, a)
@@ -101,6 +104,7 @@
 
 static const reach_theme reach_theme_dark = {
     .mode = REACH_THEME_MODE_DARK,
+    .glass = {.intensity = REACH_CONFIG_GLASS_INTENSITY_DEFAULT, .floor = 0.0f, .ceiling = 1.0f},
 
     .dock_background = REACH_DARK_DEEP(1.0f),
     .top_bar_background = REACH_DARK_DEEP(1.0f),
@@ -113,6 +117,7 @@ static const reach_theme reach_theme_dark = {
     .widget_background = REACH_DARK_BASE(1.0f),
     .widget_border = REACH_DARK_EDGE_ON_BASE(1.0f),
     .popup_separator = REACH_DARK_STRUCTURE(1.0f),
+    .glass_popup_separator = REACH_PURE_WHITE(0.18f),
     .system_hud_background = REACH_DARK_BASE(1.0f),
     .system_hud_border = REACH_DARK_EDGE_ON_BASE(1.0f),
     .system_hud_primary_text = REACH_DARK_HIGH_CONTRAST_WHITE(1.0f),
@@ -235,6 +240,7 @@ static const reach_theme reach_theme_dark = {
 
 static const reach_theme reach_theme_light = {
     .mode = REACH_THEME_MODE_LIGHT,
+    .glass = {.intensity = REACH_CONFIG_GLASS_INTENSITY_DEFAULT, .floor = 0.0f, .ceiling = 1.0f},
 
     .dock_background = REACH_LIGHT_BASE(1.0f),
     .top_bar_background = REACH_LIGHT_BASE(1.0f),
@@ -247,6 +253,7 @@ static const reach_theme reach_theme_light = {
     .widget_background = REACH_LIGHT_BASE(1.0f),
     .widget_border = REACH_LIGHT_EDGE_ON_BASE(1.0f),
     .popup_separator = REACH_LIGHT_STRUCTURE(1.0f),
+    .glass_popup_separator = REACH_RGB8(0, 0, 0, 0.18f),
     .system_hud_background = REACH_LIGHT_BASE(1.0f),
     .system_hud_border = REACH_LIGHT_EDGE_ON_BASE(1.0f),
     .system_hud_primary_text = REACH_LIGHT_HIGH_CONTRAST_BLACK(1.0f),
@@ -449,6 +456,62 @@ static reach_color reach_theme_meet_contrast(reach_color color, reach_color refe
     return reach_theme_color_mix(color, toward, high);
 }
 
+static int32_t reach_theme_glass_surface_readable(const reach_theme *theme, float level)
+{
+    const reach_color surface = {level, level, level, 1.0f};
+    const reach_color primary[] = {
+        theme->primary_text,
+        theme->bar_text_primary,
+        theme->context_menu_text,
+        theme->switcher_label_text,
+        theme->launcher_search_text,
+        theme->clipboard_primary_text,
+        theme->system_hud_primary_text,
+        theme->now_playing_control_text,
+    };
+    const reach_color secondary[] = {
+        theme->bar_text_secondary,
+        theme->quick_settings_secondary_text,
+        theme->quick_settings_section_label,
+        theme->launcher_placeholder_text,
+        theme->launcher_row_path,
+        theme->clipboard_secondary_text,
+        theme->system_hud_secondary_text,
+    };
+    for (size_t index = 0; index < sizeof(primary) / sizeof(primary[0]); ++index)
+    {
+        reach_color text = reach_theme_color_mix(surface, primary[index], primary[index].a);
+        if (reach_theme_contrast(text, surface) < REACH_THEME_GLASS_PRIMARY_CONTRAST)
+            return 0;
+    }
+    for (size_t index = 0; index < sizeof(secondary) / sizeof(secondary[0]); ++index)
+    {
+        reach_color text = reach_theme_color_mix(surface, secondary[index], secondary[index].a);
+        if (reach_theme_contrast(text, surface) < REACH_THEME_GLASS_SECONDARY_CONTRAST)
+            return 0;
+    }
+    return 1;
+}
+
+// The furthest gray level from the theme's own surfaces that keeps every glass text token
+// readable. Dark themes bound how light glass gets, light themes how dark.
+static float reach_theme_glass_limit(const reach_theme *theme, int32_t light)
+{
+    float readable = light ? 1.0f : 0.0f;
+    float unreadable = light ? 0.0f : 1.0f;
+    if (reach_theme_glass_surface_readable(theme, unreadable))
+        return unreadable;
+    for (int32_t step = 0; step < 24; ++step)
+    {
+        float middle = (readable + unreadable) * 0.5f;
+        if (reach_theme_glass_surface_readable(theme, middle))
+            readable = middle;
+        else
+            unreadable = middle;
+    }
+    return readable;
+}
+
 void reach_theme_resolve(reach_theme_mode mode, const reach_accent_pair *accent,
                          reach_theme *out_theme)
 {
@@ -471,6 +534,9 @@ void reach_theme_resolve(reach_theme_mode mode, const reach_accent_pair *accent,
         reach_theme_meet_contrast(light ? pair.deep : pair.bright, surface, light ? black : white);
     out_theme->accent_tint = reach_theme_color_alpha(fill, out_theme->accent_tint_alpha);
     out_theme->accent_selection = reach_theme_color_alpha(fill, 0.30f);
+    float limit = reach_theme_glass_limit(out_theme, light);
+    out_theme->glass.floor = light ? limit : 0.0f;
+    out_theme->glass.ceiling = light ? 1.0f : limit;
 }
 
 reach_color reach_theme_color_alpha(reach_color color, float alpha)
@@ -492,7 +558,7 @@ reach_color reach_theme_color_mix(reach_color from, reach_color to, float t)
 float reach_theme_border_thickness(const reach_theme *theme, float dpi_scale)
 {
     const reach_theme *actual = theme != 0 ? theme : reach_theme_default();
-    return actual->border_thickness * (dpi_scale > 0.0f ? dpi_scale : 1.0f);
+    return reach_line_thickness(actual->border_thickness * (dpi_scale > 0.0f ? dpi_scale : 1.0f));
 }
 
 reach_rect_f32 reach_theme_border_content_rect(const reach_theme *theme, float dpi_scale,

@@ -177,6 +177,7 @@ struct reach_d2d_retained_layer
     UINT capacity_width = 0;
     UINT capacity_height = 0;
     bool initialized = false;
+    reach_glass glass = {};
     bool raster_birth_aligned = false;
     bool raster_finite_translation = false;
     bool has_children = false;
@@ -218,6 +219,7 @@ struct reach_render_device
     uint32_t recoveries = 0;
     uint64_t generation = 0;
     bool warp_active = false;
+    ComPtr<IInspectable> dispatcher_queue_controller;
     reach_render_recovery recovery = {};
 
     std::vector<reach_d2d_icon_cache_entry> icon_cache;
@@ -283,7 +285,9 @@ struct reach_render_backend
     ComPtr<ABI::Windows::UI::Composition::ICompositor> compositor;
     ComPtr<ABI::Windows::UI::Composition::ICompositionTarget> composition_target;
     ComPtr<ABI::Windows::UI::Composition::IContainerVisual> root_visual;
-    ComPtr<ABI::Windows::UI::Composition::ISpriteVisual> backdrop_visual;
+    ComPtr<ABI::Windows::UI::Composition::ICompositionBrush> host_backdrop_brush;
+    ComPtr<ABI::Windows::UI::Composition::ICompositionEffectFactory> glass_factory;
+    reach_glass glass_factory_glass = {};
     ComPtr<ABI::Windows::UI::Composition::ISpriteVisual> swap_chain_visual;
     ComPtr<ABI::Windows::UI::Composition::ICompositionSurface> composition_surface;
     ComPtr<ABI::Windows::UI::Composition::ICompositionGraphicsDevice> composition_graphics_device;
@@ -325,7 +329,6 @@ struct reach_render_backend
 
     UINT target_width;
     UINT target_height;
-    reach_rect_f32 backdrop_content_rect;
 };
 
 ID2D1RenderTarget *reach_d2d_target(reach_render_backend *backend);
@@ -386,8 +389,8 @@ reach_result reach_dcomp_create_target_bitmap(reach_render_backend *backend);
 reach_result reach_dcomp_create_target(reach_render_backend *backend);
 reach_result reach_dcomp_create_blur_target(reach_render_backend *backend);
 
-HRESULT
-reach_winrt_activate_compositor(ABI::Windows::UI::Composition::ICompositor **out_compositor);
+HRESULT reach_winrt_activate_compositor(reach_render_device *device);
+void reach_winrt_shutdown_dispatcher_queue(reach_render_device *device);
 HRESULT reach_visual_set_size(IInspectable *inspectable, float width, float height);
 reach_result reach_wuc_create_target(reach_render_backend *backend);
 
@@ -433,8 +436,8 @@ reach_result reach_d2d_draw_group_shadow(reach_render_backend *backend,
 reach_result reach_d2d_execute_fallback(reach_render_backend *backend,
                                         const reach_render_command_buffer *commands,
                                         double now_seconds);
-reach_result reach_wuc_apply_content_clip(reach_render_backend *backend,
-                                          reach_rect_f32 content_rect);
+HRESULT reach_wuc_sync_glass(reach_render_backend *backend, reach_d2d_retained_layer &layer,
+                             reach_glass glass, bool surface_recreated);
 reach_result reach_d2d_draw_triangle(ID2D1RenderTarget *target,
                                      const reach_render_command *command);
 reach_result reach_d2d_fill_rect_or_rounded_rect(ID2D1RenderTarget *target,

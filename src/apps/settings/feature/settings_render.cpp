@@ -330,7 +330,8 @@ static void render_power_page(const reach_settings_render_input *input,
                 float divider_x = (hours.x + hours.width + minutes.x) * 0.5f;
                 reach_settings_push_rect(commands,
                                          {divider_x, slot.y + slot.height * 0.25f,
-                                          reach_settings_scale(input, 1.0f), slot.height * 0.5f},
+                                          reach_line_thickness(reach_settings_scale(input, 1.0f)),
+                                          slot.height * 0.5f},
                                          0.0f, input->theme->settings_divider);
 
                 static const uint16_t *suffixes[REACH_SETTINGS_POWER_FIELD_COUNT] = {
@@ -631,6 +632,23 @@ static void render_theme_page(const reach_settings_render_input *input,
         (const uint16_t *)u"Choose the Reach interface theme", reach_theme_labels, 2,
         &model->theme_reach_selection, REACH_SETTINGS_HIT_THEME_REACH);
     render_accent_card(input, commands);
+
+    const theme_toggle_card glass = {layout->theme_glass_card,
+                                     {},
+                                     layout->theme_glass_title,
+                                     layout->theme_glass_subtitle,
+                                     layout->theme_glass_toggle,
+                                     REACH_VECTOR_ICON_NONE,
+                                     nullptr,
+                                     L"Glass effect",
+                                     L"Show a blurred backdrop behind bars and menus",
+                                     &model->glass_toggle,
+                                     REACH_SETTINGS_HIT_THEME_GLASS_TOGGLE};
+    render_theme_toggle_card(input, commands, &toggle_style, &glass);
+    render_slider_card(
+        input, commands, &layout->theme_glass_intensity, (const uint16_t *)u"Glass intensity",
+        (const uint16_t *)u"How much of the backdrop shows through",
+        (float)model->glass.intensity / REACH_CONFIG_GLASS_INTENSITY_MAX, model->glass.intensity);
 
     reach_settings_push_text(
         commands, layout->theme_windows_section_title, (const uint16_t *)u"System appearance",
