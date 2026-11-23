@@ -4,8 +4,8 @@ Open items only.
 
 ## Needs the user's decision
 
-- Theme redesign phases (`tools/theme_palette.py`): 5 accent roles.
-- Accent ladder: accent-derived strengths are still literals in features (`widgets_feature.cpp:892,905,962,964,1071,1491`, `ui_controls.cpp:449-450`, `settings_render.cpp:122`). Choose a few accent roles derived in `reach_theme_resolve`, then tokenize them.
+- Theme redesign phase 5, accent roles (`ACCENT_STRENGTHS`), is applied; validate live: Widgets cards, meters, dividers, decoration ribbons (0.08–0.09 became 0.12), media control washes and drag marker; Settings pills, avatar, neutral and danger buttons in light mode, window buttons; Dock and tray fallback icon letters.
+- Text-strength literals missed by the phase 2 audit: secondary text at 0.55/0.6/0.7 through `reach_settings_color_with_alpha` (`settings_render.cpp:225,277,1454`, `settings_wifi_render.cpp:42,102,186`) and Clipboard's clear-button text at 0.90/0.35 (`clipboard_render.cpp:722`). Map each to a text strength.
 
 ## Bugs
 
@@ -51,7 +51,7 @@ Open items only.
 - Capsule state structs are public and composition reads them. A third of the public feature API is internals. Per-feature action enums remain in public headers.
 - Dock and Launcher internals live in `core`.
 - Glass policy is split: `theme.c` includes `core/config.h` for the default intensity, and the intensity-to-backdrop-weight curve lives in the adapter (`reach_wuc_create_glass_factory`).
-- `glass_popup_separator` is a raw 18% black or white used only by the Context Menu; other glass surfaces keep `popup_separator`.
+- `glass_popup_separator` (quaternary text) is used only by the Context Menu; other glass surfaces keep `popup_separator`.
 - `reach_ui_layout` and its only consumer are dead.
 - Context Menu uses the Dock's capacity as its "no target" sentinel.
 - Point-in-rect is implemented 14 times with three semantics; `reach_rect_equal` is redefined 4 times.
