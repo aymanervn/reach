@@ -492,7 +492,7 @@ reach_color reach_theme_color_mix(reach_color from, reach_color to, float t)
 float reach_theme_border_thickness(const reach_theme *theme, float dpi_scale)
 {
     const reach_theme *actual = theme != 0 ? theme : reach_theme_default();
-    return actual->border_thickness * (dpi_scale > 0.0f ? dpi_scale : 1.0f);
+    return reach_line_thickness(actual->border_thickness * (dpi_scale > 0.0f ? dpi_scale : 1.0f));
 }
 
 reach_rect_f32 reach_theme_border_content_rect(const reach_theme *theme, float dpi_scale,

@@ -198,7 +198,8 @@ static reach_result reach_dock_push_background(const reach_dock_render_input *in
     shape.radius = dock_radius;
     return reach_render_push_bordered_background(
         commands, &shape, theme->dock_background, theme->bar_border,
-        reach_theme_border_thickness(theme, input->dpi_scale) * layout->content_scale,
+        reach_line_thickness(reach_theme_border_thickness(theme, input->dpi_scale) *
+                             layout->content_scale),
         &theme->bar_shadow, input->dpi_scale);
 }
 

@@ -330,7 +330,8 @@ static void render_power_page(const reach_settings_render_input *input,
                 float divider_x = (hours.x + hours.width + minutes.x) * 0.5f;
                 reach_settings_push_rect(commands,
                                          {divider_x, slot.y + slot.height * 0.25f,
-                                          reach_settings_scale(input, 1.0f), slot.height * 0.5f},
+                                          reach_line_thickness(reach_settings_scale(input, 1.0f)),
+                                          slot.height * 0.5f},
                                          0.0f, input->theme->settings_divider);
 
                 static const uint16_t *suffixes[REACH_SETTINGS_POWER_FIELD_COUNT] = {
