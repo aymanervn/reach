@@ -334,9 +334,11 @@ void reach_theme_resolve(reach_theme_mode mode, const reach_accent_pair *accent,
                   reach_theme_color_close(resolved->faint, base->faint) &&
                   reach_theme_color_close(resolved->text_tint, base->text_tint) &&
                   reach_theme_color_close(resolved->text_muted, base->text_muted)));
+    // Readable text alone would let glass drift into the other mode's brightness; the band
+    // keeps it on its own side, whichever bound is stricter.
     float limit = reach_theme_glass_limit(out_theme, light);
-    out_theme->glass.floor = light ? limit : 0.0f;
-    out_theme->glass.ceiling = light ? 1.0f : limit;
+    out_theme->glass.floor = light ? fmaxf(limit, REACH_LIGHT_GLASS_FLOOR) : 0.0f;
+    out_theme->glass.ceiling = light ? 1.0f : fminf(limit, REACH_DARK_GLASS_CEILING);
 }
 
 reach_color reach_theme_color_alpha(reach_color color, float alpha)

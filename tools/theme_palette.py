@@ -41,6 +41,14 @@ TEXT_STRENGTHS = [
     ("QUATERNARY", 0.18),
 ]
 
+# (name, OKLCH lightness of a neutral gray): how far glass may move toward the other mode. Light
+# glass never composes darker than LIGHT_GLASS_FLOOR, dark glass never lighter than
+# DARK_GLASS_CEILING. Emitted as the sRGB channel value the glass bounds compare against.
+GLASS_BANDS = [
+    ("DARK_GLASS_CEILING", 0.405),
+    ("LIGHT_GLASS_FLOOR", 0.827),
+]
+
 # (name, opacity): accent strengths applied to the resolved accent fill or accent text.
 ACCENT_STRENGTHS = [
     ("FAINT", 0.12),
@@ -122,6 +130,8 @@ def render() -> str:
     lines.append("")
     for name, opacity in TEXT_STRENGTHS:
         lines.append(f"#define REACH_TEXT_{name} {opacity:.2f}f")
+    for name, lightness in GLASS_BANDS:
+        lines.append(f"#define REACH_{name} {_encode(lightness**3):.3f}f")
     for name, opacity in ACCENT_STRENGTHS:
         lines.append(f"#define REACH_ACCENT_{name} {opacity:.2f}f")
     for name, dark, light in FILL_STRENGTHS:
