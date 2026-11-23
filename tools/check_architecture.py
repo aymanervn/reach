@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import importlib.util
 import re
 import sys
 from dataclasses import dataclass
@@ -964,6 +965,12 @@ def validate_cmake_dependencies() -> list[str]:
 
     return violations
 
+def validate_theme_palette() -> list[str]:
+    spec = importlib.util.spec_from_file_location("theme_palette", ROOT / "tools" / "theme_palette.py")
+    palette = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(palette)
+    return palette.check()
+
 def main() -> int:
     violations: list[str] = []
     warnings: list[str] = []
@@ -975,6 +982,7 @@ def main() -> int:
     violations.extend(validate_cmake_dependencies())
     violations.extend(validate_feature_registry_contract())
     violations.extend(validate_generic_surface_loops())
+    violations.extend(validate_theme_palette())
 
     for path in source_files:
         text = read(path)
