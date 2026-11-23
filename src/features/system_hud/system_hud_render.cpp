@@ -64,7 +64,7 @@ static void reach_system_hud_push_media_button(const reach_system_hud_state *sta
         reach_system_hud_push_circle(
             commands,
             reach_system_hud_centered_glyph(rect, rect.height * REACH_SYSTEM_HUD_MEDIA_BUTTON_FILL),
-            theme->bar_button_background);
+            theme->shared_button_background);
     }
     reach_system_hud_push_vector_icon(
         commands, reach_system_hud_centered_glyph(rect, rect.height * 0.5f), icon,
@@ -147,7 +147,7 @@ static void reach_system_hud_render_level(const reach_system_hud_state *state,
         reach_system_hud_centered_glyph(state->layout.icon, state->layout.icon.height * 0.56f),
         icon, muted ? theme->system_hud_secondary_text : theme->system_hud_glyph);
 
-    reach_color fill = muted ? theme->system_hud_muted_fill : theme->accent;
+    reach_color fill = muted ? theme->system_hud_muted_fill : theme->accent_fill;
     reach_rect_f32 origin = {};
     (void)reach_progress_bar_build_render_commands(state->layout.track, state->layout.fill, origin,
                                                    theme->system_hud_track, fill, commands);

@@ -154,7 +154,7 @@ void reach_settings_render_bluetooth_page(const reach_settings_render_input *inp
 
     reach_ui_toggle_style toggle_style = {};
     toggle_style.track_off = input->theme->settings_toggle_track_off;
-    toggle_style.track_on = input->theme->accent;
+    toggle_style.track_on = input->theme->accent_fill;
     toggle_style.knob = input->theme->settings_toggle_knob;
     reach_ui_toggle_motion_render(
         commands, layout->bluetooth_radio_toggle, &toggle_style,

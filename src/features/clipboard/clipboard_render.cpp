@@ -476,7 +476,7 @@ static reach_result reach_clipboard_push_row(const reach_clipboard_render_input 
     commands->current_group_id = id;
     result = reach_ui_bordered_motion_color_feedback_render(
         commands, id + 1, &card_bounds, item_radius, border_thickness,
-        theme->clipboard_item_background, theme->accent, theme->accent, &hover);
+        theme->clipboard_item_background, theme->accent_fill, theme->accent_fill, &hover);
     commands->current_group_id = 0;
     if (result != REACH_OK)
         return result;

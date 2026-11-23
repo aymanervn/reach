@@ -288,7 +288,7 @@ static void render_power_page(const reach_settings_render_input *input,
                 reach_render_command_buffer_end_group(commands);
             reach_ui_toggle_style toggle_style = {};
             toggle_style.track_off = input->theme->settings_toggle_track_off;
-            toggle_style.track_on = input->theme->accent;
+            toggle_style.track_on = input->theme->accent_fill;
             toggle_style.knob = input->theme->settings_toggle_knob;
             reach_ui_toggle_motion_render(commands, layout->power_wait_toggles[timer],
                                           &toggle_style, id, motion);
@@ -473,7 +473,7 @@ static void render_theme_selector_card(const reach_settings_render_input *input,
                        subtitle_text);
     reach_ui_segmented_control_style style = {};
     style.track = input->theme->settings_segmented_control_background;
-    style.selection = input->theme->accent;
+    style.selection = input->theme->accent_fill;
     style.text = input->theme->settings_secondary_text;
     style.selected_text = input->theme->settings_text;
     style.selection_inset = reach_settings_scale(input, 3.0f);
@@ -563,7 +563,7 @@ static void render_slider_card(const reach_settings_render_input *input,
         commands, slider->subtitle, subtitle, reach_settings_scale(input, REACH_TEXT_SIZE_XSMALL),
         REACH_TEXT_WEIGHT_NORMAL, input->text_alignment_leading, theme->settings_secondary_text, 1);
 
-    reach_color level = input->theme->accent;
+    reach_color level = input->theme->accent_fill;
     reach_rect_f32 area = slider->track;
     float track_height = reach_settings_scale(input, 4.0f);
     float thumb_size = reach_settings_scale(input, REACH_SETTINGS_SLIDER_THUMB_SIZE);
@@ -599,7 +599,7 @@ static void render_theme_page(const reach_settings_render_input *input,
 
     reach_ui_toggle_style toggle_style = {};
     toggle_style.track_off = input->theme->settings_toggle_track_off;
-    toggle_style.track_on = input->theme->accent;
+    toggle_style.track_on = input->theme->accent_fill;
     toggle_style.knob = input->theme->settings_toggle_knob;
 
     const theme_toggle_card cards[] = {
@@ -867,7 +867,7 @@ static void render_startup_apps_page(const reach_settings_render_input *input,
 
         reach_ui_toggle_style toggle_style = {};
         toggle_style.track_off = input->theme->settings_toggle_track_off;
-        toggle_style.track_on = input->theme->accent;
+        toggle_style.track_on = input->theme->accent_fill;
         toggle_style.knob = input->theme->settings_toggle_knob;
         reach_ui_toggle_motion_render(
             commands, toggle, &toggle_style,
@@ -1280,9 +1280,10 @@ static void render_update_page(const reach_settings_render_input *input,
                                      REACH_VECTOR_ICON_CLOSE, 0.06f);
         else
         {
-            reach_color checkbox_background = update->selected ? input->theme->accent : row_color;
-            reach_color checkbox_border =
-                update->selected ? input->theme->accent : input->theme->settings_secondary_text;
+            reach_color checkbox_background =
+                update->selected ? input->theme->accent_fill : row_color;
+            reach_color checkbox_border = update->selected ? input->theme->accent_fill
+                                                           : input->theme->settings_secondary_text;
             reach_settings_push_bordered_background(
                 commands, checkbox, reach_settings_scale(input, input->theme->radius_small),
                 reach_settings_scale(input, 1.5f), checkbox_background, checkbox_border);
@@ -1336,7 +1337,7 @@ static void render_widgets_page(const reach_settings_render_input *input,
 {
     const auto *theme = input->theme;
     const auto *layout = input->layout;
-    const reach_ui_toggle_style style = {theme->settings_toggle_track_off, theme->accent,
+    const reach_ui_toggle_style style = {theme->settings_toggle_track_off, theme->accent_fill,
                                          theme->settings_toggle_knob};
     const bool reset_hover = input->model->hovered_button == REACH_SETTINGS_HIT_WIDGET_RESET;
     reach_settings_push_rect(
@@ -1379,7 +1380,7 @@ reach_result reach_settings_build_render_commands(const reach_settings_render_in
     background.rect = input->layout->bounds;
     background.radius = reach_settings_scale(input, input->theme->radius_large);
     (void)reach_render_push_bordered_background(
-        commands, &background, input->theme->settings_background, input->theme->bar_border,
+        commands, &background, input->theme->settings_background, input->theme->shared_border,
         border_thickness, nullptr, scale);
 
     reach_rect_f32 content_bounds =

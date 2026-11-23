@@ -257,12 +257,12 @@ reach_top_bar_now_playing_build_render_commands(const reach_top_bar_now_playing_
     if (!input->model->visible)
     {
         reach_top_bar_now_playing_push_rect(out_commands, input->layout->bounds,
-                                            theme->bar_button_background, radius);
+                                            theme->shared_button_background, radius);
         reach_render_command glyph = {};
         glyph.type = REACH_RENDER_COMMAND_VECTOR_ICON;
         glyph.rect = input->layout->cover;
         glyph.icon_id = REACH_VECTOR_ICON_MUSIC_NOTE;
-        glyph.color = theme->system_glyph;
+        glyph.color = theme->shared_glyph;
         return reach_render_command_buffer_push(out_commands, &glyph);
     }
 
@@ -273,7 +273,7 @@ reach_top_bar_now_playing_build_render_commands(const reach_top_bar_now_playing_
     artwork.bounds = input->layout->bounds;
     artwork.cover_bounds = input->layout->cover;
     artwork.cover_image_id = input->model->cover_image_id;
-    artwork.base_background = theme->bar_button_background;
+    artwork.base_background = theme->shared_button_background;
     artwork.overlay = theme->now_playing_background;
     artwork.radius = radius;
     artwork.blur = REACH_NOW_PLAYING_ARTWORK_BLUR;

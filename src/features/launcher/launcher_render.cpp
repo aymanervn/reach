@@ -192,7 +192,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
             pill.bounds = {0, 0, fmaxf(1, ceilf(width)), fmaxf(1, ceilf(height))};
             pill.opacity = opacity;
             result = reach_render_push_rect_motion(out_commands, &pill, &input->selection,
-                                                   row_selected_radius, theme->accent);
+                                                   row_selected_radius, theme->accent_fill);
             if (result != REACH_OK)
                 return result;
         }
@@ -212,7 +212,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
             placement.bounds = hover;
             placement.parent_id = content_id;
             result = reach_ui_feedback_render(out_commands, UINT64_C(0x2900000000060030), hover,
-                                              row_selected_radius, theme->accent,
+                                              row_selected_radius, theme->accent_fill,
                                               &input->hover_opacity, &placement);
             if (result != REACH_OK)
                 return result;

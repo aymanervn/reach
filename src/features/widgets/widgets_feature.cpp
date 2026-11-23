@@ -1005,10 +1005,10 @@ static void reach_widgets_meter(reach_render_command_buffer *commands, const rea
     const float detail_x = body.x + body.width - inset - detail_width;
     reach_widgets_text(commands, {body.x + inset, y, label_width, 22.0f * scale},
                        reinterpret_cast<const uint16_t *>(left), REACH_TEXT_SIZE_SMALL * scale,
-                       REACH_TEXT_WEIGHT_SEMIBOLD, theme->primary_text);
+                       REACH_TEXT_WEIGHT_SEMIBOLD, theme->shared_text);
     reach_widgets_text(commands, {detail_x, y, detail_width, 22.0f * scale},
                        reinterpret_cast<const uint16_t *>(right), REACH_TEXT_SIZE_SMALL * scale,
-                       REACH_TEXT_WEIGHT_SEMIBOLD, theme->primary_text,
+                       REACH_TEXT_WEIGHT_SEMIBOLD, theme->shared_text,
                        REACH_TEXT_ALIGNMENT_TRAILING);
     const float track_width = std::max(0.0f, detail_x - column_gap - track_x);
     const reach_rect_f32 track = {track_x, y, track_width, 22.0f * scale};
@@ -1028,7 +1028,7 @@ static void reach_widgets_title(reach_render_command_buffer *commands, const rea
                                 float size = REACH_TEXT_SIZE_SMALL)
 {
     reach_widgets_text(commands, bounds, label, size * scale, REACH_TEXT_WEIGHT_SEMIBOLD,
-                       theme->primary_text, alignment);
+                       theme->shared_text, alignment);
 }
 
 static void reach_widgets_section_header(reach_render_command_buffer *commands,
@@ -1050,13 +1050,13 @@ static void reach_widgets_section_header(reach_render_command_buffer *commands,
     reach_widgets_rect(commands, badge, badge.height * 0.5f,
                        reach_theme_color_alpha(theme->accent_text, badge_alpha));
     reach_widgets_text(commands, badge, badge_label, text_size, REACH_TEXT_WEIGHT_SEMIBOLD,
-                       theme->primary_text, REACH_TEXT_ALIGNMENT_CENTER);
+                       theme->shared_text, REACH_TEXT_ALIGNMENT_CENTER);
     const float label_width =
         std::ceil(reach_text_width_or_estimate(text_measure, section_label, text_size,
                                                REACH_TEXT_WEIGHT_SEMIBOLD, 0.65f)) +
         scale;
     reach_widgets_text(commands, {section.x, section.y, label_width, section.height}, section_label,
-                       text_size, REACH_TEXT_WEIGHT_SEMIBOLD, theme->primary_text);
+                       text_size, REACH_TEXT_WEIGHT_SEMIBOLD, theme->shared_text);
     const float divider_x = section.x + label_width + 8.0f * scale;
     const float divider_width = badge.x - divider_x - 8.0f * scale;
     if (divider_width > 0.0f)
@@ -1193,7 +1193,7 @@ static void reach_widgets_pomodoro_render(const reach_widgets *widgets, const re
     reach_widgets_text(
         commands, {chrome.body.x, chrome.body.y + 5.0f * scale, chrome.body.width, 43.0f * scale},
         reinterpret_cast<const uint16_t *>(buffer), REACH_TEXT_SIZE_XLARGE * scale,
-        REACH_TEXT_WEIGHT_DEMIBOLD, theme->primary_text, REACH_TEXT_ALIGNMENT_CENTER);
+        REACH_TEXT_WEIGHT_DEMIBOLD, theme->shared_text, REACH_TEXT_ALIGNMENT_CENTER);
     const wchar_t *session = L"Session %d";
     if (widgets->pomodoro.phase != 0)
     {
@@ -1207,7 +1207,7 @@ static void reach_widgets_pomodoro_render(const reach_widgets *widgets, const re
     reach_widgets_text(
         commands, {chrome.body.x, chrome.body.y + 50.0f * scale, chrome.body.width, 18.0f * scale},
         reinterpret_cast<const uint16_t *>(buffer), REACH_TEXT_SIZE_XSMALL * scale,
-        REACH_TEXT_WEIGHT_NORMAL, theme->primary_text, REACH_TEXT_ALIGNMENT_CENTER);
+        REACH_TEXT_WEIGHT_NORMAL, theme->shared_text, REACH_TEXT_ALIGNMENT_CENTER);
     float duration = widgets->pomodoro.phase == 0   ? 1500.0f
                      : widgets->pomodoro.phase == 1 ? 300.0f
                                                     : 900.0f;
@@ -1274,7 +1274,7 @@ static void reach_widgets_render_body(const reach_widgets *widgets, size_t index
         swprintf_s(buffer, L"%02llu:%02llu.%llu", tenths / 600, tenths / 10 % 60, tenths % 10);
         reach_widgets_text(commands, value, reinterpret_cast<const uint16_t *>(buffer),
                            REACH_TEXT_SIZE_XLARGE * scale, REACH_TEXT_WEIGHT_DEMIBOLD,
-                           actual->primary_text, REACH_TEXT_ALIGNMENT_CENTER);
+                           actual->shared_text, REACH_TEXT_ALIGNMENT_CENTER);
         for (int32_t button = 0; button < reach_widgets_controls[index].count; ++button)
         {
             const auto bounds = reach_widgets_control_bounds(chrome, (int32_t)index, button, scale);
@@ -1295,7 +1295,7 @@ static void reach_widgets_render_body(const reach_widgets *widgets, size_t index
                                 scale);
             reach_widgets_text(commands, body, (const uint16_t *)u"Date unavailable",
                                REACH_TEXT_SIZE_MEDIUM * scale, REACH_TEXT_WEIGHT_NORMAL,
-                               actual->primary_text, REACH_TEXT_ALIGNMENT_CENTER);
+                               actual->shared_text, REACH_TEXT_ALIGNMENT_CENTER);
             return;
         }
         int32_t year = widgets->clock_snapshot.year;
@@ -1312,11 +1312,11 @@ static void reach_widgets_render_body(const reach_widgets *widgets, size_t index
                             REACH_TEXT_ALIGNMENT_CENTER, REACH_TEXT_SIZE_MEDIUM);
         reach_widgets_text(commands, reach_widgets_control_bounds(chrome, (int32_t)index, 0, scale),
                            reinterpret_cast<const uint16_t *>(L"‹"), REACH_TEXT_SIZE_MEDIUM * scale,
-                           REACH_TEXT_WEIGHT_SEMIBOLD, actual->primary_text,
+                           REACH_TEXT_WEIGHT_SEMIBOLD, actual->shared_text,
                            REACH_TEXT_ALIGNMENT_CENTER);
         reach_widgets_text(commands, reach_widgets_control_bounds(chrome, (int32_t)index, 1, scale),
                            reinterpret_cast<const uint16_t *>(L"›"), REACH_TEXT_SIZE_MEDIUM * scale,
-                           REACH_TEXT_WEIGHT_SEMIBOLD, actual->primary_text,
+                           REACH_TEXT_WEIGHT_SEMIBOLD, actual->shared_text,
                            REACH_TEXT_ALIGNMENT_CENTER);
         const wchar_t *weekdays[7] = {L"S", L"M", L"T", L"W", L"T", L"F", L"S"};
         float cell_width = body.width / 7.0f;
@@ -1328,7 +1328,7 @@ static void reach_widgets_render_body(const reach_widgets *widgets, size_t index
                                    22.0f * scale};
             reach_widgets_text(commands, cell, reinterpret_cast<const uint16_t *>(weekdays[column]),
                                REACH_TEXT_SIZE_XSMALL * scale, REACH_TEXT_WEIGHT_SEMIBOLD,
-                               actual->primary_text);
+                               actual->shared_text);
         }
         int32_t days = reach_widgets_days_in_month(year, month);
         for (int32_t day = 1; day <= days; ++day)
@@ -1344,16 +1344,15 @@ static void reach_widgets_render_body(const reach_widgets *widgets, size_t index
             if (today)
             {
                 reach_widgets_rect(commands, cell, widget_control_radius_dp * scale,
-                                   actual->accent);
+                                   actual->accent_fill);
             }
             swprintf_s(buffer, L"%d", day);
-            reach_widgets_text(commands,
-                               {cell.x + 7.0f * scale, cell.y + 5.0f * scale,
-                                cell.width - 8.0f * scale, cell.height - 4.0f * scale},
-                               reinterpret_cast<const uint16_t *>(buffer),
-                               REACH_TEXT_SIZE_SMALL * scale,
-                               today ? REACH_TEXT_WEIGHT_SEMIBOLD : REACH_TEXT_WEIGHT_NORMAL,
-                               actual->primary_text);
+            reach_widgets_text(
+                commands,
+                {cell.x + 7.0f * scale, cell.y + 5.0f * scale, cell.width - 8.0f * scale,
+                 cell.height - 4.0f * scale},
+                reinterpret_cast<const uint16_t *>(buffer), REACH_TEXT_SIZE_SMALL * scale,
+                today ? REACH_TEXT_WEIGHT_SEMIBOLD : REACH_TEXT_WEIGHT_NORMAL, actual->shared_text);
         }
         return;
     }
@@ -1381,11 +1380,11 @@ static void reach_widgets_render_body(const reach_widgets *widgets, size_t index
                                     body.width - cover_space, 27.0f * scale};
             reach_widgets_text(commands, track, widgets->media_snapshot.title,
                                REACH_TEXT_SIZE_MEDIUM * scale, REACH_TEXT_WEIGHT_DEMIBOLD,
-                               actual->primary_text);
+                               actual->shared_text);
             track.y += 28.0f * scale;
             reach_widgets_text(commands, track, widgets->media_snapshot.artist,
                                REACH_TEXT_SIZE_SMALL * scale, REACH_TEXT_WEIGHT_NORMAL,
-                               actual->primary_text);
+                               actual->shared_text);
             const reach_vector_icon_id controls[3] = {REACH_VECTOR_ICON_PREVIOUS,
                                                       widgets->media_snapshot.playback ==
                                                               REACH_MEDIA_PLAYBACK_PLAYING
@@ -1404,7 +1403,7 @@ static void reach_widgets_render_body(const reach_widgets *widgets, size_t index
                 icon.icon_id = controls[control];
                 icon.rect = {button.x + 8.0f * scale, button.y + 5.0f * scale, 20.0f * scale,
                              20.0f * scale};
-                icon.color = actual->primary_text;
+                icon.color = actual->shared_text;
                 (void)reach_render_command_buffer_push(commands, &icon);
             }
             return;
@@ -1414,7 +1413,7 @@ static void reach_widgets_render_body(const reach_widgets *widgets, size_t index
     reach_widgets_text(
         commands, value, reinterpret_cast<const uint16_t *>(buffer),
         (index == REACH_WIDGET_CLOCK ? REACH_TEXT_SIZE_XLARGE : REACH_TEXT_SIZE_LARGE) * scale,
-        REACH_TEXT_WEIGHT_DEMIBOLD, actual->primary_text);
+        REACH_TEXT_WEIGHT_DEMIBOLD, actual->shared_text);
     if (index == REACH_WIDGET_CLOCK && widgets->clock_snapshot.valid)
     {
         swprintf_s(buffer, L"%04d / %02d / %02d", widgets->clock_snapshot.year,
@@ -1422,7 +1421,7 @@ static void reach_widgets_render_body(const reach_widgets *widgets, size_t index
         reach_widgets_text(commands, {body.x, body.y + 55.0f * scale, body.width, 24.0f * scale},
                            reinterpret_cast<const uint16_t *>(buffer),
                            REACH_TEXT_SIZE_SMALL * scale, REACH_TEXT_WEIGHT_NORMAL,
-                           actual->primary_text);
+                           actual->shared_text);
     }
 }
 

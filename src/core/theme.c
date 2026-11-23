@@ -57,17 +57,17 @@ static const reach_theme reach_theme_dark = {
     .top_bar_background = REACH_DARK_SURFACE_BASE(1.0f),
     .top_bar_scrim = REACH_PURE_BLACK(0.65f),
     .switcher_background = REACH_DARK_SURFACE_BASE(1.0f),
-    .bar_border = REACH_DARK_BORDER(1.0f),
+    .shared_border = REACH_DARK_BORDER(1.0f),
     .popup_background = REACH_DARK_SURFACE_RAISED(1.0f),
-    .top_bar_dropdown_background = REACH_DARK_SURFACE_BASE(1.0f),
+    .bar_popup_background = REACH_DARK_SURFACE_BASE(1.0f),
     .popup_border = REACH_DARK_BORDER(1.0f),
     .widget_background = REACH_DARK_SURFACE_RAISED(1.0f),
     .widget_border = REACH_DARK_BORDER(1.0f),
     .widget_unavailable_text = REACH_DARK_TEXT(REACH_TEXT_SECONDARY),
     .widget_resize_grip = REACH_DARK_TEXT(REACH_TEXT_TERTIARY),
     .widget_artwork_overlay = REACH_DARK_SURFACE_RAISED(0.48f),
-    .popup_separator = REACH_DARK_DIVIDER(1.0f),
-    .glass_popup_separator = REACH_DARK_TEXT(REACH_TEXT_QUATERNARY),
+    .popup_divider = REACH_DARK_DIVIDER(1.0f),
+    .popup_glass_divider = REACH_DARK_TEXT(REACH_TEXT_QUATERNARY),
     .system_hud_background = REACH_DARK_SURFACE_RAISED(1.0f),
     .system_hud_border = REACH_DARK_BORDER(1.0f),
     .system_hud_primary_text = REACH_DARK_TEXT(REACH_TEXT_PRIMARY),
@@ -76,19 +76,18 @@ static const reach_theme reach_theme_dark = {
     .system_hud_glyph = REACH_DARK_TEXT(REACH_TEXT_PRIMARY),
     .system_hud_track = REACH_FILL(REACH_DARK_FILL_SECONDARY),
     .system_hud_muted_fill = REACH_DARK_TEXT(REACH_TEXT_TERTIARY),
-    .toggle_track_off = REACH_DARK_TEXT(REACH_TEXT_TERTIARY),
+    .toggle_off_track = REACH_DARK_TEXT(REACH_TEXT_TERTIARY),
     .toggle_knob = REACH_PURE_WHITE(1.0f),
 
-    .primary_text = REACH_DARK_TEXT(REACH_TEXT_PRIMARY),
+    .shared_text = REACH_DARK_TEXT(REACH_TEXT_PRIMARY),
     .inverse_text = REACH_LIGHT_TEXT(REACH_TEXT_PRIMARY),
 
-    .icon_box_background = REACH_PURE_WHITE(1.0f),
     .dock_fallback_icon_background = REACH_PURE_WHITE(0.80f),
-    .system_glyph = REACH_DARK_TEXT(REACH_TEXT_PRIMARY),
-    .fallback_icon_text = REACH_LIGHT_TEXT(REACH_TEXT_PRIMARY),
+    .shared_glyph = REACH_DARK_TEXT(REACH_TEXT_PRIMARY),
+    .bar_fallback_icon_text = REACH_LIGHT_TEXT(REACH_TEXT_PRIMARY),
     .bar_text_primary = REACH_DARK_TEXT(REACH_TEXT_PRIMARY),
     .bar_text_secondary = REACH_DARK_TEXT(REACH_TEXT_SECONDARY),
-    .bar_button_background = REACH_FILL(REACH_DARK_FILL_TERTIARY),
+    .shared_button_background = REACH_FILL(REACH_DARK_FILL_TERTIARY),
     .bar_tray_background = REACH_FILL(REACH_DARK_FILL_TERTIARY),
     .bar_battery_background = REACH_FILL(REACH_DARK_FILL_TERTIARY),
     .bar_battery_fill = REACH_GREEN_DEEP(1.0f),
@@ -100,7 +99,7 @@ static const reach_theme reach_theme_dark = {
     .bar_stats_memory = REACH_LAVENDER_BRIGHT(1.0f),
     .bar_stats_download = REACH_GREEN_BRIGHT(1.0f),
     .bar_stats_upload = REACH_ORANGE_BRIGHT(1.0f),
-    .bar_click_feedback = REACH_DARK_SURFACE_ELEVATED(1.0f),
+    .bar_pressed_background = REACH_DARK_SURFACE_ELEVATED(1.0f),
     .bar_separator_dot = REACH_DARK_TEXT(REACH_TEXT_SECONDARY),
 
     .quick_settings_slider_track = REACH_FILL(REACH_DARK_FILL_SECONDARY),
@@ -188,7 +187,7 @@ static const reach_theme reach_theme_dark = {
     .settings_window_minimize_hover = REACH_YELLOW_BRIGHT(1.0f),
     .settings_scrollbar_track = REACH_FILL(REACH_DARK_FILL_SECONDARY),
     .settings_scrollbar_thumb = REACH_DARK_TEXT(REACH_TEXT_SECONDARY),
-    .accent = REACH_BLUE_DEEP(1.0f),
+    .accent_fill = REACH_BLUE_DEEP(1.0f),
     .accent_text = REACH_BLUE_BRIGHT(1.0f),
     .accent_tint = REACH_BLUE_DEEP(REACH_ACCENT_TINT),
     .accent_selection = REACH_BLUE_DEEP(REACH_ACCENT_SELECTION),
@@ -218,17 +217,17 @@ static const reach_theme reach_theme_light = {
     .top_bar_background = REACH_LIGHT_SURFACE_BASE(1.0f),
     .top_bar_scrim = REACH_PURE_WHITE(0.65f),
     .switcher_background = REACH_LIGHT_SURFACE_BASE(1.0f),
-    .bar_border = REACH_LIGHT_BORDER(1.0f),
+    .shared_border = REACH_LIGHT_BORDER(1.0f),
     .popup_background = REACH_LIGHT_SURFACE_BASE(1.0f),
-    .top_bar_dropdown_background = REACH_LIGHT_SURFACE_BASE(1.0f),
+    .bar_popup_background = REACH_LIGHT_SURFACE_BASE(1.0f),
     .popup_border = REACH_LIGHT_BORDER(1.0f),
     .widget_background = REACH_LIGHT_SURFACE_BASE(1.0f),
     .widget_border = REACH_LIGHT_BORDER(1.0f),
     .widget_unavailable_text = REACH_LIGHT_TEXT(REACH_TEXT_SECONDARY),
     .widget_resize_grip = REACH_LIGHT_TEXT(REACH_TEXT_TERTIARY),
     .widget_artwork_overlay = REACH_LIGHT_SURFACE_BASE(0.48f),
-    .popup_separator = REACH_LIGHT_DIVIDER(1.0f),
-    .glass_popup_separator = REACH_LIGHT_TEXT(REACH_TEXT_QUATERNARY),
+    .popup_divider = REACH_LIGHT_DIVIDER(1.0f),
+    .popup_glass_divider = REACH_LIGHT_TEXT(REACH_TEXT_QUATERNARY),
     .system_hud_background = REACH_LIGHT_SURFACE_BASE(1.0f),
     .system_hud_border = REACH_LIGHT_BORDER(1.0f),
     .system_hud_primary_text = REACH_LIGHT_TEXT(REACH_TEXT_PRIMARY),
@@ -237,19 +236,18 @@ static const reach_theme reach_theme_light = {
     .system_hud_glyph = REACH_LIGHT_TEXT(REACH_TEXT_PRIMARY),
     .system_hud_track = REACH_FILL(REACH_LIGHT_FILL_SECONDARY),
     .system_hud_muted_fill = REACH_LIGHT_TEXT(REACH_TEXT_TERTIARY),
-    .toggle_track_off = REACH_LIGHT_TEXT(REACH_TEXT_TERTIARY),
+    .toggle_off_track = REACH_LIGHT_TEXT(REACH_TEXT_TERTIARY),
     .toggle_knob = REACH_PURE_WHITE(1.0f),
 
-    .primary_text = REACH_LIGHT_TEXT(REACH_TEXT_PRIMARY),
+    .shared_text = REACH_LIGHT_TEXT(REACH_TEXT_PRIMARY),
     .inverse_text = REACH_DARK_TEXT(REACH_TEXT_PRIMARY),
 
-    .icon_box_background = REACH_LIGHT_SURFACE_RAISED(1.0f),
     .dock_fallback_icon_background = REACH_LIGHT_SURFACE_RAISED(0.80f),
-    .system_glyph = REACH_LIGHT_TEXT(REACH_TEXT_PRIMARY),
-    .fallback_icon_text = REACH_LIGHT_TEXT(REACH_TEXT_PRIMARY),
+    .shared_glyph = REACH_LIGHT_TEXT(REACH_TEXT_PRIMARY),
+    .bar_fallback_icon_text = REACH_LIGHT_TEXT(REACH_TEXT_PRIMARY),
     .bar_text_primary = REACH_LIGHT_TEXT(REACH_TEXT_PRIMARY),
     .bar_text_secondary = REACH_LIGHT_TEXT(REACH_TEXT_SECONDARY),
-    .bar_button_background = REACH_FILL(REACH_LIGHT_FILL_TERTIARY),
+    .shared_button_background = REACH_FILL(REACH_LIGHT_FILL_TERTIARY),
     .bar_tray_background = REACH_FILL(REACH_LIGHT_FILL_TERTIARY),
     .bar_battery_background = REACH_FILL(REACH_LIGHT_FILL_TERTIARY),
     .bar_battery_fill = REACH_GREEN_BRIGHT(1.0f),
@@ -261,7 +259,7 @@ static const reach_theme reach_theme_light = {
     .bar_stats_memory = REACH_LAVENDER_INK(1.0f),
     .bar_stats_download = REACH_GREEN_INK(1.0f),
     .bar_stats_upload = REACH_ORANGE_INK(1.0f),
-    .bar_click_feedback = REACH_LIGHT_SURFACE_RAISED(1.0f),
+    .bar_pressed_background = REACH_LIGHT_SURFACE_RAISED(1.0f),
     .bar_separator_dot = REACH_LIGHT_TEXT(REACH_TEXT_SECONDARY),
 
     .quick_settings_slider_track = REACH_FILL(REACH_LIGHT_FILL_SECONDARY),
@@ -349,7 +347,7 @@ static const reach_theme reach_theme_light = {
     .settings_window_minimize_hover = REACH_YELLOW_DEEP(1.0f),
     .settings_scrollbar_track = REACH_FILL(REACH_LIGHT_FILL_SECONDARY),
     .settings_scrollbar_thumb = REACH_LIGHT_TEXT(REACH_TEXT_SECONDARY),
-    .accent = REACH_BLUE_BRIGHT(1.0f),
+    .accent_fill = REACH_BLUE_BRIGHT(1.0f),
     .accent_text = REACH_BLUE_DEEP(1.0f),
     .accent_tint = REACH_BLUE_BRIGHT(REACH_ACCENT_TINT),
     .accent_selection = REACH_BLUE_BRIGHT(REACH_ACCENT_SELECTION),
@@ -463,7 +461,7 @@ static int32_t reach_theme_glass_surface_readable(const reach_theme *theme, floa
 {
     const reach_color surface = {level, level, level, 1.0f};
     const reach_color primary[] = {
-        theme->primary_text,
+        theme->shared_text,
         theme->bar_text_primary,
         theme->context_menu_text,
         theme->switcher_label_text,
@@ -534,8 +532,8 @@ void reach_theme_resolve(reach_theme_mode mode, const reach_accent_pair *accent,
     const reach_color surface = light ? (reach_color)REACH_LIGHT_SURFACE_ELEVATED(1.0f)
                                       : (reach_color)REACH_DARK_SURFACE_ELEVATED(1.0f);
     reach_color fill = reach_theme_meet_contrast(light ? pair.bright : pair.deep,
-                                                 out_theme->primary_text, light ? white : black);
-    out_theme->accent = fill;
+                                                 out_theme->shared_text, light ? white : black);
+    out_theme->accent_fill = fill;
     out_theme->accent_text =
         reach_theme_meet_contrast(light ? pair.deep : pair.bright, surface, light ? black : white);
     const reach_color text = out_theme->accent_text;
@@ -560,7 +558,7 @@ void reach_theme_resolve(reach_theme_mode mode, const reach_accent_pair *accent,
     REACH_ASSERT(
         !reach_theme_color_close(pair.deep, blue.deep) ||
         !reach_theme_color_close(pair.bright, blue.bright) ||
-        (reach_theme_color_close(out_theme->accent, base->accent) &&
+        (reach_theme_color_close(out_theme->accent_fill, base->accent_fill) &&
          reach_theme_color_close(out_theme->accent_text, base->accent_text) &&
          reach_theme_color_close(out_theme->accent_tint, base->accent_tint) &&
          reach_theme_color_close(out_theme->accent_selection, base->accent_selection) &&

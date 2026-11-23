@@ -134,7 +134,7 @@ static void reach_settings_wifi_render_add_row(const reach_settings_render_input
 
     reach_ui_toggle_style toggle_style = {};
     toggle_style.track_off = input->theme->settings_toggle_track_off;
-    toggle_style.track_on = input->theme->accent;
+    toggle_style.track_on = input->theme->accent_fill;
     toggle_style.knob = input->theme->settings_toggle_knob;
     reach_ui_toggle_render(commands, layout->wifi_add_auto_toggle, &toggle_style,
                            model->wifi.connect_automatically ? 1.0f : 0.0f);
@@ -241,7 +241,7 @@ static void reach_settings_wifi_render_row(const reach_settings_render_input *in
 
         reach_ui_toggle_style toggle_style = {};
         toggle_style.track_off = input->theme->settings_toggle_track_off;
-        toggle_style.track_on = input->theme->accent;
+        toggle_style.track_on = input->theme->accent_fill;
         toggle_style.knob = input->theme->settings_toggle_knob;
         reach_ui_toggle_render(commands, layout->wifi_auto_toggle, &toggle_style,
                                model->wifi.connect_automatically ? 1.0f : 0.0f);
@@ -340,7 +340,7 @@ void reach_settings_render_wifi_page(const reach_settings_render_input *input,
 
         reach_ui_toggle_style toggle_style = {};
         toggle_style.track_off = input->theme->settings_toggle_track_off;
-        toggle_style.track_on = input->theme->accent;
+        toggle_style.track_on = input->theme->accent_fill;
         toggle_style.knob = input->theme->settings_toggle_knob;
         reach_ui_toggle_motion_render(
             commands, layout->wifi_radio_toggle, &toggle_style,

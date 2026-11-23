@@ -45,13 +45,13 @@ reach_result reach_battery_append_render_commands(const reach_battery *battery,
 
     reach_battery_push_text(out_commands, state->percent_label, percent_label,
                             metrics.label_text_size * scale, REACH_TEXT_WEIGHT_NORMAL,
-                            REACH_TEXT_ALIGNMENT_LEADING, theme->context_menu_text);
+                            REACH_TEXT_ALIGNMENT_LEADING, theme->shared_text);
 
     uint16_t value[8] = {};
     reach_battery_format_percent(value, 8, state->model.percent);
     reach_battery_push_text(out_commands, state->percent_label, value,
                             metrics.value_text_size * scale, REACH_TEXT_WEIGHT_DEMIBOLD,
-                            REACH_TEXT_ALIGNMENT_TRAILING, theme->primary_text);
+                            REACH_TEXT_ALIGNMENT_TRAILING, theme->shared_text);
 
     static const uint16_t time_label[] = {'T', 'i', 'm', 'e', ' ', 'r', 'e', 'm',
                                           'a', 'i', 'n', 'i', 'n', 'g', 0};
@@ -60,7 +60,7 @@ reach_result reach_battery_append_render_commands(const reach_battery *battery,
     reach_battery_push_text(out_commands, state->time_label,
                             state->model.plugged_in ? source_label : time_label,
                             metrics.label_text_size * scale, REACH_TEXT_WEIGHT_NORMAL,
-                            REACH_TEXT_ALIGNMENT_LEADING, theme->context_menu_text);
+                            REACH_TEXT_ALIGNMENT_LEADING, theme->shared_text);
 
     uint16_t time_value[REACH_BATTERY_TIME_TEXT_CAPACITY] = {};
     reach_battery_format_time_remaining(time_value, REACH_BATTERY_TIME_TEXT_CAPACITY,
@@ -73,19 +73,19 @@ reach_result reach_battery_append_render_commands(const reach_battery *battery,
     reach_render_command_buffer_begin_group(out_commands, &time_group);
     reach_battery_push_text(out_commands, state->time_label, time_value,
                             metrics.value_text_size * scale, REACH_TEXT_WEIGHT_DEMIBOLD,
-                            REACH_TEXT_ALIGNMENT_TRAILING, theme->primary_text);
+                            REACH_TEXT_ALIGNMENT_TRAILING, theme->shared_text);
     reach_render_command_buffer_end_group(out_commands);
 
     (void)reach_ui_horizontal_separator_render(out_commands, state->separator,
-                                               theme->popup_separator);
+                                               theme->popup_divider);
 
     reach_battery_push_text(out_commands, state->saver_label, saver_label,
                             metrics.label_text_size * scale, REACH_TEXT_WEIGHT_NORMAL,
-                            REACH_TEXT_ALIGNMENT_LEADING, theme->context_menu_text);
+                            REACH_TEXT_ALIGNMENT_LEADING, theme->shared_text);
 
     reach_ui_toggle_style toggle_style = {};
-    toggle_style.track_off = theme->toggle_track_off;
-    toggle_style.track_on = theme->accent;
+    toggle_style.track_off = theme->toggle_off_track;
+    toggle_style.track_on = theme->accent_fill;
     toggle_style.knob = theme->toggle_knob;
     reach_ui_toggle_render(out_commands, state->saver_toggle, &toggle_style,
                            reach_battery_model_saver_effective(&state->model) ? 1.0f : 0.0f);

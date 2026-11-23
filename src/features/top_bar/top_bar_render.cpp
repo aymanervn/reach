@@ -105,7 +105,7 @@ static reach_result reach_top_bar_push_pill_background(const reach_theme *theme,
     shape.radius = radius;
     shape.glass = theme->glass;
     return reach_render_push_bordered_background(
-        commands, &shape, theme->top_bar_background, theme->bar_border,
+        commands, &shape, theme->top_bar_background, theme->shared_border,
         border ? reach_theme_border_thickness(theme, dpi_scale) : 0.0f, &theme->bar_shadow,
         dpi_scale);
 }
@@ -152,7 +152,7 @@ static void reach_top_bar_push_power_button(const reach_top_bar_render_input *in
         return;
     }
 
-    reach_top_bar_push_rect(commands, power_box, theme->bar_button_background,
+    reach_top_bar_push_rect(commands, power_box, theme->shared_button_background,
                             power_box.height * 0.5f);
     reach_top_bar_push_text(commands, power_box, (const uint16_t *)L"Reach",
                             metrics.reach_label_text_size * input->dpi_scale,
@@ -163,7 +163,7 @@ static void reach_top_bar_push_power_button(const reach_top_bar_render_input *in
     {
         (void)reach_ui_feedback_render(commands, REACH_TOP_BAR_FEEDBACK_GROUP_ID, power_box,
                                        power_box.height * 0.5f,
-                                       reach_theme_color_alpha(theme->bar_click_feedback, 1.0f),
+                                       reach_theme_color_alpha(theme->bar_pressed_background, 1.0f),
                                        input->click_feedback, nullptr);
     }
 }
@@ -202,7 +202,7 @@ static void reach_top_bar_push_button_feedback(const reach_top_bar_render_input 
                                                reach_rect_f32 button, size_t feedback_slot)
 {
     reach_top_bar_push_button_feedback_colored(input, commands, button, feedback_slot,
-                                               input->theme->bar_click_feedback);
+                                               input->theme->bar_pressed_background);
 }
 
 static void reach_top_bar_push_separator_dot(const reach_top_bar_render_input *input,
@@ -269,7 +269,7 @@ static void reach_top_bar_push_tray_item(const reach_top_bar_render_input *input
     if (input->click_feedback_index == REACH_TOP_BAR_FEEDBACK_TRAY_BASE + index)
         (void)reach_push_icon_press_feedback_motion(
             commands, REACH_TOP_BAR_FEEDBACK_GROUP_ID, slot, slot.height * 0.5f,
-            input->tray_items[index].icon_id, input->theme->bar_click_feedback,
+            input->tray_items[index].icon_id, input->theme->bar_pressed_background,
             input->click_feedback, &group);
 }
 
@@ -312,12 +312,12 @@ static void reach_top_bar_push_tray(const reach_top_bar_render_input *input,
     int32_t feedback =
         input->click_feedback_index == REACH_TOP_BAR_FEEDBACK_TRAY_OVERFLOW &&
         reach_ui_color_feedback_begin(commands, REACH_TOP_BAR_FEEDBACK_GROUP_ID, glyph,
-                                      input->theme->system_glyph, input->theme->bar_click_feedback,
-                                      input->click_feedback);
+                                      input->theme->shared_glyph,
+                                      input->theme->bar_pressed_background, input->click_feedback);
     reach_top_bar_push_vector_icon(commands, glyph,
                                    input->tray_popup_open ? REACH_VECTOR_ICON_ARROW_UP
                                                           : REACH_VECTOR_ICON_ARROW_DOWN,
-                                   feedback ? reach_color{1, 1, 1, 1} : input->theme->system_glyph);
+                                   feedback ? reach_color{1, 1, 1, 1} : input->theme->shared_glyph);
     if (feedback)
         reach_render_command_buffer_end_group(commands);
 }
@@ -362,7 +362,7 @@ static void reach_top_bar_push_language(const reach_top_bar_render_input *input,
         return;
     }
 
-    reach_top_bar_push_rect(commands, button, input->theme->bar_button_background,
+    reach_top_bar_push_rect(commands, button, input->theme->shared_button_background,
                             button.height * 0.5f);
     reach_top_bar_push_text(
         commands, button, input->language_code, metrics.language_text_size * input->dpi_scale,
@@ -449,7 +449,7 @@ static void reach_top_bar_push_battery(const reach_top_bar_render_input *input,
 static reach_color reach_top_bar_status_glyph_color(const reach_top_bar_render_input *input,
                                                     int32_t active)
 {
-    return active ? input->theme->accent_text : input->theme->system_glyph;
+    return active ? input->theme->accent_text : input->theme->shared_glyph;
 }
 
 static void reach_top_bar_push_quick_settings(const reach_top_bar_render_input *input,
@@ -463,7 +463,7 @@ static void reach_top_bar_push_quick_settings(const reach_top_bar_render_input *
         return;
     }
 
-    reach_top_bar_push_rect(commands, button, input->theme->bar_button_background,
+    reach_top_bar_push_rect(commands, button, input->theme->shared_button_background,
                             button.height * 0.5f);
     reach_top_bar_push_vector_icon(
         commands, layout->network_icon, input->network_icon_id,

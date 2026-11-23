@@ -93,18 +93,18 @@ extern "C"
         reach_color top_bar_background;
         reach_color top_bar_scrim;
         reach_color switcher_background;
-        reach_color bar_border;
+        reach_color shared_border;
         reach_shadow bar_shadow;
         reach_color popup_background;
-        reach_color top_bar_dropdown_background;
+        reach_color bar_popup_background;
         reach_color popup_border;
         reach_color widget_background;
         reach_color widget_border;
         reach_color widget_unavailable_text;
         reach_color widget_resize_grip;
         reach_color widget_artwork_overlay;
-        reach_color popup_separator;
-        reach_color glass_popup_separator;
+        reach_color popup_divider;
+        reach_color popup_glass_divider;
         reach_color system_hud_background;
         reach_color system_hud_border;
         reach_color system_hud_primary_text;
@@ -113,21 +113,20 @@ extern "C"
         reach_color system_hud_glyph;
         reach_color system_hud_track;
         reach_color system_hud_muted_fill;
-        reach_color toggle_track_off;
+        reach_color toggle_off_track;
         reach_color toggle_knob;
         reach_shadow popup_shadow;
         reach_shadow widget_shadow;
 
-        reach_color primary_text;
+        reach_color shared_text;
         reach_color inverse_text;
 
-        reach_color icon_box_background;
         reach_color dock_fallback_icon_background;
-        reach_color system_glyph;
-        reach_color fallback_icon_text;
+        reach_color shared_glyph;
+        reach_color bar_fallback_icon_text;
         reach_color bar_text_primary;
         reach_color bar_text_secondary;
-        reach_color bar_button_background;
+        reach_color shared_button_background;
         reach_color bar_tray_background;
         reach_color bar_battery_background;
         reach_color bar_battery_fill;
@@ -139,7 +138,7 @@ extern "C"
         reach_color bar_stats_memory;
         reach_color bar_stats_download;
         reach_color bar_stats_upload;
-        reach_color bar_click_feedback;
+        reach_color bar_pressed_background;
         reach_color bar_separator_dot;
 
         reach_color quick_settings_slider_track;
@@ -227,7 +226,7 @@ extern "C"
         reach_color settings_window_minimize_hover;
         reach_color settings_scrollbar_track;
         reach_color settings_scrollbar_thumb;
-        reach_color accent;
+        reach_color accent_fill;
         reach_color accent_text;
         reach_color accent_tint;
         reach_color accent_selection;

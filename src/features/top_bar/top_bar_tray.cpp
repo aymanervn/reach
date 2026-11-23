@@ -701,7 +701,7 @@ reach_result reach_top_bar_append_tray_render_commands(reach_top_bar *top_bar,
     popup.notch_center_x = popup_state->placement.notch_anchor_x - ctx->bounds.x;
     popup.notch_side = popup_state->placement.notch_side;
     popup.dpi_scale = ctx->dpi_scale;
-    popup.background_color_override = ctx->theme->top_bar_dropdown_background;
+    popup.background_color_override = ctx->theme->bar_popup_background;
     popup.has_background_color_override = 1;
     popup.hide_notch = 1;
     popup.glass = ctx->theme->glass;
@@ -741,7 +741,7 @@ reach_result reach_top_bar_append_tray_render_commands(reach_top_bar *top_bar,
         {
             command.type = REACH_RENDER_COMMAND_TEXT;
             command.rect = slot;
-            command.color = ctx->theme->fallback_icon_text;
+            command.color = ctx->theme->bar_fallback_icon_text;
             command.text_size = REACH_TEXT_SIZE_HEADING * ctx->dpi_scale;
             command.text_alignment = REACH_TEXT_ALIGNMENT_CENTER;
             command.text[0] = item != nullptr && item->title[0] != 0 ? item->title[0] : '?';
@@ -753,7 +753,7 @@ reach_result reach_top_bar_append_tray_render_commands(reach_top_bar *top_bar,
             result = reach_push_icon_press_feedback_motion(
                 out_commands, 1, item != nullptr && item->icon_id != 0 ? icon_rect : slot,
                 icon_box_radius, item != nullptr ? item->icon_id : 0,
-                ctx->theme->bar_click_feedback, &popup_state->press_feedback, nullptr);
+                ctx->theme->bar_pressed_background, &popup_state->press_feedback, nullptr);
             if (result != REACH_OK)
                 return result;
         }

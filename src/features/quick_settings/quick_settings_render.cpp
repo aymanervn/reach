@@ -349,7 +349,7 @@ static reach_result reach_quick_settings_push_toggle(
     if (toggle != REACH_QUICK_SETTINGS_TOGGLE_PROJECT)
     {
         reach_ui_color_feedback_apply(&background, theme->quick_settings_button_background,
-                                      theme->accent, state);
+                                      theme->accent_fill, state);
     }
     reach_result result = reach_render_command_buffer_begin_group(commands, &background);
     if (result == REACH_OK)
@@ -381,13 +381,13 @@ static reach_result reach_quick_settings_push_toggle(
         icon.type = REACH_RENDER_COMMAND_VECTOR_ICON;
         icon.rect = layout->icon;
         icon.icon_id = icon_id;
-        icon.color = theme->primary_text;
+        icon.color = theme->shared_text;
         (void)reach_render_command_buffer_push(commands, &icon);
         reach_quick_settings_push_rounded_rect(commands, layout->divider, 0.0f,
                                                theme->quick_settings_toggle_divider);
         reach_quick_settings_push_fitted_text(
             commands, layout->title, title, metrics->toggle_title_text_size, REACH_TEXT_WEIGHT_BOLD,
-            REACH_TEXT_ALIGNMENT_CENTER, theme->primary_text, text_measure);
+            REACH_TEXT_ALIGNMENT_CENTER, theme->shared_text, text_measure);
         reach_quick_settings_push_fitted_text(commands, layout->status, status,
                                               metrics->toggle_status_text_size,
                                               REACH_TEXT_WEIGHT_NORMAL, REACH_TEXT_ALIGNMENT_CENTER,
@@ -496,12 +496,12 @@ static reach_result reach_quick_settings_push_header(const reach_quick_settings_
         settings.rect = {layout.settings_button.x + inset, layout.settings_button.y + inset,
                          metrics->header_button_icon_size, metrics->header_button_icon_size};
         settings.icon_id = REACH_VECTOR_ICON_SETTINGS;
-        settings.color = theme.system_glyph;
+        settings.color = theme.shared_glyph;
         (void)reach_render_command_buffer_push(commands, &settings);
 
         reach_quick_settings_push_rounded_rect(commands, layout.avatar_ring,
                                                layout.avatar_ring.width * 0.5f,
-                                               theme.bar_button_background);
+                                               theme.shared_button_background);
         if (input->model.picture_image_id != 0)
         {
             reach_render_command avatar = {};
@@ -516,17 +516,17 @@ static reach_result reach_quick_settings_push_header(const reach_quick_settings_
         else
         {
             reach_quick_settings_push_rounded_rect(commands, layout.avatar,
-                                                   layout.avatar.width * 0.5f, theme.accent);
+                                                   layout.avatar.width * 0.5f, theme.accent_fill);
             uint16_t initial[2] = {input->model.display_name[0], 0};
             reach_quick_settings_push_text(
                 commands, layout.avatar, initial, metrics->identity_name_text_size,
-                REACH_TEXT_WEIGHT_SEMIBOLD, REACH_TEXT_ALIGNMENT_CENTER, theme.primary_text);
+                REACH_TEXT_WEIGHT_SEMIBOLD, REACH_TEXT_ALIGNMENT_CENTER, theme.shared_text);
         }
 
         reach_quick_settings_push_fitted_text(
             commands, layout.identity_name, input->model.display_name,
             metrics->identity_name_text_size, REACH_TEXT_WEIGHT_SEMIBOLD,
-            REACH_TEXT_ALIGNMENT_LEADING, theme.primary_text, &input->text_measure);
+            REACH_TEXT_ALIGNMENT_LEADING, theme.shared_text, &input->text_measure);
         uint16_t detail[64] = {};
         reach_quick_settings_identity_detail(&input->model, detail, 64);
         reach_quick_settings_push_fitted_text(
@@ -569,8 +569,8 @@ static reach_result reach_quick_settings_push_rail(const reach_quick_settings_re
     reach_result result = reach_render_command_buffer_begin_group(commands, &marker);
     if (result == REACH_OK)
     {
-        reach_quick_settings_push_rounded_rect(commands, layout.rail_items[0],
-                                               layout.rail_items[0].width * 0.5f, theme.accent);
+        reach_quick_settings_push_rounded_rect(
+            commands, layout.rail_items[0], layout.rail_items[0].width * 0.5f, theme.accent_fill);
     }
     reach_render_command_buffer_end_group(commands);
     if (result != REACH_OK)
@@ -598,7 +598,7 @@ static reach_result reach_quick_settings_push_rail(const reach_quick_settings_re
         icon.rect = {item.x + inset, item.y + inset, metrics.toggle_icon_size,
                      metrics.toggle_icon_size};
         icon.icon_id = icons[index];
-        icon.color = (size_t)input->model.page == index ? theme.primary_text
+        icon.color = (size_t)input->model.page == index ? theme.shared_text
                                                         : theme.quick_settings_secondary_text;
         result = reach_render_command_buffer_push(commands, &icon);
     }
@@ -690,7 +690,7 @@ static void reach_quick_settings_push_pill_icon(reach_render_command_buffer *com
 {
     reach_render_command icon = {};
     icon.rect = rect;
-    icon.color = theme->primary_text;
+    icon.color = theme->shared_text;
     if (image_icon != 0)
     {
         icon.type = REACH_RENDER_COMMAND_ICON;
@@ -720,14 +720,15 @@ static void reach_quick_settings_push_pill(reach_render_command_buffer *commands
     reach_rect_f32 fill = pill;
     float rest_width = (layout->icon.x - pill.x) * 2.0f + layout->icon.width;
     fill.width = fmaxf(rest_width, pill.width * reach_quick_settings_clamp01(level));
-    reach_quick_settings_push_rounded_rect(
-        commands, fill, radius, muted ? theme->quick_settings_slider_muted_fill : theme->accent);
+    reach_quick_settings_push_rounded_rect(commands, fill, radius,
+                                           muted ? theme->quick_settings_slider_muted_fill
+                                                 : theme->accent_fill);
     reach_quick_settings_push_pill_icon(commands, layout->icon, vector_icon, image_icon, theme);
     if (label != nullptr && label[0] != 0 && layout->label.width > 0.0f)
     {
         reach_quick_settings_push_fitted_text(
             commands, layout->label, label, metrics->pill_label_text_size,
-            REACH_TEXT_WEIGHT_SEMIBOLD, REACH_TEXT_ALIGNMENT_LEADING, theme->primary_text,
+            REACH_TEXT_WEIGHT_SEMIBOLD, REACH_TEXT_ALIGNMENT_LEADING, theme->shared_text,
             text_measure);
     }
     static const uint16_t muted_label[] = {'M', 'u', 't', 'e', 'd', 0};
@@ -742,7 +743,7 @@ static void reach_quick_settings_push_pill(reach_render_command_buffer *commands
     }
     reach_quick_settings_push_text(commands, layout->value, value,
                                    metrics->overview_pill_value_text_size, REACH_TEXT_WEIGHT_NORMAL,
-                                   REACH_TEXT_ALIGNMENT_TRAILING, theme->primary_text);
+                                   REACH_TEXT_ALIGNMENT_TRAILING, theme->shared_text);
 }
 
 static void reach_quick_settings_push_section_label(reach_render_command_buffer *commands,
@@ -766,7 +767,7 @@ static void reach_quick_settings_push_output_row(
     if (device->is_default)
     {
         reach_quick_settings_push_rounded_rect(commands, layout->bounds,
-                                               layout->bounds.height * 0.5f, theme->accent);
+                                               layout->bounds.height * 0.5f, theme->accent_fill);
     }
     reach_quick_settings_push_pill_icon(commands, layout->icon, REACH_VECTOR_ICON_VOLUME_HIGH,
                                         device->icon_id, theme);
@@ -776,10 +777,9 @@ static void reach_quick_settings_push_output_row(
                                                    device->label);
     reach_quick_settings_copy_device_secondary_label(
         detail, REACH_AUDIO_VOLUME_DEVICE_LABEL_CAPACITY, device->label);
-    reach_quick_settings_push_fitted_text(commands, layout->title, title,
-                                          metrics->output_row_title_text_size,
-                                          REACH_TEXT_WEIGHT_SEMIBOLD, REACH_TEXT_ALIGNMENT_LEADING,
-                                          theme->primary_text, text_measure);
+    reach_quick_settings_push_fitted_text(
+        commands, layout->title, title, metrics->output_row_title_text_size,
+        REACH_TEXT_WEIGHT_SEMIBOLD, REACH_TEXT_ALIGNMENT_LEADING, theme->shared_text, text_measure);
     reach_quick_settings_push_fitted_text(commands, layout->detail, detail,
                                           metrics->output_row_detail_text_size,
                                           REACH_TEXT_WEIGHT_NORMAL, REACH_TEXT_ALIGNMENT_LEADING,
@@ -790,7 +790,7 @@ static void reach_quick_settings_push_output_row(
         check.type = REACH_RENDER_COMMAND_VECTOR_ICON;
         check.rect = layout->checkmark;
         check.icon_id = REACH_VECTOR_ICON_CHECK;
-        check.color = theme->primary_text;
+        check.color = theme->shared_text;
         (void)reach_render_command_buffer_push(commands, &check);
     }
 }
@@ -955,14 +955,13 @@ static void reach_quick_settings_push_wifi_row(
     if (network->connected)
     {
         reach_quick_settings_push_rounded_rect(commands, row->bounds, row->bounds.height * 0.5f,
-                                               theme->accent);
+                                               theme->accent_fill);
     }
     reach_quick_settings_push_pill_icon(commands, row->icon,
                                         reach_wifi_signal_icon(network->signal_strength), 0, theme);
-    reach_quick_settings_push_fitted_text(commands, row->title, network->ssid,
-                                          metrics->output_row_title_text_size,
-                                          REACH_TEXT_WEIGHT_SEMIBOLD, REACH_TEXT_ALIGNMENT_LEADING,
-                                          theme->primary_text, text_measure);
+    reach_quick_settings_push_fitted_text(
+        commands, row->title, network->ssid, metrics->output_row_title_text_size,
+        REACH_TEXT_WEIGHT_SEMIBOLD, REACH_TEXT_ALIGNMENT_LEADING, theme->shared_text, text_measure);
     const uint16_t *detail = reach_wifi_session_network_detail(network, 0);
     if (model->wifi_status != REACH_WIFI_SESSION_STATUS_IDLE &&
         model->wifi_status != REACH_WIFI_SESSION_STATUS_SCANNING &&
@@ -981,7 +980,7 @@ static void reach_quick_settings_push_wifi_row(
         trailing.rect = row->checkmark;
         trailing.icon_id = network->connected ? REACH_VECTOR_ICON_CHECK : REACH_VECTOR_ICON_LOCK;
         trailing.color =
-            network->connected ? theme->primary_text : theme->quick_settings_secondary_text;
+            network->connected ? theme->shared_text : theme->quick_settings_secondary_text;
         (void)reach_render_command_buffer_push(commands, &trailing);
     }
     if (forget.width > 0.0f)
@@ -991,7 +990,7 @@ static void reach_quick_settings_push_wifi_row(
         static const uint16_t forget_label[] = {'F', 'o', 'r', 'g', 'e', 't', 0};
         reach_quick_settings_push_text(commands, forget, forget_label,
                                        metrics->pill_label_text_size, REACH_TEXT_WEIGHT_SEMIBOLD,
-                                       REACH_TEXT_ALIGNMENT_CENTER, theme->primary_text);
+                                       REACH_TEXT_ALIGNMENT_CENTER, theme->shared_text);
     }
 }
 
@@ -1006,18 +1005,17 @@ static void reach_quick_settings_push_wifi_key(const reach_quick_settings_render
     reach_quick_settings_wifi_key_rects(row, metrics, &field, &connect);
     int32_t ready = reach_wifi_key_length_valid(network->security, input->model.wifi_key.length);
     reach_quick_settings_push_rounded_rect(commands, connect, connect.height * 0.5f,
-                                           ready ? theme.accent
+                                           ready ? theme.accent_fill
                                                  : theme.quick_settings_button_background);
     static const uint16_t connect_label[] = {'C', 'o', 'n', 'n', 'e', 'c', 't', 0};
     reach_quick_settings_push_text(commands, connect, connect_label, metrics->pill_label_text_size,
                                    REACH_TEXT_WEIGHT_SEMIBOLD, REACH_TEXT_ALIGNMENT_CENTER,
-                                   ready ? theme.primary_text
-                                         : theme.quick_settings_secondary_text);
+                                   ready ? theme.shared_text : theme.quick_settings_secondary_text);
 
     reach_ui_selection_item_style style = {};
     style.background = theme.quick_settings_slider_track;
-    style.accent = theme.accent;
-    style.text = theme.primary_text;
+    style.accent = theme.accent_fill;
+    style.text = theme.shared_text;
     style.border_width = input->dpi_scale;
     style.text_size = metrics->pill_label_text_size;
     style.text_weight = REACH_TEXT_WEIGHT_NORMAL;
@@ -1036,7 +1034,7 @@ static void reach_quick_settings_push_wifi_key(const reach_quick_settings_render
     state.caret_id = 760;
     state.caret_viewport = field;
     reach_text_edit_selection_range(&edit, &state.selection_start, &state.selection_end);
-    state.text_color = theme.primary_text;
+    state.text_color = theme.shared_text;
     state.placeholder_color = theme.quick_settings_secondary_text;
     state.selection_color = theme.accent_selection;
     float inset = field.height * 0.5f;
@@ -1067,12 +1065,12 @@ static reach_result reach_quick_settings_push_wifi(const reach_quick_settings_re
         static const uint16_t title[] = {'W', 'i', '-', 'F', 'i', 0};
         reach_quick_settings_push_text(commands, layout.wifi_title, title,
                                        metrics->wifi_title_text_size, REACH_TEXT_WEIGHT_SEMIBOLD,
-                                       REACH_TEXT_ALIGNMENT_LEADING, theme.primary_text);
+                                       REACH_TEXT_ALIGNMENT_LEADING, theme.shared_text);
         if (model.wifi_radio != REACH_WIFI_RADIO_UNAVAILABLE)
         {
             reach_ui_toggle_style style = {};
             style.track_off = theme.quick_settings_toggle_track_off;
-            style.track_on = theme.accent;
+            style.track_on = theme.accent_fill;
             style.knob = theme.toggle_knob;
             result = reach_ui_toggle_motion_render(commands, layout.wifi_switch, &style, 700,
                                                    &input->wifi_switch);
@@ -1167,14 +1165,13 @@ static void reach_quick_settings_push_bluetooth_row(
     if (device->connected)
     {
         reach_quick_settings_push_rounded_rect(commands, row->bounds, row->bounds.height * 0.5f,
-                                               theme->accent);
+                                               theme->accent_fill);
     }
     reach_quick_settings_push_pill_icon(
         commands, row->icon, reach_bluetooth_session_device_icon(device->kind), 0, theme);
-    reach_quick_settings_push_fitted_text(commands, row->title, device->name,
-                                          metrics->output_row_title_text_size,
-                                          REACH_TEXT_WEIGHT_SEMIBOLD, REACH_TEXT_ALIGNMENT_LEADING,
-                                          theme->primary_text, text_measure);
+    reach_quick_settings_push_fitted_text(
+        commands, row->title, device->name, metrics->output_row_title_text_size,
+        REACH_TEXT_WEIGHT_SEMIBOLD, REACH_TEXT_ALIGNMENT_LEADING, theme->shared_text, text_measure);
     static const uint16_t tap_to_pair[] = {'T', 'a', 'p', ' ', 't', 'o',
                                            ' ', 'p', 'a', 'i', 'r', 0};
     static const uint16_t not_connected[] = {'N', 'o', 't', ' ', 'c', 'o', 'n',
@@ -1226,7 +1223,7 @@ static void reach_quick_settings_push_bluetooth_action(
     reach_quick_settings_push_fitted_text(
         commands, label, prompt, metrics->pill_label_text_size,
         pin ? REACH_TEXT_WEIGHT_SEMIBOLD : REACH_TEXT_WEIGHT_NORMAL, REACH_TEXT_ALIGNMENT_LEADING,
-        theme.primary_text, &input->text_measure);
+        theme.shared_text, &input->text_measure);
     const uint16_t *labels[2] = {pin ? yes : remove_label, no};
     for (size_t index = 0; index < 2; ++index)
     {
@@ -1235,10 +1232,10 @@ static void reach_quick_settings_push_bluetooth_action(
         int32_t primary = index == 0 && pin;
         reach_quick_settings_push_rounded_rect(
             commands, buttons[index], buttons[index].height * 0.5f,
-            primary ? theme.accent : theme.quick_settings_button_background);
+            primary ? theme.accent_fill : theme.quick_settings_button_background);
         reach_quick_settings_push_text(commands, buttons[index], labels[index],
                                        metrics->pill_label_text_size, REACH_TEXT_WEIGHT_SEMIBOLD,
-                                       REACH_TEXT_ALIGNMENT_CENTER, theme.primary_text);
+                                       REACH_TEXT_ALIGNMENT_CENTER, theme.shared_text);
     }
 }
 
@@ -1257,7 +1254,7 @@ reach_quick_settings_push_bluetooth(const reach_quick_settings_render_input *inp
         static const uint16_t title[] = {'B', 'l', 'u', 'e', 't', 'o', 'o', 't', 'h', 0};
         reach_quick_settings_push_text(commands, layout.bluetooth_title, title,
                                        metrics->wifi_title_text_size, REACH_TEXT_WEIGHT_SEMIBOLD,
-                                       REACH_TEXT_ALIGNMENT_LEADING, theme.primary_text);
+                                       REACH_TEXT_ALIGNMENT_LEADING, theme.shared_text);
         static const uint16_t off[] = {'B', 'l', 'u', 'e', 't', 'o', 'o', 't', 'h',
                                        ' ', 'i', 's', ' ', 'o', 'f', 'f', 0};
         static const uint16_t unavailable[] = {'N', 'o', ' ', 'B', 'l', 'u', 'e',
@@ -1272,7 +1269,7 @@ reach_quick_settings_push_bluetooth(const reach_quick_settings_render_input *inp
         {
             reach_ui_toggle_style style = {};
             style.track_off = theme.quick_settings_toggle_track_off;
-            style.track_on = theme.accent;
+            style.track_on = theme.accent_fill;
             style.knob = theme.toggle_knob;
             result = reach_ui_toggle_motion_render(commands, layout.bluetooth_switch, &style, 704,
                                                    &input->bluetooth_switch);
@@ -1492,7 +1489,7 @@ reach_quick_settings_push_overview(const reach_quick_settings_render_input *inpu
         icon.rect = {layout.sound_page_button.x + inset, layout.sound_page_button.y + inset,
                      metrics->toggle_icon_size, metrics->toggle_icon_size};
         icon.icon_id = REACH_VECTOR_ICON_ARROW_RIGHT;
-        icon.color = theme.system_glyph;
+        icon.color = theme.shared_glyph;
         (void)reach_render_command_buffer_push(commands, &icon);
         if (input->model.brightness.available)
         {
@@ -1540,7 +1537,7 @@ reach_quick_settings_build_render_commands(const reach_quick_settings_render_inp
         background.notch_center_x = input->notch_center_x;
         background.notch_side = input->notch_side;
         background.dpi_scale = input->dpi_scale;
-        background.background_color_override = input->theme.top_bar_dropdown_background;
+        background.background_color_override = input->theme.bar_popup_background;
         background.has_background_color_override = 1;
         background.hide_notch = 1;
         background.glass = input->theme.glass;

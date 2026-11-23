@@ -104,7 +104,7 @@ reach_ui_button_style reach_settings_button_style(const reach_settings_render_in
 
 reach_ui_button_style reach_settings_accent_button_style(const reach_settings_render_input *input)
 {
-    reach_ui_button_style style = reach_settings_button_style(input, input->theme->accent);
+    reach_ui_button_style style = reach_settings_button_style(input, input->theme->accent_fill);
     style.text = input->theme->settings_text;
     return style;
 }
