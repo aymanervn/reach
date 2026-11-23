@@ -22,6 +22,7 @@
 
 ## Theme
 
+- Theme color names follow `<consumer>_<element>[_<state>]_<role>` (`reach_theme` in `include/reach/core/theme.h`). The consumer is a feature, a common component (`popup`, `toggle`), `bar` (Dock and Top Bar), `accent`, or `shared` for values several unrelated features use. The state comes just before the role. The role is one of background, border, divider, shadow, scrim, overlay, text, secondary_text, tertiary_text, placeholder_text, glyph, fill, track, thumb, knob. A feature that needs another feature's value gets its own token.
 - Surface background tokens name their consumer even when values match. Border-bearing backgrounds are opaque; Now Playing keeps its own translucency (`reach_theme` in `include/reach/core/theme.h`).
 - The color scheme adapts to fixed text, never the reverse. Text, glyph and knob colors keep their tokens on every background. Contrast is fixed by `reach_theme_resolve`: `accent_fill` at ≥4.5:1 with `shared_text`, `accent_text` at ≥4.5:1 on the elevated surface. New color sources feed the same resolver.
 - Every color is authored in OKLCH in `tools/theme_palette.py`, which generates `src/core/theme_palette.h`; the architecture check fails when the header is stale. Features, apps and adapters take colors only from `reach_theme` tokens and never write literal colors, alphas or mix amounts. White tint bases for retained color feedback and image modulation are not colors.
