@@ -299,7 +299,7 @@ reach_top_bar_now_playing_build_render_commands(const reach_top_bar_now_playing_
         input->layout->text_advance > text.width ? input->layout->text_advance : text.width;
     reach_top_bar_now_playing_push_text(
         out_commands, text, input->model->line, REACH_TEXT_SIZE_MEDIUM * dpi_scale,
-        REACH_TEXT_WEIGHT_BOLD, REACH_TEXT_ALIGNMENT_LEADING, theme->now_playing_title,
+        REACH_TEXT_WEIGHT_BOLD, REACH_TEXT_ALIGNMENT_LEADING, theme->now_playing_title_text,
         input->layout->text, input->animate_text ? &input->marquee : nullptr);
 
     reach_vector_icon_id icons[3] = {REACH_VECTOR_ICON_PREVIOUS,
@@ -347,8 +347,8 @@ reach_top_bar_now_playing_build_render_commands(const reach_top_bar_now_playing_
             icon.rect.x += icon_size * 0.06f;
         }
         icon.icon_id = icons[index];
-        icon.color = enabled[index] ? theme->now_playing_control_text
-                                    : theme->now_playing_control_disabled_text;
+        icon.color = enabled[index] ? theme->now_playing_control_glyph
+                                    : theme->now_playing_control_disabled_glyph;
         (void)reach_render_command_buffer_push(out_commands, &icon);
         reach_render_command_buffer_end_group(out_commands);
     }

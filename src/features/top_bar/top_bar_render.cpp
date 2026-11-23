@@ -157,7 +157,7 @@ static void reach_top_bar_push_power_button(const reach_top_bar_render_input *in
     reach_top_bar_push_text(commands, power_box, (const uint16_t *)L"Reach",
                             metrics.reach_label_text_size * input->dpi_scale,
                             metrics.reach_label_text_weight, REACH_TEXT_ALIGNMENT_CENTER,
-                            theme->bar_text_primary);
+                            theme->top_bar_text);
 
     if (input->click_feedback_index == REACH_TOP_BAR_FEEDBACK_POWER_BUTTON)
     {
@@ -177,11 +177,11 @@ static void reach_top_bar_push_clock(const reach_top_bar_render_input *input,
     reach_top_bar_push_text(commands, layout->clock_time, input->time_text,
                             metrics.clock_time_text_size * input->dpi_scale,
                             metrics.clock_time_text_weight, REACH_TEXT_ALIGNMENT_LEADING,
-                            input->theme->bar_text_primary);
+                            input->theme->top_bar_text);
     reach_top_bar_push_text(commands, layout->clock_date, input->date_text,
                             metrics.clock_date_text_size * input->dpi_scale,
                             metrics.clock_date_text_weight, REACH_TEXT_ALIGNMENT_LEADING,
-                            input->theme->bar_text_primary);
+                            input->theme->top_bar_text);
 }
 
 static void reach_top_bar_push_button_feedback_colored(const reach_top_bar_render_input *input,
@@ -213,7 +213,7 @@ static void reach_top_bar_push_separator_dot(const reach_top_bar_render_input *i
     {
         return;
     }
-    reach_top_bar_push_rect(commands, dot, input->theme->bar_separator_dot, dot.height * 0.5f);
+    reach_top_bar_push_rect(commands, dot, input->theme->top_bar_separator_fill, dot.height * 0.5f);
 }
 
 static void reach_top_bar_push_current_app(const reach_top_bar_render_input *input,
@@ -241,7 +241,7 @@ static void reach_top_bar_push_current_app(const reach_top_bar_render_input *inp
         reach_top_bar_push_text(commands, text, input->current_app_name,
                                 metrics.current_app_name_text_size * input->dpi_scale,
                                 metrics.current_app_name_text_weight, REACH_TEXT_ALIGNMENT_LEADING,
-                                input->theme->bar_text_primary);
+                                input->theme->top_bar_text);
     }
 }
 
@@ -282,7 +282,7 @@ static void reach_top_bar_push_tray(const reach_top_bar_render_input *input,
     if (layout->tray_background.width > 0.0f)
     {
         reach_top_bar_push_rect(commands, layout->tray_background,
-                                input->theme->bar_tray_background,
+                                input->theme->top_bar_tray_background,
                                 layout->tray_background.height * 0.5f);
     }
 
@@ -343,13 +343,13 @@ static void reach_top_bar_push_stats(const reach_top_bar_render_input *input,
     const reach_theme *theme = input->theme;
 
     reach_top_bar_push_stat(input, commands, layout->stats_cpu, input->stats_cpu_text,
-                            theme->bar_stats_cpu);
+                            theme->top_bar_cpu_text);
     reach_top_bar_push_stat(input, commands, layout->stats_memory, input->stats_memory_text,
-                            theme->bar_stats_memory);
+                            theme->top_bar_memory_text);
     reach_top_bar_push_stat(input, commands, layout->stats_download, input->stats_download_text,
-                            theme->bar_stats_download);
+                            theme->top_bar_download_text);
     reach_top_bar_push_stat(input, commands, layout->stats_upload, input->stats_upload_text,
-                            theme->bar_stats_upload);
+                            theme->top_bar_upload_text);
 }
 
 static void reach_top_bar_push_language(const reach_top_bar_render_input *input,
@@ -366,7 +366,7 @@ static void reach_top_bar_push_language(const reach_top_bar_render_input *input,
                             button.height * 0.5f);
     reach_top_bar_push_text(
         commands, button, input->language_code, metrics.language_text_size * input->dpi_scale,
-        metrics.language_text_weight, REACH_TEXT_ALIGNMENT_CENTER, input->theme->bar_text_primary);
+        metrics.language_text_weight, REACH_TEXT_ALIGNMENT_CENTER, input->theme->top_bar_text);
     reach_top_bar_push_button_feedback(input, commands, button,
                                        REACH_TOP_BAR_FEEDBACK_LANGUAGE_BUTTON);
 }
@@ -393,20 +393,20 @@ static void reach_top_bar_push_battery(const reach_top_bar_render_input *input,
     }
 
     float shell_radius = shell.height * 0.5f;
-    reach_top_bar_push_rect(commands, shell, theme->bar_battery_background, shell_radius);
+    reach_top_bar_push_rect(commands, shell, theme->top_bar_battery_background, shell_radius);
 
-    reach_color fill_color = theme->bar_battery_fill;
+    reach_color fill_color = theme->top_bar_battery_fill;
     if (input->battery_charging)
     {
-        fill_color = theme->bar_battery_charging;
+        fill_color = theme->top_bar_battery_charging_fill;
     }
     else if ((float)percent <= metrics.battery_low_percent)
     {
-        fill_color = theme->bar_battery_low;
+        fill_color = theme->top_bar_battery_low_fill;
     }
     else if (input->battery_saver_on)
     {
-        fill_color = theme->bar_battery_saver;
+        fill_color = theme->top_bar_battery_saver_fill;
     }
 
     float fill_width = shell.width * (float)percent / 100.0f;
@@ -440,7 +440,7 @@ static void reach_top_bar_push_battery(const reach_top_bar_render_input *input,
     percentage[digit] = '%';
     reach_top_bar_push_text(commands, shell, percentage,
                             metrics.volume_text_size * input->dpi_scale, metrics.volume_text_weight,
-                            REACH_TEXT_ALIGNMENT_CENTER, theme->bar_text_primary);
+                            REACH_TEXT_ALIGNMENT_CENTER, theme->top_bar_text);
 
     reach_top_bar_push_button_feedback(input, commands, input->layout->battery_button,
                                        REACH_TOP_BAR_FEEDBACK_BATTERY_BUTTON);
@@ -473,7 +473,7 @@ static void reach_top_bar_push_quick_settings(const reach_top_bar_render_input *
         reach_top_bar_push_text(commands, layout->network_label, input->network_name,
                                 metrics.network_name_text_size * input->dpi_scale,
                                 metrics.network_name_text_weight, REACH_TEXT_ALIGNMENT_LEADING,
-                                input->theme->bar_text_primary);
+                                input->theme->top_bar_text);
     }
     if (input->bluetooth_icon_id != REACH_VECTOR_ICON_NONE)
     {
@@ -486,8 +486,8 @@ static void reach_top_bar_push_quick_settings(const reach_top_bar_render_input *
         reach_top_bar_push_text(commands, layout->volume_label, input->volume_text,
                                 metrics.volume_text_size * input->dpi_scale,
                                 metrics.volume_text_weight, REACH_TEXT_ALIGNMENT_LEADING,
-                                input->volume_muted ? input->theme->bar_text_secondary
-                                                    : input->theme->bar_text_primary);
+                                input->volume_muted ? input->theme->top_bar_secondary_text
+                                                    : input->theme->top_bar_text);
     }
     reach_top_bar_push_button_feedback(input, commands, button,
                                        REACH_TOP_BAR_FEEDBACK_QUICK_SETTINGS_BUTTON);

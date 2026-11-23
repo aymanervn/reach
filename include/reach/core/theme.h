@@ -124,22 +124,22 @@ extern "C"
         reach_color dock_fallback_icon_background;
         reach_color shared_glyph;
         reach_color bar_fallback_icon_text;
-        reach_color bar_text_primary;
-        reach_color bar_text_secondary;
+        reach_color top_bar_text;
+        reach_color top_bar_secondary_text;
         reach_color shared_button_background;
-        reach_color bar_tray_background;
-        reach_color bar_battery_background;
-        reach_color bar_battery_fill;
-        reach_color bar_battery_low;
-        reach_color bar_battery_saver;
-        reach_color bar_battery_charging;
+        reach_color top_bar_tray_background;
+        reach_color top_bar_battery_background;
+        reach_color top_bar_battery_fill;
+        reach_color top_bar_battery_low_fill;
+        reach_color top_bar_battery_saver_fill;
+        reach_color top_bar_battery_charging_fill;
         reach_color battery_press_overlay;
-        reach_color bar_stats_cpu;
-        reach_color bar_stats_memory;
-        reach_color bar_stats_download;
-        reach_color bar_stats_upload;
+        reach_color top_bar_cpu_text;
+        reach_color top_bar_memory_text;
+        reach_color top_bar_download_text;
+        reach_color top_bar_upload_text;
         reach_color bar_pressed_background;
-        reach_color bar_separator_dot;
+        reach_color top_bar_separator_fill;
 
         reach_color quick_settings_slider_track;
         reach_color quick_settings_slider_muted_fill;
@@ -153,9 +153,9 @@ extern "C"
         reach_color quick_settings_press_overlay;
 
         reach_color now_playing_background;
-        reach_color now_playing_title;
-        reach_color now_playing_control_text;
-        reach_color now_playing_control_disabled_text;
+        reach_color now_playing_title_text;
+        reach_color now_playing_control_glyph;
+        reach_color now_playing_control_disabled_glyph;
 
         reach_color launcher_search_background;
         reach_color launcher_search_text;
