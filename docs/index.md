@@ -58,6 +58,11 @@ core ← protocol ← ports ← services ← features
 - New tests only guard fatal crashes: worst-case render-budget overflow in `tests/host_layout_tests.cpp`. No new helper, framework, motion, rendering or UI tests. Edit an existing test only when a change breaks it. Use `REACH_ASSERT` at invariants.
 - The user validates visible behavior on a deployed build. Do not automate it with probes.
 
+## Commits
+
+- One line in conventional style: `type (component): details`, for example `fix (dock): resize the dock by dragging its top rim`.
+- No body, co-author or attribution lines: commit with `git commit -m "<line>"` only.
+
 ## Keeping these docs
 
 - `boundaries.md`, `rendering.md`, `interaction.md` and `features.md` hold only rules the user confirmed. Existing code never adds a rule.
