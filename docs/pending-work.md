@@ -4,8 +4,7 @@ Open items only.
 
 ## Needs the user's decision
 
-- Theme redesign phase 5, accent roles (`ACCENT_STRENGTHS`), is applied; validate live: Widgets cards, meters, dividers, decoration ribbons (0.08–0.09 became 0.12), media control washes and drag marker; Settings pills, avatar, neutral and danger buttons in light mode, window buttons; Dock and tray fallback icon letters.
-- Text-strength literals missed by the phase 2 audit: secondary text at 0.55/0.6/0.7 through `reach_settings_color_with_alpha` (`settings_render.cpp:225,277,1454`, `settings_wifi_render.cpp:42,102,186`) and Clipboard's clear-button text at 0.90/0.35 (`clipboard_render.cpp:722`). Map each to a text strength.
+- Theme redesign phase 5, accent roles (`ACCENT_STRENGTHS`), is applied; validate live: Widgets cards, meters, dividers, decoration ribbons (0.08–0.09 became 0.12), media control washes and drag marker; Settings pills, avatar, neutral and danger buttons in light mode, window buttons; Dock and tray fallback icon letters; Settings and Wi-Fi placeholders (now tertiary), unit suffixes, version footer, out-of-range Wi-Fi icon, power "Wait for apps" label; Clipboard clear-button text.
 
 ## Bugs
 
