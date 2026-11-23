@@ -98,11 +98,11 @@ extern "C"
         reach_color popup_background;
         reach_color bar_popup_background;
         reach_color popup_border;
-        reach_color widget_background;
-        reach_color widget_border;
-        reach_color widget_unavailable_text;
-        reach_color widget_resize_grip;
-        reach_color widget_artwork_overlay;
+        reach_color widgets_background;
+        reach_color widgets_border;
+        reach_color widgets_unavailable_text;
+        reach_color widgets_resize_grip_fill;
+        reach_color widgets_artwork_overlay;
         reach_color popup_divider;
         reach_color popup_glass_divider;
         reach_color system_hud_background;
@@ -116,7 +116,7 @@ extern "C"
         reach_color toggle_off_track;
         reach_color toggle_knob;
         reach_shadow popup_shadow;
-        reach_shadow widget_shadow;
+        reach_shadow widgets_shadow;
 
         reach_color shared_text;
         reach_color settings_window_button_glyph;
@@ -230,15 +230,15 @@ extern "C"
         reach_color accent_text;
         reach_color accent_tint;
         reach_color accent_selection;
-        reach_color widget_accent_background;
-        reach_color widget_decoration;
-        reach_color widget_decoration_ribbon;
-        reach_color widget_meter_empty;
-        reach_color widget_meter_muted;
-        reach_color widget_section_divider;
-        reach_color widget_drag_marker;
-        reach_color widget_primary_control_wash;
-        reach_color widget_control_wash;
+        reach_color widgets_accent_background;
+        reach_color widgets_decoration_fill;
+        reach_color widgets_ribbon_fill;
+        reach_color widgets_meter_empty_fill;
+        reach_color widgets_meter_muted_fill;
+        reach_color widgets_section_divider;
+        reach_color widgets_drag_overlay;
+        reach_color widgets_primary_control_background;
+        reach_color widgets_control_background;
         reach_color settings_avatar_border;
         reach_color settings_avatar_placeholder_background;
 

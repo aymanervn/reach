@@ -889,9 +889,9 @@ static void reach_widgets_card(reach_render_command_buffer *commands, const reac
     shape.type = REACH_RENDER_COMMAND_RECT;
     shape.rect = rect;
     shape.radius = radius;
-    (void)reach_render_push_bordered_background(commands, &shape, theme->widget_accent_background,
-                                                theme->widget_border, border, &theme->widget_shadow,
-                                                scale);
+    (void)reach_render_push_bordered_background(commands, &shape, theme->widgets_accent_background,
+                                                theme->widgets_border, border,
+                                                &theme->widgets_shadow, scale);
 }
 
 static void reach_widgets_decorate(reach_render_command_buffer *commands, reach_rect_f32 inner,
@@ -956,8 +956,8 @@ static void reach_widgets_segments(reach_render_command_buffer *commands, const 
     const float meter_x = track.x + track.width - meter_width;
     const float amount_filled =
         available ? std::clamp(value / 100.0f, 0.0f, 1.0f) * segments : 0.0f;
-    const reach_color empty = theme->widget_meter_empty;
-    const reach_color muted = theme->widget_meter_muted;
+    const reach_color empty = theme->widgets_meter_empty_fill;
+    const reach_color muted = theme->widgets_meter_muted_fill;
     for (int32_t segment = 0; segment < segments; ++segment)
     {
         const reach_rect_f32 pill = {meter_x + segment * (pill_width + gap),
@@ -1015,7 +1015,7 @@ static void reach_widgets_meter(reach_render_command_buffer *commands, const rea
     if (!available && detail != nullptr && !show_labeled_percentage)
     {
         reach_widgets_text(commands, track, (const uint16_t *)u"—", REACH_TEXT_SIZE_SMALL * scale,
-                           REACH_TEXT_WEIGHT_SEMIBOLD, theme->widget_unavailable_text,
+                           REACH_TEXT_WEIGHT_SEMIBOLD, theme->widgets_unavailable_text,
                            REACH_TEXT_ALIGNMENT_CENTER);
         return;
     }
@@ -1064,7 +1064,7 @@ static void reach_widgets_section_header(reach_render_command_buffer *commands,
         reach_widgets_rect(commands,
                            reach_ui_horizontal_separator_bounds(
                                divider_x, section.y + section.height * 0.5f, divider_width, scale),
-                           0.0f, theme->widget_section_divider);
+                           0.0f, theme->widgets_section_divider);
     }
 }
 
@@ -1163,7 +1163,7 @@ static void reach_widgets_resize_grip(reach_render_command_buffer *commands,
 {
     reach_widgets_rect(commands,
                        {grip.x + 4.0f * scale, grip.y + 10.0f * scale, 11.0f * scale, 2.0f * scale},
-                       scale, theme->widget_resize_grip);
+                       scale, theme->widgets_resize_grip_fill);
 }
 
 static void reach_widgets_footer_button(reach_render_command_buffer *commands,
@@ -1396,8 +1396,8 @@ static void reach_widgets_render_body(const reach_widgets *widgets, size_t index
                 const auto button =
                     reach_widgets_control_bounds(chrome, (int32_t)index, control, scale);
                 reach_widgets_rect(commands, button, button.height * 0.5f,
-                                   control == 1 ? actual->widget_primary_control_wash
-                                                : actual->widget_control_wash);
+                                   control == 1 ? actual->widgets_primary_control_background
+                                                : actual->widgets_control_background);
                 reach_render_command icon = {};
                 icon.type = REACH_RENDER_COMMAND_VECTOR_ICON;
                 icon.icon_id = controls[control];
@@ -1458,7 +1458,7 @@ reach_result reach_widgets_render_desktop(const reach_widgets *widgets, const re
     const reach_theme *actual = theme != nullptr ? theme : reach_theme_default();
     float scale = dpi_scale > 0.0f ? dpi_scale : 1.0f;
     const float card_radius = actual->radius_large * scale;
-    const auto shadow_pad = reach_theme_shadow_pad(&actual->widget_shadow, scale);
+    const auto shadow_pad = reach_theme_shadow_pad(&actual->widgets_shadow, scale);
     constexpr uint64_t preview_group = reach_widgets_card_group_base + REACH_MAX_DESKTOP_WIDGETS;
     for (size_t draw = 0; draw < REACH_MAX_DESKTOP_WIDGETS; ++draw)
     {
@@ -1483,7 +1483,7 @@ reach_result reach_widgets_render_desktop(const reach_widgets *widgets, const re
                 return result;
             }
             reach_widgets_rect(commands, {0, 0, target.width, target.height}, card_radius,
-                               actual->widget_drag_marker);
+                               actual->widgets_drag_overlay);
             reach_render_command_buffer_end_group(commands);
         }
         reach_result result =
@@ -1508,11 +1508,11 @@ reach_result reach_widgets_render_desktop(const reach_widgets *widgets, const re
             artwork.radius = inner_radius;
             artwork.blur = REACH_NOW_PLAYING_ARTWORK_BLUR;
             artwork.cover_image_id = widgets->media_snapshot.cover_image_id;
-            artwork.overlay = actual->widget_artwork_overlay;
+            artwork.overlay = actual->widgets_artwork_overlay;
             (void)reach_now_playing_artwork_build_render_commands(&artwork, commands);
         }
-        reach_widgets_decorate(commands, inner, inner_radius, actual->widget_decoration,
-                               actual->widget_decoration_ribbon);
+        reach_widgets_decorate(commands, inner, inner_radius, actual->widgets_decoration_fill,
+                               actual->widgets_ribbon_fill);
         const auto chrome =
             reach_widgets_chrome(rect, scale, reach_widgets_has_footer((int32_t)index));
         reach_widgets_render_body(widgets, index, chrome, actual, scale, text_measure, commands);

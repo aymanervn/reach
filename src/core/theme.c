@@ -15,7 +15,7 @@
 
 #define REACH_THEME_SHADOWS                                                                        \
     .bar_shadow = REACH_SHADOW_AMBIENT(5.0f), .popup_shadow = REACH_SHADOW_AMBIENT(5.0f),          \
-    .widget_shadow = REACH_SHADOW_AMBIENT(5.0f)
+    .widgets_shadow = REACH_SHADOW_AMBIENT(5.0f)
 
 #define REACH_THEME_METRICS                                                                        \
     .radius_small = 12.0f, .radius_large = 20.0f, .button_pressed_darken = 0.65f,                  \
@@ -61,11 +61,11 @@ static const reach_theme reach_theme_dark = {
     .popup_background = REACH_DARK_SURFACE_RAISED(1.0f),
     .bar_popup_background = REACH_DARK_SURFACE_BASE(1.0f),
     .popup_border = REACH_DARK_BORDER(1.0f),
-    .widget_background = REACH_DARK_SURFACE_RAISED(1.0f),
-    .widget_border = REACH_DARK_BORDER(1.0f),
-    .widget_unavailable_text = REACH_DARK_TEXT(REACH_TEXT_SECONDARY),
-    .widget_resize_grip = REACH_DARK_TEXT(REACH_TEXT_TERTIARY),
-    .widget_artwork_overlay = REACH_DARK_SURFACE_RAISED(0.48f),
+    .widgets_background = REACH_DARK_SURFACE_RAISED(1.0f),
+    .widgets_border = REACH_DARK_BORDER(1.0f),
+    .widgets_unavailable_text = REACH_DARK_TEXT(REACH_TEXT_SECONDARY),
+    .widgets_resize_grip_fill = REACH_DARK_TEXT(REACH_TEXT_TERTIARY),
+    .widgets_artwork_overlay = REACH_DARK_SURFACE_RAISED(0.48f),
     .popup_divider = REACH_DARK_DIVIDER(1.0f),
     .popup_glass_divider = REACH_DARK_TEXT(REACH_TEXT_QUATERNARY),
     .system_hud_background = REACH_DARK_SURFACE_RAISED(1.0f),
@@ -191,17 +191,17 @@ static const reach_theme reach_theme_dark = {
     .accent_text = REACH_BLUE_BRIGHT(1.0f),
     .accent_tint = REACH_BLUE_DEEP(REACH_ACCENT_TINT),
     .accent_selection = REACH_BLUE_DEEP(REACH_ACCENT_SELECTION),
-    .widget_decoration = REACH_BLUE_DEEP(REACH_ACCENT_TINT),
-    .widget_decoration_ribbon = REACH_BLUE_DEEP(REACH_ACCENT_FAINT),
-    .widget_meter_empty = REACH_BLUE_BRIGHT(REACH_ACCENT_TINT),
-    .widget_meter_muted = REACH_BLUE_BRIGHT(REACH_ACCENT_MUTED),
-    .widget_section_divider = REACH_BLUE_BRIGHT(REACH_ACCENT_TINT),
-    .widget_drag_marker = REACH_BLUE_DEEP(REACH_ACCENT_SELECTION),
-    .widget_primary_control_wash = REACH_BLUE_DEEP(REACH_ACCENT_TINT),
-    .widget_control_wash = REACH_BLUE_DEEP(REACH_ACCENT_FAINT),
+    .widgets_decoration_fill = REACH_BLUE_DEEP(REACH_ACCENT_TINT),
+    .widgets_ribbon_fill = REACH_BLUE_DEEP(REACH_ACCENT_FAINT),
+    .widgets_meter_empty_fill = REACH_BLUE_BRIGHT(REACH_ACCENT_TINT),
+    .widgets_meter_muted_fill = REACH_BLUE_BRIGHT(REACH_ACCENT_MUTED),
+    .widgets_section_divider = REACH_BLUE_BRIGHT(REACH_ACCENT_TINT),
+    .widgets_drag_overlay = REACH_BLUE_DEEP(REACH_ACCENT_SELECTION),
+    .widgets_primary_control_background = REACH_BLUE_DEEP(REACH_ACCENT_TINT),
+    .widgets_control_background = REACH_BLUE_DEEP(REACH_ACCENT_FAINT),
     .settings_avatar_placeholder_background = REACH_BLUE_BRIGHT(REACH_ACCENT_TINT),
     // Opaque accent blends exist only once resolved; unresolved tables keep the plain surface.
-    .widget_accent_background = REACH_DARK_SURFACE_RAISED(1.0f),
+    .widgets_accent_background = REACH_DARK_SURFACE_RAISED(1.0f),
     .settings_avatar_border = REACH_DARK_SURFACE_ELEVATED(1.0f),
 
     REACH_THEME_SHADOWS,
@@ -221,11 +221,11 @@ static const reach_theme reach_theme_light = {
     .popup_background = REACH_LIGHT_SURFACE_BASE(1.0f),
     .bar_popup_background = REACH_LIGHT_SURFACE_BASE(1.0f),
     .popup_border = REACH_LIGHT_BORDER(1.0f),
-    .widget_background = REACH_LIGHT_SURFACE_BASE(1.0f),
-    .widget_border = REACH_LIGHT_BORDER(1.0f),
-    .widget_unavailable_text = REACH_LIGHT_TEXT(REACH_TEXT_SECONDARY),
-    .widget_resize_grip = REACH_LIGHT_TEXT(REACH_TEXT_TERTIARY),
-    .widget_artwork_overlay = REACH_LIGHT_SURFACE_BASE(0.48f),
+    .widgets_background = REACH_LIGHT_SURFACE_BASE(1.0f),
+    .widgets_border = REACH_LIGHT_BORDER(1.0f),
+    .widgets_unavailable_text = REACH_LIGHT_TEXT(REACH_TEXT_SECONDARY),
+    .widgets_resize_grip_fill = REACH_LIGHT_TEXT(REACH_TEXT_TERTIARY),
+    .widgets_artwork_overlay = REACH_LIGHT_SURFACE_BASE(0.48f),
     .popup_divider = REACH_LIGHT_DIVIDER(1.0f),
     .popup_glass_divider = REACH_LIGHT_TEXT(REACH_TEXT_QUATERNARY),
     .system_hud_background = REACH_LIGHT_SURFACE_BASE(1.0f),
@@ -351,17 +351,17 @@ static const reach_theme reach_theme_light = {
     .accent_text = REACH_BLUE_DEEP(1.0f),
     .accent_tint = REACH_BLUE_BRIGHT(REACH_ACCENT_TINT),
     .accent_selection = REACH_BLUE_BRIGHT(REACH_ACCENT_SELECTION),
-    .widget_decoration = REACH_BLUE_BRIGHT(REACH_ACCENT_TINT),
-    .widget_decoration_ribbon = REACH_BLUE_BRIGHT(REACH_ACCENT_FAINT),
-    .widget_meter_empty = REACH_BLUE_DEEP(REACH_ACCENT_TINT),
-    .widget_meter_muted = REACH_BLUE_DEEP(REACH_ACCENT_MUTED),
-    .widget_section_divider = REACH_BLUE_DEEP(REACH_ACCENT_TINT),
-    .widget_drag_marker = REACH_BLUE_BRIGHT(REACH_ACCENT_SELECTION),
-    .widget_primary_control_wash = REACH_BLUE_BRIGHT(REACH_ACCENT_TINT),
-    .widget_control_wash = REACH_BLUE_BRIGHT(REACH_ACCENT_FAINT),
+    .widgets_decoration_fill = REACH_BLUE_BRIGHT(REACH_ACCENT_TINT),
+    .widgets_ribbon_fill = REACH_BLUE_BRIGHT(REACH_ACCENT_FAINT),
+    .widgets_meter_empty_fill = REACH_BLUE_DEEP(REACH_ACCENT_TINT),
+    .widgets_meter_muted_fill = REACH_BLUE_DEEP(REACH_ACCENT_MUTED),
+    .widgets_section_divider = REACH_BLUE_DEEP(REACH_ACCENT_TINT),
+    .widgets_drag_overlay = REACH_BLUE_BRIGHT(REACH_ACCENT_SELECTION),
+    .widgets_primary_control_background = REACH_BLUE_BRIGHT(REACH_ACCENT_TINT),
+    .widgets_control_background = REACH_BLUE_BRIGHT(REACH_ACCENT_FAINT),
     .settings_avatar_placeholder_background = REACH_BLUE_DEEP(REACH_ACCENT_TINT),
     // Opaque accent blends exist only once resolved; unresolved tables keep the plain surface.
-    .widget_accent_background = REACH_LIGHT_SURFACE_BASE(1.0f),
+    .widgets_accent_background = REACH_LIGHT_SURFACE_BASE(1.0f),
     .settings_avatar_border = REACH_LIGHT_SURFACE_BASE(1.0f),
 
     REACH_THEME_SHADOWS,
@@ -535,16 +535,17 @@ void reach_theme_resolve(reach_theme_mode mode, const reach_accent_pair *accent,
     const reach_color text = out_theme->accent_text;
     out_theme->accent_tint = reach_theme_color_alpha(fill, REACH_ACCENT_TINT);
     out_theme->accent_selection = reach_theme_color_alpha(fill, REACH_ACCENT_SELECTION);
-    out_theme->widget_accent_background =
-        reach_theme_color_mix(out_theme->widget_background, fill, REACH_ACCENT_FAINT);
-    out_theme->widget_decoration = reach_theme_color_alpha(fill, REACH_ACCENT_TINT);
-    out_theme->widget_decoration_ribbon = reach_theme_color_alpha(fill, REACH_ACCENT_FAINT);
-    out_theme->widget_meter_empty = reach_theme_color_alpha(text, REACH_ACCENT_TINT);
-    out_theme->widget_meter_muted = reach_theme_color_alpha(text, REACH_ACCENT_MUTED);
-    out_theme->widget_section_divider = reach_theme_color_alpha(text, REACH_ACCENT_TINT);
-    out_theme->widget_drag_marker = reach_theme_color_alpha(fill, REACH_ACCENT_SELECTION);
-    out_theme->widget_primary_control_wash = reach_theme_color_alpha(fill, REACH_ACCENT_TINT);
-    out_theme->widget_control_wash = reach_theme_color_alpha(fill, REACH_ACCENT_FAINT);
+    out_theme->widgets_accent_background =
+        reach_theme_color_mix(out_theme->widgets_background, fill, REACH_ACCENT_FAINT);
+    out_theme->widgets_decoration_fill = reach_theme_color_alpha(fill, REACH_ACCENT_TINT);
+    out_theme->widgets_ribbon_fill = reach_theme_color_alpha(fill, REACH_ACCENT_FAINT);
+    out_theme->widgets_meter_empty_fill = reach_theme_color_alpha(text, REACH_ACCENT_TINT);
+    out_theme->widgets_meter_muted_fill = reach_theme_color_alpha(text, REACH_ACCENT_MUTED);
+    out_theme->widgets_section_divider = reach_theme_color_alpha(text, REACH_ACCENT_TINT);
+    out_theme->widgets_drag_overlay = reach_theme_color_alpha(fill, REACH_ACCENT_SELECTION);
+    out_theme->widgets_primary_control_background =
+        reach_theme_color_alpha(fill, REACH_ACCENT_TINT);
+    out_theme->widgets_control_background = reach_theme_color_alpha(fill, REACH_ACCENT_FAINT);
     out_theme->settings_avatar_border =
         reach_theme_color_mix(out_theme->settings_card_background, text, REACH_ACCENT_MUTED);
     out_theme->settings_avatar_placeholder_background =
@@ -559,8 +560,9 @@ void reach_theme_resolve(reach_theme_mode mode, const reach_accent_pair *accent,
          reach_theme_color_close(out_theme->accent_text, base->accent_text) &&
          reach_theme_color_close(out_theme->accent_tint, base->accent_tint) &&
          reach_theme_color_close(out_theme->accent_selection, base->accent_selection) &&
-         reach_theme_color_close(out_theme->widget_meter_muted, base->widget_meter_muted) &&
-         reach_theme_color_close(out_theme->widget_drag_marker, base->widget_drag_marker)));
+         reach_theme_color_close(out_theme->widgets_meter_muted_fill,
+                                 base->widgets_meter_muted_fill) &&
+         reach_theme_color_close(out_theme->widgets_drag_overlay, base->widgets_drag_overlay)));
     float limit = reach_theme_glass_limit(out_theme, light);
     out_theme->glass.floor = light ? limit : 0.0f;
     out_theme->glass.ceiling = light ? 1.0f : limit;
