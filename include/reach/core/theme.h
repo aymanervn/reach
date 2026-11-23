@@ -146,6 +146,8 @@ extern "C"
         reach_color quick_settings_scrollbar_track;
         reach_color quick_settings_scrollbar_thumb;
         reach_color quick_settings_section_label;
+        reach_color quick_settings_toggle_divider;
+        reach_color quick_settings_press_overlay;
 
         reach_color now_playing_background;
         reach_color now_playing_title;

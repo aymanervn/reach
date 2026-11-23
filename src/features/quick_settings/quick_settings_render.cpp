@@ -383,9 +383,8 @@ static reach_result reach_quick_settings_push_toggle(
         icon.icon_id = icon_id;
         icon.color = theme->primary_text;
         (void)reach_render_command_buffer_push(commands, &icon);
-        reach_quick_settings_push_rounded_rect(
-            commands, layout->divider, 0.0f,
-            reach_theme_color_alpha(theme->quick_settings_secondary_text, 0.5f));
+        reach_quick_settings_push_rounded_rect(commands, layout->divider, 0.0f,
+                                               theme->quick_settings_toggle_divider);
         reach_quick_settings_push_fitted_text(
             commands, layout->title, title, metrics->toggle_title_text_size, REACH_TEXT_WEIGHT_BOLD,
             REACH_TEXT_ALIGNMENT_CENTER, theme->primary_text, text_measure);
@@ -1459,8 +1458,8 @@ reach_quick_settings_push_press_feedback(const reach_quick_settings_render_input
     reach_render_group placement = {};
     placement.bounds = bounds;
     placement.parent_id = parents[slot];
-    reach_color overlay = {0.0f, 0.0f, 0.0f, 0.12f};
-    return reach_ui_feedback_render(commands, 900, bounds, bounds.height * 0.5f, overlay,
+    return reach_ui_feedback_render(commands, 900, bounds, bounds.height * 0.5f,
+                                    input->theme.quick_settings_press_overlay,
                                     &input->press_feedback, &placement);
 }
 

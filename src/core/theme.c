@@ -107,6 +107,8 @@ static const reach_theme reach_theme_dark = {
     .quick_settings_scrollbar_track = REACH_DARK_STRUCTURE(1.0f),
     .quick_settings_scrollbar_thumb = REACH_DARK_MID_CONTRAST_GRAY(1.0f),
     .quick_settings_section_label = REACH_DARK_MID_CONTRAST_GRAY(1.0f),
+    .quick_settings_toggle_divider = REACH_DARK_MID_CONTRAST_GRAY(0.5f),
+    .quick_settings_press_overlay = REACH_PURE_BLACK(0.12f),
 
     .now_playing_background = REACH_DARK_DEEP(0.35f),
     .now_playing_title = REACH_DARK_HIGH_CONTRAST_WHITE(1.0f),
@@ -243,6 +245,8 @@ static const reach_theme reach_theme_light = {
     .quick_settings_scrollbar_track = REACH_LIGHT_MIDTONE(1.0f),
     .quick_settings_scrollbar_thumb = REACH_LIGHT_MID_CONTRAST_GRAY(1.0f),
     .quick_settings_section_label = REACH_LIGHT_MID_CONTRAST_GRAY(1.0f),
+    .quick_settings_toggle_divider = REACH_LIGHT_MID_CONTRAST_GRAY(0.5f),
+    .quick_settings_press_overlay = REACH_PURE_BLACK(0.12f),
 
     .now_playing_background = REACH_LIGHT_RAISED(0.35f),
     .now_playing_title = REACH_LIGHT_HIGH_CONTRAST_BLACK(1.0f),
