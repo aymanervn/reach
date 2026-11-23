@@ -65,6 +65,7 @@ Open items only.
 
 ## GPU migration (remaining)
 
+- Migrate resizable cards to one modern nine-grid representation (`CompositionNineGridBrush`) used while resizing and at rest, replacing the clip/painted pair in `reach_ui_motion_background_render` and the stretched tiles (`reach_render_push_stretched_chrome`).
 - Repeatable baseline measurements, and final comparable performance acceptance. Windows profiling policy blocks system trace collection.
 - Dock to GPU: size fit and slot insertion/removal (`dock_feature.cpp`, `size_scale` and `slot_motions`). Reveal and reorder are done.
 - Top Bar pill widths to GPU: Now Playing, current app, tray (`top_bar_feature.cpp:505`). The reveal slide stays on the CPU.
