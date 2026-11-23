@@ -112,10 +112,10 @@ static reach_result reach_system_hud_render_media(const reach_system_hud_state *
     const uint16_t *title = state->media.title[0] != 0 ? state->media.title : fallback_title;
     reach_system_hud_push_text(commands, state->layout.title, title,
                                REACH_TEXT_SIZE_MEDIUM * ctx->dpi_scale, REACH_TEXT_WEIGHT_BOLD,
-                               REACH_TEXT_ALIGNMENT_LEADING, theme->system_hud_primary_text);
+                               REACH_TEXT_ALIGNMENT_LEADING, theme->system_hud_text);
     reach_system_hud_push_text(commands, state->layout.subtitle, state->media.artist,
                                REACH_TEXT_SIZE_SMALL * ctx->dpi_scale, REACH_TEXT_WEIGHT_NORMAL,
-                               REACH_TEXT_ALIGNMENT_LEADING, theme->system_hud_primary_text);
+                               REACH_TEXT_ALIGNMENT_LEADING, theme->system_hud_text);
 
     reach_system_hud_push_media_button(state, theme, commands, state->layout.media_previous,
                                        REACH_VECTOR_ICON_PREVIOUS,
@@ -165,7 +165,7 @@ static void reach_system_hud_render_level(const reach_system_hud_state *state,
     reach_level_format_whole_percent(value, 8, level);
     reach_system_hud_push_text(commands, state->layout.value, value,
                                REACH_TEXT_SIZE_MEDIUM * ctx->dpi_scale, REACH_TEXT_WEIGHT_DEMIBOLD,
-                               REACH_TEXT_ALIGNMENT_TRAILING, theme->system_hud_primary_text);
+                               REACH_TEXT_ALIGNMENT_TRAILING, theme->system_hud_text);
 }
 
 static size_t reach_system_hud_append_text(uint16_t *destination, size_t capacity, size_t offset,
@@ -210,7 +210,7 @@ static void reach_system_hud_render_app_removed(const reach_system_hud_state *st
     reach_system_hud_append_text(message, REACH_APPLICATION_TEXT_CAPACITY, offset, suffix);
     reach_system_hud_push_text(commands, state->layout.title, message,
                                REACH_TEXT_SIZE_MEDIUM * ctx->dpi_scale, REACH_TEXT_WEIGHT_NORMAL,
-                               REACH_TEXT_ALIGNMENT_CENTER, ctx->theme->system_hud_primary_text);
+                               REACH_TEXT_ALIGNMENT_CENTER, ctx->theme->system_hud_text);
 }
 
 static void reach_system_hud_render_screenshot_copied(const reach_system_hud_state *state,
@@ -221,7 +221,7 @@ static void reach_system_hud_render_screenshot_copied(const reach_system_hud_sta
                                        't', ' ', 'c', 'o', 'p', 'i', 'e', 'd', 0};
     reach_system_hud_push_text(commands, state->layout.title, message,
                                REACH_TEXT_SIZE_MEDIUM * ctx->dpi_scale, REACH_TEXT_WEIGHT_NORMAL,
-                               REACH_TEXT_ALIGNMENT_CENTER, ctx->theme->system_hud_primary_text);
+                               REACH_TEXT_ALIGNMENT_CENTER, ctx->theme->system_hud_text);
 }
 
 reach_result reach_system_hud_append_render_commands(const reach_system_hud *hud,

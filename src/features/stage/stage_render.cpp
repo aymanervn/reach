@@ -31,7 +31,7 @@ static reach_result reach_stage_push_tile_background(const reach_stage_render_co
         return REACH_OK;
     }
 
-    reach_color background = ctx->theme->stage_backdrop;
+    reach_color background = ctx->theme->stage_background;
     background.a = 1.0f;
     reach_render_command shape = {};
     shape.type = REACH_RENDER_COMMAND_RECT;
@@ -58,7 +58,7 @@ static reach_result reach_stage_push_tile_placeholder(const reach_stage_render_c
     reach_render_command plate = {};
     plate.type = REACH_RENDER_COMMAND_RECT;
     plate.rect = rect;
-    plate.color = reach_theme_color_alpha(ctx->theme->stage_tile_placeholder, alpha);
+    plate.color = reach_theme_color_alpha(ctx->theme->stage_tile_placeholder_background, alpha);
     reach_result result = reach_render_command_buffer_push(out_commands, &plate);
     if (result != REACH_OK || tile->icon_id == 0)
     {
@@ -200,7 +200,7 @@ static reach_result reach_stage_push_tile_header(reach_stage *stage,
         label.text_weight = REACH_TEXT_WEIGHT_SEMIBOLD;
         label.text_alignment = REACH_TEXT_ALIGNMENT_LEADING;
         label.text_ellipsis = 1;
-        label.color = ctx->theme->stage_tile_label;
+        label.color = ctx->theme->stage_tile_text;
         label.color.a *= alpha;
         label.text_color = label.color;
         (void)reach_copy_utf16(label.text, 260, tile->label);

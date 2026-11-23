@@ -103,7 +103,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
             model->query[0] == 0 ? REACH_TEXT_WEIGHT_SEMIBOLD : REACH_TEXT_WEIGHT_NORMAL;
         command.text_alignment = input->text_alignment_leading;
         command.text_color = theme->launcher_search_text;
-        command.placeholder_color = theme->launcher_placeholder_text;
+        command.placeholder_color = theme->launcher_search_placeholder_text;
         command.selection_color = theme->accent_selection;
         command.caret_index = input->caret_index;
         command.caret_visible = input->caret_visible;
@@ -281,8 +281,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
             command.rect.y = row_y + row_title_y;
             command.rect.width = row_width - row_text_x - row_text_right_padding;
             command.rect.height = row_title_height;
-            command.color =
-                selected ? theme->launcher_row_title_selected : theme->launcher_row_title;
+            command.color = selected ? theme->launcher_row_selected_text : theme->launcher_row_text;
             command.text_size = row_title_size;
             command.text_weight = REACH_TEXT_WEIGHT_SEMIBOLD;
             command.text_alignment = input->text_alignment_leading;
@@ -298,8 +297,8 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
                     return REACH_INVALID_ARGUMENT;
                 title.opacity = row.opacity;
                 title.y = offset;
-                reach_ui_color_feedback_apply(&title, theme->launcher_row_title,
-                                              theme->launcher_row_title_selected,
+                reach_ui_color_feedback_apply(&title, theme->launcher_row_text,
+                                              theme->launcher_row_selected_text,
                                               &input->row_selected[slot]);
                 command.color = {1.0f, 1.0f, 1.0f, 1.0f};
                 result = reach_render_retain_commands(out_commands, first, row_id + 1, content_id,
@@ -322,7 +321,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
             command.rect.y = row_y + row_path_y;
             command.rect.width = row_width - row_text_x - row_text_right_padding;
             command.rect.height = row_path_height;
-            command.color = theme->launcher_row_path;
+            command.color = theme->launcher_row_secondary_text;
             command.text_size = row_path_size;
             command.text_alignment = input->text_alignment_leading;
             command.text_ellipsis = 1;
@@ -343,7 +342,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
             placement.bounds = press;
             placement.parent_id = content_id;
             result = reach_ui_feedback_render(out_commands, UINT64_C(0x2900000000060031), press,
-                                              row_selected_radius, theme->launcher_press_overlay,
+                                              row_selected_radius, theme->launcher_pressed_overlay,
                                               &input->press_feedback, &placement);
             if (result != REACH_OK)
                 return result;
@@ -362,7 +361,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
             command.rect.y = row_y + row_title_y;
             command.rect.width = row_width;
             command.rect.height = row_title_height;
-            command.color = theme->launcher_row_title;
+            command.color = theme->launcher_row_text;
             command.text_size = row_title_size;
             command.text_weight = REACH_TEXT_WEIGHT_SEMIBOLD;
             command.text_alignment = REACH_TEXT_ALIGNMENT_CENTER;
@@ -376,7 +375,7 @@ reach_result reach_launcher_build_render_commands(const reach_launcher_render_in
             command.rect.y = row_y + row_path_y;
             command.rect.width = row_width;
             command.rect.height = row_path_height;
-            command.color = theme->launcher_row_path;
+            command.color = theme->launcher_row_secondary_text;
             command.text_size = row_path_size;
             command.text_alignment = REACH_TEXT_ALIGNMENT_CENTER;
             command.text_ellipsis = 1;

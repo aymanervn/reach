@@ -107,7 +107,7 @@ extern "C"
         reach_color popup_glass_divider;
         reach_color system_hud_background;
         reach_color system_hud_border;
-        reach_color system_hud_primary_text;
+        reach_color system_hud_text;
         reach_color system_hud_secondary_text;
         reach_color system_hud_icon_background;
         reach_color system_hud_glyph;
@@ -133,7 +133,7 @@ extern "C"
         reach_color top_bar_battery_low_fill;
         reach_color top_bar_battery_saver_fill;
         reach_color top_bar_battery_charging_fill;
-        reach_color battery_press_overlay;
+        reach_color battery_pressed_overlay;
         reach_color top_bar_cpu_text;
         reach_color top_bar_memory_text;
         reach_color top_bar_download_text;
@@ -145,12 +145,12 @@ extern "C"
         reach_color quick_settings_slider_muted_fill;
         reach_color quick_settings_button_background;
         reach_color quick_settings_secondary_text;
-        reach_color quick_settings_toggle_track_off;
+        reach_color quick_settings_toggle_off_track;
         reach_color quick_settings_scrollbar_track;
         reach_color quick_settings_scrollbar_thumb;
-        reach_color quick_settings_section_label;
+        reach_color quick_settings_section_text;
         reach_color quick_settings_toggle_divider;
-        reach_color quick_settings_press_overlay;
+        reach_color quick_settings_pressed_overlay;
 
         reach_color now_playing_background;
         reach_color now_playing_title_text;
@@ -159,16 +159,16 @@ extern "C"
 
         reach_color launcher_search_background;
         reach_color launcher_search_text;
-        reach_color launcher_placeholder_text;
+        reach_color launcher_search_placeholder_text;
         reach_color launcher_border;
         reach_color launcher_scrollbar_track;
         reach_color launcher_scrollbar_thumb;
         reach_color launcher_row_icon_background;
         reach_color launcher_row_icon_glyph;
-        reach_color launcher_row_title;
-        reach_color launcher_row_title_selected;
-        reach_color launcher_row_path;
-        reach_color launcher_press_overlay;
+        reach_color launcher_row_text;
+        reach_color launcher_row_selected_text;
+        reach_color launcher_row_secondary_text;
+        reach_color launcher_pressed_overlay;
 
         reach_color switcher_label_text;
 
@@ -176,9 +176,9 @@ extern "C"
         reach_color context_menu_close_background;
         reach_color context_menu_close_glyph;
 
-        reach_color stage_backdrop;
-        reach_color stage_tile_placeholder;
-        reach_color stage_tile_label;
+        reach_color stage_background;
+        reach_color stage_tile_placeholder_background;
+        reach_color stage_tile_text;
         reach_color stage_tile_header_background;
         reach_color stage_close_background;
         reach_color stage_close_hover_background;
@@ -187,7 +187,7 @@ extern "C"
 
         reach_color clipboard_background;
         reach_color clipboard_border;
-        reach_color clipboard_primary_text;
+        reach_color clipboard_text;
         reach_color clipboard_secondary_text;
         reach_color clipboard_disabled_text;
         reach_color clipboard_empty_text;

@@ -542,7 +542,7 @@ static reach_result reach_clipboard_push_row(const reach_clipboard_render_input 
     const float text_right =
         content.x + content.width - metrics.close_button_size - metrics.close_button_margin * 2.0f;
     float text_x = content.x + padding;
-    reach_color text_color = theme->clipboard_primary_text;
+    reach_color text_color = theme->clipboard_text;
     if (item_data->kind == REACH_CLIPBOARD_ITEM_IMAGE && item_data->thumbnail_id != 0)
     {
         const float thumbnail_height = fminf(metrics.thumbnail_height, content.height);
@@ -678,7 +678,7 @@ reach_result reach_clipboard_build_render_commands(const reach_clipboard_render_
     reach_render_command command = {};
     command.type = REACH_RENDER_COMMAND_TEXT;
     command.rect = reach_clipboard_local(layout->title, origin);
-    command.color = theme->clipboard_primary_text;
+    command.color = theme->clipboard_text;
     command.text_size = metrics.title_font_size;
     command.text_weight = metrics.title_font_weight;
     command.text_alignment = input->text_alignment_leading;

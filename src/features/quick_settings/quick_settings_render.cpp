@@ -756,7 +756,7 @@ static void reach_quick_settings_push_section_label(reach_render_command_buffer 
     inset.width = fmaxf(0.0f, inset.width - metrics->overview_pill_icon_inset);
     reach_quick_settings_push_text(commands, inset, text, metrics->section_label_text_size,
                                    REACH_TEXT_WEIGHT_NORMAL, REACH_TEXT_ALIGNMENT_LEADING,
-                                   theme->quick_settings_section_label);
+                                   theme->quick_settings_section_text);
 }
 
 static void reach_quick_settings_push_output_row(
@@ -1069,7 +1069,7 @@ static reach_result reach_quick_settings_push_wifi(const reach_quick_settings_re
         if (model.wifi_radio != REACH_WIFI_RADIO_UNAVAILABLE)
         {
             reach_ui_toggle_style style = {};
-            style.track_off = theme.quick_settings_toggle_track_off;
+            style.track_off = theme.quick_settings_toggle_off_track;
             style.track_on = theme.accent_fill;
             style.knob = theme.toggle_knob;
             result = reach_ui_toggle_motion_render(commands, layout.wifi_switch, &style, 700,
@@ -1268,7 +1268,7 @@ reach_quick_settings_push_bluetooth(const reach_quick_settings_render_input *inp
         if (model.bluetooth.available)
         {
             reach_ui_toggle_style style = {};
-            style.track_off = theme.quick_settings_toggle_track_off;
+            style.track_off = theme.quick_settings_toggle_off_track;
             style.track_on = theme.accent_fill;
             style.knob = theme.toggle_knob;
             result = reach_ui_toggle_motion_render(commands, layout.bluetooth_switch, &style, 704,
@@ -1456,7 +1456,7 @@ reach_quick_settings_push_press_feedback(const reach_quick_settings_render_input
     placement.bounds = bounds;
     placement.parent_id = parents[slot];
     return reach_ui_feedback_render(commands, 900, bounds, bounds.height * 0.5f,
-                                    input->theme.quick_settings_press_overlay,
+                                    input->theme.quick_settings_pressed_overlay,
                                     &input->press_feedback, &placement);
 }
 
