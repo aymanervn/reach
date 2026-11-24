@@ -642,6 +642,83 @@ static reach_result reach_window_manager_window_at(const reach_window_manager *m
     return REACH_OK;
 }
 
+static reach_rect_f32 reach_windows_rect_f32(RECT rect)
+{
+    return {(float)rect.left, (float)rect.top, (float)(rect.right - rect.left),
+            (float)(rect.bottom - rect.top)};
+}
+
+int32_t reach_windows_restored_bounds(uintptr_t window, reach_rect_f32 *out_window,
+                                      reach_rect_f32 *out_frame)
+{
+    HWND hwnd = reinterpret_cast<HWND>(window);
+    WINDOWPLACEMENT placement = {};
+    placement.length = sizeof(placement);
+    RECT minimized_window = {};
+    RECT minimized_frame = {};
+    if (out_window == nullptr || out_frame == nullptr || !IsWindow(hwnd) || !IsIconic(hwnd) ||
+        !GetWindowPlacement(hwnd, &placement) ||
+        placement.rcNormalPosition.right <= placement.rcNormalPosition.left ||
+        placement.rcNormalPosition.bottom <= placement.rcNormalPosition.top)
+    {
+        return 0;
+    }
+
+    // DWM keeps its invisible resize borders around the minimized caption too, but its bottom
+    // border there is unreliable (0 or the side width), so every border is taken from the left
+    // one: on a restored window the left, right and bottom borders match and the top has none.
+    // A maximized window overhangs its work area by the same border on all four sides. Without
+    // a readable, symmetric border the frame is the whole window.
+    LONG border = 0;
+    if (GetWindowRect(hwnd, &minimized_window) &&
+        SUCCEEDED(DwmGetWindowAttribute(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, &minimized_frame,
+                                        sizeof(minimized_frame))) &&
+        minimized_frame.left - minimized_window.left >= 0 &&
+        minimized_window.right - minimized_frame.right ==
+            minimized_frame.left - minimized_window.left)
+    {
+        border = minimized_frame.left - minimized_window.left;
+    }
+
+    HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+    MONITORINFO monitor_info = {};
+    monitor_info.cbSize = sizeof(monitor_info);
+    if (!GetMonitorInfoW(monitor, &monitor_info))
+    {
+        return 0;
+    }
+
+    RECT restored_window = {};
+    RECT restored_frame = {};
+    if (placement.showCmd == SW_SHOWMAXIMIZED || (placement.flags & WPF_RESTORETOMAXIMIZED) != 0)
+    {
+        restored_frame = monitor_info.rcWork;
+        restored_window = restored_frame;
+        InflateRect(&restored_window, border, border);
+    }
+    else
+    {
+        // rcNormalPosition is in workspace coordinates, except for tool windows.
+        restored_window = placement.rcNormalPosition;
+        if ((GetWindowLongPtrW(hwnd, GWL_EXSTYLE) & WS_EX_TOOLWINDOW) == 0)
+        {
+            OffsetRect(&restored_window, monitor_info.rcWork.left - monitor_info.rcMonitor.left,
+                       monitor_info.rcWork.top - monitor_info.rcMonitor.top);
+        }
+        restored_frame = {restored_window.left + border, restored_window.top,
+                          restored_window.right - border, restored_window.bottom - border};
+        if (restored_frame.right <= restored_frame.left ||
+            restored_frame.bottom <= restored_frame.top)
+        {
+            restored_frame = restored_window;
+        }
+    }
+
+    *out_window = reach_windows_rect_f32(restored_window);
+    *out_frame = reach_windows_rect_f32(restored_frame);
+    return 1;
+}
+
 static reach_result reach_window_manager_frame_bounds(const reach_window_manager *manager,
                                                       reach_window_id window_id,
                                                       reach_rect_f32 *out_bounds)
@@ -662,34 +739,9 @@ static reach_result reach_window_manager_frame_bounds(const reach_window_manager
     RECT frame = {};
     if (IsIconic(hwnd))
     {
-        WINDOWPLACEMENT placement = {};
-        placement.length = sizeof(placement);
-        if (!GetWindowPlacement(hwnd, &placement) ||
-            placement.rcNormalPosition.right <= placement.rcNormalPosition.left ||
-            placement.rcNormalPosition.bottom <= placement.rcNormalPosition.top)
-        {
-            return REACH_ERROR;
-        }
-        HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
-        MONITORINFO monitor_info = {};
-        monitor_info.cbSize = sizeof(monitor_info);
-        int32_t restore_to_maximized = placement.showCmd == SW_SHOWMAXIMIZED ||
-                                       (placement.flags & WPF_RESTORETOMAXIMIZED) != 0;
-        if (restore_to_maximized && GetMonitorInfoW(monitor, &monitor_info))
-        {
-            frame = monitor_info.rcWork;
-        }
-        else
-        {
-            frame = placement.rcNormalPosition;
-            LONG_PTR ex_style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
-            if ((ex_style & WS_EX_TOOLWINDOW) == 0 && GetMonitorInfoW(monitor, &monitor_info))
-            {
-                LONG offset_x = monitor_info.rcWork.left - monitor_info.rcMonitor.left;
-                LONG offset_y = monitor_info.rcWork.top - monitor_info.rcMonitor.top;
-                OffsetRect(&frame, offset_x, offset_y);
-            }
-        }
+        reach_rect_f32 restored_window = {};
+        return reach_windows_restored_bounds(window_id, &restored_window, out_bounds) ? REACH_OK
+                                                                                      : REACH_ERROR;
     }
     else if (FAILED(
                  DwmGetWindowAttribute(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, &frame, sizeof(frame))) &&

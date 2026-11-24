@@ -175,6 +175,11 @@ extern "C"
     int32_t reach_windows_shell_value_is_reach(const uint16_t *shell, const uint16_t *exe_path);
     reach_result reach_windows_shell_launch_explorer(void);
 
+    // A minimized window's outer rectangle and visible frame as they will be once restored, in
+    // physical screen pixels. Returns 0 when the window is not minimized or the bounds are unknown.
+    int32_t reach_windows_restored_bounds(uintptr_t window, reach_rect_f32 *out_window,
+                                          reach_rect_f32 *out_frame);
+
 #ifdef __cplusplus
 }
 #endif

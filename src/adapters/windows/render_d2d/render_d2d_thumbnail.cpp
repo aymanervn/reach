@@ -53,10 +53,25 @@ static bool reach_d2d_thumbnail_source(HWND source, const reach_render_command &
                                        RECT *out_crop)
 {
     RECT window = {};
-    if (IsIconic(source) || !GetWindowRect(source, &window))
-        return false;
     RECT visible = {};
-    if (command.source_screen.width > 0.0f && command.source_screen.height > 0.0f)
+    if (IsIconic(source))
+    {
+        // A minimized window gets the crop it will have once restored, so restoring it keeps the
+        // same thumbnail instead of recreating it mid-flight.
+        reach_rect_f32 restored_window = {};
+        reach_rect_f32 restored_frame = {};
+        if (!reach_windows_restored_bounds((uintptr_t)source, &restored_window, &restored_frame))
+            return false;
+        window = {(LONG)restored_window.x, (LONG)restored_window.y,
+                  (LONG)(restored_window.x + restored_window.width),
+                  (LONG)(restored_window.y + restored_window.height)};
+        visible = {(LONG)restored_frame.x, (LONG)restored_frame.y,
+                   (LONG)(restored_frame.x + restored_frame.width),
+                   (LONG)(restored_frame.y + restored_frame.height)};
+    }
+    else if (!GetWindowRect(source, &window))
+        return false;
+    else if (command.source_screen.width > 0.0f && command.source_screen.height > 0.0f)
     {
         visible.left = (LONG)command.source_screen.x;
         visible.top = (LONG)command.source_screen.y;
