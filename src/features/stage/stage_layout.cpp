@@ -33,7 +33,9 @@ typedef struct reach_stage_layout_item
     float thumbnail_width;
     float thumbnail_height;
     float bar;
-    float box_height;
+    // The tile's footprint: header and thumbnail plus the margin on every side.
+    float slot_width;
+    float slot_height;
 } reach_stage_layout_item;
 
 typedef struct reach_stage_layout_row
@@ -54,6 +56,7 @@ typedef struct reach_stage_layout
     size_t row_count;
     float bar_height;
     float border;
+    float margin;
     float gap;
 } reach_stage_layout;
 
@@ -156,7 +159,9 @@ static void reach_stage_scale_layout_items(reach_stage_layout *layout, float fit
         item->thumbnail_height = item->height * scale;
         float bar_limit = item->thumbnail_height * REACH_STAGE_BAR_MAX_THUMBNAIL_RATIO;
         item->bar = layout->bar_height < bar_limit ? layout->bar_height : bar_limit;
-        item->box_height = item->bar + layout->border * 2.0f + item->thumbnail_height;
+        item->slot_width = item->thumbnail_width + layout->margin * 2.0f;
+        item->slot_height =
+            item->bar + layout->border * 2.0f + item->thumbnail_height + layout->margin * 2.0f;
     }
 }
 
@@ -166,7 +171,7 @@ static void reach_stage_split_layout_rows(reach_stage_layout *layout, size_t row
     float total = layout->gap * (float)(layout->count - row_count);
     for (size_t index = 0; index < layout->count; ++index)
     {
-        total += layout->items[index].thumbnail_width;
+        total += layout->items[index].slot_width;
     }
 
     layout->row_count = 0;
@@ -177,10 +182,10 @@ static void reach_stage_split_layout_rows(reach_stage_layout *layout, size_t row
         size_t rows_after = row_count - row - 1;
         float target = total * (float)(row + 1) / (float)row_count;
         size_t end = begin + 1;
-        consumed += layout->items[layout->order[begin]].thumbnail_width;
+        consumed += layout->items[layout->order[begin]].slot_width;
         while (end < layout->count - rows_after)
         {
-            float width = layout->items[layout->order[end]].thumbnail_width + layout->gap;
+            float width = layout->items[layout->order[end]].slot_width + layout->gap;
             if (rows_after != 0 && consumed + width * 0.5f > target)
             {
                 break;
@@ -197,8 +202,8 @@ static void reach_stage_split_layout_rows(reach_stage_layout *layout, size_t row
         for (size_t at = begin; at < end; ++at)
         {
             const reach_stage_layout_item *item = &layout->items[layout->order[at]];
-            line->width += item->thumbnail_width;
-            line->height = item->box_height > line->height ? item->box_height : line->height;
+            line->width += item->slot_width;
+            line->height = item->slot_height > line->height ? item->slot_height : line->height;
         }
         begin = end;
     }
@@ -363,7 +368,7 @@ static void reach_stage_place_layout(reach_stage_state *state, reach_stage_layou
         for (size_t at = 0; at < line->count; ++at)
         {
             const reach_stage_layout_item *item = &layout->items[ordered[at]];
-            float anchored = item->anchor.x * area.width - item->thumbnail_width * 0.5f - offset;
+            float anchored = item->anchor.x * area.width - item->slot_width * 0.5f - offset;
             shift_sum[blocks] = reach_stage_pull(slack * 0.5f, anchored, -1.0e9f, 1.0e9f);
             shift_count[blocks] = 1;
             ++blocks;
@@ -374,7 +379,7 @@ static void reach_stage_place_layout(reach_stage_state *state, reach_stage_layou
                 shift_count[blocks - 2] += shift_count[blocks - 1];
                 --blocks;
             }
-            offset += item->thumbnail_width + layout->gap;
+            offset += item->slot_width + layout->gap;
         }
 
         offset = 0.0f;
@@ -387,8 +392,8 @@ static void reach_stage_place_layout(reach_stage_state *state, reach_stage_layou
             {
                 reach_stage_layout_item *item = &layout->items[ordered[at]];
                 reach_stage_tile *tile = &state->tiles[item->tile];
-                tile->target_rect.x = area.x + offset + shift;
-                offset += item->thumbnail_width + layout->gap;
+                tile->target_rect.x = area.x + offset + shift + layout->margin;
+                offset += item->slot_width + layout->gap;
             }
         }
 
@@ -397,12 +402,13 @@ static void reach_stage_place_layout(reach_stage_state *state, reach_stage_layou
             reach_stage_layout_item *item = &layout->items[ordered[member]];
             reach_stage_tile *tile = &state->tiles[item->tile];
 
-            float spare = line->height - item->box_height;
-            float anchored_y = item->anchor.y * area.height - row_top - item->box_height * 0.5f;
+            float spare = line->height - item->slot_height;
+            float anchored_y = item->anchor.y * area.height - row_top - item->slot_height * 0.5f;
             float y = reach_stage_pull(spare * 0.5f, anchored_y, 0.0f, spare);
 
             tile->bar_height = item->bar;
-            tile->target_rect.y = area.y + row_top + y + item->bar + layout->border;
+            tile->target_rect.y =
+                area.y + row_top + y + layout->margin + item->bar + layout->border;
             tile->target_rect.width = item->thumbnail_width;
             tile->target_rect.height = item->thumbnail_height;
         }
@@ -537,6 +543,7 @@ void reach_stage_rebuild_layout(reach_stage *stage)
     layout = {};
     layout.bar_height = reach_stage_tile_bar_height(state);
     layout.border = border_thickness;
+    layout.margin = REACH_STAGE_TILE_MARGIN * dpi_scale;
     layout.gap = REACH_STAGE_TILE_GAP * dpi_scale;
     reach_stage_collect_layout_items(state, dpi_scale, &layout);
     if (layout.count == 0)

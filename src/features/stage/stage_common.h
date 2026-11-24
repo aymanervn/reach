@@ -5,10 +5,14 @@
 
 #include "reach/core/theme.h"
 #include "reach/features/common/pressable.h"
+#include "reach/features/common/selection_pill.h"
 #include "reach/support/motion.h"
 
 #define REACH_STAGE_DESKTOP_ANIMATION_FACTOR 0.35
 #define REACH_STAGE_PRESENCE_MIN_SCALE 0.88f
+// Space the layout keeps around every tile's header and thumbnail, in DP, so the hover pill can
+// surround the tile with an even ring without crowding its neighbours.
+#define REACH_STAGE_TILE_MARGIN 4.0f
 
 static inline float reach_stage_animation_seconds_default(void)
 {
@@ -45,6 +49,10 @@ struct reach_stage
     double sampled_seconds;
     reach_stage_state state;
     reach_motion close_hover;
+    // The shared selection pill behind the hovered tile; it glides between hovered tiles and
+    // fades out when no tile is hovered.
+    reach_selection_pill hover_pill;
+    reach_motion hover_pill_opacity;
     reach_pressable pressable;
     size_t pressable_generation;
 
@@ -81,6 +89,8 @@ double reach_stage_motion_event_seconds(const reach_stage *stage,
 // Samples every track at now and lays tiles out from it, without snapping settled springs.
 void reach_stage_sample_at(reach_stage *stage, double now);
 int32_t reach_stage_compositor_active(const reach_stage *stage);
+// Whether the hover pill is gliding or fading.
+int32_t reach_stage_hover_pill_moving(const reach_stage *stage);
 // Between compositor events the sampled state is stale; every entry point that reads or changes
 // tile geometry brings it to now first.
 void reach_stage_sync_compositor(reach_stage *stage);

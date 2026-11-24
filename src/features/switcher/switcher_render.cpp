@@ -3,6 +3,7 @@
 #include "switcher_common.h"
 
 #include "reach/core/typography.h"
+#include "reach/features/common/selection_pill.h"
 #include "reach/features/common/ui_controls.h"
 
 #include <math.h>
@@ -56,7 +57,7 @@ reach_result reach_switcher_append_render_commands(reach_switcher *switcher,
     if (result != REACH_OK)
         return result;
     float card_scale = layout.card_scale > 0 ? layout.card_scale : scale;
-    float inset = REACH_SWITCHER_SELECTION_INSET * card_scale;
+    float inset = REACH_SELECTION_PILL_INSET * card_scale;
     float body_minimum = 0, body_maximum = 0;
     if (reach_motion_range(&layout.body.width, &body_minimum, &body_maximum) != REACH_OK)
         return REACH_INVALID_ARGUMENT;

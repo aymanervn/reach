@@ -693,7 +693,7 @@ int32_t reach_switcher_arrange(reach_switcher *switcher, const reach_switcher_ar
     target.width =
         fminf(fmaxf(row_width + padding * 2.0f + border * 2.0f, REACH_SWITCHER_MIN_WIDTH * scale),
               ctx->monitor_bounds.width - padding * 2.0f);
-    float bottom_padding = (REACH_SWITCHER_PADDING - REACH_SWITCHER_SELECTION_INSET -
+    float bottom_padding = (REACH_SWITCHER_PADDING - REACH_SELECTION_PILL_INSET -
                             (REACH_SWITCHER_LABEL_HEIGHT - REACH_TEXT_SIZE_MEDIUM)) *
                            scale;
     target.height = height + padding + bottom_padding +
@@ -766,7 +766,7 @@ int32_t reach_switcher_arrange(reach_switcher *switcher, const reach_switcher_ar
                 row_width > 0
                     ? fminf(fmaxf((target.width - (padding + border) * 2) / row_width, 0), 1)
                     : 1;
-            float inset = REACH_SWITCHER_SELECTION_INSET * scale;
+            float inset = REACH_SELECTION_PILL_INSET * scale;
             selection.x = settled_fit * (prefix - row_width * .5f) - inset;
             selection.y = border + padding + height * (1 - settled_fit) * .5f - inset;
             selection.width = widths[index] * settled_fit + inset * 2;

@@ -12,6 +12,9 @@ extern "C"
 {
 #endif
 
+    // Gap between the pill's edge and the selected item it surrounds, in DP.
+    static const float REACH_SELECTION_PILL_INSET = 5.0f;
+
     typedef enum reach_selection_pill_mode
     {
         REACH_SELECTION_PILL_STEP = 0,

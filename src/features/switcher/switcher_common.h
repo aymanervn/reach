@@ -31,7 +31,6 @@ static const float REACH_SWITCHER_MIN_WIDTH = 280.0f;
 static const float REACH_SWITCHER_FALLBACK_ICON_SIZE = 88.0f;
 static const float REACH_SWITCHER_PADDING = 24.0f;
 static const float REACH_SWITCHER_GAP = 24.0f;
-static const float REACH_SWITCHER_SELECTION_INSET = 5.0f;
 static const float REACH_SWITCHER_THUMBNAIL_SCALE = 0.95f;
 static const float REACH_SWITCHER_LABEL_GAP = 12.0f;
 static const float REACH_SWITCHER_LABEL_HEIGHT = 20.0f;

@@ -25,6 +25,7 @@ reach_result reach_stage_create(reach_stage **out_stage)
         reach_motion_set(&motion, 0.0f);
     reach_pressable_init(&stage->pressable);
     reach_motion_set(&stage->close_hover, 0.0f);
+    reach_motion_set(&stage->hover_pill_opacity, 0.0f);
     *out_stage = stage;
     return REACH_OK;
 }
@@ -162,6 +163,7 @@ reach_result reach_stage_open(reach_stage *stage, reach_rect_f32 monitor_bounds,
     reach_motion_set(&stage->motions[REACH_STAGE_ANIMATION_REFLOW], 1.0f);
     reach_motion_set(&stage->motions[REACH_STAGE_ANIMATION_DEPARTURE], 1.0f);
     reach_motion_set(&stage->close_hover, 0.0f);
+    reach_motion_set(&stage->hover_pill_opacity, 0.0f);
     reach_motion_set(&stage->motions[REACH_STAGE_ANIMATION_RETARGET], 0.0f);
 
     reach_stage_rebuild_layout(stage);
@@ -449,6 +451,7 @@ void reach_stage_force_close(reach_stage *stage)
     reach_motion_set(&stage->motions[REACH_STAGE_ANIMATION_REFLOW], 0.0f);
     reach_motion_set(&stage->motions[REACH_STAGE_ANIMATION_DEPARTURE], 0.0f);
     reach_motion_set(&stage->close_hover, 0.0f);
+    reach_motion_set(&stage->hover_pill_opacity, 0.0f);
     reach_motion_set(&stage->motions[REACH_STAGE_ANIMATION_RETARGET], 0.0f);
 }
 
@@ -947,6 +950,11 @@ static int32_t reach_stage_capsule_needs_frame(const void *capsule)
     }
     int32_t compositor = reach_stage_compositor_active(stage) && !stage->compositor_sampled;
     if (!compositor && reach_stage_animation_active(stage))
+    {
+        return 1;
+    }
+    // Compositor motion plays the hover pill itself; the sampled paths redraw it every frame.
+    if (!compositor && reach_stage_hover_pill_moving(stage))
     {
         return 1;
     }

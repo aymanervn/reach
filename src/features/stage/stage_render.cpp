@@ -25,10 +25,9 @@ static float reach_stage_scaled(const reach_stage_render_context *ctx, float val
 
 static reach_result reach_stage_push_tile_background(const reach_stage_render_context *ctx,
                                                      reach_render_command_buffer *commands,
-                                                     reach_rect_f32 item, float width,
-                                                     int32_t hovered, float alpha)
+                                                     reach_rect_f32 item, float alpha)
 {
-    if (ctx == nullptr || commands == nullptr || width <= 0.0f)
+    if (ctx == nullptr || commands == nullptr)
     {
         return REACH_OK;
     }
@@ -37,19 +36,9 @@ static reach_result reach_stage_push_tile_background(const reach_stage_render_co
     background.a = 1.0f;
     reach_render_command shape = {};
     shape.type = REACH_RENDER_COMMAND_RECT;
-    if (!hovered)
-    {
-        shape.rect = reach_render_pixel_aligned_rect(item);
-        shape.color = reach_theme_color_alpha(background, alpha);
-        return reach_render_command_buffer_push(commands, &shape);
-    }
-
-    width *= 2.0f;
-    shape.rect = {item.x - width, item.y - width, item.width + width * 2.0f,
-                  item.height + width * 2.0f};
-    reach_color border = reach_theme_color_mix(background, ctx->theme->accent.text, alpha);
-    return reach_render_push_bordered_background(commands, &shape, background, border, width,
-                                                 nullptr, ctx->dpi_scale);
+    shape.rect = reach_render_pixel_aligned_rect(item);
+    shape.color = reach_theme_color_alpha(background, alpha);
+    return reach_render_command_buffer_push(commands, &shape);
 }
 
 static reach_result reach_stage_push_tile_placeholder(const reach_stage_render_context *ctx,
@@ -227,15 +216,17 @@ enum
     REACH_STAGE_GROUP_CLOSE_GLYPH,
     REACH_STAGE_GROUP_PLACEHOLDER,
     REACH_STAGE_GROUP_PLACEHOLDER_ICON,
-    REACH_STAGE_GROUP_THUMBNAIL
+    REACH_STAGE_GROUP_THUMBNAIL,
+    REACH_STAGE_GROUP_HOVER_PILL
 };
 
 // Worst case one tile adds on the compositor path: a closing tile draws background, header, label,
 // placeholder plate, placeholder icon and thumbnail. The hovered tile's close button adds two tint
-// groups and its border one command; the desktop tile's backdrop and thumbnail fit in its share.
+// groups, and the hover pill two groups and one command; the desktop tile's backdrop and thumbnail
+// fit in its share.
 #define REACH_STAGE_COMPOSITOR_TILE_GROUPS 6
 #define REACH_STAGE_COMPOSITOR_TILE_COMMANDS 6
-static_assert(REACH_STAGE_MAX_TILES * REACH_STAGE_COMPOSITOR_TILE_GROUPS + 2 <=
+static_assert(REACH_STAGE_MAX_TILES * REACH_STAGE_COMPOSITOR_TILE_GROUPS + 4 <=
                   REACH_MAX_RENDER_GROUPS,
               "every tracked window fits the render group budget on the compositor path");
 static_assert(REACH_STAGE_MAX_TILES * REACH_STAGE_COMPOSITOR_TILE_COMMANDS + 1 <=
@@ -439,37 +430,11 @@ reach_stage_push_compositor_chrome(reach_stage *stage, const reach_stage_render_
     shape.type = REACH_RENDER_COMMAND_RECT;
     shape.rect = base;
     shape.color = background;
-    reach_result result = REACH_OK;
-    uint64_t background_id = reach_stage_group_id(REACH_STAGE_GROUP_BACKGROUND, tile->window);
-    if (state->has_hover && state->hover_index == index)
-    {
-        // reach_stage_push_tile_background draws the hover border outside the item.
-        float border = reach_theme_border_thickness(theme, ctx->dpi_scale) * 2.0f;
-        reach_rect_motion outer = {reach_motion_affine(&item.x, 1.0f, -border),
-                                   reach_motion_affine(&item.y, 1.0f, -border),
-                                   reach_motion_affine(&item.width, 1.0f, border * 2.0f),
-                                   reach_motion_affine(&item.height, 1.0f, border * 2.0f)};
-        reach_rect_f32 outer_base = {0.0f, 0.0f, base.width + border * 2.0f,
-                                     base.height + border * 2.0f};
-        reach_render_group group =
-            reach_stage_scaled_group(background_id, &outer, outer_base, &motion->alpha);
-        result = reach_render_command_buffer_begin_group(commands, &group);
-        if (result != REACH_OK)
-            return result;
-        shape.rect = outer_base;
-        reach_color border_color = reach_theme_color_mix(
-            background, theme->accent.text, reach_motion_value_at(&motion->alpha, now));
-        result = reach_render_push_bordered_background(commands, &shape, background, border_color,
-                                                       border, nullptr, ctx->dpi_scale);
-        reach_render_command_buffer_end_group(commands);
-    }
-    else
-    {
-        shape.rect = reach_stage_fill_base;
-        reach_render_group group =
-            reach_stage_scaled_group(background_id, &item, reach_stage_fill_base, &motion->alpha);
-        result = reach_stage_push_grouped(commands, &group, &shape);
-    }
+    shape.rect = reach_stage_fill_base;
+    reach_render_group background_group =
+        reach_stage_scaled_group(reach_stage_group_id(REACH_STAGE_GROUP_BACKGROUND, tile->window),
+                                 &item, reach_stage_fill_base, &motion->alpha);
+    reach_result result = reach_stage_push_grouped(commands, &background_group, &shape);
     if (result != REACH_OK)
         return result;
 
@@ -560,6 +525,117 @@ int32_t reach_stage_compositor_active(const reach_stage *stage)
     return stage != nullptr && stage->compositor_motion;
 }
 
+// Retargets the hover pill at the hovered tile's resting rect, in surface coordinates. The pill
+// shows only while Stage rests open, so it never trails tiles that open or close. Returns 0 when
+// it has nothing to draw.
+static int32_t reach_stage_update_hover_pill(reach_stage *stage,
+                                             const reach_stage_render_context *ctx, double now)
+{
+    const reach_stage_state *state = &stage->state;
+    if (state->closing)
+    {
+        reach_motion_set(&stage->hover_pill_opacity, 0.0f);
+        return 0;
+    }
+
+    int32_t resting = !reach_stage_track_active(stage, REACH_STAGE_ANIMATION_PROGRESS) &&
+                      !reach_stage_track_active(stage, REACH_STAGE_ANIMATION_DESKTOP_PROGRESS);
+    const reach_stage_tile *tile =
+        resting && state->has_hover && state->hover_index < state->tile_count
+            ? &state->tiles[state->hover_index]
+            : nullptr;
+    if (tile != nullptr && (tile->desktop || tile->departing))
+        tile = nullptr;
+
+    if (tile != nullptr)
+    {
+        // The pill surrounds the tile's header and thumbnail with an even ring: the margin the
+        // layout keeps around every tile plus the shared pill inset.
+        float inset = (REACH_STAGE_TILE_MARGIN + REACH_SELECTION_PILL_INSET) * ctx->dpi_scale;
+        reach_rect_f32 target = {tile->target_rect.x - ctx->bounds.x - inset,
+                                 tile->target_rect.y - tile->bar_height - ctx->bounds.y - inset,
+                                 tile->target_rect.width + inset * 2.0f,
+                                 tile->target_rect.height + tile->bar_height + inset * 2.0f};
+        // The pointer moves continuously, so a newly hovered tile is always a neighbour: step to
+        // it while the pill shows, and appear in place when it was hidden.
+        int32_t shown = stage->hover_pill_opacity.to > 0.0f ||
+                        reach_motion_value_at(&stage->hover_pill_opacity, now) > 0.0f;
+        reach_selection_pill_retarget(&stage->hover_pill, ctx->theme, target, state->hover_index,
+                                      shown ? REACH_SELECTION_PILL_STEP : REACH_SELECTION_PILL_SET,
+                                      now);
+        if (stage->hover_pill_opacity.to != 1.0f)
+            reach_motion_animate_spec_to_at(&stage->hover_pill_opacity, 1.0f,
+                                            reach_stage_motion_preset(REACH_MOTION_PRESET_FADE_IN),
+                                            now);
+    }
+    else if (stage->hover_pill_opacity.to != 0.0f)
+    {
+        reach_motion_animate_spec_to_at(&stage->hover_pill_opacity, 0.0f,
+                                        reach_stage_motion_preset(REACH_MOTION_PRESET_FADE_OUT),
+                                        now);
+    }
+    return stage->hover_pill_opacity.to > 0.0f ||
+           reach_motion_value_at(&stage->hover_pill_opacity, now) > 0.0f;
+}
+
+static float reach_stage_hover_pill_radius(const reach_stage *stage,
+                                           const reach_stage_render_context *ctx)
+{
+    float width = 0.0f, height = 0.0f, unused = 0.0f;
+    (void)reach_motion_range(&stage->hover_pill.rect.width, &width, &unused);
+    (void)reach_motion_range(&stage->hover_pill.rect.height, &height, &unused);
+    return fminf(ctx->theme->radius_small * ctx->dpi_scale,
+                 fmaxf(0.0f, fminf(width, height) * 0.5f));
+}
+
+static reach_result reach_stage_push_compositor_hover_pill(reach_stage *stage,
+                                                           const reach_stage_render_context *ctx,
+                                                           double now,
+                                                           reach_render_command_buffer *commands)
+{
+    if (!reach_stage_update_hover_pill(stage, ctx, now))
+        return REACH_OK;
+    float width = 0.0f, height = 0.0f, unused = 0.0f;
+    if (reach_motion_range(&stage->hover_pill.rect.width, &unused, &width) != REACH_OK ||
+        reach_motion_range(&stage->hover_pill.rect.height, &unused, &height) != REACH_OK)
+        return REACH_OK;
+    reach_render_group pill = {};
+    pill.id = reach_stage_group_id(REACH_STAGE_GROUP_HOVER_PILL, 0);
+    pill.bounds = {0.0f, 0.0f, fmaxf(1.0f, ceilf(width)), fmaxf(1.0f, ceilf(height))};
+    pill.opacity = reach_motion_clamp(&stage->hover_pill_opacity, 0.0f, 1.0f);
+    return reach_render_push_rect_motion(commands, &pill, &stage->hover_pill.rect,
+                                         reach_stage_hover_pill_radius(stage, ctx),
+                                         ctx->theme->accent.fill);
+}
+
+// Without compositor motion the pill is drawn at its current sample, and Stage keeps frames
+// running while it moves (reach_stage_hover_pill_moving).
+static reach_result reach_stage_push_sampled_hover_pill(reach_stage *stage,
+                                                        const reach_stage_render_context *ctx,
+                                                        reach_render_command_buffer *commands)
+{
+    double now = reach_motion_now_seconds();
+    if (!reach_stage_update_hover_pill(stage, ctx, now))
+        return REACH_OK;
+    float opacity =
+        fminf(1.0f, fmaxf(0.0f, reach_motion_value_at(&stage->hover_pill_opacity, now)));
+    reach_render_command pill = {};
+    pill.type = REACH_RENDER_COMMAND_RECT;
+    pill.rect = reach_rect_motion_value_at(&stage->hover_pill.rect, now);
+    pill.radius = reach_stage_hover_pill_radius(stage, ctx);
+    pill.color =
+        reach_theme_color_alpha(ctx->theme->accent.fill, ctx->theme->accent.fill.a * opacity);
+    return opacity > 0.0f ? reach_render_command_buffer_push(commands, &pill) : REACH_OK;
+}
+
+int32_t reach_stage_hover_pill_moving(const reach_stage *stage)
+{
+    const reach_rect_motion *rect = &stage->hover_pill.rect;
+    return reach_motion_active(&stage->hover_pill_opacity) || reach_motion_active(&rect->x) ||
+           reach_motion_active(&rect->y) || reach_motion_active(&rect->width) ||
+           reach_motion_active(&rect->height);
+}
+
 // Every tile at this moment's sample, as constant motions: the CPU state presented as it is.
 static void reach_stage_sampled_motions(const reach_stage *stage, reach_stage_tile_motion *motions)
 {
@@ -607,6 +683,9 @@ static reach_result reach_stage_push_compositor_scene(reach_stage *stage,
         if (result == REACH_OK)
             result = reach_stage_push_compositor_thumbnail(ctx, tile, &motions[index], commands);
     }
+    // The pill sits behind every tile's chrome, so only its inset ring shows around the tile.
+    if (result == REACH_OK)
+        result = reach_stage_push_compositor_hover_pill(stage, ctx, now, commands);
     for (size_t pass = 0; pass < 4 && result == REACH_OK; ++pass)
     {
         // Passes 0-1 draw tile chrome and 2-3 the thumbnails above all of it, each with the
@@ -689,7 +768,11 @@ reach_result reach_stage_append_render_commands(reach_stage *stage,
 
     float eased = state->progress;
 
-    float border = reach_theme_border_thickness(ctx->theme, ctx->dpi_scale);
+    reach_result pill_result = reach_stage_push_sampled_hover_pill(stage, ctx, out_commands);
+    if (pill_result != REACH_OK)
+    {
+        return pill_result;
+    }
     for (size_t pass = 0; pass < 2; ++pass)
     {
         for (size_t index = 0; index < state->tile_count; ++index)
@@ -725,9 +808,7 @@ reach_result reach_stage_append_render_commands(reach_stage *stage,
             reach_rect_f32 item = rect;
             item.y -= tile->current_bar.height;
             item.height += tile->current_bar.height;
-            int32_t hovered = state->has_hover && state->hover_index == index;
-            reach_result result =
-                reach_stage_push_tile_background(ctx, out_commands, item, border, hovered, alpha);
+            reach_result result = reach_stage_push_tile_background(ctx, out_commands, item, alpha);
             if (result != REACH_OK)
             {
                 return result;
