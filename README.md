@@ -63,7 +63,7 @@ Run as admin:
 ./reachctl --install
 ```
 
-This configures Windows to launch Reach instead of Explorer. Sign out and back in to start Reach.
+This configures Windows to launch Reach instead of Explorer. Sign out and back in to start Reach, or, if Explorer is already closed, just open `reach.exe`.
 
 You also need the retriever service installed and running to use the launcher feature.
 

@@ -192,3 +192,47 @@ reach_result reach_windows_shell_launch_explorer(void)
 
     return ShellExecuteExW(&info) ? REACH_OK : REACH_ERROR;
 }
+
+int32_t reach_windows_other_shell_running(void)
+{
+    HWND shell = GetShellWindow();
+    if (shell == nullptr)
+    {
+        return 0;
+    }
+
+    DWORD process_id = 0;
+    GetWindowThreadProcessId(shell, &process_id);
+    HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, process_id);
+    if (process == nullptr)
+    {
+        return 1;
+    }
+
+    wchar_t path[MAX_PATH] = {};
+    DWORD length = MAX_PATH;
+    BOOL ok = QueryFullProcessImageNameW(process, 0, path, &length);
+    CloseHandle(process);
+    if (!ok)
+    {
+        return 1;
+    }
+
+    const wchar_t *name = wcsrchr(path, L'\\');
+    return !reach_shell_equals(name != nullptr ? name + 1 : path, L"reach.exe");
+}
+
+int32_t reach_windows_process_elevated(void)
+{
+    HANDLE token = nullptr;
+    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token))
+    {
+        return 0;
+    }
+
+    TOKEN_ELEVATION elevation = {};
+    DWORD size = sizeof(elevation);
+    BOOL ok = GetTokenInformation(token, TokenElevation, &elevation, sizeof(elevation), &size);
+    CloseHandle(token);
+    return ok && elevation.TokenIsElevated;
+}

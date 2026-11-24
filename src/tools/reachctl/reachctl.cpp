@@ -3,6 +3,8 @@
 #include "reachctl_service.h"
 #include "reachctl_session_commands.h"
 
+#include "reach/platform/shell_registration.h"
+
 #include <windows.h>
 
 int wmain(int argc, wchar_t **argv)
@@ -18,7 +20,7 @@ int wmain(int argc, wchar_t **argv)
     {
         if (lstrcmpiW(argv[index], L"--install") == 0)
         {
-            if (!reachctl_is_process_elevated())
+            if (!reach_windows_process_elevated())
             {
                 reachctl_print(L"Reach install requires Administrator privileges to "
                                L"create the reach service scheduled task. "
@@ -30,10 +32,10 @@ int wmain(int argc, wchar_t **argv)
             reach_result shell_result = reachctl_install_reach_shell(reach_exe);
             reach_result helper_result = reachctl_install_service(nullptr);
             int ok = shell_result == REACH_OK && helper_result == REACH_OK;
-            reachctl_print(ok ? L"Reach installed. Shell registry, reach service task, and "
-                                L"Explorer context menus configured. If Reach is not running "
-                                L"yet, sign out and back in to start it."
-                              : L"Reach install failed.");
+            reachctl_print(!ok ? L"Reach install failed."
+                           : reach_windows_other_shell_running()
+                               ? L"Reach installed. Sign out and back in to start it."
+                               : L"Reach installed. Open reach.exe to start it.");
             return ok ? 0 : 1;
         }
 
@@ -46,10 +48,17 @@ int wmain(int argc, wchar_t **argv)
                 return 1;
             }
 
-            if (reachctl_other_shell_running())
+            if (reach_windows_other_shell_running())
             {
                 reachctl_print(L"Another shell is running in this session. Sign out and back in "
                                L"to start Reach.");
+                return 1;
+            }
+
+            if (!reachctl_reach_is_running() && reach_windows_process_elevated())
+            {
+                reachctl_print(L"Run reachctl --start from a terminal without administrator "
+                               L"rights so Reach does not run elevated.");
                 return 1;
             }
 
@@ -63,7 +72,7 @@ int wmain(int argc, wchar_t **argv)
 
         if (lstrcmpiW(argv[index], L"--install-service") == 0)
         {
-            if (!reachctl_is_process_elevated())
+            if (!reach_windows_process_elevated())
             {
                 reachctl_print(L"Reach service repair requires Administrator privileges.");
                 return 1;
@@ -81,7 +90,7 @@ int wmain(int argc, wchar_t **argv)
 
         if (lstrcmpiW(argv[index], L"--reset") == 0)
         {
-            if (!reachctl_is_process_elevated())
+            if (!reach_windows_process_elevated())
             {
                 reachctl_print(L"Reach reset requires Administrator privileges to "
                                L"remove the reach service scheduled task. "

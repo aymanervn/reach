@@ -14,6 +14,8 @@
 #include <shellapi.h>
 #include <cwchar>
 
+static const DWORD REACHCTL_RESTART_GRACE_MS = 2500;
+
 struct reachctl_monitor_list_state
 {
     size_t index;
@@ -275,14 +277,21 @@ int32_t reachctl_reach_is_running(void)
     return reachctl_process_running(L"reach.exe");
 }
 
-int32_t reachctl_other_shell_running(void)
-{
-    return !reachctl_reach_is_running() && GetShellWindow() != nullptr;
-}
-
 // Windows restarts the session shell with the command it read at logon, so ending a running Reach
 // is the whole restart. With no shell at all, the Reach started here claims the shell window and
 // Windows supervises it from then on.
+static reach_result reachctl_launch_reach(const uint16_t *reach_exe)
+{
+    wchar_t install_dir[MAX_PATH] = {};
+    if (wcscpy_s(install_dir, reinterpret_cast<const wchar_t *>(reach_exe)) != 0 ||
+        !PathRemoveFileSpecW(install_dir))
+    {
+        return REACH_ERROR;
+    }
+    return reachctl_start_process(reinterpret_cast<const wchar_t *>(reach_exe), L"--launch",
+                                  install_dir);
+}
+
 reach_result reachctl_start_reach_session(const uint16_t *reach_exe)
 {
     reach_result work_area_result = REACH_OK;
@@ -291,20 +300,18 @@ reach_result reachctl_start_reach_session(const uint16_t *reach_exe)
         work_area_result = reachctl_reset_monitor_work_areas();
     }
 
-    reach_result start_result = REACH_ERROR;
+    reach_result start_result = REACH_OK;
     if (reachctl_reach_is_running())
     {
         start_result = reachctl_terminate_processes_by_name(L"reach.exe");
+        // Windows restarts a supervised shell within about a second, but not every Reach is
+        // supervised (one started by hand may not be), so start it if no successor appeared.
+        Sleep(REACHCTL_RESTART_GRACE_MS);
     }
-    else
+    if (start_result == REACH_OK && !reachctl_reach_is_running())
     {
-        wchar_t install_dir[MAX_PATH] = {};
-        if (wcscpy_s(install_dir, reinterpret_cast<const wchar_t *>(reach_exe)) == 0 &&
-            PathRemoveFileSpecW(install_dir))
-        {
-            start_result = reachctl_start_process(reinterpret_cast<const wchar_t *>(reach_exe),
-                                                  L"--launch", install_dir);
-        }
+        start_result =
+            reach_windows_process_elevated() ? REACH_ERROR : reachctl_launch_reach(reach_exe);
     }
     return work_area_result == REACH_OK && start_result == REACH_OK ? REACH_OK : REACH_ERROR;
 }
@@ -336,22 +343,6 @@ reach_result reachctl_list_monitors(void)
     BOOL ok = EnumDisplayMonitors(nullptr, nullptr, reachctl_print_monitor_proc,
                                   reinterpret_cast<LPARAM>(&state));
     return ok && state.index > 0 ? REACH_OK : REACH_ERROR;
-}
-
-int32_t reachctl_is_process_elevated(void)
-{
-    HANDLE token = nullptr;
-    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token))
-    {
-        return 0;
-    }
-
-    TOKEN_ELEVATION elevation = {};
-    DWORD size = sizeof(elevation);
-    BOOL ok = GetTokenInformation(token, TokenElevation, &elevation, sizeof(elevation), &size);
-
-    CloseHandle(token);
-    return ok && elevation.TokenIsElevated;
 }
 
 int32_t reachctl_is_reach_installed(void)
@@ -411,7 +402,7 @@ reach_result reachctl_install_reach_shell(const uint16_t *reach_exe)
         return REACH_INVALID_ARGUMENT;
     }
 
-    if (!reachctl_is_process_elevated())
+    if (!reach_windows_process_elevated())
     {
         return REACH_ERROR;
     }

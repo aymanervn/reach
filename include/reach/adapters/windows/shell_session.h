@@ -17,6 +17,10 @@ extern "C"
     // Persists this start and reports whether the recent starts form a crash loop.
     int32_t reach_windows_shell_session_record_start(void);
 
+    // A run that survives 10 s proves the version starts, so the start history is cleared and only
+    // consecutive short-lived runs count toward a crash loop.
+    void reach_windows_shell_session_start_health_timer(void);
+
     // Registers a placeholder shell window so this process is the one Windows supervises.
     reach_result reach_windows_shell_session_claim(void);
 

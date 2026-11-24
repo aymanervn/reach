@@ -880,6 +880,7 @@ target_link_libraries(reach_shell_registration_tests PRIVATE
     reach_support
     advapi32
     shell32
+    user32
 )
 
 add_executable(reach_now_playing_animation_tests

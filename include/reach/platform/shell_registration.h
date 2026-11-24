@@ -23,6 +23,9 @@ extern "C"
     reach_windows_shell_query_current_user(const uint16_t *exe_path,
                                            reach_shell_registration_status *out_status);
     reach_result reach_windows_shell_launch_explorer(void);
+    // A shell window exists and belongs to a process other than reach.exe, such as Explorer.
+    int32_t reach_windows_other_shell_running(void);
+    int32_t reach_windows_process_elevated(void);
     reach_result reach_windows_shell_install_command_current_user(const uint16_t *identity_exe_path,
                                                                   const uint16_t *shell_command);
 

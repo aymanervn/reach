@@ -1,6 +1,7 @@
 #include <windows.h>
 #include <objbase.h>
 #include <shellapi.h>
+#include <tlhelp32.h>
 #include <stdio.h>
 
 #include "reach/composition/composition_root.h"
@@ -11,6 +12,7 @@
 #include "reach/adapters/windows/frame_wait.h"
 #include "reach/adapters/windows/install_check.h"
 #include "reach/adapters/windows/shell_session.h"
+#include "reach/platform/shell_registration.h"
 #include "reach/protocol/reach_service_protocol.h"
 #include "reach/support/util.h"
 
@@ -35,6 +37,30 @@ static int32_t reach_arg_present(int argc, wchar_t **argv, const wchar_t *arg)
     }
 
     return 0;
+}
+
+static DWORD reach_parent_process_id(void)
+{
+    HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (snapshot == INVALID_HANDLE_VALUE)
+    {
+        return 0;
+    }
+
+    DWORD self = GetCurrentProcessId();
+    DWORD parent = 0;
+    PROCESSENTRY32W entry = {};
+    entry.dwSize = sizeof(entry);
+    for (BOOL more = Process32FirstW(snapshot, &entry); more && parent == 0;
+         more = Process32NextW(snapshot, &entry))
+    {
+        if (entry.th32ProcessID == self)
+        {
+            parent = entry.th32ParentProcessID;
+        }
+    }
+    CloseHandle(snapshot);
+    return parent;
 }
 
 // reachService keeps a handle to this mutex and briefly owns it while it notices the previous
@@ -70,31 +96,42 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
 
     int argc = 0;
     wchar_t **argv = CommandLineToArgvW(GetCommandLineW(), &argc);
-    int32_t launch_allowed = argv != nullptr && reach_arg_present(argc, argv, REACH_LAUNCH_ARG);
+    int32_t launched_as_shell = argv != nullptr && reach_arg_present(argc, argv, REACH_LAUNCH_ARG);
     if (argv != nullptr)
     {
         LocalFree(argv);
     }
 
-    if (!launch_allowed)
+    if (!reach_windows_reach_is_installed())
     {
+        reach_log_info("launch refused reason=not_installed exit=0");
         MessageBoxW(nullptr,
-                    L"Reach cannot be launched directly. Run reachctl --install, then sign "
-                    L"out and back in.",
+                    L"Reach is not installed. Run reachctl --install as administrator first.",
                     L"Reach", MB_OK | MB_ICONINFORMATION);
         return 0;
     }
 
-    if (!reach_windows_reach_is_installed())
+    // Opened by hand rather than by Windows as the session shell: start only when no other
+    // shell owns the session, and never elevated, since every app Reach launches would be too.
+    if (!launched_as_shell && reach_windows_other_shell_running())
     {
-        reach_log_info("launch refused reason=not_installed exit=0");
-        MessageBoxW(nullptr, L"Please install Reach first.", L"Reach", MB_OK | MB_ICONINFORMATION);
+        reach_log_info("launch refused reason=other_shell exit=0");
+        MessageBoxW(nullptr, L"Another shell is running. Sign out and back in to start Reach.",
+                    L"Reach", MB_OK | MB_ICONINFORMATION);
+        return 0;
+    }
+    if (!launched_as_shell && reach_windows_process_elevated())
+    {
+        reach_log_info("launch refused reason=elevated exit=0");
+        MessageBoxW(nullptr, L"Open Reach without administrator rights.", L"Reach",
+                    MB_OK | MB_ICONINFORMATION);
         return 0;
     }
 
     HANDLE instance_mutex = reach_acquire_instance_mutex();
     if (instance_mutex == nullptr)
     {
+        reach_log_info("start skipped reason=instance_running exit=0");
         return 0;
     }
 
@@ -107,7 +144,13 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
         return 0;
     }
 
-    (void)reach_windows_shell_session_claim();
+    reach_result claim = reach_windows_shell_session_claim();
+    reach_windows_shell_session_start_health_timer();
+    char start_line[96] = {};
+    snprintf(start_line, sizeof(start_line), "start parent=%lu as_shell=%d claim=%s",
+             (unsigned long)reach_parent_process_id(), launched_as_shell,
+             claim == REACH_OK ? "ok" : "failed");
+    reach_log_info(start_line);
     reach_crash_dump_prune();
 
     reach_workload_session workload("reach");

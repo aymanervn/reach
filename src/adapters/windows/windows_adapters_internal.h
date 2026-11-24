@@ -174,6 +174,9 @@ extern "C"
                                            reach_shell_registration_status *out_status);
     int32_t reach_windows_shell_value_is_reach(const uint16_t *shell, const uint16_t *exe_path);
     reach_result reach_windows_shell_launch_explorer(void);
+    // A shell window exists and belongs to a process other than reach.exe, such as Explorer.
+    int32_t reach_windows_other_shell_running(void);
+    int32_t reach_windows_process_elevated(void);
 
     // A minimized window's outer rectangle and visible frame as they will be once restored, in
     // physical screen pixels. Returns 0 when the window is not minimized or the bounds are unknown.

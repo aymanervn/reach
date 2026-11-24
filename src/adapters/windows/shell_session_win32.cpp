@@ -19,6 +19,7 @@ static const UINT REACH_SHELL_SESSION_NOTICE_MESSAGE = WM_APP + 1;
 static const UINT REACH_SHELL_SESSION_NOTICE_ICON_ID = 1;
 static const UINT_PTR REACH_SHELL_SESSION_NOTICE_TIMER_ID = 1;
 static const UINT REACH_SHELL_SESSION_NOTICE_BOUND_MS = 120000;
+static const DWORD REACH_SHELL_SESSION_HEALTHY_MS = 10000;
 
 static HANDLE reach_shell_session_claim_thread = nullptr;
 static DWORD reach_shell_session_claim_thread_id = 0;
@@ -137,6 +138,34 @@ reach_result reach_windows_shell_session_claim(void)
         reach_log_error("shell window claim failed; Windows will not restart this Reach");
     }
     return result;
+}
+
+static DWORD WINAPI reach_shell_session_health_proc(void *)
+{
+    Sleep(REACH_SHELL_SESSION_HEALTHY_MS);
+    wchar_t path[MAX_PATH] = {};
+    if (reach_shell_session_history_path(path))
+    {
+        HANDLE file = CreateFileW(path, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
+                                  FILE_ATTRIBUTE_NORMAL, nullptr);
+        if (file != INVALID_HANDLE_VALUE)
+        {
+            reach_crash_loop cleared = {};
+            DWORD written = 0;
+            WriteFile(file, &cleared, sizeof(cleared), &written, nullptr);
+            CloseHandle(file);
+        }
+    }
+    return 0;
+}
+
+void reach_windows_shell_session_start_health_timer(void)
+{
+    HANDLE thread = CreateThread(nullptr, 0, reach_shell_session_health_proc, nullptr, 0, nullptr);
+    if (thread != nullptr)
+    {
+        CloseHandle(thread);
+    }
 }
 
 reach_result reach_windows_shell_session_register(void *hwnd)
