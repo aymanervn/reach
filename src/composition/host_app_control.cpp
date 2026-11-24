@@ -493,6 +493,22 @@ static uintptr_t reach_host_find_open_app_window(reach_host *host, const uint16_
     return 0;
 }
 
+static void reach_host_refresh_window_manager(reach_host *host)
+{
+    if (host->window_manager.ops.refresh != nullptr)
+    {
+        (void)host->window_manager.ops.refresh(host->window_manager.manager);
+        (void)reach_host_refresh_open_windows(host, nullptr);
+    }
+}
+
+int32_t reach_host_window_toggle_minimizes(reach_host *host, uintptr_t window_id)
+{
+    reach_host_refresh_window_manager(host);
+    return reach_window_tracking_window_is_foreground(host->window_tracking, window_id) &&
+           !reach_host_window_is_minimized(host, window_id);
+}
+
 reach_result reach_host_focus_window(reach_host *host, uintptr_t window_id,
                                      int32_t minimize_if_foreground)
 {
@@ -506,16 +522,18 @@ reach_result reach_host_focus_window(reach_host *host, uintptr_t window_id,
         return REACH_OK;
     }
 
-    if (host->window_manager.ops.refresh != nullptr)
+    int32_t minimize = 0;
+    if (minimize_if_foreground)
     {
-        (void)host->window_manager.ops.refresh(host->window_manager.manager);
-        (void)reach_host_refresh_open_windows(host, nullptr);
+        minimize = reach_host_window_toggle_minimizes(host, window_id);
+    }
+    else
+    {
+        reach_host_refresh_window_manager(host);
     }
 
     reach_result result = REACH_OK;
-    if (minimize_if_foreground &&
-        reach_window_tracking_window_is_foreground(host->window_tracking, window_id) &&
-        !reach_host_window_is_minimized(host, window_id))
+    if (minimize)
     {
         result = reach_host_schedule_window_control(host, REACH_WINDOW_CONTROL_MINIMIZE, window_id,
                                                     nullptr);

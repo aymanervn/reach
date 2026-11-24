@@ -929,6 +929,9 @@ reach_result reach_host_pin_feature_target(reach_host *host, const reach_feature
 
 reach_result reach_host_focus_window(reach_host *host, uintptr_t window_id,
                                      int32_t minimize_if_foreground);
+// Whether toggling the window's focus minimizes it (it is the unminimized foreground window).
+// Refreshes the window world first.
+int32_t reach_host_window_toggle_minimizes(reach_host *host, uintptr_t window_id);
 reach_result reach_host_launch_app(reach_host *host, const uint16_t *path,
                                    const uint16_t *arguments, const uint16_t *app_user_model_id,
                                    reach_application_launch_kind launch_kind,

@@ -32,6 +32,23 @@ static void reach_host_arm_close_handoff(reach_host *host, reach_feature_runtime
     }
 }
 
+static reach_feature_runtime *reach_host_open_close_handoff_surface(reach_host *host)
+{
+    for (size_t index = 0; index < host->surface_count; ++index)
+    {
+        reach_feature_runtime *runtime = &host->feature_runtimes[index];
+        const reach_feature_capsule_ops *ops = runtime->definition->capsule_ops;
+        // A surface without is_open counts as always open, so it never qualifies here.
+        if (runtime->surface != nullptr && ops != nullptr &&
+            ops->set_close_handoff_pending != nullptr && ops->is_open != nullptr &&
+            ops->is_open(runtime->capsule))
+        {
+            return runtime;
+        }
+    }
+    return nullptr;
+}
+
 reach_result reach_host_apply_feature_action(reach_host *host, reach_feature_runtime *desc,
                                              const reach_capsule_action *action)
 {
@@ -69,6 +86,23 @@ reach_result reach_host_apply_feature_action(reach_host *host, reach_feature_run
 
     case REACH_FEATURE_ACTION_TOGGLE_WINDOW_FOCUS:
     {
+        // An open surface that holds its close for an activation hands the window off
+        // exactly as its own activation does, so the window stays covered until it lands.
+        reach_feature_runtime *handoff = reach_host_open_close_handoff_surface(host);
+        if (handoff != nullptr && action->window != 0 &&
+            !reach_host_window_toggle_minimizes(host, action->window))
+        {
+            reach_capsule_action activate = {};
+            activate.kind = REACH_FEATURE_ACTION_ACTIVATE_WINDOW;
+            activate.flags = REACH_FEATURE_ACTION_FLAG_CLOSE_HANDOFF;
+            activate.window = action->window;
+            reach_result activate_result =
+                reach_host_apply_feature_action(host, handoff, &activate);
+            if (activate_result == REACH_OK)
+                reach_host_close_transient_surfaces(host, 0);
+            reach_host_invalidate_surface_content(host, REACH_SURFACE_REDRAW_ACTIVATION_REQUESTED);
+            return activate_result;
+        }
         // Like opening a target, restoring or minimizing an app closes transient surfaces so the
         // app never animates over them.
         reach_result focus_result = reach_host_focus_window(host, action->window, 1);
