@@ -113,7 +113,7 @@ reach_result reach_stage_open(reach_stage *stage, reach_rect_f32 monitor_bounds,
         tile->icon_id = windows[index].icon_id;
         tile->minimized = windows[index].minimized;
         tile->desktop = windows[index].desktop;
-        tile->monitor_index = windows[index].monitor_index;
+        tile->anchor = windows[index].anchor;
         tile->monitor_portrait = windows[index].monitor_portrait;
         tile->presence = 1.0f;
         tile->presence_from = 1.0f;
@@ -632,7 +632,7 @@ int32_t reach_stage_update_windows(reach_stage *stage, const reach_stage_open_wi
         tile->icon_id = windows[candidate].icon_id;
         tile->minimized = windows[candidate].minimized;
         tile->desktop = windows[candidate].desktop;
-        tile->monitor_index = windows[candidate].monitor_index;
+        tile->anchor = windows[candidate].anchor;
         tile->monitor_portrait = windows[candidate].monitor_portrait;
         tile->source_rect = windows[candidate].frame;
         tile->target_rect = windows[candidate].frame;
@@ -1014,50 +1014,37 @@ void reach_stage_set_display(reach_stage *stage, const reach_display_environment
     }
 }
 
-static size_t reach_stage_monitor_index_for(const reach_stage *stage, reach_rect_f32 frame,
-                                            int32_t *out_portrait)
+static reach_point_f32 reach_stage_monitor_anchor(const reach_stage *stage, reach_rect_f32 frame,
+                                                  int32_t *out_portrait)
 {
     *out_portrait = 0;
+    reach_point_f32 center = {frame.x + frame.width * 0.5f, frame.y + frame.height * 0.5f};
     if (stage->display.monitor_count == 0)
     {
-        return 0;
+        return {0.5f, 0.5f};
     }
 
-    float center_x = frame.x + frame.width * 0.5f;
-    float center_y = frame.y + frame.height * 0.5f;
-    size_t match = stage->display.monitor_count;
-    for (size_t index = 0;
-         index < stage->display.monitor_count && match == stage->display.monitor_count; ++index)
+    size_t match = 0;
+    for (size_t index = 0; index < stage->display.monitor_count; ++index)
     {
         reach_rect_f32 bounds = stage->display.monitors[index];
-        if (center_x >= bounds.x && center_x < bounds.x + bounds.width && center_y >= bounds.y &&
-            center_y < bounds.y + bounds.height)
+        if (center.x >= bounds.x && center.x < bounds.x + bounds.width && center.y >= bounds.y &&
+            center.y < bounds.y + bounds.height)
         {
             match = index;
+            break;
         }
-    }
-    if (match == stage->display.monitor_count)
-    {
-        match = 0;
     }
 
     reach_rect_f32 matched = stage->display.monitors[match];
     *out_portrait = matched.height > matched.width ? 1 : 0;
-
-    size_t rank = 0;
-    for (size_t index = 0; index < stage->display.monitor_count; ++index)
+    if (matched.width <= 0.0f || matched.height <= 0.0f)
     {
-        if (index == match)
-        {
-            continue;
-        }
-        reach_rect_f32 bounds = stage->display.monitors[index];
-        if (bounds.x < matched.x || (bounds.x == matched.x && bounds.y < matched.y))
-        {
-            ++rank;
-        }
+        return {0.5f, 0.5f};
     }
-    return rank;
+    float x = (center.x - matched.x) / matched.width;
+    float y = (center.y - matched.y) / matched.height;
+    return {x < 0.0f ? 0.0f : (x > 1.0f ? 1.0f : x), y < 0.0f ? 0.0f : (y > 1.0f ? 1.0f : y)};
 }
 
 static size_t reach_stage_collect_windows(reach_stage *stage, reach_stage_open_window *out_windows,
@@ -1099,7 +1086,7 @@ static size_t reach_stage_collect_windows(reach_stage *stage, reach_stage_open_w
         entry->minimized = snapshot->minimized;
         entry->frame = frame;
         int32_t portrait = 0;
-        entry->monitor_index = (uint32_t)reach_stage_monitor_index_for(stage, frame, &portrait);
+        entry->anchor = reach_stage_monitor_anchor(stage, frame, &portrait);
         entry->monitor_portrait = portrait;
         entry->icon_id =
             reach_icon_service_get(stage->icons, snapshot->icon_ref, stage->display.icon_size_px);
@@ -1116,8 +1103,7 @@ static size_t reach_stage_collect_windows(reach_stage *stage, reach_stage_open_w
         entry->desktop = 1;
         entry->frame = stage->display.primary_bounds;
         int32_t portrait = 0;
-        entry->monitor_index =
-            (uint32_t)reach_stage_monitor_index_for(stage, entry->frame, &portrait);
+        entry->anchor = reach_stage_monitor_anchor(stage, entry->frame, &portrait);
         entry->monitor_portrait = portrait;
         collected++;
     }

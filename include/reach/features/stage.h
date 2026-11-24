@@ -32,7 +32,8 @@ extern "C"
         uint16_t label[260];
         int32_t minimized;
         int32_t desktop;
-        uint32_t monitor_index;
+        // The window's centre as a fraction of its own monitor, where Stage places its tile.
+        reach_point_f32 anchor;
         int32_t monitor_portrait;
         int32_t departing;
         float presence;
@@ -94,7 +95,7 @@ extern "C"
         const uint16_t *label;
         int32_t minimized;
         int32_t desktop;
-        uint32_t monitor_index;
+        reach_point_f32 anchor;
         int32_t monitor_portrait;
         reach_rect_f32 frame;
     } reach_stage_open_window;

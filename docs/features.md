@@ -21,6 +21,7 @@
 - Stage has one close choreography for every trigger (`reach_stage_begin_close`). An app tile queues ordinary activation and then requests the same close; Stage stores no closing selection. Movement starts immediately; external window readiness never gates it. Activation completion may only hold the aligned opaque frame. Never write foreground tracking optimistically.
 - On an app-click handoff, the activated window is published as a presentation-only front source and stays above the other relationships through teardown, with its tile chrome drawn last. This must not fork close geometry, timing or teardown.
 - Stage thumbnails are best-effort during presentation: retry missing relationships without aborting the frame. Close boundaries stay strict.
+- Stage places each app tile near its window's real position (its centre as a fraction of its own monitor; all monitors share one space) in loosely aligned, non-overlapping rows, with no per-monitor sections. Tile size compresses real size (displayed area grows with the square root of real area), never exceeds real size, and never drops below a 144 dp longer side unless the window is smaller or the whole set cannot otherwise fit. Ties follow focus order; the layout changes only when the window set, displays or Stage area change (`reach_stage_rebuild_layout`).
 
 ## Shell lifecycle
 

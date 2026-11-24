@@ -2,90 +2,66 @@
 
 #include "stage_common.h"
 
-#define REACH_STAGE_MAX_SECTIONS 8
+#include <math.h>
+
 #define REACH_STAGE_BOX_LONG 16.0f
 #define REACH_STAGE_BOX_SHORT 9.0f
 #define REACH_STAGE_BAR_HEIGHT 32.0f
-#define REACH_STAGE_BAR_MAX_BOX_RATIO 0.20f
+#define REACH_STAGE_BAR_MAX_THUMBNAIL_RATIO 0.25f
 #define REACH_STAGE_DESKTOP_EDGE_GAP 20.0f
 #define REACH_STAGE_CONTENT_INSET 24.0f
 #define REACH_STAGE_TILE_GAP 20.0f
-#define REACH_STAGE_SECTION_GAP 28.0f
-#define REACH_STAGE_PORTRAIT_SCALE_WEIGHT 1.30f
+// A tile's displayed area grows with its window's real area raised to this power, so larger
+// windows stay larger without dominating.
+#define REACH_STAGE_AREA_EXPONENT 0.5f
+// Smallest longer side of a tile's thumbnail, in DP, unless its window is smaller or the whole
+// set cannot otherwise fit.
+#define REACH_STAGE_MIN_LONG_SIDE 144.0f
+// How far each tile moves from its row's centred packing toward its window's real position.
+#define REACH_STAGE_ANCHOR_PULL 0.5f
+#define REACH_STAGE_FIT_ITERATIONS 24
 
-typedef struct reach_stage_section
+typedef struct reach_stage_layout_item
 {
-    size_t rank;
-    int32_t portrait;
-    size_t indices[REACH_STAGE_MAX_TILES];
+    size_t tile;
+    reach_point_f32 anchor;
+    float width;
+    float height;
+    // Linear scale per unit of the fit factor, before the real-size cap and the floor.
+    float scale_per_fit;
+    float floor_scale;
+    float thumbnail_width;
+    float thumbnail_height;
+    float bar;
+    float box_height;
+} reach_stage_layout_item;
+
+typedef struct reach_stage_layout_row
+{
+    size_t begin;
     size_t count;
-    size_t columns;
-    size_t rows;
-    float scale;
-} reach_stage_section;
+    float width;
+    float height;
+} reach_stage_layout_row;
 
-typedef struct reach_stage_sections
+typedef struct reach_stage_layout
 {
-    reach_stage_section entries[REACH_STAGE_MAX_SECTIONS];
+    reach_stage_layout_item items[REACH_STAGE_MAX_TILES];
     size_t count;
-} reach_stage_sections;
-
-static void reach_stage_resolve_section_grid(reach_stage_section *section)
-{
-    if (section->portrait)
-    {
-        section->columns = 1;
-        section->rows = section->count;
-        return;
-    }
-
-    section->columns = 1;
-    while (section->columns * section->columns < section->count)
-    {
-        section->columns++;
-    }
-    section->rows = section->count / section->columns;
-    if (section->count % section->columns != 0)
-    {
-        section->rows++;
-    }
-}
-
-static float reach_stage_box_height(float scale)
-{
-    return REACH_STAGE_BOX_SHORT * scale;
-}
-
-static float reach_stage_box_bar(float box_height, float bar_height)
-{
-    float limit = box_height * REACH_STAGE_BAR_MAX_BOX_RATIO;
-    return bar_height < limit ? bar_height : limit;
-}
+    // Item indices in reading order of their anchors: top to bottom, then left to right.
+    size_t order[REACH_STAGE_MAX_TILES];
+    reach_stage_layout_row rows[REACH_STAGE_MAX_TILES];
+    size_t row_count;
+    float bar_height;
+    float border;
+    float gap;
+} reach_stage_layout;
 
 static float reach_stage_tile_aspect(const reach_stage_tile *tile)
 {
     return tile->source_rect.width > 0.0f && tile->source_rect.height > 0.0f
                ? tile->source_rect.width / tile->source_rect.height
                : REACH_STAGE_BOX_LONG / REACH_STAGE_BOX_SHORT;
-}
-
-static float reach_stage_tile_height(const reach_stage_tile *tile, float content_height)
-{
-    if (content_height <= 0.0f)
-    {
-        return 0.0f;
-    }
-    return tile->source_rect.height > 0.0f && tile->source_rect.height < content_height
-               ? tile->source_rect.height
-               : content_height;
-}
-
-static float reach_stage_tile_layout_width(const reach_stage_tile *tile, float box_height,
-                                           float bar_height, float border_thickness)
-{
-    float height = reach_stage_tile_height(
-        tile, box_height - reach_stage_box_bar(box_height, bar_height) - border_thickness * 2.0f);
-    return height * reach_stage_tile_aspect(tile);
 }
 
 static reach_rect_f32 reach_stage_content_area(reach_rect_f32 monitor_bounds, float dpi_scale)
@@ -106,66 +82,6 @@ float reach_stage_tile_bar_height(const reach_stage_state *state)
     return REACH_STAGE_BAR_HEIGHT * dpi_scale;
 }
 
-static void reach_stage_collect_sections(const reach_stage_state *state,
-                                         reach_stage_sections *sections)
-{
-    reach_stage_section buckets[REACH_STAGE_MAX_SECTIONS] = {};
-
-    for (size_t index = 0; index < state->tile_count; ++index)
-    {
-        const reach_stage_tile *tile = &state->tiles[index];
-        if (tile->departing || tile->desktop)
-        {
-            continue;
-        }
-
-        size_t rank = (size_t)tile->monitor_index;
-        if (rank >= REACH_STAGE_MAX_SECTIONS)
-        {
-            rank = REACH_STAGE_MAX_SECTIONS - 1;
-        }
-
-        reach_stage_section *section = &buckets[rank];
-        section->rank = rank;
-        section->portrait = tile->monitor_portrait;
-        section->indices[section->count++] = index;
-    }
-
-    sections->count = 0;
-    for (size_t rank = 0; rank < REACH_STAGE_MAX_SECTIONS; ++rank)
-    {
-        if (buckets[rank].count == 0)
-        {
-            continue;
-        }
-
-        reach_stage_section *section = &sections->entries[sections->count++];
-        *section = buckets[rank];
-
-        for (size_t index = 1; index < section->count; ++index)
-        {
-            size_t current = section->indices[index];
-            size_t at = index;
-            while (at > 0)
-            {
-                size_t previous = section->indices[at - 1];
-                const reach_rect_f32 *current_rect = &state->tiles[current].source_rect;
-                const reach_rect_f32 *previous_rect = &state->tiles[previous].source_rect;
-                if (previous_rect->y < current_rect->y ||
-                    (previous_rect->y == current_rect->y && previous_rect->x <= current_rect->x))
-                {
-                    break;
-                }
-                section->indices[at] = previous;
-                --at;
-            }
-            section->indices[at] = current;
-        }
-
-        reach_stage_resolve_section_grid(section);
-    }
-}
-
 static reach_stage_tile *reach_stage_desktop_tile(reach_stage_state *state)
 {
     for (size_t index = 0; index < state->tile_count; ++index)
@@ -178,90 +94,152 @@ static reach_stage_tile *reach_stage_desktop_tile(reach_stage_state *state)
     return nullptr;
 }
 
-static float reach_stage_row_width(const reach_stage_state *state,
-                                   const reach_stage_section *section, size_t row, float scale,
-                                   float tile_gap, float bar_height, float border_thickness)
+static void reach_stage_collect_layout_items(const reach_stage_state *state, float dpi_scale,
+                                             reach_stage_layout *layout)
 {
-    size_t begin = row * section->columns;
-    size_t remaining = section->count - begin;
-    size_t count = remaining < section->columns ? remaining : section->columns;
-    float width = tile_gap * (float)(count - 1);
-    float box_height = reach_stage_box_height(scale);
-    for (size_t index = 0; index < count; ++index)
+    layout->count = 0;
+    float min_long_side = REACH_STAGE_MIN_LONG_SIDE * dpi_scale;
+    for (size_t index = 0; index < state->tile_count; ++index)
     {
-        width += reach_stage_tile_layout_width(&state->tiles[section->indices[begin + index]],
-                                               box_height, bar_height, border_thickness);
+        const reach_stage_tile *tile = &state->tiles[index];
+        if (tile->departing || tile->desktop)
+        {
+            continue;
+        }
+
+        reach_stage_layout_item *item = &layout->items[layout->count];
+        *item = {};
+        item->tile = index;
+        item->anchor = tile->anchor;
+        item->height = tile->source_rect.height > 0.0f ? tile->source_rect.height : 1.0f;
+        item->width = item->height * reach_stage_tile_aspect(tile);
+        item->scale_per_fit =
+            powf(item->width * item->height, (REACH_STAGE_AREA_EXPONENT - 1.0f) * 0.5f);
+        float long_side = item->width > item->height ? item->width : item->height;
+        item->floor_scale = long_side > min_long_side ? min_long_side / long_side : 1.0f;
+        layout->order[layout->count] = layout->count;
+        layout->count++;
     }
-    return width;
+
+    // Ties keep tile order, which runs front to back.
+    for (size_t at = 1; at < layout->count; ++at)
+    {
+        size_t current = layout->order[at];
+        size_t to = at;
+        while (to > 0)
+        {
+            const reach_stage_layout_item *previous = &layout->items[layout->order[to - 1]];
+            const reach_stage_layout_item *next = &layout->items[current];
+            if (previous->anchor.y < next->anchor.y ||
+                (previous->anchor.y == next->anchor.y && previous->anchor.x <= next->anchor.x))
+            {
+                break;
+            }
+            layout->order[to] = layout->order[to - 1];
+            --to;
+        }
+        layout->order[to] = current;
+    }
 }
 
-static float reach_stage_section_width(const reach_stage_state *state,
-                                       const reach_stage_section *section, float scale,
-                                       float tile_gap, float bar_height, float border_thickness)
+// The real size always caps a tile; the floor only holds a tile up to it.
+static void reach_stage_scale_layout_items(reach_stage_layout *layout, float fit, float floor)
 {
-    float width = 0.0f;
-    for (size_t row = 0; row < section->rows; ++row)
+    for (size_t index = 0; index < layout->count; ++index)
     {
-        float row_width = reach_stage_row_width(state, section, row, scale, tile_gap, bar_height,
-                                                border_thickness);
-        if (row_width > width)
+        reach_stage_layout_item *item = &layout->items[index];
+        float scale = fit * item->scale_per_fit;
+        float minimum = item->floor_scale * floor;
+        scale = scale < minimum ? minimum : scale;
+        scale = scale > 1.0f ? 1.0f : scale;
+        item->thumbnail_width = item->width * scale;
+        item->thumbnail_height = item->height * scale;
+        float bar_limit = item->thumbnail_height * REACH_STAGE_BAR_MAX_THUMBNAIL_RATIO;
+        item->bar = layout->bar_height < bar_limit ? layout->bar_height : bar_limit;
+        item->box_height = item->bar + layout->border * 2.0f + item->thumbnail_height;
+    }
+}
+
+// Splits the reading order into row_count consecutive, non-empty rows of similar width.
+static void reach_stage_split_layout_rows(reach_stage_layout *layout, size_t row_count)
+{
+    float total = layout->gap * (float)(layout->count - row_count);
+    for (size_t index = 0; index < layout->count; ++index)
+    {
+        total += layout->items[index].thumbnail_width;
+    }
+
+    layout->row_count = 0;
+    size_t begin = 0;
+    float consumed = 0.0f;
+    for (size_t row = 0; row < row_count; ++row)
+    {
+        size_t rows_after = row_count - row - 1;
+        float target = total * (float)(row + 1) / (float)row_count;
+        size_t end = begin + 1;
+        consumed += layout->items[layout->order[begin]].thumbnail_width;
+        while (end < layout->count - rows_after)
         {
-            width = row_width;
+            float width = layout->items[layout->order[end]].thumbnail_width + layout->gap;
+            if (rows_after != 0 && consumed + width * 0.5f > target)
+            {
+                break;
+            }
+            consumed += width;
+            ++end;
+        }
+
+        reach_stage_layout_row *line = &layout->rows[layout->row_count++];
+        line->begin = begin;
+        line->count = end - begin;
+        line->width = layout->gap * (float)(line->count - 1);
+        line->height = 0.0f;
+        for (size_t at = begin; at < end; ++at)
+        {
+            const reach_stage_layout_item *item = &layout->items[layout->order[at]];
+            line->width += item->thumbnail_width;
+            line->height = item->box_height > line->height ? item->box_height : line->height;
+        }
+        begin = end;
+    }
+}
+
+static float reach_stage_layout_block_height(const reach_stage_layout *layout)
+{
+    float height = layout->gap * (float)(layout->row_count - 1);
+    for (size_t row = 0; row < layout->row_count; ++row)
+    {
+        height += layout->rows[row].height;
+    }
+    return height;
+}
+
+static int32_t reach_stage_layout_fits(reach_stage_layout *layout, size_t row_count, float fit,
+                                       float floor, reach_rect_f32 area)
+{
+    reach_stage_scale_layout_items(layout, fit, floor);
+    reach_stage_split_layout_rows(layout, row_count);
+    for (size_t row = 0; row < layout->row_count; ++row)
+    {
+        if (layout->rows[row].width > area.width)
+        {
+            return 0;
         }
     }
-    return width;
+    return reach_stage_layout_block_height(layout) <= area.height;
 }
 
-static float reach_stage_section_scale(const reach_stage_section *section, float factor)
+// Largest factor in [low, high] that fits; low itself is assumed to fit.
+static float reach_stage_search_fit(reach_stage_layout *layout, size_t row_count, float low,
+                                    float high, int32_t floor_factor, reach_rect_f32 area)
 {
-    float weighted = factor * (section->portrait ? REACH_STAGE_PORTRAIT_SCALE_WEIGHT : 1.0f);
-    return section->scale * (weighted < 1.0f ? weighted : 1.0f);
-}
-
-static float reach_stage_sections_width(const reach_stage_state *state,
-                                        const reach_stage_sections *sections, float factor,
-                                        float tile_gap, float section_gap, float bar_height,
-                                        float border_thickness)
-{
-    float width = section_gap * (float)(sections->count - 1);
-    for (size_t index = 0; index < sections->count; ++index)
-    {
-        const reach_stage_section *section = &sections->entries[index];
-        width +=
-            reach_stage_section_width(state, section, reach_stage_section_scale(section, factor),
-                                      tile_gap, bar_height, border_thickness);
-    }
-    return width;
-}
-
-static void reach_stage_resolve_section_scales(const reach_stage_state *state,
-                                               reach_stage_sections *sections, reach_rect_f32 area,
-                                               float tile_gap, float section_gap, float bar_height,
-                                               float border_thickness)
-{
-    for (size_t index = 0; index < sections->count; ++index)
-    {
-        reach_stage_section *section = &sections->entries[index];
-        float scalable_height = (float)section->rows * REACH_STAGE_BOX_SHORT;
-        float fixed_height = tile_gap * (float)(section->rows - 1);
-        section->scale = scalable_height > 0.0f && area.height > fixed_height
-                             ? (area.height - fixed_height) / scalable_height
-                             : 0.0f;
-    }
-
-    if (reach_stage_sections_width(state, sections, 1.0f, tile_gap, section_gap, bar_height,
-                                   border_thickness) <= area.width)
-    {
-        return;
-    }
-
-    float low = 0.0f;
-    float high = 1.0f;
-    for (size_t iteration = 0; iteration < 24; ++iteration)
+    for (size_t iteration = 0; iteration < REACH_STAGE_FIT_ITERATIONS; ++iteration)
     {
         float middle = (low + high) * 0.5f;
-        if (reach_stage_sections_width(state, sections, middle, tile_gap, section_gap, bar_height,
-                                       border_thickness) <= area.width)
+        int32_t fits = floor_factor
+                           ? reach_stage_layout_fits(layout, row_count, 0.0f, middle, area)
+                           : reach_stage_layout_fits(layout, row_count, middle, 1.0f, area);
+        if (fits)
         {
             low = middle;
         }
@@ -270,9 +248,165 @@ static void reach_stage_resolve_section_scales(const reach_stage_state *state,
             high = middle;
         }
     }
-    for (size_t index = 0; index < sections->count; ++index)
+    return low;
+}
+
+// How far the block's shape is from the area's, so equal-sized candidates prefer filling it.
+static float reach_stage_layout_shape_error(const reach_stage_layout *layout, reach_rect_f32 area)
+{
+    float width = 0.0f;
+    for (size_t row = 0; row < layout->row_count; ++row)
     {
-        sections->entries[index].scale = reach_stage_section_scale(&sections->entries[index], low);
+        width = layout->rows[row].width > width ? layout->rows[row].width : width;
+    }
+    float height = reach_stage_layout_block_height(layout);
+    if (width <= 0.0f || height <= 0.0f)
+    {
+        return 0.0f;
+    }
+    return fabsf(logf((width / height) / (area.width / area.height)));
+}
+
+// Leaves the layout scaled and split for the row count that gives the largest tiles. Tiles keep
+// their floor while some row count fits it; otherwise the floor shrinks for every tile.
+static void reach_stage_resolve_layout(reach_stage_layout *layout, reach_rect_f32 area)
+{
+    float fit_high = 0.0f;
+    for (size_t index = 0; index < layout->count; ++index)
+    {
+        float full = 1.0f / layout->items[index].scale_per_fit;
+        fit_high = full > fit_high ? full : fit_high;
+    }
+
+    size_t best_rows = 1;
+    float best_fit = 0.0f;
+    float best_floor = 0.0f;
+    float best_size = -1.0f;
+    float best_error = 0.0f;
+    for (int32_t floor_factor = 0; floor_factor < 2 && best_size < 0.0f; ++floor_factor)
+    {
+        for (size_t rows = 1; rows <= layout->count; ++rows)
+        {
+            float fit = 0.0f;
+            float floor = 1.0f;
+            if (floor_factor)
+            {
+                floor = reach_stage_search_fit(layout, rows, 0.0f, 1.0f, 1, area);
+            }
+            else if (!reach_stage_layout_fits(layout, rows, 0.0f, 1.0f, area))
+            {
+                continue;
+            }
+            else if (reach_stage_layout_fits(layout, rows, fit_high, 1.0f, area))
+            {
+                fit = fit_high;
+            }
+            else
+            {
+                fit = reach_stage_search_fit(layout, rows, 0.0f, fit_high, 0, area);
+            }
+            float size = floor_factor ? floor : fit;
+            (void)reach_stage_layout_fits(layout, rows, fit, floor, area);
+            float error = reach_stage_layout_shape_error(layout, area);
+            if (best_size < 0.0f || size > best_size * 1.0001f ||
+                (size >= best_size * 0.9999f && error < best_error))
+            {
+                best_rows = rows;
+                best_fit = fit;
+                best_floor = floor;
+                best_size = size;
+                best_error = error;
+            }
+        }
+    }
+    (void)reach_stage_layout_fits(layout, best_rows, best_fit, best_floor, area);
+}
+
+// Moves a coordinate from its packed position toward its anchored one, kept inside [low, high].
+static float reach_stage_pull(float packed, float anchored, float low, float high)
+{
+    float value = packed + (anchored - packed) * REACH_STAGE_ANCHOR_PULL;
+    value = value > high ? high : value;
+    return value < low ? low : value;
+}
+
+static void reach_stage_place_layout(reach_stage_state *state, reach_stage_layout *layout,
+                                     reach_rect_f32 area)
+{
+    float block_height = reach_stage_layout_block_height(layout);
+    float row_top = (area.height - block_height) * 0.5f;
+    size_t ordered[REACH_STAGE_MAX_TILES] = {};
+    for (size_t row = 0; row < layout->row_count; ++row)
+    {
+        const reach_stage_layout_row *line = &layout->rows[row];
+        for (size_t at = 0; at < line->count; ++at)
+        {
+            size_t current = layout->order[line->begin + at];
+            size_t to = at;
+            while (to > 0 &&
+                   layout->items[ordered[to - 1]].anchor.x > layout->items[current].anchor.x)
+            {
+                ordered[to] = ordered[to - 1];
+                --to;
+            }
+            ordered[to] = current;
+        }
+
+        // A tile's shift from the left-packed row is wanted at its pulled target; shifts must
+        // not decrease left to right (no overlap) and stay within the row's slack. Pooling
+        // adjacent violators gives the closest such shifts, so equal anchors stay centred.
+        float slack = area.width - line->width;
+        float shift_sum[REACH_STAGE_MAX_TILES] = {};
+        size_t shift_count[REACH_STAGE_MAX_TILES] = {};
+        size_t blocks = 0;
+        float offset = 0.0f;
+        for (size_t at = 0; at < line->count; ++at)
+        {
+            const reach_stage_layout_item *item = &layout->items[ordered[at]];
+            float anchored = item->anchor.x * area.width - item->thumbnail_width * 0.5f - offset;
+            shift_sum[blocks] = reach_stage_pull(slack * 0.5f, anchored, -1.0e9f, 1.0e9f);
+            shift_count[blocks] = 1;
+            ++blocks;
+            while (blocks > 1 && shift_sum[blocks - 2] * (float)shift_count[blocks - 1] >
+                                     shift_sum[blocks - 1] * (float)shift_count[blocks - 2])
+            {
+                shift_sum[blocks - 2] += shift_sum[blocks - 1];
+                shift_count[blocks - 2] += shift_count[blocks - 1];
+                --blocks;
+            }
+            offset += item->thumbnail_width + layout->gap;
+        }
+
+        offset = 0.0f;
+        size_t at = 0;
+        for (size_t block = 0; block < blocks; ++block)
+        {
+            float shift = shift_sum[block] / (float)shift_count[block];
+            shift = shift > slack ? slack : (shift < 0.0f ? 0.0f : shift);
+            for (size_t member = 0; member < shift_count[block]; ++member, ++at)
+            {
+                reach_stage_layout_item *item = &layout->items[ordered[at]];
+                reach_stage_tile *tile = &state->tiles[item->tile];
+                tile->target_rect.x = area.x + offset + shift;
+                offset += item->thumbnail_width + layout->gap;
+            }
+        }
+
+        for (size_t member = 0; member < line->count; ++member)
+        {
+            reach_stage_layout_item *item = &layout->items[ordered[member]];
+            reach_stage_tile *tile = &state->tiles[item->tile];
+
+            float spare = line->height - item->box_height;
+            float anchored_y = item->anchor.y * area.height - row_top - item->box_height * 0.5f;
+            float y = reach_stage_pull(spare * 0.5f, anchored_y, 0.0f, spare);
+
+            tile->bar_height = item->bar;
+            tile->target_rect.y = area.y + row_top + y + item->bar + layout->border;
+            tile->target_rect.width = item->thumbnail_width;
+            tile->target_rect.height = item->thumbnail_height;
+        }
+        row_top += line->height + layout->gap;
     }
 }
 
@@ -334,47 +468,6 @@ static void reach_stage_place_desktop(reach_stage_tile *tile, reach_rect_f32 are
     tile->target_rect = reach_stage_fit_into_box(inner, tile->source_rect);
 }
 
-static void reach_stage_place_section(reach_stage_state *state, const reach_stage_section *section,
-                                      float tile_gap, float origin_x, reach_rect_f32 area,
-                                      float bar_height, float border_thickness)
-{
-    float box_height = reach_stage_box_height(section->scale);
-    float section_width = reach_stage_section_width(state, section, section->scale, tile_gap,
-                                                    bar_height, border_thickness);
-    float section_height =
-        (float)section->rows * box_height + tile_gap * (float)(section->rows - 1);
-    float origin_y = area.y + (area.height - section_height) * 0.5f;
-
-    for (size_t row = 0; row < section->rows; ++row)
-    {
-        size_t begin = row * section->columns;
-        size_t remaining = section->count - begin;
-        size_t count = remaining < section->columns ? remaining : section->columns;
-        float row_width = reach_stage_row_width(state, section, row, section->scale, tile_gap,
-                                                bar_height, border_thickness);
-        float x = origin_x + (section_width - row_width) * 0.5f;
-        float y = origin_y + (float)row * (box_height + tile_gap);
-        float bar = reach_stage_box_bar(box_height, bar_height);
-        float height = box_height - bar - border_thickness * 2.0f;
-        if (height < 0.0f)
-        {
-            height = 0.0f;
-        }
-
-        for (size_t index = 0; index < count; ++index)
-        {
-            reach_stage_tile *tile = &state->tiles[section->indices[begin + index]];
-            float tile_height = reach_stage_tile_height(tile, height);
-            tile->bar_height = bar;
-            tile->target_rect.x = x;
-            tile->target_rect.y = y + bar + border_thickness + (height - tile_height) * 0.5f;
-            tile->target_rect.width = tile_height * reach_stage_tile_aspect(tile);
-            tile->target_rect.height = tile_height;
-            x += tile->target_rect.width + tile_gap;
-        }
-    }
-}
-
 static reach_rect_f32 reach_stage_scale_rect(reach_rect_f32 rect, float scale)
 {
     reach_rect_f32 out = {};
@@ -427,8 +520,6 @@ void reach_stage_rebuild_layout(reach_stage *stage)
     }
 
     float dpi_scale = state->dpi_scale > 0.0f ? state->dpi_scale : 1.0f;
-    float tile_gap = REACH_STAGE_TILE_GAP * dpi_scale;
-    float section_gap = REACH_STAGE_SECTION_GAP * dpi_scale;
     float border_thickness = reach_theme_border_thickness(reach_theme_default(), dpi_scale);
     reach_stage_tile *desktop = reach_stage_desktop_tile(state);
     reach_stage_place_desktop(desktop, state->desktop_bounds, border_thickness, dpi_scale);
@@ -437,30 +528,23 @@ void reach_stage_rebuild_layout(reach_stage *stage)
                                     ? desktop->target_rect
                                     : state->desktop_bounds;
     reach_rect_f32 area = reach_stage_content_area(app_bounds, dpi_scale);
-
-    reach_stage_sections sections = {};
-    reach_stage_collect_sections(state, &sections);
-    if (sections.count == 0)
+    if (area.width <= 0.0f || area.height <= 0.0f)
     {
         return;
     }
 
-    float bar_height = reach_stage_tile_bar_height(state);
-    reach_stage_resolve_section_scales(state, &sections, area, tile_gap, section_gap, bar_height,
-                                       border_thickness);
-
-    float total_width = reach_stage_sections_width(state, &sections, 1.0f, tile_gap, section_gap,
-                                                   bar_height, border_thickness);
-
-    float x = area.x + (area.width - total_width) * 0.5f;
-    for (size_t index = 0; index < sections.count; ++index)
+    static reach_stage_layout layout;
+    layout = {};
+    layout.bar_height = reach_stage_tile_bar_height(state);
+    layout.border = border_thickness;
+    layout.gap = REACH_STAGE_TILE_GAP * dpi_scale;
+    reach_stage_collect_layout_items(state, dpi_scale, &layout);
+    if (layout.count == 0)
     {
-        const reach_stage_section *section = &sections.entries[index];
-        reach_stage_place_section(state, section, tile_gap, x, area, bar_height, border_thickness);
-        x += reach_stage_section_width(state, section, section->scale, tile_gap, bar_height,
-                                       border_thickness) +
-             section_gap;
+        return;
     }
+    reach_stage_resolve_layout(&layout, area);
+    reach_stage_place_layout(state, &layout, area);
 }
 
 void reach_stage_apply_progress(reach_stage *stage)

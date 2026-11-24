@@ -52,6 +52,7 @@ static reach_stage_open_window make_window(uintptr_t id, reach_rect_f32 frame)
     reach_stage_open_window window = {};
     window.window = id;
     window.frame = frame;
+    window.anchor = {0.5f, 0.5f};
     return window;
 }
 
@@ -875,10 +876,6 @@ static void test_app_grid_fits_inside_desktop_preview(void)
     reach_stage_open_window windows[4] = {
         make_window(1, make_rect(0, 0, 1600, 900)), make_window(2, make_rect(1600, 0, 900, 800)),
         make_window(3, make_rect(1600, 800, 900, 800)), make_desktop(100, bounds)};
-    windows[1].monitor_index = 1;
-    windows[1].monitor_portrait = 1;
-    windows[2].monitor_index = 1;
-    windows[2].monitor_portrait = 1;
     reach_stage_open(stage, bounds, 1, windows, 4);
     advance_stage(stage, 30, 0.016);
 
@@ -906,55 +903,12 @@ static void test_app_grid_fits_inside_desktop_preview(void)
     reach_stage_destroy(stage);
 }
 
-static void test_portrait_monitor_apps_stack_by_screen_position(void)
-{
-    reach_stage *stage = nullptr;
-    reach_stage_create(&stage);
-    reach_stage_open_window windows[2] = {make_window(1, make_rect(1920, 900, 900, 700)),
-                                          make_window(2, make_rect(1920, 0, 900, 800))};
-    windows[0].monitor_portrait = 1;
-    windows[1].monitor_portrait = 1;
-    reach_stage_open(stage, make_rect(0, 0, 1920, 1080), 1, windows, 2);
-    advance_stage(stage, 30, 0.016);
-
-    const reach_stage_state *state = reach_stage_state_ptr(stage);
-    float lower_center = state->tiles[0].target_rect.x + state->tiles[0].target_rect.width * 0.5f;
-    float upper_center = state->tiles[1].target_rect.x + state->tiles[1].target_rect.width * 0.5f;
-    expect_true(state->tiles[1].target_rect.y < state->tiles[0].target_rect.y,
-                "portrait-monitor apps preserve their vertical screen order");
-    expect_near(lower_center, upper_center, "portrait-monitor apps share one vertical column");
-    expect_true(state->tiles[0].target_rect.height > 350.0f &&
-                    state->tiles[1].target_rect.height > 350.0f,
-                "portrait-monitor apps use the available vertical space");
-    reach_stage_destroy(stage);
-}
-
-static void test_portrait_monitor_receives_more_scale_when_width_is_constrained(void)
-{
-    reach_stage *stage = nullptr;
-    reach_stage_create(&stage);
-    reach_rect_f32 bounds = make_rect(0, 0, 1920, 1080);
-    reach_stage_open_window windows[3] = {make_window(1, make_rect(0, 0, 1600, 900)),
-                                          make_window(2, make_rect(1920, 0, 900, 1600)),
-                                          make_desktop(100, bounds)};
-    windows[1].monitor_index = 1;
-    windows[1].monitor_portrait = 1;
-    reach_stage_open(stage, bounds, 1, windows, 3);
-    advance_stage(stage, 30, 0.016);
-
-    const reach_stage_state *state = reach_stage_state_ptr(stage);
-    expect_true(state->tiles[1].target_rect.height > state->tiles[0].target_rect.height * 1.25f,
-                "portrait-monitor apps receive more scale than landscape-monitor apps");
-    reach_stage_destroy(stage);
-}
-
 static void test_app_targets_are_visually_centered(void)
 {
     reach_stage *stage = nullptr;
     reach_stage_create(&stage);
     reach_stage_open_window windows[2] = {make_window(1, make_rect(0, 0, 1200, 900)),
                                           make_window(2, make_rect(1920, 0, 2100, 900))};
-    windows[1].monitor_index = 1;
     reach_stage_open(stage, make_rect(0, 0, 1920, 1080), 1, windows, 2);
     advance_stage(stage, 30, 0.016);
 
@@ -1087,58 +1041,60 @@ struct golden_row
 };
 
 static const golden_row golden_rows_100[] = {
-    {1, 61.0f, 221.0f, 808.0f, 638.0f, 0.0f, 0, 0.0705882385f, 0.0705882385f, 0.0784313753f, 1.0f,
+    {1, 61.0f, 217.0f, 819.0f, 646.0f, 0.0f, 0, 0.0705882385f, 0.0705882385f, 0.0784313753f, 1.0f,
      0},
-    {1, 61.333374f, 221.04547f, 807.8788f, 32.0f, 0.0f, 0, 0.141176477f, 0.141176477f, 0.149019614f,
-     0.45f, 0},
-    {2, 69.333374f, 221.04547f, 775.8788f, 32.0f, 0.0f, 0, 1.0f, 1.0f, 1.0f, 0.85f, 65},
-    {1, 845.21216f, 229.04547f, 16.0f, 16.0f, 8.0f, 0, 1.0f, 1.0f, 1.0f, 0.55f, 0},
-    {10, 849.0522f, 232.88547f, 8.32f, 8.32f, 0.0f, 0, 1.0f, 1.0f, 1.0f, 0.8f, 35},
-    {1, 889.0f, 221.0f, 970.0f, 638.0f, 0.0f, 0, 0.0705882385f, 0.0705882385f, 0.0784313753f, 1.0f,
+    {1, 61.3334351f, 216.881714f, 818.982056f, 32.0f, 0.0f, 0, 0.141176477f, 0.141176477f,
+     0.149019614f, 0.449999988f, 0},
+    {2, 69.3334351f, 216.881714f, 786.982056f, 32.0f, 0.0f, 0, 1.0f, 1.0f, 1.0f, 0.850000024f, 65},
+    {1, 856.315491f, 224.881714f, 16.0f, 16.0f, 8.0f, 0, 1.0f, 1.0f, 1.0f, 0.550000012f, 0},
+    {10, 860.155518f, 228.72171f, 8.31999969f, 8.31999969f, 0.0f, 0, 1.0f, 1.0f, 1.0f, 0.800000012f,
+     35},
+    {1, 900.0f, 225.0f, 959.0f, 630.0f, 0.0f, 0, 0.0705882385f, 0.0705882385f, 0.0784313753f, 1.0f,
      0},
-    {1, 889.21216f, 221.04547f, 969.4545f, 32.0f, 0.0f, 0, 0.141176477f, 0.141176477f, 0.149019614f,
-     0.45f, 0},
-    {2, 897.21216f, 221.04547f, 937.4545f, 32.0f, 0.0f, 0, 1.0f, 1.0f, 1.0f, 0.85f, 66},
-    {1, 1834.6667f, 229.04547f, 16.0f, 16.0f, 8.0f, 0, 1.0f, 1.0f, 1.0f, 0.55f, 0},
-    {10, 1838.5067f, 232.88547f, 8.32f, 8.32f, 0.0f, 0, 1.0f, 1.0f, 1.0f, 0.8f, 35},
+    {1, 900.315491f, 224.515228f, 958.351257f, 32.0f, 0.0f, 0, 0.141176477f, 0.141176477f,
+     0.149019614f, 0.449999988f, 0},
+    {2, 908.315491f, 224.515228f, 926.351257f, 32.0f, 0.0f, 0, 1.0f, 1.0f, 1.0f, 0.850000024f, 66},
+    {1, 1834.66675f, 232.515228f, 16.0f, 16.0f, 8.0f, 0, 1.0f, 1.0f, 1.0f, 0.550000012f, 0},
+    {10, 1838.50671f, 236.355225f, 8.31999969f, 8.31999969f, 0.0f, 0, 1.0f, 1.0f, 1.0f,
+     0.800000012f, 35},
 };
 
 static const golden_row golden_rows_125[] = {
-    {1, 76.0f, 223.0f, 792.0f, 634.0f, 0.0f, 0, 0.0705882385f, 0.0705882385f, 0.0784313753f, 1.0f,
+    {1, 76.0f, 219.0f, 803.0f, 642.0f, 0.0f, 0, 0.0705882385f, 0.0705882385f, 0.0784313753f, 1.0f,
      0},
-    {1, 76.22229f, 222.973511f, 792.070679f, 40.0f, 0.0f, 0, 0.141176477f, 0.141176477f,
+    {1, 76.2223511f, 218.891235f, 802.956665f, 40.0f, 0.0f, 0, 0.141176477f, 0.141176477f,
      0.149019614f, 0.449999988f, 0},
-    {2, 86.22229f, 222.973511f, 752.070679f, 40.0f, 0.0f, 0, 1.0f, 1.0f, 1.0f, 0.85f, 65},
-    {1, 838.292969f, 232.973511f, 20.0f, 20.0f, 10.0f, 0, 1.0f, 1.0f, 1.0f, 0.55f, 0},
-    {10, 843.092957f, 237.773514f, 10.4000006f, 10.4000006f, 0.0f, 0, 1.0f, 1.0f, 1.0f,
+    {2, 86.2223511f, 218.891235f, 762.956665f, 40.0f, 0.0f, 0, 1.0f, 1.0f, 1.0f, 0.850000024f, 65},
+    {1, 849.179016f, 228.891235f, 20.0f, 20.0f, 10.0f, 0, 1.0f, 1.0f, 1.0f, 0.550000012f, 0},
+    {10, 853.979004f, 233.691238f, 10.4000006f, 10.4000006f, 0.0f, 0, 1.0f, 1.0f, 1.0f,
      0.800000012f, 35},
-    {1, 893.0f, 223.0f, 951.0f, 634.0f, 0.0f, 0, 0.0705882385f, 0.0705882385f, 0.0784313753f, 1.0f,
+    {1, 904.0f, 226.0f, 940.0f, 628.0f, 0.0f, 0, 0.0705882385f, 0.0705882385f, 0.0784313753f, 1.0f,
      0},
-    {1, 893.292969f, 222.973511f, 950.484802f, 40.0f, 0.0f, 0, 0.141176477f, 0.141176477f,
+    {1, 904.179016f, 226.375397f, 939.598755f, 40.0f, 0.0f, 0, 0.141176477f, 0.141176477f,
      0.149019614f, 0.449999988f, 0},
-    {2, 903.292969f, 222.973511f, 910.484802f, 40.0f, 0.0f, 0, 1.0f, 1.0f, 1.0f, 0.85f, 66},
-    {1, 1813.77783f, 232.973511f, 20.0f, 20.0f, 10.0f, 0, 1.0f, 1.0f, 1.0f, 0.55f, 0},
-    {10, 1818.57788f, 237.773514f, 10.4000006f, 10.4000006f, 0.0f, 0, 1.0f, 1.0f, 1.0f,
-     0.800000012f, 35},
+    {2, 914.179016f, 226.375397f, 899.598755f, 40.0f, 0.0f, 0, 1.0f, 1.0f, 1.0f, 0.850000024f, 66},
+    {1, 1813.77783f, 236.375397f, 20.0f, 20.0f, 10.0f, 0, 1.0f, 1.0f, 1.0f, 0.550000012f, 0},
+    {10, 1818.57788f, 241.1754f, 10.4000006f, 10.4000006f, 0.0f, 0, 1.0f, 1.0f, 1.0f, 0.800000012f,
+     35},
 };
 
 static const golden_row golden_rows_150[] = {
-    {1, 93.0f, 226.0f, 775.0f, 628.0f, 0.0f, 0, 0.0705882385f, 0.0705882385f, 0.0784313753f, 1.0f,
+    {1, 93.0f, 222.0f, 785.0f, 636.0f, 0.0f, 0, 0.0705882385f, 0.0705882385f, 0.0784313753f, 1.0f,
      0},
-    {1, 92.888855f, 225.507568f, 774.646484f, 48.0f, 0.0f, 0, 0.141176477f, 0.141176477f,
+    {1, 92.8889771f, 221.515137f, 785.292969f, 48.0f, 0.0f, 0, 0.141176477f, 0.141176477f,
      0.149019614f, 0.449999988f, 0},
-    {2, 104.888855f, 225.507568f, 726.646484f, 48.0f, 0.0f, 0, 1.0f, 1.0f, 1.0f, 0.85f, 65},
-    {1, 831.535339f, 237.507568f, 24.0f, 24.0f, 12.0f, 0, 1.0f, 1.0f, 1.0f, 0.55f, 0},
-    {10, 837.295349f, 243.267563f, 12.4800005f, 12.4800005f, 0.0f, 0, 1.0f, 1.0f, 1.0f,
+    {2, 104.888977f, 221.515137f, 737.292969f, 48.0f, 0.0f, 0, 1.0f, 1.0f, 1.0f, 0.850000024f, 65},
+    {1, 842.181946f, 233.515137f, 24.0f, 24.0f, 12.0f, 0, 1.0f, 1.0f, 1.0f, 0.550000012f, 0},
+    {10, 847.941956f, 239.275131f, 12.4800005f, 12.4800005f, 0.0f, 0, 1.0f, 1.0f, 1.0f,
      0.800000012f, 35},
-    {1, 898.0f, 226.0f, 929.0f, 628.0f, 0.0f, 0, 0.0705882385f, 0.0705882385f, 0.0784313753f, 1.0f,
+    {1, 908.0f, 229.0f, 919.0f, 622.0f, 0.0f, 0, 0.0705882385f, 0.0705882385f, 0.0784313753f, 1.0f,
      0},
-    {1, 897.535339f, 225.507568f, 929.575806f, 48.0f, 0.0f, 0, 0.141176477f, 0.141176477f,
+    {1, 908.181946f, 228.834625f, 918.929199f, 48.0f, 0.0f, 0, 0.141176477f, 0.141176477f,
      0.149019614f, 0.449999988f, 0},
-    {2, 909.535339f, 225.507568f, 881.575806f, 48.0f, 0.0f, 0, 1.0f, 1.0f, 1.0f, 0.85f, 66},
-    {1, 1791.11108f, 237.507568f, 24.0f, 24.0f, 12.0f, 0, 1.0f, 1.0f, 1.0f, 0.55f, 0},
-    {10, 1796.87109f, 243.267563f, 12.4800005f, 12.4800005f, 0.0f, 0, 1.0f, 1.0f, 1.0f,
-     0.800000012f, 35},
+    {2, 920.181946f, 228.834625f, 870.929199f, 48.0f, 0.0f, 0, 1.0f, 1.0f, 1.0f, 0.850000024f, 66},
+    {1, 1791.11108f, 240.834625f, 24.0f, 24.0f, 12.0f, 0, 1.0f, 1.0f, 1.0f, 0.550000012f, 0},
+    {10, 1796.87109f, 246.59462f, 12.4800005f, 12.4800005f, 0.0f, 0, 1.0f, 1.0f, 1.0f, 0.800000012f,
+     35},
 };
 
 static void expect_golden_rows(float dpi, const golden_row *rows, size_t count)
@@ -1190,8 +1146,6 @@ int main(void)
     test_closing_stage_retargets_newly_minimized_windows();
     test_departing_tile_fades_three_times_faster_than_reflow();
     test_app_grid_fits_inside_desktop_preview();
-    test_portrait_monitor_apps_stack_by_screen_position();
-    test_portrait_monitor_receives_more_scale_when_width_is_constrained();
     test_app_targets_are_visually_centered();
     test_adjacent_apps_use_a_compact_gap();
     test_single_app_uses_the_available_stage_area();
