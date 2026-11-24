@@ -1,6 +1,7 @@
 #include <windows.h>
 #include <objbase.h>
 #include <shellapi.h>
+#include <stdio.h>
 
 #include "reach/composition/composition_root.h"
 #include "reach/core/frame_clock.h"
@@ -238,6 +239,10 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
                 reach_frame_clock_presented(&frame_clock, current_seconds);
                 if (update_result != REACH_OK && update_result != REACH_DEVICE_LOST)
                 {
+                    char line[64];
+                    snprintf(line, sizeof(line), "update failed result=%d exit=%d",
+                             (int)update_result, REACH_EXIT_FAILURE);
+                    reach_log_error(line);
                     running = 0;
                     exit_code = REACH_EXIT_FAILURE;
                     break;

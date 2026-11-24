@@ -478,6 +478,8 @@ typedef struct reach_feature_runtime
     reach_platform_window *cursor_region_window;
     reach_cursor_kind cursor_kind;
     reach_rect_f32 cursor_region;
+    // When this surface's frame last failed, in reach_motion_now_seconds time; 0 when never.
+    double frame_failure_seconds;
     const reach_feature_definition *definition;
 } reach_feature_runtime;
 

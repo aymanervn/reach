@@ -175,6 +175,42 @@ static reach_result reach_host_finish_update(reach_host *host)
     return REACH_OK;
 }
 
+// A failure this soon after the same surface's previous one ends the update, so a surface that
+// cannot recover still exits Reach and Windows restarts it.
+#define REACH_HOST_FRAME_FAILURE_WINDOW_SECONDS 10.0
+
+// Logs a failed surface frame and, unless the surface failed shortly before, resets and closes it
+// so every other surface keeps running. Returns whether the frame pass may continue.
+static int32_t reach_host_recover_failed_frame(reach_host *host, reach_feature_runtime *runtime,
+                                               reach_result result)
+{
+    double now = reach_motion_now_seconds();
+    int32_t repeated =
+        runtime->frame_failure_seconds > 0.0 &&
+        now - runtime->frame_failure_seconds < REACH_HOST_FRAME_FAILURE_WINDOW_SECONDS;
+    runtime->frame_failure_seconds = now;
+    char line[128];
+    snprintf(line, sizeof(line), "frame failed surface=%u result=%d action=%s",
+             (unsigned)runtime->definition->id, (int)result, repeated ? "exit" : "reset");
+    reach_log_error(line);
+    if (repeated)
+    {
+        return 0;
+    }
+    if (runtime->definition->capsule_ops->reset != nullptr)
+    {
+        runtime->definition->capsule_ops->reset(runtime->capsule);
+    }
+    reach_host_close_registered_surface(host, runtime->definition->id,
+                                        REACH_SURFACE_CLOSE_SUPERSEDED);
+    if (runtime->surface != nullptr)
+    {
+        runtime->surface->dirty_flags = 1;
+    }
+    reach_host_request_update(host);
+    return 1;
+}
+
 static reach_result reach_host_frame_surfaces(reach_host *host, const reach_monitor_info *monitor,
                                               int32_t game_mode)
 {
@@ -198,7 +234,8 @@ static reach_result reach_host_frame_surfaces(reach_host *host, const reach_moni
             continue;
         }
         const reach_result result = reach_host_frame_registered_surface(host, runtime, &frame);
-        if (result != REACH_OK)
+        if (result != REACH_OK && (result == REACH_DEVICE_LOST ||
+                                   !reach_host_recover_failed_frame(host, runtime, result)))
         {
             return result;
         }
