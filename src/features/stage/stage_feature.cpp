@@ -91,7 +91,7 @@ reach_result reach_stage_open(reach_stage *stage, reach_rect_f32 monitor_bounds,
     stage->pressable_generation = 0;
     state->animation_seconds = animation_seconds;
     state->bounds = monitor_bounds;
-    state->desktop_bounds = monitor_bounds;
+    state->available_bounds = monitor_bounds;
     state->dpi_scale = dpi_scale > 0.0f ? dpi_scale : 1.0f;
 
     size_t count = window_count < REACH_STAGE_MAX_TILES ? window_count : REACH_STAGE_MAX_TILES;
@@ -149,16 +149,16 @@ reach_result reach_stage_open(reach_stage *stage, reach_rect_f32 monitor_bounds,
     return REACH_OK;
 }
 
-int32_t reach_stage_set_desktop_bounds(reach_stage *stage, reach_rect_f32 bounds)
+int32_t reach_stage_set_available_bounds(reach_stage *stage, reach_rect_f32 bounds)
 {
     if (stage == nullptr || stage->state.closing || bounds.width <= 0.0f || bounds.height <= 0.0f ||
-        reach_rect_equal(stage->state.desktop_bounds, bounds))
+        reach_rect_equal(stage->state.available_bounds, bounds))
     {
         return 0;
     }
 
     reach_stage_sync_compositor(stage);
-    stage->state.desktop_bounds = bounds;
+    stage->state.available_bounds = bounds;
     if (!stage->state.open)
     {
         return 1;
@@ -751,12 +751,6 @@ static void reach_stage_capsule_set_close_handoff_pending(void *capsule, int32_t
 static const size_t reach_stage_spring_tracks[] = {REACH_STAGE_ANIMATION_PROGRESS,
                                                    REACH_STAGE_ANIMATION_REFLOW};
 
-static int32_t reach_stage_rect_near(reach_rect_f32 a, reach_rect_f32 b, float tolerance)
-{
-    return fabsf(a.x - b.x) < tolerance && fabsf(a.y - b.y) < tolerance &&
-           fabsf(a.width - b.width) < tolerance && fabsf(a.height - b.height) < tolerance;
-}
-
 static void reach_stage_sample_tracks(reach_stage *stage)
 {
     reach_stage_state *state = &stage->state;
@@ -794,14 +788,15 @@ static void reach_stage_finish_settled_springs(reach_stage *stage)
     reach_stage_sample_tracks(&settled);
     reach_stage_apply_progress(&settled);
 
-    const float pixel_tolerance = 2.0f;
+    // Strictly under 2 px.
+    const float pixel_tolerance = nextafterf(2.0f, 0.0f);
     const float presence_tolerance = 1.0f / 512.0f;
     for (size_t index = 0; index < stage->state.tile_count; ++index)
     {
         const reach_stage_tile *now = &stage->state.tiles[index];
         const reach_stage_tile *end = &settled.state.tiles[index];
-        if (!reach_stage_rect_near(now->current_rect, end->current_rect, pixel_tolerance) ||
-            !reach_stage_rect_near(now->current_bar, end->current_bar, pixel_tolerance) ||
+        if (!reach_stage_rect_within(now->current_rect, end->current_rect, pixel_tolerance) ||
+            !reach_stage_rect_within(now->current_bar, end->current_bar, pixel_tolerance) ||
             fabsf(now->presence - end->presence) >= presence_tolerance)
             return;
     }

@@ -74,7 +74,7 @@ extern "C"
         float retarget_progress;
         float animation_seconds;
         reach_rect_f32 bounds;
-        reach_rect_f32 desktop_bounds;
+        reach_rect_f32 available_bounds;
         float dpi_scale;
         size_t tile_count;
         size_t tile_generation;
@@ -121,7 +121,7 @@ extern "C"
     void reach_stage_attach_services(reach_stage *stage, reach_window_tracking *windows,
                                      reach_icon_service *icons, reach_app_control *apps);
     void reach_stage_set_display(reach_stage *stage, const reach_display_environment *display);
-    int32_t reach_stage_set_desktop_bounds(reach_stage *stage, reach_rect_f32 bounds);
+    int32_t reach_stage_set_available_bounds(reach_stage *stage, reach_rect_f32 bounds);
     // Enabled when the surface renderer composes live window thumbnails: tiles then move on the
     // compositor instead of being resampled every frame. Returns whether the mode changed.
     int32_t reach_stage_set_compositor_motion(reach_stage *stage, int32_t enabled);

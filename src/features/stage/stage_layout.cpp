@@ -4,8 +4,8 @@
 
 #include <math.h>
 
-#define REACH_STAGE_BOX_LONG 16.0f
-#define REACH_STAGE_BOX_SHORT 9.0f
+// Shape of a tile whose window size is unknown.
+#define REACH_STAGE_FALLBACK_ASPECT (16.0f / 9.0f)
 #define REACH_STAGE_BAR_HEIGHT 32.0f
 #define REACH_STAGE_BAR_MAX_THUMBNAIL_RATIO 0.25f
 #define REACH_STAGE_CONTENT_INSET 24.0f
@@ -63,7 +63,7 @@ static float reach_stage_tile_aspect(const reach_stage_tile *tile)
 {
     return tile->source_rect.width > 0.0f && tile->source_rect.height > 0.0f
                ? tile->source_rect.width / tile->source_rect.height
-               : REACH_STAGE_BOX_LONG / REACH_STAGE_BOX_SHORT;
+               : REACH_STAGE_FALLBACK_ASPECT;
 }
 
 static reach_rect_f32 reach_stage_content_area(reach_rect_f32 monitor_bounds, float dpi_scale)
@@ -464,7 +464,7 @@ void reach_stage_rebuild_layout(reach_stage *stage)
         desktop->bar_height = 0.0f;
         desktop->target_rect = desktop->source_rect;
     }
-    reach_rect_f32 area = reach_stage_content_area(state->desktop_bounds, dpi_scale);
+    reach_rect_f32 area = reach_stage_content_area(state->available_bounds, dpi_scale);
     if (area.width <= 0.0f || area.height <= 0.0f)
     {
         return;

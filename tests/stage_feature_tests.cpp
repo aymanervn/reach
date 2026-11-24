@@ -333,7 +333,7 @@ static void test_desktop_keeps_solo_geometry_behind_apps(void)
     expect_true(reach_stage_open(stage, bounds, 1.0f, &desktop, 1) == REACH_OK,
                 "desktop-only stage opens");
     reach_rect_f32 available = make_rect(0.0f, 40.0f, 1920.0f, 960.0f);
-    expect_true(reach_stage_set_desktop_bounds(stage, available),
+    expect_true(reach_stage_set_available_bounds(stage, available),
                 "desktop accepts the space reserved between the bars");
     advance_stage(stage, 40, 0.016);
 
@@ -358,7 +358,7 @@ static void test_desktop_keeps_solo_geometry_behind_apps(void)
                                           desktop};
     expect_true(reach_stage_open(stage, bounds, 1.0f, windows, 3) == REACH_OK,
                 "stage opens with apps and desktop");
-    expect_true(reach_stage_set_desktop_bounds(stage, available),
+    expect_true(reach_stage_set_available_bounds(stage, available),
                 "reopened desktop accepts the space reserved between the bars");
     advance_stage(stage, 40, 0.016);
 

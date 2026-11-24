@@ -1154,7 +1154,7 @@ static int32_t reach_stage_surface_arrange(void *capsule, const reach_feature_su
 {
     reach_stage *stage = static_cast<reach_stage *>(capsule);
     int32_t changed = reach_stage_set_compositor_motion(stage, ctx->window_thumbnails_supported);
-    return reach_stage_set_desktop_bounds(stage, ctx->available_bounds) || changed;
+    return reach_stage_set_available_bounds(stage, ctx->available_bounds) || changed;
 }
 
 static const reach_feature_native_overlay_ops reach_stage_native_overlay_ops = {

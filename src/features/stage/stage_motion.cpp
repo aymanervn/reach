@@ -251,11 +251,6 @@ reach_stage_tile_shape<Math> reach_stage_tile_geometry(Math &math, const reach_s
             presence};
 }
 
-bool reach_stage_rect_matches(reach_rect_f32 a, reach_rect_f32 b, float tolerance)
-{
-    return fabsf(a.x - b.x) <= tolerance && fabsf(a.y - b.y) <= tolerance &&
-           fabsf(a.width - b.width) <= tolerance && fabsf(a.height - b.height) <= tolerance;
-}
 } // namespace
 
 void reach_stage_apply_progress(reach_stage *stage)
@@ -303,7 +298,7 @@ int32_t reach_stage_tile_motion_at(const reach_stage *stage, size_t index, doubl
 
     // The compositor must reproduce the CPU sample exactly; anything else falls back to sampling.
     reach_rect_f32 sampled = reach_rect_motion_value_at(&shape.rect, now);
-    return reach_stage_rect_matches(sampled, tile->current_rect, 0.5f) &&
+    return reach_stage_rect_within(sampled, tile->current_rect, 0.5f) &&
                    fabsf(reach_motion_value_at(&shape.bar, now) - tile->current_bar.height) <= 0.5f
                ? 1
                : 0;
@@ -349,7 +344,7 @@ double reach_stage_motion_event_seconds(const reach_stage *stage,
             float end_bar = reach_motion_value_at(&motion.bar, spring_end);
             float now_presence = reach_motion_value_at(&motion.presence, at);
             float end_presence = reach_motion_value_at(&motion.presence, spring_end);
-            if (!reach_stage_rect_matches(now_rect, end_rect, 1.999f) ||
+            if (!reach_stage_rect_within(now_rect, end_rect, 1.999f) ||
                 fabsf(now_bar - end_bar) >= 2.0f ||
                 fabsf(now_presence - end_presence) >= 1.0f / 512.0f)
                 return false;

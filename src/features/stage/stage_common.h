@@ -8,6 +8,8 @@
 #include "reach/features/common/selection_pill.h"
 #include "reach/support/motion.h"
 
+#include <math.h>
+
 #define REACH_STAGE_PRESENCE_MIN_SCALE 0.88f
 // Space the layout keeps around every tile's header and thumbnail, in DP, so the hover pill can
 // surround the tile with an even ring without crowding its neighbours.
@@ -92,6 +94,13 @@ int32_t reach_stage_hover_pill_moving(const reach_stage *stage);
 // Between compositor events the sampled state is stale; every entry point that reads or changes
 // tile geometry brings it to now first.
 void reach_stage_sync_compositor(reach_stage *stage);
+
+// Whether every edge of the two rects differs by at most tolerance.
+static inline int32_t reach_stage_rect_within(reach_rect_f32 a, reach_rect_f32 b, float tolerance)
+{
+    return fabsf(a.x - b.x) <= tolerance && fabsf(a.y - b.y) <= tolerance &&
+           fabsf(a.width - b.width) <= tolerance && fabsf(a.height - b.height) <= tolerance;
+}
 
 reach_rect_f32 reach_stage_interpolate_rect(reach_rect_f32 from, reach_rect_f32 to, float factor);
 reach_rect_f32 reach_stage_minimized_offscreen_rect(const reach_stage_state *state,
