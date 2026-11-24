@@ -15,8 +15,6 @@ Open items only.
 - App Control worker test assumes a queued job has not started.
 - Quick Settings Bluetooth rows can stay blank on first open. The cause is in retained presentation (`render_d2d_retained.cpp`, `draw_layer`); it needs a renderer trace.
 - Cross-app activation sometimes leaves the previous app active; a direct click restores focus. Unresolved since 2026-09-07.
-- Stage minimized placeholders expand toward restore bounds on close (reopened 2026-09-19).
-- Stage held input about 500ms after its motion looked finished. The fix is waiting for live validation.
 - Compositor-driven Stage needs live validation: thumbnail stacking with the focused window on top, Dock restore/minimize closing Stage, minimized windows rising from the bottom centre, about 50 windows, and the classic-thumbnail fallback without ordinal 147.
 - Any surface's failed frame ends `reach.exe` without a dump or log line (`update_result` in `reach_main.cpp`); renderer failures other than device loss are not logged either (`reach_d2d_device_check`). The DirectComposition branch of `draw_layer` (`render_d2d_retained.cpp`) also has no surface memory budget.
 - Launcher fast scroll can leave the last page's items unloaded. Suspect: the icon prefetch range in `launcher_render.cpp`.
