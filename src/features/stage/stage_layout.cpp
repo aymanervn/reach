@@ -474,16 +474,6 @@ static void reach_stage_place_desktop(reach_stage_tile *tile, reach_rect_f32 are
     tile->target_rect = reach_stage_fit_into_box(inner, tile->source_rect);
 }
 
-static reach_rect_f32 reach_stage_scale_rect(reach_rect_f32 rect, float scale)
-{
-    reach_rect_f32 out = {};
-    out.width = rect.width * scale;
-    out.height = rect.height * scale;
-    out.x = rect.x + (rect.width - out.width) * 0.5f;
-    out.y = rect.y + (rect.height - out.height) * 0.5f;
-    return out;
-}
-
 reach_rect_f32 reach_stage_interpolate_rect(reach_rect_f32 from, reach_rect_f32 to, float factor)
 {
     if (factor >= 1.0f)
@@ -552,72 +542,4 @@ void reach_stage_rebuild_layout(reach_stage *stage)
     }
     reach_stage_resolve_layout(&layout, area);
     reach_stage_place_layout(state, &layout, area);
-}
-
-void reach_stage_apply_progress(reach_stage *stage)
-{
-    REACH_ASSERT(stage != nullptr);
-    if (stage == nullptr)
-    {
-        return;
-    }
-
-    reach_stage_state *state = &stage->state;
-    for (size_t index = 0; index < state->tile_count; ++index)
-    {
-        reach_stage_tile *tile = &state->tiles[index];
-
-        float presence_target = tile->departing ? 0.0f : 1.0f;
-        float presence_progress = tile->departing ? state->departure_progress : state->reflow;
-        tile->presence =
-            tile->presence_from + (presence_target - tile->presence_from) * presence_progress;
-
-        reach_rect_f32 resolved =
-            reach_stage_interpolate_rect(tile->reflow_from, tile->target_rect, state->reflow);
-        if (tile->presence < 1.0f)
-        {
-            resolved = reach_stage_scale_rect(
-                resolved, REACH_STAGE_PRESENCE_MIN_SCALE +
-                              (1.0f - REACH_STAGE_PRESENCE_MIN_SCALE) * tile->presence);
-        }
-
-        float progress = tile->desktop ? state->desktop_progress : state->progress;
-        if (state->closing && tile->close_retargeting)
-        {
-            tile->current_rect = reach_stage_interpolate_rect(
-                tile->close_destination_rect, tile->close_from_rect, state->retarget_progress);
-        }
-        else if (state->closing)
-        {
-            float close_progress =
-                tile->close_from_progress > 0.0f ? progress / tile->close_from_progress : 0.0f;
-            if (close_progress > 1.0f)
-            {
-                close_progress = 1.0f;
-            }
-            tile->current_rect = reach_stage_interpolate_rect(
-                tile->close_destination_rect, tile->close_from_rect, close_progress);
-        }
-        else if (tile->reopening)
-        {
-            float span = 1.0f - tile->open_from_progress;
-            float open_progress =
-                span > 0.0001f ? (progress - tile->open_from_progress) / span : 1.0f;
-            tile->current_rect =
-                reach_stage_interpolate_rect(tile->open_from_rect, resolved, open_progress);
-        }
-        else
-        {
-            reach_rect_f32 from = tile->minimized && !tile->desktop
-                                      ? reach_stage_minimized_offscreen_rect(state, resolved)
-                                      : tile->source_rect;
-            tile->current_rect = reach_stage_interpolate_rect(from, resolved, progress);
-        }
-
-        float bar = tile->bar_height * progress * tile->presence;
-        tile->current_bar.x = tile->current_rect.x;
-        tile->current_bar.y = tile->current_rect.y - bar;
-        tile->current_bar.width = tile->current_rect.width;
-        tile->current_bar.height = bar;
-    }
 }
