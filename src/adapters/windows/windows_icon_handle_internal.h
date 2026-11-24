@@ -23,7 +23,6 @@ struct reach_windows_icon
 
 uint64_t reach_windows_icon_id_from_hicon(HICON hicon);
 uint64_t reach_windows_icon_id_from_hbitmap(HBITMAP hbitmap);
-void reach_windows_icon_id_retain(uint64_t icon_id);
 void reach_windows_icon_id_release(uint64_t icon_id);
 reach_windows_icon *reach_windows_icon_lookup(uint64_t icon_id);
 

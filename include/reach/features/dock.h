@@ -173,9 +173,6 @@ extern "C"
     void reach_dock_apply_pinned_apps(reach_dock *dock, const reach_pinned_app_model *apps,
                                       size_t count);
 
-    reach_dock_pointer_region reach_dock_pointer_region_at(const reach_dock *dock, int32_t local_x,
-                                                           int32_t local_y);
-
     const reach_bar_reveal_ops *reach_dock_reveal_ops(void);
 
     typedef struct reach_dock_build_context
@@ -226,7 +223,6 @@ extern "C"
 
     reach_point_i32 reach_dock_local_point(const reach_dock_layout *layout, int32_t x, int32_t y);
     reach_rect_f32 reach_dock_rect_to_screen(const reach_dock_layout *layout, reach_rect_f32 rect);
-    reach_dock_layout reach_dock_layout_to_screen(reach_dock_layout layout);
     int32_t reach_dock_item_anchor(const reach_dock *dock, size_t index, reach_rect_f32 *out_button,
                                    float *out_bar_edge_y);
 
@@ -306,20 +302,12 @@ extern "C"
         const uint16_t *title;
     } reach_dock_item_window;
 
-    size_t reach_dock_collect_matching_windows(const reach_pinned_app_model *pinned_app,
-                                               const reach_window_snapshot *windows,
-                                               size_t window_count, const uintptr_t *focus_history,
-                                               size_t focus_history_count,
-                                               reach_dock_window_matches_pinned_fn matches,
-                                               void *match_user, size_t *out_indices, size_t cap);
-
     size_t reach_dock_collect_item_windows(reach_dock *dock, size_t item_index,
                                            reach_dock_item_window *out, size_t cap);
 
     int32_t reach_dock_build_menu_request(reach_dock *dock, size_t item_index, float pointer_x,
                                           float pointer_y, reach_menu_request *out_request);
 
-    size_t reach_dock_order_count(reach_dock *dock);
     uint32_t reach_dock_order_key_at(reach_dock *dock, size_t index);
     void reach_dock_restore_order(reach_dock *dock, const uint32_t *keys, size_t count);
 

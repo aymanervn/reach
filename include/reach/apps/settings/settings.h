@@ -590,7 +590,6 @@ extern "C"
                                                 const reach_app_update_info *info, int32_t result);
     void reach_settings_model_begin_reach_download(reach_settings_model *model);
     void reach_settings_model_apply_reach_download(reach_settings_model *model, int32_t success);
-    int32_t reach_settings_model_reach_update_action_enabled(const reach_settings_model *model);
     const uint16_t *reach_settings_model_reach_update_status(const reach_settings_model *model);
     const uint16_t *
     reach_settings_model_reach_update_button_label(const reach_settings_model *model);

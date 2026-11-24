@@ -44,11 +44,6 @@ extern "C"
         reach_rect_f32 search_result_scrollbar_track;
     } reach_launcher_layout;
 
-    typedef struct reach_ui_layout
-    {
-        reach_dock_layout dock;
-    } reach_ui_layout;
-
 #define REACH_DISPLAY_MAX_MONITORS 32
 
     /* Monitors resolved by composition, so a feature that has to reason about where a window

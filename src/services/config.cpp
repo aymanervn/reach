@@ -665,18 +665,6 @@ reach_result reach_config_service_unpin_id(reach_config_service *service, uint32
     return reach_config_service_commit(service, &operation);
 }
 
-reach_result reach_config_service_unpin_path(reach_config_service *service, const uint16_t *path)
-{
-    if (path == nullptr || path[0] == 0)
-    {
-        return REACH_INVALID_ARGUMENT;
-    }
-    reach_config_operation operation = {};
-    operation.type = REACH_CONFIG_OPERATION_UNPIN_PATH;
-    (void)reach_copy_utf16(operation.path, 260, path);
-    return reach_config_service_commit(service, &operation);
-}
-
 reach_result reach_config_service_move_pin(reach_config_service *service, uint32_t pin_id,
                                            size_t target_index)
 {

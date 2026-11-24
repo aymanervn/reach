@@ -244,9 +244,6 @@ extern "C"
     reach_quick_settings_layout_for_content_bounds(reach_rect_f32 content_bounds,
                                                    const reach_theme *theme,
                                                    const reach_quick_settings_model *model);
-    reach_quick_settings_layout reach_quick_settings_layout_for_content_bounds_scaled(
-        reach_rect_f32 content_bounds, const reach_theme *theme,
-        const reach_quick_settings_model *model, float dpi_scale);
 
     float reach_quick_settings_content_height_for_model(const reach_quick_settings_model *model);
     float

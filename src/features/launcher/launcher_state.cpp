@@ -776,31 +776,6 @@ int32_t reach_launcher_is_open(reach_launcher *launcher)
     return launcher != nullptr && reach_launcher_state_ptr(launcher)->model.open;
 }
 
-size_t reach_launcher_result_count(reach_launcher *launcher)
-{
-    return launcher != nullptr ? reach_launcher_state_ptr(launcher)->model.result_count : 0;
-}
-
-const reach_launcher_result *reach_launcher_result_at(reach_launcher *launcher, size_t index)
-{
-    if (launcher == nullptr || index >= reach_launcher_state_ptr(launcher)->model.result_count)
-    {
-        return nullptr;
-    }
-    return &reach_launcher_state_ptr(launcher)->model.results[index];
-}
-
-size_t reach_launcher_selected_result_index(reach_launcher *launcher)
-{
-    return launcher != nullptr ? reach_launcher_state_ptr(launcher)->model.selected_result_index
-                               : 0;
-}
-
-const uint16_t *reach_launcher_query_text(reach_launcher *launcher)
-{
-    return launcher != nullptr ? reach_launcher_state_ptr(launcher)->model.query : nullptr;
-}
-
 static size_t reach_launcher_query_length(reach_launcher *launcher)
 {
     return launcher != nullptr ? reach_launcher_state_ptr(launcher)->model.query_length : 0;

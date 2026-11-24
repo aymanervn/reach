@@ -12,22 +12,6 @@ static float reach_progress_bar_min(float a, float b)
     return a < b ? a : b;
 }
 
-reach_rect_f32 reach_progress_bar_fill_rect(reach_rect_f32 track, float level)
-{
-    if (level < 0.0f)
-    {
-        level = 0.0f;
-    }
-    if (level > 1.0f)
-    {
-        level = 1.0f;
-    }
-
-    reach_rect_f32 fill = track;
-    fill.width = track.width * level;
-    return fill;
-}
-
 reach_result reach_progress_bar_build_render_commands(reach_rect_f32 track, reach_rect_f32 fill,
                                                       reach_rect_f32 origin,
                                                       reach_color track_color,

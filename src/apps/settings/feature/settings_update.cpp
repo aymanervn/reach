@@ -98,11 +98,6 @@ void reach_settings_model_apply_reach_download(reach_settings_model *model, int3
         success ? REACH_SETTINGS_REACH_UPDATE_AVAILABLE : REACH_SETTINGS_REACH_UPDATE_FAILED;
 }
 
-int32_t reach_settings_model_reach_update_action_enabled(const reach_settings_model *model)
-{
-    return model != nullptr && model->reach_update_state == REACH_SETTINGS_REACH_UPDATE_AVAILABLE;
-}
-
 const uint16_t *reach_settings_model_reach_update_status(const reach_settings_model *model)
 {
     if (model == nullptr)

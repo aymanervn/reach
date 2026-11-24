@@ -81,16 +81,3 @@ reach_context_menu_hit_result reach_context_menu_hit_test_menu_items(const reach
     }
     return hit;
 }
-
-reach_context_menu_action reach_context_menu_action_for_hit(const uint32_t *item_commands,
-                                                            size_t item_count,
-                                                            reach_context_menu_hit_result hit)
-{
-    reach_context_menu_action action = {};
-    if (item_commands == nullptr || !hit.hit || hit.index >= item_count)
-    {
-        return action;
-    }
-    action.command = item_commands[hit.index];
-    return action;
-}

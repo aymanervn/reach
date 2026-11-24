@@ -237,11 +237,6 @@ void reach_installed_apps_service_uninstall(reach_installed_apps_service *servic
     reach_installed_apps_service_submit(service, REACH_INSTALLED_APPS_COMMAND_UNINSTALL, index);
 }
 
-void reach_installed_apps_service_manage(reach_installed_apps_service *service, size_t index)
-{
-    reach_installed_apps_service_submit(service, REACH_INSTALLED_APPS_COMMAND_MANAGE, index);
-}
-
 int32_t reach_installed_apps_service_take(reach_installed_apps_service *service,
                                           reach_installed_apps_snapshot *out_snapshot)
 {
@@ -257,14 +252,4 @@ int32_t reach_installed_apps_service_take(reach_installed_apps_service *service,
     *out_snapshot = service->snapshot;
     service->completed = 0;
     return 1;
-}
-
-int32_t reach_installed_apps_service_pending(const reach_installed_apps_service *service)
-{
-    if (service == nullptr)
-    {
-        return 0;
-    }
-    std::lock_guard<std::mutex> lock(service->mutex);
-    return service->pending || service->in_flight || service->completed;
 }

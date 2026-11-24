@@ -28,13 +28,3 @@ void reach_surface_runtime_mark_dirty(reach_surface_runtime *runtime, uint32_t d
 
     runtime->dirty_flags |= dirty_flags;
 }
-
-void reach_surface_runtime_clear_dirty(reach_surface_runtime *runtime, uint32_t dirty_flags)
-{
-    if (runtime == nullptr)
-    {
-        return;
-    }
-
-    runtime->dirty_flags &= ~dirty_flags;
-}

@@ -501,12 +501,6 @@ void reach_app_control_destroy(reach_app_control *service)
     delete service;
 }
 
-int32_t reach_app_control_launch_available(const reach_app_control *service)
-{
-    return service != nullptr && service->launch != nullptr &&
-           service->launch->launcher.ops.launch != nullptr;
-}
-
 static reach_result reach_app_control_enqueue(reach_app_control_launch_state *state,
                                               const reach_app_control_launch_item *item,
                                               uint64_t *out_request_id)

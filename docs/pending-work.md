@@ -54,7 +54,6 @@ Open items only.
 - Dock and Launcher internals live in `core`.
 - Glass policy is split: `theme.c` includes `core/config.h` for the default intensity, and the intensity-to-backdrop-weight curve lives in the adapter (`reach_wuc_create_glass_factory`).
 - Only the Context Menu draws its glass divider with `text.quaternary`; other glass surfaces keep `divider`.
-- `reach_ui_layout` and its only consumer are dead.
 - Context Menu uses the Dock's capacity as its "no target" sentinel.
 - Point-in-rect is implemented 14 times with three semantics; `reach_rect_equal` is redefined 4 times.
 - Dock and Top Bar each cache bar trespass with their own copy of the same logic.

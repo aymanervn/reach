@@ -851,15 +851,6 @@ reach_quick_settings_layout reach_quick_settings_layout_for_sections_scaled(
     return layout;
 }
 
-reach_quick_settings_layout reach_quick_settings_layout_for_content_bounds_scaled(
-    reach_rect_f32 content_bounds, const reach_theme *theme,
-    const reach_quick_settings_model *model, float dpi_scale)
-{
-    float output_span = 0, app_span = 0;
-    reach_quick_settings_section_spans(model, dpi_scale, &output_span, &app_span);
-    return reach_quick_settings_layout_for_sections_scaled(content_bounds, theme, model,
-                                                           output_span, app_span, 0, dpi_scale);
-}
 static const float REACH_QUICK_SETTINGS_POPUP_MARGIN = 8.0f;
 
 #define REACH_QUICK_SETTINGS_MAX_RETIRED_RENDER_ICONS                                              \

@@ -907,14 +907,6 @@ static const reach_feature_control_ops reach_system_hud_control_ops = {
 #define REACH_HOST_LAYER_TOP_BAR_EDGE_REVEAL 140
 #define REACH_HOST_LAYER_STAGE_EDGE_REVEAL 150
 
-static int32_t reach_prearranged_surface_arrange(void *capsule,
-                                                 const reach_feature_surface_context *ctx)
-{
-    (void)capsule;
-    (void)ctx;
-    return 0;
-}
-
 static reach_result reach_dock_surface_render(void *capsule,
                                               const reach_feature_surface_context *ctx,
                                               reach_render_command_buffer *out_commands)

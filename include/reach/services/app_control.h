@@ -48,7 +48,6 @@ extern "C"
 
     void reach_app_control_stop(reach_app_control *service);
 
-    int32_t reach_app_control_launch_available(const reach_app_control *service);
     reach_result reach_app_control_schedule_launch(reach_app_control *service,
                                                    const reach_app_launch_request *request,
                                                    uint64_t *out_request_id);

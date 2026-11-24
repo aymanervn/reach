@@ -455,12 +455,6 @@ float reach_theme_icon_box_size(const reach_theme *theme, float dock_height)
     return dock_height * actual->icon_box_height_ratio;
 }
 
-float reach_theme_icon_size(const reach_theme *theme, float icon_box_size)
-{
-    const reach_theme *actual = theme != 0 ? theme : reach_theme_default();
-    return icon_box_size * actual->icon_max_box_ratio;
-}
-
 float reach_theme_icon_box_corner_radius(const reach_theme *theme, float icon_box_size)
 {
     const reach_theme *actual = theme != 0 ? theme : reach_theme_default();

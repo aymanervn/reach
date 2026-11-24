@@ -144,14 +144,3 @@ reach_result reach_service_send_request(const reach_service_request *request,
     }
     return static_cast<reach_result>(response.result);
 }
-
-reach_result reach_service_send(reach_service_command command, uintptr_t window_id,
-                                reach_split_mode mode)
-{
-    reach_service_request request = {};
-    request.version = reach_service_protocol_version();
-    request.command = command;
-    request.window = static_cast<uint64_t>(window_id);
-    request.split_mode = static_cast<int32_t>(mode);
-    return reach_service_send_request(&request, nullptr);
-}

@@ -48,11 +48,6 @@ extern "C"
     void reach_wifi_service_set_radio_enabled(reach_wifi_service *service, int32_t enabled);
 
     int32_t reach_wifi_service_take(reach_wifi_service *service, reach_wifi_snapshot *out_snapshot);
-    void reach_wifi_service_read(const reach_wifi_service *service,
-                                 reach_wifi_snapshot *out_snapshot);
-
-    int32_t reach_wifi_service_pending(const reach_wifi_service *service);
-    int32_t reach_wifi_service_busy(const reach_wifi_service *service);
 
 #ifdef __cplusplus
 }

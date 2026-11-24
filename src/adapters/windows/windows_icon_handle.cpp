@@ -122,21 +122,6 @@ reach_windows_icon *reach_windows_icon_lookup(uint64_t icon_id)
     return reach_windows_icon_find(icon_id);
 }
 
-void reach_windows_icon_id_retain(uint64_t icon_id)
-{
-    if (icon_id == 0)
-    {
-        return;
-    }
-
-    std::lock_guard<std::mutex> guard(reach_windows_icon_lock());
-    reach_windows_icon *icon = reach_windows_icon_find(icon_id);
-    if (icon != nullptr)
-    {
-        ++icon->references;
-    }
-}
-
 void reach_windows_icon_id_release(uint64_t icon_id)
 {
     if (icon_id == 0)

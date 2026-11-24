@@ -49,11 +49,6 @@ extern "C"
 
     int32_t reach_bluetooth_service_take(reach_bluetooth_service *service,
                                          reach_bluetooth_snapshot *out_snapshot);
-    void reach_bluetooth_service_read(const reach_bluetooth_service *service,
-                                      reach_bluetooth_snapshot *out_snapshot);
-
-    int32_t reach_bluetooth_service_pending(const reach_bluetooth_service *service);
-    int32_t reach_bluetooth_service_busy(const reach_bluetooth_service *service);
 
 #ifdef __cplusplus
 }

@@ -274,14 +274,3 @@ int32_t reach_search_service_take_completed(reach_search_service *service, uint3
     service->completed = 0;
     return 1;
 }
-
-int32_t reach_search_service_work_pending(const reach_search_service *service)
-{
-    if (service == nullptr)
-    {
-        return 0;
-    }
-    reach_search_service *mutable_service = const_cast<reach_search_service *>(service);
-    std::lock_guard<std::mutex> lock(mutable_service->mutex);
-    return mutable_service->pending || mutable_service->in_flight || mutable_service->completed;
-}

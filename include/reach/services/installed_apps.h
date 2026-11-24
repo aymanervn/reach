@@ -37,10 +37,8 @@ extern "C"
     void reach_installed_apps_service_open(reach_installed_apps_service *service, size_t index);
     void reach_installed_apps_service_uninstall(reach_installed_apps_service *service,
                                                 size_t index);
-    void reach_installed_apps_service_manage(reach_installed_apps_service *service, size_t index);
     int32_t reach_installed_apps_service_take(reach_installed_apps_service *service,
                                               reach_installed_apps_snapshot *out_snapshot);
-    int32_t reach_installed_apps_service_pending(const reach_installed_apps_service *service);
 
 #ifdef __cplusplus
 }

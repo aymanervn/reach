@@ -341,23 +341,6 @@ uint32_t reach_window_tracking_window_group_id(const reach_window_tracking *serv
     return 0;
 }
 
-uint32_t reach_window_tracking_group_id_for_app(const reach_window_tracking *service,
-                                                const reach_pinned_app_model *app)
-{
-    if (service == nullptr || app == nullptr)
-    {
-        return 0;
-    }
-    for (size_t index = 0; index < service->open_window_count; ++index)
-    {
-        if (reach_window_tracking_window_matches_app(app, &service->open_windows[index]))
-        {
-            return service->group_ids[index];
-        }
-    }
-    return 0;
-}
-
 static int32_t reach_window_tracking_open_window_index(const reach_window_tracking *service,
                                                        uintptr_t window_id, size_t *out_index)
 {

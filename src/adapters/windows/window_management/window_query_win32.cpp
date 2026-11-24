@@ -160,18 +160,6 @@ int32_t reach_window_process_app_user_model_id_for_process(DWORD process_id, uin
            REACH_OK;
 }
 
-int32_t reach_window_process_app_user_model_id(HWND hwnd, uint16_t *out_id, size_t out_count)
-{
-    if (hwnd == nullptr || out_id == nullptr || out_count == 0)
-    {
-        return 0;
-    }
-
-    DWORD process_id = 0;
-    GetWindowThreadProcessId(hwnd, &process_id);
-    return reach_window_process_app_user_model_id_for_process(process_id, out_id, out_count);
-}
-
 int32_t reach_window_query_process_path(HWND hwnd, uint16_t *out_path, size_t out_path_count)
 {
     if (out_path == nullptr || out_path_count == 0)

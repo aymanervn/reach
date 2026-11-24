@@ -72,8 +72,6 @@ extern "C"
     reach_result reach_config_service_pin_app(reach_config_service *service,
                                               const reach_pinned_app_model *app);
     reach_result reach_config_service_unpin_id(reach_config_service *service, uint32_t pin_id);
-    reach_result reach_config_service_unpin_path(reach_config_service *service,
-                                                 const uint16_t *path);
     reach_result reach_config_service_move_pin(reach_config_service *service, uint32_t pin_id,
                                                size_t target_index);
     reach_result reach_config_service_set_power(reach_config_service *service,

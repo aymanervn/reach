@@ -277,29 +277,6 @@ int32_t reach_dock_take_items_changed(reach_dock *dock)
     return 1;
 }
 
-reach_dock_pointer_region reach_dock_pointer_region_at(const reach_dock *dock, int32_t local_x,
-                                                       int32_t local_y)
-{
-    if (dock == nullptr || !dock->pointer_layout_valid)
-    {
-        return REACH_DOCK_POINTER_REGION_NONE;
-    }
-    reach_dock_hit_result hit = reach_dock_hit_test(&dock->pointer_layout, local_x, local_y);
-    reach_dock_gate_animating_hit(const_cast<reach_dock *>(dock), &hit);
-    switch (hit.type)
-    {
-    case REACH_DOCK_HIT_ITEM:
-        return REACH_DOCK_POINTER_REGION_ITEM;
-    case REACH_DOCK_HIT_TRIGGER:
-        return REACH_DOCK_POINTER_REGION_TRIGGER;
-    case REACH_DOCK_HIT_RESIZE_EDGE:
-        return REACH_DOCK_POINTER_REGION_RESIZE_EDGE;
-    case REACH_DOCK_HIT_NONE:
-    default:
-        return REACH_DOCK_POINTER_REGION_NONE;
-    }
-}
-
 static void reach_dock_bar_begin_session(void *capsule)
 {
     reach_dock *dock = static_cast<reach_dock *>(capsule);
@@ -1693,11 +1670,6 @@ int32_t reach_dock_build_menu_request(reach_dock *dock, size_t item_index, float
     return 1;
 }
 
-size_t reach_dock_order_count(reach_dock *dock)
-{
-    return dock != nullptr ? reach_dock_state_mut(dock)->model.order_count : 0;
-}
-
 uint32_t reach_dock_order_key_at(reach_dock *dock, size_t index)
 {
     if (dock == nullptr || index >= reach_dock_state_mut(dock)->model.order_count)
@@ -2222,15 +2194,6 @@ reach_rect_f32 reach_dock_rect_to_screen(const reach_dock_layout *layout, reach_
     rect.x += layout->bounds.x;
     rect.y += layout->bounds.y;
     return rect;
-}
-
-reach_dock_layout reach_dock_layout_to_screen(reach_dock_layout layout)
-{
-    for (size_t index = 0; index < layout.app_slot_count; ++index)
-    {
-        layout.app_slots[index] = reach_dock_rect_to_screen(&layout, layout.app_slots[index]);
-    }
-    return layout;
 }
 
 int32_t reach_dock_item_anchor(const reach_dock *dock, size_t index, reach_rect_f32 *out_button,

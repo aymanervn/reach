@@ -221,7 +221,6 @@ extern "C"
     reach_shadow_pad reach_theme_shadow_pad(const reach_shadow *shadow, float dpi_scale);
     float reach_theme_dock_corner_radius(const reach_theme *theme, float dock_height);
     float reach_theme_icon_box_size(const reach_theme *theme, float dock_height);
-    float reach_theme_icon_size(const reach_theme *theme, float icon_box_size);
     float reach_theme_icon_box_corner_radius(const reach_theme *theme, float icon_box_size);
     float reach_theme_tray_slot_size(const reach_theme *theme, float dock_height);
     reach_motion_spec reach_theme_motion_preset(const reach_theme *theme,
