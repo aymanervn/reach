@@ -341,10 +341,7 @@ static void test_desktop_keeps_solo_geometry_behind_apps(void)
     size_t desktop_index = find_desktop_tile(state);
     expect_true(desktop_index < state->tile_count, "desktop tile is present");
     reach_rect_f32 solo = state->tiles[desktop_index].target_rect;
-    float border = reach_theme_border_thickness(reach_theme_default(), 1.0f);
-    expect_near(solo.y - border, 60.0f, "desktop outer border leaves 20 dp below the top bar");
-    expect_near(solo.y + solo.height + border, 980.0f,
-                "desktop outer border leaves 20 dp above the Dock");
+    expect_true(reach_rect_equal(solo, bounds), "the wallpaper stays where the user sees it");
     expect_true(solo.width > 1600.0f, "desktop thumbnail is noticeably larger");
     expect_near(state->tiles[desktop_index].bar_height, 0.0f,
                 "desktop tile has no artificial top bar");
@@ -553,8 +550,6 @@ static void test_app_click_uses_shared_close_animation(void)
     const reach_stage_state *app_state = reach_stage_state_ptr(app_close);
     expect_near(app_state->progress, button_state->progress,
                 "app and button closes share app progress");
-    expect_near(app_state->desktop_progress, button_state->desktop_progress,
-                "app and button closes share Desktop progress");
     for (size_t index = 0; index < app_state->tile_count; ++index)
     {
         expect_near(app_state->tiles[index].current_rect.x,
@@ -579,27 +574,6 @@ static void test_app_click_uses_shared_close_animation(void)
 
     reach_stage_destroy(button_close);
     reach_stage_destroy(app_close);
-}
-
-static void test_desktop_uses_a_shorter_relative_animation(void)
-{
-    reach_stage *stage = nullptr;
-    reach_stage_create(&stage);
-    reach_stage_set_animation_seconds(stage, 1.0f);
-    reach_stage_open_window windows[2] = {make_window(1, make_rect(100, 120, 1200, 675)),
-                                          make_desktop(100, make_rect(0, 0, 1920, 1080))};
-    reach_stage_open(stage, make_rect(0, 0, 1920, 1080), 1, windows, 2);
-
-    reach_feature_tick_result tick = {};
-    double desktop = stage_seconds(0.35f) + 0.001;
-    reach_test_motion_clock_advance(desktop);
-    reach_stage_capsule_ops()->tick(stage, desktop, &tick);
-    const reach_stage_state *state = reach_stage_state_ptr(stage);
-    expect_near(state->desktop_progress, 1.0f,
-                "Desktop settles after its relative animation segment");
-    expect_true(state->progress > 0.0f && state->progress < 1.0f,
-                "app thumbnails retain the configured Stage duration");
-    reach_stage_destroy(stage);
 }
 
 static void test_desktop_only_close_has_no_hidden_app_wait(void)
@@ -1041,59 +1015,59 @@ struct golden_row
 };
 
 static const golden_row golden_rows_100[] = {
-    {1, 65.0f, 220.0f, 812.0f, 640.0f, 0.0f, 0, 0.0705882385f, 0.0705882385f, 0.0784313753f, 1.0f,
+    {1, 28.0f, 207.0f, 846.0f, 666.0f, 0.0f, 0, 0.0705882385f, 0.0705882385f, 0.0784313753f, 1.0f,
      0},
-    {1, 65.3334351f, 219.646484f, 811.609375f, 32.0f, 0.0f, 0, 0.141176477f, 0.141176477f,
+    {1, 28.0002441f, 206.744324f, 846.015137f, 32.0f, 0.0f, 0, 0.141176477f, 0.141176477f,
      0.149019614f, 0.449999988f, 0},
-    {2, 73.3334351f, 219.646484f, 779.609375f, 32.0f, 0.0f, 0, 1.0f, 1.0f, 1.0f, 0.850000024f, 65},
-    {1, 852.94281f, 227.646484f, 16.0f, 16.0f, 8.0f, 0, 1.0f, 1.0f, 1.0f, 0.550000012f, 0},
-    {10, 856.782837f, 231.486481f, 8.31999969f, 8.31999969f, 0.0f, 0, 1.0f, 1.0f, 1.0f,
-     0.800000012f, 35},
-    {1, 905.0f, 227.0f, 950.0f, 626.0f, 0.0f, 0, 0.0705882385f, 0.0705882385f, 0.0784313753f, 1.0f,
-     0},
-    {1, 904.94281f, 227.211273f, 949.723938f, 32.0f, 0.0f, 0, 0.141176477f, 0.141176477f,
-     0.149019614f, 0.449999988f, 0},
-    {2, 912.94281f, 227.211273f, 917.723938f, 32.0f, 0.0f, 0, 1.0f, 1.0f, 1.0f, 0.850000024f, 66},
-    {1, 1830.66675f, 235.211273f, 16.0f, 16.0f, 8.0f, 0, 1.0f, 1.0f, 1.0f, 0.550000012f, 0},
-    {10, 1834.50671f, 239.05127f, 8.31999969f, 8.31999969f, 0.0f, 0, 1.0f, 1.0f, 1.0f, 0.800000012f,
+    {2, 36.0002441f, 206.744324f, 814.015137f, 32.0f, 0.0f, 0, 1.0f, 1.0f, 1.0f, 0.850000024f, 65},
+    {1, 850.015381f, 214.744324f, 16.0f, 16.0f, 8.0f, 0, 1.0f, 1.0f, 1.0f, 0.550000012f, 0},
+    {10, 853.855408f, 218.58432f, 8.31999969f, 8.31999969f, 0.0f, 0, 1.0f, 1.0f, 1.0f, 0.800000012f,
      35},
+    {1, 902.0f, 215.0f, 990.0f, 650.0f, 0.0f, 0, 0.0705882385f, 0.0705882385f, 0.0784313753f, 1.0f,
+     0},
+    {1, 902.015381f, 214.629791f, 989.98468f, 32.0f, 0.0f, 0, 0.141176477f, 0.141176477f,
+     0.149019614f, 0.449999988f, 0},
+    {2, 910.015381f, 214.629791f, 957.98468f, 32.0f, 0.0f, 0, 1.0f, 1.0f, 1.0f, 0.850000024f, 66},
+    {1, 1868.0f, 222.629791f, 16.0f, 16.0f, 8.0f, 0, 1.0f, 1.0f, 1.0f, 0.550000012f, 0},
+    {10, 1871.83997f, 226.469788f, 8.31999969f, 8.31999969f, 0.0f, 0, 1.0f, 1.0f, 1.0f,
+     0.800000012f, 35},
 };
 
 static const golden_row golden_rows_125[] = {
-    {1, 81.0f, 222.0f, 794.0f, 636.0f, 0.0f, 0, 0.0705882385f, 0.0705882385f, 0.0784313753f, 1.0f,
+    {1, 35.0f, 206.0f, 836.0f, 668.0f, 0.0f, 0, 0.0705882385f, 0.0705882385f, 0.0784313753f, 1.0f,
      0},
-    {1, 81.222229f, 222.347168f, 793.740845f, 40.0f, 0.0f, 0, 0.141176477f, 0.141176477f,
-     0.149019614f, 0.449999988f, 0},
-    {2, 91.222229f, 222.347168f, 753.740845f, 40.0f, 0.0f, 0, 1.0f, 1.0f, 1.0f, 0.850000024f, 65},
-    {1, 844.963074f, 232.347168f, 20.0f, 20.0f, 10.0f, 0, 1.0f, 1.0f, 1.0f, 0.550000012f, 0},
-    {10, 849.763062f, 237.147171f, 10.4000006f, 10.4000006f, 0.0f, 0, 1.0f, 1.0f, 1.0f,
+    {1, 35.0f, 206.373016f, 836.338623f, 40.0f, 0.0f, 0, 0.141176477f, 0.141176477f, 0.149019614f,
+     0.449999988f, 0},
+    {2, 45.0f, 206.373016f, 796.338623f, 40.0f, 0.0f, 0, 1.0f, 1.0f, 1.0f, 0.850000024f, 65},
+    {1, 841.338623f, 216.373016f, 20.0f, 20.0f, 10.0f, 0, 1.0f, 1.0f, 1.0f, 0.550000012f, 0},
+    {10, 846.138611f, 221.173019f, 10.4000006f, 10.4000006f, 0.0f, 0, 1.0f, 1.0f, 1.0f,
      0.800000012f, 35},
-    {1, 910.0f, 230.0f, 929.0f, 620.0f, 0.0f, 0, 0.0705882385f, 0.0705882385f, 0.0784313753f, 1.0f,
+    {1, 906.0f, 214.0f, 979.0f, 652.0f, 0.0f, 0, 0.0705882385f, 0.0705882385f, 0.0784313753f, 1.0f,
      0},
-    {1, 909.963074f, 229.745422f, 928.814697f, 40.0f, 0.0f, 0, 0.141176477f, 0.141176477f,
+    {1, 906.338623f, 214.168304f, 978.661438f, 40.0f, 0.0f, 0, 0.141176477f, 0.141176477f,
      0.149019614f, 0.449999988f, 0},
-    {2, 919.963074f, 229.745422f, 888.814697f, 40.0f, 0.0f, 0, 1.0f, 1.0f, 1.0f, 0.850000024f, 66},
-    {1, 1808.77783f, 239.745422f, 20.0f, 20.0f, 10.0f, 0, 1.0f, 1.0f, 1.0f, 0.550000012f, 0},
-    {10, 1813.57788f, 244.545425f, 10.4000006f, 10.4000006f, 0.0f, 0, 1.0f, 1.0f, 1.0f,
+    {2, 916.338623f, 214.168304f, 938.661438f, 40.0f, 0.0f, 0, 1.0f, 1.0f, 1.0f, 0.850000024f, 66},
+    {1, 1855.0f, 224.168304f, 20.0f, 20.0f, 10.0f, 0, 1.0f, 1.0f, 1.0f, 0.550000012f, 0},
+    {10, 1859.80005f, 228.968307f, 10.4000006f, 10.4000006f, 0.0f, 0, 1.0f, 1.0f, 1.0f,
      0.800000012f, 35},
 };
 
 static const golden_row golden_rows_150[] = {
-    {1, 99.0f, 226.0f, 774.0f, 628.0f, 0.0f, 0, 0.0705882385f, 0.0705882385f, 0.0784313753f, 1.0f,
+    {1, 42.0f, 206.0f, 827.0f, 668.0f, 0.0f, 0, 0.0705882385f, 0.0705882385f, 0.0784313753f, 1.0f,
      0},
-    {1, 98.888855f, 225.662231f, 774.234009f, 48.0f, 0.0f, 0, 0.141176477f, 0.141176477f,
-     0.149019614f, 0.449999988f, 0},
-    {2, 110.888855f, 225.662231f, 726.234009f, 48.0f, 0.0f, 0, 1.0f, 1.0f, 1.0f, 0.850000024f, 65},
-    {1, 837.122864f, 237.662231f, 24.0f, 24.0f, 12.0f, 0, 1.0f, 1.0f, 1.0f, 0.550000012f, 0},
-    {10, 842.882874f, 243.422226f, 12.4800005f, 12.4800005f, 0.0f, 0, 1.0f, 1.0f, 1.0f,
+    {1, 42.0f, 206.00177f, 826.661987f, 48.0f, 0.0f, 0, 0.141176477f, 0.141176477f, 0.149019614f,
+     0.449999988f, 0},
+    {2, 54.0f, 206.00177f, 778.661987f, 48.0f, 0.0f, 0, 1.0f, 1.0f, 1.0f, 0.850000024f, 65},
+    {1, 832.661987f, 218.00177f, 24.0f, 24.0f, 12.0f, 0, 1.0f, 1.0f, 1.0f, 0.550000012f, 0},
+    {10, 838.421997f, 223.761765f, 12.4800005f, 12.4800005f, 0.0f, 0, 1.0f, 1.0f, 1.0f,
      0.800000012f, 35},
-    {1, 915.0f, 233.0f, 906.0f, 614.0f, 0.0f, 0, 0.0705882385f, 0.0705882385f, 0.0784313753f, 1.0f,
+    {1, 911.0f, 214.0f, 967.0f, 652.0f, 0.0f, 0, 0.0705882385f, 0.0705882385f, 0.0784313753f, 1.0f,
      0},
-    {1, 915.122864f, 232.878662f, 905.988281f, 48.0f, 0.0f, 0, 0.141176477f, 0.141176477f,
+    {1, 910.661987f, 213.706848f, 967.338074f, 48.0f, 0.0f, 0, 0.141176477f, 0.141176477f,
      0.149019614f, 0.449999988f, 0},
-    {2, 927.122864f, 232.878662f, 857.988281f, 48.0f, 0.0f, 0, 1.0f, 1.0f, 1.0f, 0.850000024f, 66},
-    {1, 1785.11108f, 244.878662f, 24.0f, 24.0f, 12.0f, 0, 1.0f, 1.0f, 1.0f, 0.550000012f, 0},
-    {10, 1790.87109f, 250.638657f, 12.4800005f, 12.4800005f, 0.0f, 0, 1.0f, 1.0f, 1.0f,
+    {2, 922.661987f, 213.706848f, 919.338074f, 48.0f, 0.0f, 0, 1.0f, 1.0f, 1.0f, 0.850000024f, 66},
+    {1, 1842.0f, 225.706848f, 24.0f, 24.0f, 12.0f, 0, 1.0f, 1.0f, 1.0f, 0.550000012f, 0},
+    {10, 1847.76001f, 231.466843f, 12.4800005f, 12.4800005f, 0.0f, 0, 1.0f, 1.0f, 1.0f,
      0.800000012f, 35},
 };
 
@@ -1137,7 +1111,6 @@ int main(void)
     test_close_requires_completion_before_teardown();
     test_close_handoff_holds_only_the_reveal();
     test_app_click_uses_shared_close_animation();
-    test_desktop_uses_a_shorter_relative_animation();
     test_desktop_only_close_has_no_hidden_app_wait();
     test_tile_clicks_publish_immediate_window_actions();
     test_closing_stage_retargets_restored_windows();

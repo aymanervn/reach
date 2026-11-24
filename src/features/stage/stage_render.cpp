@@ -538,8 +538,7 @@ static int32_t reach_stage_update_hover_pill(reach_stage *stage,
         return 0;
     }
 
-    int32_t resting = !reach_stage_track_active(stage, REACH_STAGE_ANIMATION_PROGRESS) &&
-                      !reach_stage_track_active(stage, REACH_STAGE_ANIMATION_DESKTOP_PROGRESS);
+    int32_t resting = !reach_stage_track_active(stage, REACH_STAGE_ANIMATION_PROGRESS);
     const reach_stage_tile *tile =
         resting && state->has_hover && state->hover_index < state->tile_count
             ? &state->tiles[state->hover_index]

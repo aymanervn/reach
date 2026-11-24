@@ -36,8 +36,6 @@ struct reach_stage_scalar_math
         {
         case REACH_STAGE_ANIMATION_PROGRESS:
             return state->progress;
-        case REACH_STAGE_ANIMATION_DESKTOP_PROGRESS:
-            return state->desktop_progress;
         case REACH_STAGE_ANIMATION_REFLOW:
             return state->reflow;
         case REACH_STAGE_ANIMATION_DEPARTURE:
@@ -201,13 +199,16 @@ reach_stage_tile_shape<Math> reach_stage_tile_geometry(Math &math, const reach_s
     using value = typename Math::value;
     using rect = typename Math::rect;
 
-    value progress = math.track(tile->desktop ? REACH_STAGE_ANIMATION_DESKTOP_PROGRESS
-                                              : REACH_STAGE_ANIMATION_PROGRESS);
     value presence_driver = math.track(tile->departing ? REACH_STAGE_ANIMATION_DEPARTURE
                                                        : REACH_STAGE_ANIMATION_REFLOW);
     float presence_target = tile->departing ? 0.0f : 1.0f;
     value presence =
         math.affine(presence_driver, presence_target - tile->presence_from, tile->presence_from);
+    // The wallpaper stays exactly where the user sees it; only app tiles move.
+    if (tile->desktop)
+        return {math.constant_rect(tile->source_rect), math.constant(0.0f), presence};
+
+    value progress = math.track(REACH_STAGE_ANIMATION_PROGRESS);
 
     // A tile whose layout did not move does not depend on the reflow track.
     value reflow = reach_rect_equal(tile->reflow_from, tile->target_rect)
@@ -311,9 +312,7 @@ int32_t reach_stage_tile_motion_at(const reach_stage *stage, size_t index, doubl
 double reach_stage_motion_event_seconds(const reach_stage *stage,
                                         const reach_stage_tile_motion *motions, double now)
 {
-    static const size_t springs[] = {REACH_STAGE_ANIMATION_PROGRESS,
-                                     REACH_STAGE_ANIMATION_DESKTOP_PROGRESS,
-                                     REACH_STAGE_ANIMATION_REFLOW};
+    static const size_t springs[] = {REACH_STAGE_ANIMATION_PROGRESS, REACH_STAGE_ANIMATION_REFLOW};
     uint32_t spring_mask = 0;
     double spring_end = 0.0;
     for (size_t track : springs)

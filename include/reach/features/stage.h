@@ -34,7 +34,6 @@ extern "C"
         int32_t desktop;
         // The window's centre as a fraction of its own monitor, where Stage places its tile.
         reach_point_f32 anchor;
-        int32_t monitor_portrait;
         int32_t departing;
         float presence;
         float presence_from;
@@ -70,7 +69,6 @@ extern "C"
         int32_t close_failed;
         float backdrop_opacity;
         float progress;
-        float desktop_progress;
         float reflow;
         float departure_progress;
         float retarget_progress;
@@ -96,7 +94,6 @@ extern "C"
         int32_t minimized;
         int32_t desktop;
         reach_point_f32 anchor;
-        int32_t monitor_portrait;
         reach_rect_f32 frame;
     } reach_stage_open_window;
 

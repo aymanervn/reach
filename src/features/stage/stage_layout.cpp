@@ -8,7 +8,6 @@
 #define REACH_STAGE_BOX_SHORT 9.0f
 #define REACH_STAGE_BAR_HEIGHT 32.0f
 #define REACH_STAGE_BAR_MAX_THUMBNAIL_RATIO 0.25f
-#define REACH_STAGE_DESKTOP_EDGE_GAP 20.0f
 #define REACH_STAGE_CONTENT_INSET 24.0f
 #define REACH_STAGE_TILE_GAP 20.0f
 // A tile's displayed area grows with its window's real area raised to this power, so larger
@@ -416,64 +415,6 @@ static void reach_stage_place_layout(reach_stage_state *state, reach_stage_layou
     }
 }
 
-static reach_rect_f32 reach_stage_fit_into_box(reach_rect_f32 box, reach_rect_f32 source)
-{
-    if (source.width <= 0.0f || source.height <= 0.0f)
-    {
-        return box;
-    }
-
-    float scale_x = box.width / source.width;
-    float scale_y = box.height / source.height;
-    float scale = scale_x < scale_y ? scale_x : scale_y;
-
-    reach_rect_f32 fitted = {};
-    fitted.width = source.width * scale;
-    fitted.height = source.height * scale;
-    fitted.x = box.x + (box.width - fitted.width) * 0.5f;
-    fitted.y = box.y + (box.height - fitted.height) * 0.5f;
-    return fitted;
-}
-
-static void reach_stage_place_desktop(reach_stage_tile *tile, reach_rect_f32 area,
-                                      float border_thickness, float dpi_scale)
-{
-    if (tile == nullptr)
-    {
-        return;
-    }
-
-    float edge_gap = REACH_STAGE_DESKTOP_EDGE_GAP * dpi_scale;
-    area.y += edge_gap;
-    area.height -= edge_gap * 2.0f;
-    if (area.width <= 0.0f || area.height <= 0.0f)
-    {
-        tile->target_rect = {};
-        return;
-    }
-
-    float box_width = tile->monitor_portrait ? REACH_STAGE_BOX_SHORT : REACH_STAGE_BOX_LONG;
-    float box_height = tile->monitor_portrait ? REACH_STAGE_BOX_LONG : REACH_STAGE_BOX_SHORT;
-    float scale_x = area.width / box_width;
-    float scale_y = area.height / box_height;
-    float scale = scale_x < scale_y ? scale_x : scale_y;
-
-    reach_rect_f32 box = {};
-    box.width = box_width * scale;
-    box.height = box_height * scale;
-    box.x = area.x + (area.width - box.width) * 0.5f;
-    box.y = area.y + (area.height - box.height) * 0.5f;
-
-    reach_rect_f32 inner = box;
-    inner.x += border_thickness;
-    inner.y += border_thickness;
-    inner.width -= border_thickness * 2.0f;
-    inner.height -= border_thickness * 2.0f;
-
-    tile->bar_height = 0.0f;
-    tile->target_rect = reach_stage_fit_into_box(inner, tile->source_rect);
-}
-
 reach_rect_f32 reach_stage_interpolate_rect(reach_rect_f32 from, reach_rect_f32 to, float factor)
 {
     if (factor >= 1.0f)
@@ -518,12 +459,12 @@ void reach_stage_rebuild_layout(reach_stage *stage)
     float dpi_scale = state->dpi_scale > 0.0f ? state->dpi_scale : 1.0f;
     float border_thickness = reach_theme_border_thickness(reach_theme_default(), dpi_scale);
     reach_stage_tile *desktop = reach_stage_desktop_tile(state);
-    reach_stage_place_desktop(desktop, state->desktop_bounds, border_thickness, dpi_scale);
-    reach_rect_f32 app_bounds = desktop != nullptr && desktop->target_rect.width > 0.0f &&
-                                        desktop->target_rect.height > 0.0f
-                                    ? desktop->target_rect
-                                    : state->desktop_bounds;
-    reach_rect_f32 area = reach_stage_content_area(app_bounds, dpi_scale);
+    if (desktop != nullptr)
+    {
+        desktop->bar_height = 0.0f;
+        desktop->target_rect = desktop->source_rect;
+    }
+    reach_rect_f32 area = reach_stage_content_area(state->desktop_bounds, dpi_scale);
     if (area.width <= 0.0f || area.height <= 0.0f)
     {
         return;

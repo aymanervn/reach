@@ -58,18 +58,6 @@ void reach_stage_set_animation_seconds(reach_stage *stage, float seconds)
     }
 }
 
-static int32_t reach_stage_has_desktop(const reach_stage_state *state)
-{
-    for (size_t index = 0; index < state->tile_count; ++index)
-    {
-        if (!state->tiles[index].departing && state->tiles[index].desktop)
-        {
-            return 1;
-        }
-    }
-    return 0;
-}
-
 static int32_t reach_stage_has_apps(const reach_stage_state *state)
 {
     for (size_t index = 0; index < state->tile_count; ++index)
@@ -115,7 +103,6 @@ reach_result reach_stage_open(reach_stage *stage, reach_rect_f32 monitor_bounds,
         tile->minimized = windows[index].minimized;
         tile->desktop = windows[index].desktop;
         tile->anchor = windows[index].anchor;
-        tile->monitor_portrait = windows[index].monitor_portrait;
         tile->presence = 1.0f;
         tile->presence_from = 1.0f;
         tile->source_rect = windows[index].frame;
@@ -134,7 +121,6 @@ reach_result reach_stage_open(reach_stage *stage, reach_rect_f32 monitor_bounds,
     state->backdrop_opacity = 1.0f;
     state->closing = 0;
     state->progress = 0.0f;
-    state->desktop_progress = 0.0f;
     state->reflow = 1.0f;
     state->departure_progress = 1.0f;
 
@@ -147,18 +133,6 @@ reach_result reach_stage_open(reach_stage *stage, reach_rect_f32 monitor_bounds,
     {
         reach_motion_set(&stage->motions[REACH_STAGE_ANIMATION_PROGRESS], 1.0f);
         state->progress = 1.0f;
-    }
-    if (reach_stage_has_desktop(state))
-    {
-        reach_stage_track_start(
-            stage, REACH_STAGE_ANIMATION_DESKTOP_PROGRESS, 0.0f, 1.0f,
-            reach_stage_presentation_spec(state->animation_seconds,
-                                          (float)REACH_STAGE_DESKTOP_ANIMATION_FACTOR));
-    }
-    else
-    {
-        reach_motion_set(&stage->motions[REACH_STAGE_ANIMATION_DESKTOP_PROGRESS], 1.0f);
-        state->desktop_progress = 1.0f;
     }
     reach_motion_set(&stage->motions[REACH_STAGE_ANIMATION_REFLOW], 1.0f);
     reach_motion_set(&stage->motions[REACH_STAGE_ANIMATION_DEPARTURE], 1.0f);
@@ -200,8 +174,7 @@ int32_t reach_stage_set_desktop_bounds(reach_stage *stage, reach_rect_f32 bounds
         reach_stage_apply_progress(stage);
     }
     else if (reach_stage_compositor_active(stage) &&
-             (reach_stage_track_active(stage, REACH_STAGE_ANIMATION_PROGRESS) ||
-              reach_stage_track_active(stage, REACH_STAGE_ANIMATION_DESKTOP_PROGRESS)) &&
+             reach_stage_track_active(stage, REACH_STAGE_ANIMATION_PROGRESS) &&
              !reach_stage_track_active(stage, REACH_STAGE_ANIMATION_REFLOW))
     {
         // While opening, a second reflow spring would stop compositor motion. Re-anchor the open
@@ -210,8 +183,7 @@ int32_t reach_stage_set_desktop_bounds(reach_stage *stage, reach_rect_f32 bounds
         {
             reach_stage_tile *tile = &stage->state.tiles[index];
             tile->open_from_rect = tile->current_rect;
-            tile->open_from_progress =
-                tile->desktop ? stage->state.desktop_progress : stage->state.progress;
+            tile->open_from_progress = stage->state.progress;
             tile->reopening = 1;
         }
         reach_stage_rebuild_layout(stage);
@@ -354,17 +326,6 @@ static void reach_stage_drive_presentation(reach_stage *stage, float target)
     {
         reach_motion_set(&stage->motions[REACH_STAGE_ANIMATION_PROGRESS], target);
     }
-    if (reach_stage_has_desktop(&stage->state))
-    {
-        reach_stage_track_to(
-            stage, REACH_STAGE_ANIMATION_DESKTOP_PROGRESS, target,
-            reach_stage_presentation_spec(stage->state.animation_seconds,
-                                          (float)REACH_STAGE_DESKTOP_ANIMATION_FACTOR));
-    }
-    else
-    {
-        reach_motion_set(&stage->motions[REACH_STAGE_ANIMATION_DESKTOP_PROGRESS], target);
-    }
 }
 
 void reach_stage_begin_close(reach_stage *stage)
@@ -385,8 +346,7 @@ void reach_stage_begin_close(reach_stage *stage)
         tile->close_from_rect = tile->current_rect;
         tile->close_destination_rect =
             reach_stage_close_destination(&stage->state, tile, tile->close_from_rect);
-        tile->close_from_progress =
-            tile->desktop ? stage->state.desktop_progress : stage->state.progress;
+        tile->close_from_progress = stage->state.progress;
         tile->close_retargeting = 0;
     }
     reach_pressable_reset(&stage->pressable, nullptr);
@@ -423,7 +383,7 @@ static int32_t reach_stage_reopen(reach_stage *stage, const reach_stage_open_win
     {
         reach_stage_tile *tile = &state->tiles[index];
         tile->open_from_rect = tile->current_rect;
-        tile->open_from_progress = tile->desktop ? state->desktop_progress : state->progress;
+        tile->open_from_progress = state->progress;
         tile->reopening = 1;
         tile->close_retargeting = 0;
     }
@@ -447,7 +407,6 @@ void reach_stage_force_close(reach_stage *stage)
     stage->pressable_generation = 0;
     state->animation_seconds = animation_seconds;
     reach_motion_set(&stage->motions[REACH_STAGE_ANIMATION_PROGRESS], 0.0f);
-    reach_motion_set(&stage->motions[REACH_STAGE_ANIMATION_DESKTOP_PROGRESS], 0.0f);
     reach_motion_set(&stage->motions[REACH_STAGE_ANIMATION_REFLOW], 0.0f);
     reach_motion_set(&stage->motions[REACH_STAGE_ANIMATION_DEPARTURE], 0.0f);
     reach_motion_set(&stage->close_hover, 0.0f);
@@ -514,7 +473,7 @@ static int32_t reach_stage_update_closing_windows(reach_stage *stage,
         }
         if (!reach_rect_equal(tile->close_destination_rect, destination))
         {
-            float progress = tile->desktop ? state->desktop_progress : state->progress;
+            float progress = state->progress;
             tile->close_from_rect = tile->current_rect;
             tile->close_from_progress = progress;
             tile->close_destination_rect = destination;
@@ -636,7 +595,6 @@ int32_t reach_stage_update_windows(reach_stage *stage, const reach_stage_open_wi
         tile->minimized = windows[candidate].minimized;
         tile->desktop = windows[candidate].desktop;
         tile->anchor = windows[candidate].anchor;
-        tile->monitor_portrait = windows[candidate].monitor_portrait;
         tile->source_rect = windows[candidate].frame;
         tile->target_rect = windows[candidate].frame;
         tile->reflow_from = windows[candidate].frame;
@@ -791,7 +749,6 @@ static void reach_stage_capsule_set_close_handoff_pending(void *capsule, int32_t
 }
 
 static const size_t reach_stage_spring_tracks[] = {REACH_STAGE_ANIMATION_PROGRESS,
-                                                   REACH_STAGE_ANIMATION_DESKTOP_PROGRESS,
                                                    REACH_STAGE_ANIMATION_REFLOW};
 
 static int32_t reach_stage_rect_near(reach_rect_f32 a, reach_rect_f32 b, float tolerance)
@@ -804,8 +761,6 @@ static void reach_stage_sample_tracks(reach_stage *stage)
 {
     reach_stage_state *state = &stage->state;
     state->progress = reach_stage_track_value(stage, REACH_STAGE_ANIMATION_PROGRESS);
-    state->desktop_progress =
-        reach_stage_track_value(stage, REACH_STAGE_ANIMATION_DESKTOP_PROGRESS);
     state->reflow = reach_stage_track_value(stage, REACH_STAGE_ANIMATION_REFLOW);
     state->departure_progress = reach_stage_track_value(stage, REACH_STAGE_ANIMATION_DEPARTURE);
     state->retarget_progress = reach_stage_track_value(stage, REACH_STAGE_ANIMATION_RETARGET);
@@ -903,7 +858,6 @@ static void reach_stage_capsule_tick(void *capsule, double delta_seconds,
 
     if (state->close_phase == REACH_STAGE_CLOSE_MOVING &&
         !reach_stage_track_active(stage, REACH_STAGE_ANIMATION_PROGRESS) &&
-        !reach_stage_track_active(stage, REACH_STAGE_ANIMATION_DESKTOP_PROGRESS) &&
         !reach_stage_track_active(stage, REACH_STAGE_ANIMATION_RETARGET))
     {
         state->close_phase = REACH_STAGE_CLOSE_ALIGNED;
@@ -1022,10 +976,8 @@ void reach_stage_set_display(reach_stage *stage, const reach_display_environment
     }
 }
 
-static reach_point_f32 reach_stage_monitor_anchor(const reach_stage *stage, reach_rect_f32 frame,
-                                                  int32_t *out_portrait)
+static reach_point_f32 reach_stage_monitor_anchor(const reach_stage *stage, reach_rect_f32 frame)
 {
-    *out_portrait = 0;
     reach_point_f32 center = {frame.x + frame.width * 0.5f, frame.y + frame.height * 0.5f};
     if (stage->display.monitor_count == 0)
     {
@@ -1045,7 +997,6 @@ static reach_point_f32 reach_stage_monitor_anchor(const reach_stage *stage, reac
     }
 
     reach_rect_f32 matched = stage->display.monitors[match];
-    *out_portrait = matched.height > matched.width ? 1 : 0;
     if (matched.width <= 0.0f || matched.height <= 0.0f)
     {
         return {0.5f, 0.5f};
@@ -1093,9 +1044,7 @@ static size_t reach_stage_collect_windows(reach_stage *stage, reach_stage_open_w
         entry->label = snapshot->title;
         entry->minimized = snapshot->minimized;
         entry->frame = frame;
-        int32_t portrait = 0;
-        entry->anchor = reach_stage_monitor_anchor(stage, frame, &portrait);
-        entry->monitor_portrait = portrait;
+        entry->anchor = reach_stage_monitor_anchor(stage, frame);
         entry->icon_id =
             reach_icon_service_get(stage->icons, snapshot->icon_ref, stage->display.icon_size_px);
         collected++;
@@ -1110,9 +1059,7 @@ static size_t reach_stage_collect_windows(reach_stage *stage, reach_stage_open_w
         entry->label = desktop_label;
         entry->desktop = 1;
         entry->frame = stage->display.primary_bounds;
-        int32_t portrait = 0;
-        entry->anchor = reach_stage_monitor_anchor(stage, entry->frame, &portrait);
-        entry->monitor_portrait = portrait;
+        entry->anchor = reach_stage_monitor_anchor(stage, entry->frame);
         collected++;
     }
 

@@ -8,7 +8,6 @@
 #include "reach/features/common/selection_pill.h"
 #include "reach/support/motion.h"
 
-#define REACH_STAGE_DESKTOP_ANIMATION_FACTOR 0.35
 #define REACH_STAGE_PRESENCE_MIN_SCALE 0.88f
 // Space the layout keeps around every tile's header and thumbnail, in DP, so the hover pill can
 // surround the tile with an even ring without crowding its neighbours.
@@ -36,7 +35,6 @@ static inline reach_motion_spec reach_stage_presentation_spec(float animation_se
 enum
 {
     REACH_STAGE_ANIMATION_PROGRESS = 0,
-    REACH_STAGE_ANIMATION_DESKTOP_PROGRESS,
     REACH_STAGE_ANIMATION_REFLOW,
     REACH_STAGE_ANIMATION_DEPARTURE,
     REACH_STAGE_ANIMATION_RETARGET,
