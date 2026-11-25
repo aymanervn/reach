@@ -3,7 +3,7 @@
 #include "reach_service_client_win32.h"
 #include "reach_service_shared_state_win32.h"
 #include "reach_service_task_win32.h"
-#include "window_query_win32.h"
+#include "window_focus_win32.h"
 
 #include <windows.h>
 #include <dwmapi.h>
@@ -281,29 +281,6 @@ static HWND reach_window_manager_prompt_owner(void)
     return nullptr;
 }
 
-static void reach_window_manager_prepare_prompt_owner(HWND owner)
-{
-    if (owner == nullptr)
-    {
-        return;
-    }
-
-    HWND foreground = GetForegroundWindow();
-    DWORD foreground_thread = reach_window_input_thread(foreground);
-    DWORD current_thread = GetCurrentThreadId();
-    // Workaround: attaching to the foreground thread bypasses the foreground lock.
-    int32_t attached = foreground_thread != 0 && foreground_thread != current_thread &&
-                       AttachThreadInput(current_thread, foreground_thread, TRUE);
-
-    (void)BringWindowToTop(owner);
-    (void)SetForegroundWindow(owner);
-
-    if (attached)
-    {
-        (void)AttachThreadInput(current_thread, foreground_thread, FALSE);
-    }
-}
-
 static int32_t reach_window_manager_confirm_privileged_control_repair(reach_window_manager *manager)
 {
     if (manager == nullptr || InterlockedCompareExchange(&manager->helper_prompt_active, 1, 0) != 0)
@@ -312,7 +289,7 @@ static int32_t reach_window_manager_confirm_privileged_control_repair(reach_wind
     }
 
     HWND owner = reach_window_manager_prompt_owner();
-    reach_window_manager_prepare_prompt_owner(owner);
+    (void)reach_window_take_foreground(owner, REACH_WINDOW_FOCUS_RAISE);
     int response = MessageBoxW(
         owner,
         L"Reach's privileged helper task is missing or points to a different installation. "

@@ -21,7 +21,5 @@ int32_t reach_window_query_process_path_for_process(DWORD process_id, uint16_t *
 int32_t reach_window_identity_is_explorer_dialog(const uint16_t *process_path,
                                                  const uint16_t *class_name);
 int32_t reach_window_is_explorer_dialog(HWND hwnd);
-// The thread whose input queue owns hwnd, for AttachThreadInput; 0 when unknown.
-DWORD reach_window_input_thread(HWND hwnd);
 
 #endif

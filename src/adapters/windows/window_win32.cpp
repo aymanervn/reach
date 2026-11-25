@@ -1,5 +1,5 @@
 #include "windows_adapters_internal.h"
-#include "window_management/window_query_win32.h"
+#include "window_management/window_focus_win32.h"
 
 #include <dwmapi.h>
 #include <dbt.h>
@@ -688,54 +688,6 @@ static DWORD reach_window_ex_style(uint32_t window_flags)
     return style;
 }
 
-static void reach_platform_window_focus(HWND hwnd)
-{
-    if (hwnd == nullptr || !IsWindow(hwnd))
-    {
-        return;
-    }
-
-    DWORD target_thread = reach_window_input_thread(hwnd);
-    DWORD current_thread = GetCurrentThreadId();
-    DWORD foreground_thread = 0;
-    HWND foreground = GetForegroundWindow();
-    if (foreground != nullptr)
-    {
-        foreground_thread = reach_window_input_thread(foreground);
-    }
-
-    // Workaround: attaching to the target and foreground threads bypasses the foreground lock.
-    BOOL attached_target = FALSE;
-    BOOL attached_foreground = FALSE;
-    if (target_thread != 0 && target_thread != current_thread)
-    {
-        attached_target = AttachThreadInput(current_thread, target_thread, TRUE);
-    }
-    if (foreground_thread != 0 && foreground_thread != current_thread &&
-        foreground_thread != target_thread)
-    {
-        attached_foreground = AttachThreadInput(current_thread, foreground_thread, TRUE);
-    }
-
-    SetForegroundWindow(hwnd);
-
-    if (GetForegroundWindow() != hwnd)
-    {
-        SetActiveWindow(hwnd);
-    }
-
-    SetFocus(hwnd);
-
-    if (attached_foreground)
-    {
-        AttachThreadInput(current_thread, foreground_thread, FALSE);
-    }
-    if (attached_target)
-    {
-        AttachThreadInput(current_thread, target_thread, FALSE);
-    }
-}
-
 static reach_result reach_platform_window_place_behind(reach_platform_window *window,
                                                        reach_window_id target_window)
 {
@@ -813,7 +765,7 @@ static reach_result reach_platform_window_show(reach_platform_window *window)
     }
     else
     {
-        reach_platform_window_focus(window->hwnd);
+        (void)reach_window_take_foreground(window->hwnd, REACH_WINDOW_FOCUS_KEYBOARD);
     }
     return REACH_OK;
 }
@@ -1071,7 +1023,7 @@ static reach_result reach_platform_window_take_keyboard_focus(reach_platform_win
     {
         return REACH_INVALID_ARGUMENT;
     }
-    reach_platform_window_focus(window->hwnd);
+    (void)reach_window_take_foreground(window->hwnd, REACH_WINDOW_FOCUS_KEYBOARD);
     return GetForegroundWindow() == window->hwnd ? REACH_OK : REACH_ERROR;
 }
 
@@ -1095,7 +1047,7 @@ static reach_result reach_platform_window_raise(reach_platform_window *window)
     int show_command = IsIconic(window->hwnd) ? SW_RESTORE : SW_SHOW;
     ShowWindow(window->hwnd, show_command);
     BringWindowToTop(window->hwnd);
-    reach_platform_window_focus(window->hwnd);
+    (void)reach_window_take_foreground(window->hwnd, REACH_WINDOW_FOCUS_KEYBOARD);
 
     return IsWindow(window->hwnd) ? REACH_OK : REACH_ERROR;
 }

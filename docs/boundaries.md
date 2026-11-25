@@ -44,7 +44,7 @@
 - DWM draws host backdrop brushes black until the shell publishes the session WNF state `WNF_IMSN_TRANSPARENCYPOLICY`, which only Explorer's immersive shell does; the compat host publishes it from the transparency, high-contrast and battery-saver state (`reach_explorer_desktop_compat_publish_transparency_policy`).
 - Stage's live thumbnails come from the undocumented `dwmapi` ordinal 147 (`DwmpCreateSharedThumbnailVisual`) as DirectComposition visuals the compositor animates; its properties are fixed at creation. Without it Stage keeps classic DWM thumbnails moved per frame (`render_d2d_thumbnail.cpp`).
 - Reach's supervision rests on the undocumented `SetShellWindow` and on Windows restarting the shell when its first registrant exits (measured 2026-11-23; `shell_session_win32.cpp`).
-- Focusing Reach surfaces and app windows attaches to the target and foreground input threads (`AttachThreadInput` in `window_win32.cpp`, `window_manager_win32.cpp`, `reach_service/window_actions.cpp`) to bypass the foreground lock. A hung foreground app can stall the caller; revisit only if that is seen.
+- Focusing Reach surfaces and app windows attaches to the real input threads of the target and the foreground window to bypass the foreground lock, through one function (`reach_window_take_foreground`). A console window's input thread is its conhost.exe thread, and hung threads are never attached: attaching to one blocked the caller (measured 2026-11-25).
 
 ## Polling
 

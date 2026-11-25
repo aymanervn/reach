@@ -1,5 +1,6 @@
 #include "window_actions.h"
-#include "../../adapters/windows/window_management/window_query_win32.h"
+#include "../../adapters/windows/window_management/window_focus_win32.h"
+
 
 struct reach_window_action_state
 {
@@ -165,58 +166,6 @@ static void reach_window_management_log_failure(const char *action, HWND hwnd,
     (void)after;
 }
 
-static int32_t reach_window_management_foreground_matches(HWND target)
-{
-    HWND foreground = GetForegroundWindow();
-    return target != nullptr && foreground != nullptr &&
-           (foreground == target || GetAncestor(foreground, GA_ROOT) == target ||
-            GetAncestor(foreground, GA_ROOTOWNER) == target);
-}
-
-static int32_t reach_window_management_focus_target(HWND target, int32_t bring_to_top)
-{
-    if (target == nullptr || !IsWindow(target))
-    {
-        return 0;
-    }
-
-    DWORD target_thread = reach_window_input_thread(target);
-    DWORD foreground_thread = reach_window_input_thread(GetForegroundWindow());
-    DWORD current_thread = GetCurrentThreadId();
-
-    // Workaround: attaching to the target and foreground threads bypasses the foreground lock.
-    BOOL attached_target = FALSE;
-    BOOL attached_foreground = FALSE;
-    if (target_thread != 0 && target_thread != current_thread)
-    {
-        attached_target = AttachThreadInput(current_thread, target_thread, TRUE);
-    }
-    if (foreground_thread != 0 && foreground_thread != current_thread &&
-        foreground_thread != target_thread)
-    {
-        attached_foreground = AttachThreadInput(current_thread, foreground_thread, TRUE);
-    }
-
-    (void)SetActiveWindow(target);
-    (void)SetFocus(target);
-    BOOL foreground_ok = SetForegroundWindow(target);
-    if (bring_to_top)
-    {
-        BringWindowToTop(target);
-    }
-
-    if (attached_foreground)
-    {
-        (void)AttachThreadInput(current_thread, foreground_thread, FALSE);
-    }
-    if (attached_target)
-    {
-        (void)AttachThreadInput(current_thread, target_thread, FALSE);
-    }
-
-    return foreground_ok || reach_window_management_foreground_matches(target);
-}
-
 static reach_result reach_window_management_activate_impl(HWND hwnd, int32_t exact, int32_t covered)
 {
     if (hwnd == nullptr || !IsWindow(hwnd))
@@ -265,7 +214,8 @@ static reach_result reach_window_management_activate_impl(HWND hwnd, int32_t exa
     }
     BringWindowToTop(target);
 
-    if (reach_window_management_focus_target(target, 1))
+    if (reach_window_take_foreground(target,
+                                     REACH_WINDOW_FOCUS_RAISE | REACH_WINDOW_FOCUS_KEYBOARD))
     {
         return REACH_OK;
     }
@@ -327,7 +277,7 @@ reach_result reach_window_management_leave_game_to_desktop(HWND game)
         return REACH_ERROR;
     }
 
-    if (!reach_window_management_focus_target(desktop, 0))
+    if (!reach_window_take_foreground(desktop, REACH_WINDOW_FOCUS_KEYBOARD))
     {
         reach_window_action_state state = reach_window_management_capture_state(game);
         reach_window_management_log_failure("leave_game.foreground", game, &state, &state);

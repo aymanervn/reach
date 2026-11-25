@@ -295,6 +295,7 @@ add_library(reach_windows_adapters STATIC
     src/adapters/windows/config_path_win32.cpp
     src/adapters/windows/config_watch_win32.cpp
     src/adapters/windows/window_management/window_query_win32.cpp
+    src/adapters/windows/window_management/window_focus_win32.cpp
     src/adapters/windows/window_management/reach_service_client_win32.cpp
     src/adapters/windows/window_management/reach_service_shared_state_win32.cpp
     src/adapters/windows/window_management/reach_service_task_win32.cpp
@@ -591,6 +592,7 @@ add_executable(reach_service WIN32
     src/protocol/reach_service_protocol.cpp
     src/adapters/windows/window_management/reach_service_shared_state_win32.cpp
     src/adapters/windows/window_management/window_query_win32.cpp
+    src/adapters/windows/window_management/window_focus_win32.cpp
     src/support/layout.cpp
     src/support/util.cpp
 )
