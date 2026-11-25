@@ -589,6 +589,8 @@ add_executable(reach_service WIN32
     src/tools/reach_service/touchpad_swipe.cpp
     src/adapters/windows/touchpad_reports_win32.cpp
     src/adapters/windows/crash_local_dumps_win32.cpp
+    src/adapters/windows/diagnostics_log_win32.cpp
+    src/support/diagnostics_log.cpp
     src/protocol/reach_service_protocol.cpp
     src/adapters/windows/window_management/reach_service_shared_state_win32.cpp
     src/adapters/windows/window_management/window_query_win32.cpp
@@ -617,6 +619,7 @@ target_link_libraries(reach_service PRIVATE
     dwmapi
     user32
     shell32
+    shlwapi
     advapi32
     ole32
     propsys

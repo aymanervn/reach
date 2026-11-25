@@ -1,4 +1,5 @@
 #include "reach/adapters/windows/crash_dump.h"
+#include "reach/adapters/windows/diagnostics_log.h"
 #include "reach/protocol/reach_service_protocol.h"
 #include "../../adapters/windows/window_management/reach_service_shared_state_win32.h"
 #include "../../adapters/windows/window_management/window_query_win32.h"
@@ -1483,6 +1484,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous, PWSTR command_line, 
         return 0;
     }
 
+    reach_diagnostics_log_install("service");
     (void)reach_crash_dump_register_local_dumps();
     reach_helper_hide_minimized_window_icons();
 

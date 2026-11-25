@@ -1,6 +1,7 @@
 #include "window_actions.h"
 #include "../../adapters/windows/window_management/window_focus_win32.h"
 
+#include <stdio.h>
 
 struct reach_window_action_state
 {
@@ -160,10 +161,18 @@ static void reach_window_management_log_failure(const char *action, HWND hwnd,
                                                 const reach_window_action_state *before,
                                                 const reach_window_action_state *after)
 {
-    (void)action;
-    (void)hwnd;
-    (void)before;
-    (void)after;
+    wchar_t class_name[64] = {};
+    if (hwnd != nullptr)
+    {
+        (void)GetClassNameW(hwnd, class_name, 64);
+    }
+    char line[256] = {};
+    snprintf(line, sizeof(line),
+             "window %s failed hwnd=%p class=%ls visible=%d>%d iconic=%d>%d zoomed=%d>%d "
+             "foreground=%p",
+             action, (void *)hwnd, class_name, before->visible, after->visible, before->iconic,
+             after->iconic, before->zoomed, after->zoomed, (void *)GetForegroundWindow());
+    reach_log_error(line);
 }
 
 static reach_result reach_window_management_activate_impl(HWND hwnd, int32_t exact, int32_t covered)
