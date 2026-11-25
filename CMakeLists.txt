@@ -584,6 +584,7 @@ add_executable(reach_service WIN32
     src/tools/reach_service/touchpad.cpp
     src/tools/reach_service/touchpad_swipe.cpp
     src/adapters/windows/touchpad_reports_win32.cpp
+    src/adapters/windows/crash_local_dumps_win32.cpp
     src/protocol/reach_service_protocol.cpp
     src/adapters/windows/window_management/reach_service_shared_state_win32.cpp
     src/adapters/windows/window_management/window_query_win32.cpp

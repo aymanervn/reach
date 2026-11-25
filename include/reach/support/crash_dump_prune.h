@@ -9,7 +9,7 @@ extern "C"
 #endif
 
 #define REACH_CRASH_DUMP_KEEP 5u
-#define REACH_CRASH_DUMP_LIMIT_BYTES (50ull * 1024ull * 1024ull)
+#define REACH_CRASH_DUMP_LIMIT_BYTES (200ull * 1024ull * 1024ull)
 #define REACH_CRASH_DUMP_PRUNE_CAPACITY 256u
 
     typedef struct reach_crash_dump_entry

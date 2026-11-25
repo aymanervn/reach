@@ -2,6 +2,7 @@
 
 #include "reach/adapters/windows/diagnostics_log.h"
 #include "reach/support/util.h"
+#include "crash_dump_internal.h"
 
 #include <windows.h>
 #include <dbghelp.h>
@@ -22,7 +23,6 @@ typedef BOOL(WINAPI *reach_crash_dump_write_fn)(HANDLE, DWORD, HANDLE, MINIDUMP_
                                                 PMINIDUMP_USER_STREAM_INFORMATION,
                                                 PMINIDUMP_CALLBACK_INFORMATION);
 
-static const wchar_t *REACH_CRASH_DUMP_DIRECTORY = L"dumps";
 static const DWORD REACH_CRASH_DUMP_STACK_BYTES = 256u * 1024u;
 static const ULONG REACH_CRASH_DUMP_STACK_GUARANTEE = 64u * 1024u;
 static const DWORD REACH_CRASH_DUMP_WAIT_MS = 15000;
@@ -88,11 +88,8 @@ static int reach_crash_dump_write_file(wchar_t *out_name, size_t name_count)
     exception.ExceptionPointers = reach_crash_dump_pointers;
     exception.ClientPointers = FALSE;
 
-    MINIDUMP_TYPE type =
-        (MINIDUMP_TYPE)(MiniDumpWithDataSegs | MiniDumpWithIndirectlyReferencedMemory |
-                        MiniDumpWithThreadInfo | MiniDumpWithUnloadedModules);
     BOOL written = reach_crash_dump_write(
-        GetCurrentProcess(), GetCurrentProcessId(), file, type,
+        GetCurrentProcess(), GetCurrentProcessId(), file, REACH_CRASH_DUMP_TYPE,
         reach_crash_dump_pointers != nullptr ? &exception : nullptr, nullptr, nullptr);
     CloseHandle(file);
     if (!written)
@@ -208,7 +205,9 @@ static void reach_crash_dump_resolve_directory(void)
 
 void reach_crash_dump_install(const char *process_name)
 {
-    SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
+    // SEM_NOGPFAULTERRORBOX would also stop Windows Error Reporting from recording fail-fast
+    // crashes, which bypass the filter below; WER_FAULT_REPORTING_NO_UI already hides its UI.
+    SetErrorMode(SEM_FAILCRITICALERRORS);
     WerSetFlags(WER_FAULT_REPORTING_NO_UI);
     _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
 #ifdef _DEBUG

@@ -2,13 +2,13 @@
 
 #include "reach/adapters/windows/diagnostics_log.h"
 #include "reach/support/crash_dump_prune.h"
+#include "crash_dump_internal.h"
 
 #include <windows.h>
 #include <shlwapi.h>
 
 #include <wchar.h>
 
-static const wchar_t *REACH_CRASH_DUMP_DIRECTORY = L"dumps";
 static const wchar_t *REACH_CRASH_DUMP_PATTERN = L"*.dmp";
 
 static uint64_t reach_crash_dump_filetime(const FILETIME &time)
