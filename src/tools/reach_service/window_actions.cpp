@@ -1,4 +1,5 @@
 #include "window_actions.h"
+#include "../../adapters/windows/window_management/window_query_win32.h"
 
 struct reach_window_action_state
 {
@@ -179,8 +180,8 @@ static int32_t reach_window_management_focus_target(HWND target, int32_t bring_t
         return 0;
     }
 
-    DWORD target_thread = GetWindowThreadProcessId(target, nullptr);
-    DWORD foreground_thread = GetWindowThreadProcessId(GetForegroundWindow(), nullptr);
+    DWORD target_thread = reach_window_input_thread(target);
+    DWORD foreground_thread = reach_window_input_thread(GetForegroundWindow());
     DWORD current_thread = GetCurrentThreadId();
 
     // Workaround: attaching to the target and foreground threads bypasses the foreground lock.

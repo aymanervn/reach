@@ -2,6 +2,7 @@
 
 #include <appmodel.h>
 #include <propvarutil.h>
+#include <tlhelp32.h>
 
 static const uint16_t *reach_window_path_filename(const uint16_t *path)
 {
@@ -199,4 +200,90 @@ int32_t reach_window_query_process_path_for_process(DWORD process_id, uint16_t *
     }
     return reach_copy_utf16(out_path, out_path_count, reinterpret_cast<const uint16_t *>(path)) ==
            REACH_OK;
+}
+
+struct reach_window_owner_search
+{
+    HWND target;
+    int32_t found;
+};
+
+static BOOL CALLBACK reach_window_owner_search_proc(HWND hwnd, LPARAM lparam)
+{
+    auto *search = reinterpret_cast<reach_window_owner_search *>(lparam);
+    if (hwnd != search->target)
+    {
+        return TRUE;
+    }
+    search->found = 1;
+    return FALSE;
+}
+
+// Workaround: GetWindowThreadProcessId reports a classic console window as owned by its client
+// (powershell.exe, cmd.exe), but the window and its input queue belong to a conhost.exe thread.
+// Attaching to the reported thread does not lift the foreground lock (measured 2026-11-25).
+static DWORD reach_window_console_input_thread(HWND hwnd)
+{
+    HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS | TH32CS_SNAPTHREAD, 0);
+    if (snapshot == INVALID_HANDLE_VALUE)
+    {
+        return 0;
+    }
+
+    DWORD hosts[64] = {};
+    uint32_t host_count = 0;
+    PROCESSENTRY32W process = {};
+    process.dwSize = sizeof(process);
+    for (BOOL more = Process32FirstW(snapshot, &process); more && host_count < 64;
+         more = Process32NextW(snapshot, &process))
+    {
+        if (_wcsicmp(process.szExeFile, L"conhost.exe") == 0)
+        {
+            hosts[host_count++] = process.th32ProcessID;
+        }
+    }
+
+    DWORD owner = 0;
+    THREADENTRY32 thread = {};
+    thread.dwSize = sizeof(thread);
+    for (BOOL more = host_count > 0 && Thread32First(snapshot, &thread); more && owner == 0;
+         more = Thread32Next(snapshot, &thread))
+    {
+        for (uint32_t index = 0; index < host_count; ++index)
+        {
+            if (thread.th32OwnerProcessID != hosts[index])
+            {
+                continue;
+            }
+            reach_window_owner_search search = {hwnd, 0};
+            EnumThreadWindows(thread.th32ThreadID, reach_window_owner_search_proc,
+                              reinterpret_cast<LPARAM>(&search));
+            if (search.found)
+            {
+                owner = thread.th32ThreadID;
+            }
+            break;
+        }
+    }
+    CloseHandle(snapshot);
+    return owner;
+}
+
+DWORD reach_window_input_thread(HWND hwnd)
+{
+    if (hwnd == nullptr)
+    {
+        return 0;
+    }
+
+    wchar_t class_name[32] = {};
+    if (GetClassNameW(hwnd, class_name, 32) > 0 && wcscmp(class_name, L"ConsoleWindowClass") == 0)
+    {
+        DWORD owner = reach_window_console_input_thread(hwnd);
+        if (owner != 0)
+        {
+            return owner;
+        }
+    }
+    return GetWindowThreadProcessId(hwnd, nullptr);
 }
