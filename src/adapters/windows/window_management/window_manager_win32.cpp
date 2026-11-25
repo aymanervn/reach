@@ -3,6 +3,7 @@
 #include "reach_service_client_win32.h"
 #include "reach_service_shared_state_win32.h"
 #include "reach_service_task_win32.h"
+#include "window_query_win32.h"
 
 #include <windows.h>
 #include <dwmapi.h>
@@ -288,8 +289,7 @@ static void reach_window_manager_prepare_prompt_owner(HWND owner)
     }
 
     HWND foreground = GetForegroundWindow();
-    DWORD foreground_thread =
-        foreground != nullptr ? GetWindowThreadProcessId(foreground, nullptr) : 0;
+    DWORD foreground_thread = reach_window_input_thread(foreground);
     DWORD current_thread = GetCurrentThreadId();
     // Workaround: attaching to the foreground thread bypasses the foreground lock.
     int32_t attached = foreground_thread != 0 && foreground_thread != current_thread &&

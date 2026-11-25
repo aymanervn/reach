@@ -1,4 +1,5 @@
 #include "windows_adapters_internal.h"
+#include "window_management/window_query_win32.h"
 
 #include <dwmapi.h>
 #include <dbt.h>
@@ -694,13 +695,13 @@ static void reach_platform_window_focus(HWND hwnd)
         return;
     }
 
-    DWORD target_thread = GetWindowThreadProcessId(hwnd, nullptr);
+    DWORD target_thread = reach_window_input_thread(hwnd);
     DWORD current_thread = GetCurrentThreadId();
     DWORD foreground_thread = 0;
     HWND foreground = GetForegroundWindow();
     if (foreground != nullptr)
     {
-        foreground_thread = GetWindowThreadProcessId(foreground, nullptr);
+        foreground_thread = reach_window_input_thread(foreground);
     }
 
     // Workaround: attaching to the target and foreground threads bypasses the foreground lock.
