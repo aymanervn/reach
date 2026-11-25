@@ -965,13 +965,13 @@ static void CALLBACK reach_helper_window_event_proc(HWINEVENTHOOK hook, DWORD ev
     }
 }
 
-static DWORD WINAPI reach_helper_window_event_thread(void *param)
+static DWORD WINAPI reach_helper_window_event_thread(void *ready_event)
 {
-    (void)param;
     MSG message = {};
     PeekMessageW(&message, nullptr, WM_USER, WM_USER, PM_NOREMOVE);
     g_session.window_event_thread_id = GetCurrentThreadId();
     reach_window_management_set_event_thread(g_session.window_event_thread_id);
+    SetEvent(static_cast<HANDLE>(ready_event));
 
     const DWORD flags = WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS;
     g_session.create_hook = SetWinEventHook(EVENT_OBJECT_CREATE, EVENT_OBJECT_CREATE, nullptr,
@@ -1025,17 +1025,23 @@ static DWORD WINAPI reach_helper_window_event_thread(void *param)
 
 static void reach_helper_start_window_events(void)
 {
-    if (g_session.window_event_thread == nullptr)
+    if (g_session.window_event_thread != nullptr)
     {
-        g_session.window_event_thread =
-            CreateThread(nullptr, 0, reach_helper_window_event_thread, nullptr, 0, nullptr);
-        for (int attempt = 0; g_session.window_event_thread != nullptr &&
-                              g_session.window_event_thread_id == 0 && attempt < 20;
-             ++attempt)
-        {
-            Sleep(10);
-        }
+        return;
     }
+    HANDLE ready = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+    if (ready == nullptr)
+    {
+        return;
+    }
+    g_session.window_event_thread =
+        CreateThread(nullptr, 0, reach_helper_window_event_thread, ready, 0, nullptr);
+    if (g_session.window_event_thread != nullptr)
+    {
+        HANDLE waits[2] = {ready, g_session.window_event_thread};
+        (void)WaitForMultipleObjects(2, waits, FALSE, INFINITE);
+    }
+    CloseHandle(ready);
 }
 
 static void reach_helper_stop_window_events(void)
