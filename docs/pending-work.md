@@ -43,7 +43,7 @@ Open items only.
 - Windows skips a process's unhandled exception filter once its running exe is renamed (measured 2026-11-25), and WER's dump keys no longer match the renamed image. Between an update's rename-aside and the restart, a crash leaves only a WER event.
 - A window that becomes foreground before Reach tracks it is skipped by `reach_host_apply_foreground_change` (`host_window_tracking.cpp:332`; trace 2026-11-25). Unconfirmed whether the record catches up without another foreground change.
 - The input-language indicator reads the keyboard layout of the reported thread (`input_language_win32.cpp:15`); for a console that is the client, not the conhost thread that receives keys. Unverified whether the shown layout differs.
-- reachService activation polls with `Sleep(25)` for up to 750 ms while restoring or minimizing (`reach_window_management_wait_for`, `window_actions.cpp:71`), against the polling rule.
+- reachService waits for its window-event thread to start with a `Sleep(10)` loop of up to 200 ms (`reach_helper_start_window_events`); signal an event instead.
 - Alt+Tab away from a hung app hands the foreground to the next app, then dwm's "Not Responding" ghost window takes it back (0/3 before and after `reach_window_take_foreground`, 2026-11-25). Switching to a hung app also fails.
 - Folder opens duplicate the launcher's ShellExecute and foreground handover (`explorer_service_win32.cpp:36`, `diagnostics_log_win32.cpp:314`); move them into `app_launcher_win32.cpp`.
 - Launched apps inherit Reach's start-time environment; environment variable changes reach new apps only after Reach restarts.

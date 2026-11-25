@@ -15,4 +15,9 @@ reach_result reach_window_management_leave_game_to_desktop(HWND game);
 reach_result reach_window_management_snap(HWND hwnd, reach_split_mode mode);
 reach_result reach_window_management_close(HWND hwnd);
 
+// Window-event thread only: wakes pending actions whose window reached the state they wait for.
+void reach_window_management_note_window_event(HWND hwnd);
+// Names the window-event thread, which must keep dispatching while an action waits on it.
+void reach_window_management_set_event_thread(DWORD thread_id);
+
 #endif

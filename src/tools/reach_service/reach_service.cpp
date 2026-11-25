@@ -890,6 +890,7 @@ static void CALLBACK reach_helper_window_event_proc(HWINEVENTHOOK hook, DWORD ev
 
     if (object_id == OBJID_WINDOW && child_id == CHILDID_SELF)
     {
+        reach_window_management_note_window_event(hwnd);
         if (event == EVENT_OBJECT_DESTROY)
         {
             reach_helper_forget_window_metadata(hwnd);
@@ -970,6 +971,7 @@ static DWORD WINAPI reach_helper_window_event_thread(void *param)
     MSG message = {};
     PeekMessageW(&message, nullptr, WM_USER, WM_USER, PM_NOREMOVE);
     g_session.window_event_thread_id = GetCurrentThreadId();
+    reach_window_management_set_event_thread(g_session.window_event_thread_id);
 
     const DWORD flags = WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS;
     g_session.create_hook = SetWinEventHook(EVENT_OBJECT_CREATE, EVENT_OBJECT_CREATE, nullptr,
@@ -1016,6 +1018,7 @@ static DWORD WINAPI reach_helper_window_event_thread(void *param)
     }
 
     reach_helper_close_window_event_hooks();
+    reach_window_management_set_event_thread(0);
     g_session.window_event_thread_id = 0;
     return 0;
 }

@@ -70,22 +70,118 @@ static int32_t reach_window_management_rect_equalish(RECT a, RECT b)
            abs_long(a.right - b.right) <= tolerance && abs_long(a.bottom - b.bottom) <= tolerance;
 }
 
-static int32_t reach_window_management_wait_for(HWND hwnd, int32_t (*predicate)(HWND, const RECT *),
-                                                const RECT *expected, DWORD timeout_ms)
+typedef int32_t (*reach_window_predicate)(HWND, const RECT *);
+
+// A pending action waiting for its window to reach a state. Registered on the thread running the
+// action; signalled from the window-event thread when an event for that window satisfies it.
+struct reach_window_waiter
 {
-    DWORD start = GetTickCount();
+    HWND hwnd;
+    reach_window_predicate predicate;
+    const RECT *expected;
+    HANDLE signal;
+};
+
+static const size_t REACH_WINDOW_WAITER_CAPACITY = 4;
+static reach_window_waiter g_window_waiters[REACH_WINDOW_WAITER_CAPACITY] = {};
+static SRWLOCK g_window_waiter_lock = SRWLOCK_INIT;
+static DWORD g_window_event_thread_id = 0;
+
+void reach_window_management_set_event_thread(DWORD thread_id)
+{
+    g_window_event_thread_id = thread_id;
+}
+
+void reach_window_management_note_window_event(HWND hwnd)
+{
+    AcquireSRWLockShared(&g_window_waiter_lock);
+    for (const reach_window_waiter &waiter : g_window_waiters)
+    {
+        if (waiter.hwnd == hwnd && waiter.signal != nullptr &&
+            waiter.predicate(waiter.hwnd, waiter.expected))
+        {
+            SetEvent(waiter.signal);
+        }
+    }
+    ReleaseSRWLockShared(&g_window_waiter_lock);
+}
+
+// The window-event thread delivers the events this wait listens for, so it keeps dispatching
+// them when the wait itself runs there.
+static void reach_window_management_wait_signal(HANDLE signal, DWORD timeout_ms)
+{
+    if (GetCurrentThreadId() != g_window_event_thread_id)
+    {
+        (void)WaitForSingleObject(signal, timeout_ms);
+        return;
+    }
+
+    ULONGLONG deadline = GetTickCount64() + timeout_ms;
     for (;;)
     {
-        if (predicate(hwnd, expected))
+        ULONGLONG now = GetTickCount64();
+        if (now >= deadline)
         {
-            return 1;
+            return;
         }
-        if (GetTickCount() - start >= timeout_ms)
+        DWORD result = MsgWaitForMultipleObjectsEx(1, &signal, (DWORD)(deadline - now), QS_ALLINPUT,
+                                                   MWMO_INPUTAVAILABLE);
+        if (result != WAIT_OBJECT_0 + 1)
         {
-            return 0;
+            return;
         }
-        Sleep(25);
+        MSG message = {};
+        while (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE))
+        {
+            TranslateMessage(&message);
+            DispatchMessageW(&message);
+        }
     }
+}
+
+static int32_t reach_window_management_wait_for(HWND hwnd, reach_window_predicate predicate,
+                                                const RECT *expected, DWORD timeout_ms)
+{
+    if (predicate(hwnd, expected))
+    {
+        return 1;
+    }
+
+    HANDLE signal = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+    if (signal == nullptr)
+    {
+        return 0;
+    }
+
+    reach_window_waiter *slot = nullptr;
+    AcquireSRWLockExclusive(&g_window_waiter_lock);
+    for (reach_window_waiter &waiter : g_window_waiters)
+    {
+        if (waiter.signal == nullptr)
+        {
+            waiter = {hwnd, predicate, expected, signal};
+            slot = &waiter;
+            break;
+        }
+    }
+    ReleaseSRWLockExclusive(&g_window_waiter_lock);
+    REACH_ASSERT(slot != nullptr);
+
+    // Checked again after registering so a change between the first check and registration is
+    // not missed.
+    if (slot != nullptr && !predicate(hwnd, expected))
+    {
+        reach_window_management_wait_signal(signal, timeout_ms);
+    }
+
+    if (slot != nullptr)
+    {
+        AcquireSRWLockExclusive(&g_window_waiter_lock);
+        *slot = {};
+        ReleaseSRWLockExclusive(&g_window_waiter_lock);
+    }
+    CloseHandle(signal);
+    return predicate(hwnd, expected);
 }
 
 static int32_t reach_window_management_minimized(HWND hwnd, const RECT *expected)
@@ -157,6 +253,32 @@ void reach_window_management_prepare_minimize(HWND hwnd)
     (void)SetWindowPlacement(hwnd, &placement);
 }
 
+static const DWORD REACH_WINDOW_PREPARE_MINIMIZE_MS = 250;
+
+static DWORD WINAPI reach_window_management_prepare_minimize_proc(void *hwnd)
+{
+    reach_window_management_prepare_minimize(static_cast<HWND>(hwnd));
+    return 0;
+}
+
+// SetWindowPlacement waits for the window's own thread. An app that stopped pumping, even before
+// Windows reports it hung, would hold the caller, so the call runs on a disposable thread that
+// ends with that app; the minimize goes ahead either way.
+static void reach_window_management_prepare_minimize_bounded(HWND hwnd)
+{
+    if (hwnd == nullptr || IsHungAppWindow(hwnd))
+    {
+        return;
+    }
+    HANDLE thread =
+        CreateThread(nullptr, 0, reach_window_management_prepare_minimize_proc, hwnd, 0, nullptr);
+    if (thread != nullptr)
+    {
+        (void)WaitForSingleObject(thread, REACH_WINDOW_PREPARE_MINIMIZE_MS);
+        CloseHandle(thread);
+    }
+}
+
 static void reach_window_management_log_failure(const char *action, HWND hwnd,
                                                 const reach_window_action_state *before,
                                                 const reach_window_action_state *after)
@@ -191,7 +313,7 @@ static reach_result reach_window_management_activate_impl(HWND hwnd, int32_t exa
                                           (placement.showCmd == SW_SHOWMAXIMIZED ||
                                            (placement.flags & WPF_RESTORETOMAXIMIZED) != 0);
 
-        ShowWindow(hwnd, restore_to_maximized ? SW_SHOWMAXIMIZED : SW_RESTORE);
+        (void)ShowWindowAsync(hwnd, restore_to_maximized ? SW_SHOWMAXIMIZED : SW_RESTORE);
         int32_t restored =
             reach_window_management_wait_for(hwnd, reach_window_management_restored, nullptr, 750);
         if (!restored)
@@ -259,7 +381,7 @@ reach_result reach_window_management_minimize(HWND hwnd)
     HWND target = hwnd;
 
     reach_window_action_state before = reach_window_management_capture_state(target);
-    reach_window_management_prepare_minimize(target);
+    reach_window_management_prepare_minimize_bounded(target);
     (void)ShowWindowAsync(target, SW_MINIMIZE);
     (void)PostMessageW(target, WM_SYSCOMMAND, SC_MINIMIZE, 0);
 
@@ -386,7 +508,7 @@ reach_result reach_window_management_snap(HWND hwnd, reach_split_mode mode)
     if (!IsZoomed(hwnd) && reach_window_management_matches_split(hwnd, work_area, mode))
     {
         reach_window_action_state before = reach_window_management_capture_state(hwnd);
-        ShowWindow(hwnd, SW_MAXIMIZE);
+        (void)ShowWindowAsync(hwnd, SW_MAXIMIZE);
         if (reach_window_management_wait_for(hwnd, reach_window_management_maximized, nullptr, 750))
         {
             return REACH_OK;
@@ -399,7 +521,7 @@ reach_result reach_window_management_snap(HWND hwnd, reach_split_mode mode)
 
     if (IsZoomed(hwnd))
     {
-        ShowWindow(hwnd, SW_RESTORE);
+        (void)ShowWindowAsync(hwnd, SW_RESTORE);
         if (!reach_window_management_wait_for(hwnd, reach_window_management_restored, nullptr, 750))
         {
             reach_window_action_state after = reach_window_management_capture_state(hwnd);
@@ -411,9 +533,9 @@ reach_result reach_window_management_snap(HWND hwnd, reach_split_mode mode)
     reach_window_action_state before = reach_window_management_capture_state(hwnd);
     RECT expected = {target.left, target.top, target.right, target.bottom};
     reach_window_management_expand_by_invisible_borders(hwnd, &expected);
-    BOOL ok =
-        SetWindowPos(hwnd, nullptr, expected.left, expected.top, expected.right - expected.left,
-                     expected.bottom - expected.top, SWP_NOZORDER | SWP_NOACTIVATE);
+    BOOL ok = SetWindowPos(hwnd, nullptr, expected.left, expected.top,
+                           expected.right - expected.left, expected.bottom - expected.top,
+                           SWP_NOZORDER | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS);
     if (ok && reach_window_management_wait_for(hwnd, reach_window_management_rect_matches,
                                                &expected, 750))
     {
