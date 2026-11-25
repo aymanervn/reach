@@ -16,9 +16,9 @@ extern "C"
     // carries no CodeView record.
     int32_t reach_crash_report_build_id(char *out_id, size_t capacity);
 
-    // Calling thread: the UI thread, once at startup after the dump prune. Logs how the previous
-    // run ended and any dump written since it started, keeps the symbols of a build that left a
-    // dump, drops symbols no dump needs, and records this run.
+    // Calling thread: the UI thread, once at startup. Returns at once; a background thread prunes
+    // old dumps, logs how the previous run ended and any dump written since it started, keeps the
+    // symbols of a build that left a dump, drops symbols no dump needs, and records this run.
     void reach_crash_report_begin_run(void);
 
     // Calling thread: the UI thread, at a normal exit. Marks this run as ended cleanly.

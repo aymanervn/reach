@@ -163,7 +163,6 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
              (unsigned long)reach_parent_process_id(), launched_as_shell,
              claim == REACH_OK ? "ok" : "failed");
     reach_log_info(start_line);
-    reach_crash_dump_prune();
     reach_crash_report_begin_run();
 
     reach_workload_session workload("reach");

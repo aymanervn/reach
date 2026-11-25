@@ -1,5 +1,6 @@
 #include "reach/adapters/windows/crash_report.h"
 
+#include "reach/adapters/windows/crash_dump.h"
 #include "reach/adapters/windows/diagnostics_log.h"
 #include "reach/support/util.h"
 #include "crash_dump_internal.h"
@@ -8,7 +9,6 @@
 #include <dbghelp.h>
 #include <shlwapi.h>
 
-#include <new>
 #include <stdio.h>
 #include <string.h>
 #include <wchar.h>
@@ -33,12 +33,6 @@ struct reach_crash_report_codeview
     GUID guid;
     DWORD age;
     char pdb_path[1];
-};
-
-struct reach_crash_report_archive_job
-{
-    int32_t keep;
-    char build_id[REACH_CRASH_REPORT_BUILD_ID_CAPACITY];
 };
 
 static const reach_crash_report_codeview *reach_crash_report_codeview_record(void)
@@ -405,20 +399,12 @@ static void reach_crash_report_prune_symbols(void)
 }
 
 // Copying a PDB of a hundred megabytes stays off the UI thread.
-static DWORD WINAPI reach_crash_report_archive_proc(void *parameter)
+// Every file touched here can be slow on a cold disk or under antivirus scanning, and the PDB copy
+// moves about a hundred megabytes, so the whole report runs off the UI thread.
+static DWORD WINAPI reach_crash_report_run_proc(void *)
 {
-    reach_crash_report_archive_job *job = static_cast<reach_crash_report_archive_job *>(parameter);
-    if (job->keep)
-    {
-        reach_crash_report_keep_symbols(job->build_id);
-    }
-    reach_crash_report_prune_symbols();
-    delete job;
-    return 0;
-}
+    reach_crash_dump_prune();
 
-void reach_crash_report_begin_run(void)
-{
     reach_crash_report_run previous = {};
     int32_t has_previous = reach_crash_report_read_run(&previous);
 
@@ -429,7 +415,7 @@ void reach_crash_report_begin_run(void)
     current.start_time = reach_crash_report_filetime(now);
     reach_crash_report_build_id(current.build_id, sizeof(current.build_id));
 
-    reach_crash_report_archive_job *job = new (std::nothrow) reach_crash_report_archive_job();
+    int32_t keep = 0;
     if (has_previous)
     {
         wchar_t dump[MAX_PATH] = {};
@@ -444,12 +430,11 @@ void reach_crash_report_begin_run(void)
                      dump[0] != 0 ? dump : L"none");
             reach_log_info(line);
 
-            if (dump[0] != 0 && job != nullptr)
+            if (dump[0] != 0)
             {
                 if (previous.build_id[0] != 0 && strcmp(previous.build_id, current.build_id) == 0)
                 {
-                    job->keep = 1;
-                    strcpy_s(job->build_id, previous.build_id);
+                    keep = 1;
                 }
                 else
                 {
@@ -463,16 +448,24 @@ void reach_crash_report_begin_run(void)
     }
     reach_crash_report_write_run(&current);
 
-    HANDLE thread = job != nullptr
-                        ? CreateThread(nullptr, 0, reach_crash_report_archive_proc, job, 0, nullptr)
-                        : nullptr;
+    if (keep)
+    {
+        reach_crash_report_keep_symbols(current.build_id);
+    }
+    reach_crash_report_prune_symbols();
+    return 0;
+}
+
+void reach_crash_report_begin_run(void)
+{
+    HANDLE thread = CreateThread(nullptr, 0, reach_crash_report_run_proc, nullptr, 0, nullptr);
     if (thread != nullptr)
     {
         CloseHandle(thread);
     }
     else
     {
-        delete job;
+        reach_log_error("crash report not started");
     }
 }
 
