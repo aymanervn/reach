@@ -63,7 +63,8 @@ static int reach_crash_dump_build_path(wchar_t *out_path, size_t out_count, wcha
     return PathAppendW(out_path, out_name);
 }
 
-static int reach_crash_dump_write_file(wchar_t *out_name, size_t name_count)
+static int reach_crash_dump_write_file(EXCEPTION_POINTERS *pointers, DWORD thread_id,
+                                       wchar_t *out_name, size_t name_count)
 {
     if (reach_crash_dump_write == nullptr || reach_crash_dump_directory[0] == 0)
     {
@@ -84,13 +85,13 @@ static int reach_crash_dump_write_file(wchar_t *out_name, size_t name_count)
     }
 
     MINIDUMP_EXCEPTION_INFORMATION exception = {};
-    exception.ThreadId = reach_crash_dump_thread_id;
-    exception.ExceptionPointers = reach_crash_dump_pointers;
+    exception.ThreadId = thread_id;
+    exception.ExceptionPointers = pointers;
     exception.ClientPointers = FALSE;
 
     BOOL written = reach_crash_dump_write(
         GetCurrentProcess(), GetCurrentProcessId(), file, REACH_CRASH_DUMP_TYPE,
-        reach_crash_dump_pointers != nullptr ? &exception : nullptr, nullptr, nullptr);
+        pointers != nullptr ? &exception : nullptr, nullptr, nullptr);
     CloseHandle(file);
     if (!written)
     {
@@ -105,7 +106,8 @@ static DWORD WINAPI reach_crash_dump_thread_main(void *)
     WaitForSingleObject(reach_crash_dump_request, INFINITE);
 
     wchar_t name[96] = {};
-    int written = reach_crash_dump_write_file(name, 96);
+    int written = reach_crash_dump_write_file(reach_crash_dump_pointers, reach_crash_dump_thread_id,
+                                              name, 96);
 
     void *address = reach_crash_dump_pointers != nullptr &&
                             reach_crash_dump_pointers->ExceptionRecord != nullptr
@@ -126,6 +128,15 @@ static DWORD WINAPI reach_crash_dump_thread_main(void *)
 
     TerminateProcess(GetCurrentProcess(), reach_crash_dump_exit_code);
     return 0;
+}
+
+int reach_crash_dump_write_snapshot(wchar_t *out_name, size_t name_count)
+{
+    if (reach_crash_dump_claimed != 0)
+    {
+        return 0;
+    }
+    return reach_crash_dump_write_file(nullptr, 0, out_name, name_count);
 }
 
 static void reach_crash_dump_signal(EXCEPTION_POINTERS *pointers, DWORD code)

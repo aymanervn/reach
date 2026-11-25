@@ -10,6 +10,7 @@
 #include "reach/adapters/windows/crash_dump.h"
 #include "reach/adapters/windows/diagnostics_log.h"
 #include "reach/adapters/windows/frame_wait.h"
+#include "reach/adapters/windows/hang_guard.h"
 #include "reach/adapters/windows/install_check.h"
 #include "reach/adapters/windows/shell_session.h"
 #include "reach/platform/shell_registration.h"
@@ -198,6 +199,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
     void *device_wait_handles[1] = {device_port->ops.wait_handle(device_port->device)};
     uint32_t device_wait_count = device_wait_handles[0] != nullptr ? 1 : 0;
     int running = 1;
+    reach_hang_guard_start();
     while (running)
     {
         reach_render_device_status device_status = device_port->ops.status(device_port->device);
@@ -222,9 +224,11 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
             uint32_t idle_wait = reach_app_idle_wait_ms(app);
             wait_ms = idle_wait == REACH_APP_WAIT_FOREVER ? INFINITE : (DWORD)idle_wait;
         }
+        reach_hang_guard_idle();
         DWORD wait_result = reach_windows_frame_wait(
             frame_timer, device_wait_handles, device_wait_count, wait_ms,
             needed_frame_before_wait ? frame_clock.next_frame_seconds : -1.0);
+        reach_hang_guard_busy();
         int32_t device_signalled = device_wait_count != 0 && wait_result == WAIT_OBJECT_0;
         reach_workload_add(REACH_WORKLOAD_WAKEUPS, 1);
 
@@ -298,6 +302,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
         }
     }
 
+    reach_hang_guard_stop();
     if (app != nullptr)
     {
         (void)reach_app_stop(app);

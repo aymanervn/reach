@@ -83,6 +83,7 @@ add_library(reach_support STATIC
     src/support/diagnostics_log.cpp
     src/support/crash_loop.cpp
     src/support/crash_dump_prune.cpp
+    src/support/hang_history.cpp
     src/support/render_device_loss.cpp
     src/support/render_recovery.cpp
     src/support/motion.cpp
@@ -249,6 +250,7 @@ add_library(reach_windows_adapters STATIC
     src/adapters/windows/crash_dump_prune_win32.cpp
     src/adapters/windows/crash_dump_win32.cpp
     src/adapters/windows/diagnostics_log_win32.cpp
+    src/adapters/windows/hang_guard_win32.cpp
     src/adapters/windows/install_check_win32.cpp
     src/adapters/windows/shell_session_win32.cpp
     src/adapters/windows/watchdog_retirement_win32.cpp
@@ -362,6 +364,7 @@ target_link_libraries(reach_windows_adapters PRIVATE
     windowscodecs
     dwmapi
     powrprof
+    synchronization
     wlanapi
     iphlpapi
     wbemuuid

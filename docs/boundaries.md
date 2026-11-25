@@ -49,4 +49,4 @@
 ## Polling
 
 - Polling is prohibited unless the user approves a narrow exception.
-- `system_stats` (`src/services/system_stats.cpp`) is the only approved exception and is not a precedent.
+- Approved exceptions, none of them a precedent: `system_stats` (`src/services/system_stats.cpp`), and the hang guard (`src/adapters/windows/hang_guard_win32.cpp`), which wakes only while the UI thread works and at most once per 5 s.

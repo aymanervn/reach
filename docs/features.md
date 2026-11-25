@@ -27,6 +27,7 @@
 
 - Windows starts and restarts `reach.exe`: it reruns the logon-time shell command whenever the first process to register a shell window exits, whatever the exit code. Reach never starts Reach, so Reach and every app it launches stay outside any job.
 - Reach claims the shell window before anything that can fail and hands it to the desktop host later (`reach_windows_shell_session_claim`, `reach_windows_shell_session_register`).
+- A UI-thread pass that retrieves no posted message for about 10 s is a hang: Reach dumps, logs and ends itself so Windows restarts it; after three hang restarts within 5 minutes it only dumps and logs (`reach_hang_guard_start`, `reach_hang_history_allow_restart`).
 - Three starts within 60 s, none of which survived 10 s, mean the installed version is broken (a run that survives 10 s clears the history): Reach falls back to Explorer permanently (shell value, direct start, tray notice) and exits without claiming, so Windows stops restarting it (`reach_crash_loop_record_start`, `reach_windows_shell_session_fall_back`).
 - Switching to Reach while another shell (Explorer) runs needs a sign-out. With no shell running, opening `reach.exe` or `reachctl --start` starts Reach, never elevated (`reach_windows_other_shell_running`); `reachctl --start` also restarts a running Reach, and starts one itself when Windows brings none back within 2.5 s.
 - An update only swaps files (running ones are renamed aside), closes Settings and restarts Reach through `reachctl --start`.

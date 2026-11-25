@@ -40,7 +40,7 @@ Open items only.
 - `RoActivateInstance(Compositor)` failed with `E_ACCESSDENIED` in Reach and Settings on every start until Explorer had run once (events.log, up to 2026-11-22 17:14). Not reproduced on a cold boot straight into Reach after the transparency-policy fix (2026-11-22 20:29). Cause unknown; reopen if it returns.
 - Validate on a deployed build: three short runs within 60 s fall back to Explorer with the tray notice; apps launched from Reach survive ending Reach; the first start of a newer version shows one UAC prompt only while the watchdog task exists, and never again after a decline.
 - Windows Error Reporting dump keys for Reach stay in HKLM after uninstall (`reach_crash_dump_register_local_dumps`); removing them belongs to uninstall in `reachctl`, which needs the owner.
-- A `memset(0x10)` thread injected into the previous build (pid 15324, 2026-11-25 20:50) ended Reach with no crash log, dump or WER record; the same injection logged and dumped at 20:28. Retry on a build where WER records fail-fast crashes.
+- Windows skips a process's unhandled exception filter once its running exe is renamed (measured 2026-11-25), and WER's dump keys no longer match the renamed image. Between an update's rename-aside and the restart, a crash leaves only a WER event.
 - Folder opens duplicate the launcher's ShellExecute and foreground handover (`explorer_service_win32.cpp:36`, `diagnostics_log_win32.cpp:314`); move them into `app_launcher_win32.cpp`.
 - Launched apps inherit Reach's start-time environment; environment variable changes reach new apps only after Reach restarts.
 - Idle Watch starts during host creation. A full host stop ends its worker until the host is recreated (`host_lifecycle.cpp`, `idle_watch.cpp`).
