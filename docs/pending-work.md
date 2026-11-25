@@ -14,7 +14,7 @@ Open items only.
 - Settings toggle-animation test is timing-sensitive under Idle priority. Drive it from explicit timestamps.
 - App Control worker test assumes a queued job has not started.
 - Quick Settings Bluetooth rows can stay blank on first open. The cause is in retained presentation (`render_d2d_retained.cpp`, `draw_layer`); it needs a renderer trace.
-- Cross-app activation sometimes leaves the previous app active; a direct click restores focus. Unresolved since 2026-09-07.
+- Validate in daily use: cross-app activation sometimes left the previous app active (open since 2026-09-07). Likely the console foreground-lock bug fixed in `0131c9a4` and `a765ebd2`; delete this item if it does not return.
 - Compositor-driven Stage needs live validation: thumbnail stacking with the focused window on top, Dock restore/minimize closing Stage, minimized windows rising from the bottom centre, about 50 windows, and the classic-thumbnail fallback without ordinal 147.
 - Renderer failures other than device loss are not logged (`reach_d2d_device_check`), so a failed frame's log line (`reach_host_recover_failed_frame`) gives only the surface slot and result. The DirectComposition branch of `draw_layer` (`render_d2d_retained.cpp`) also has no surface memory budget.
 - Launcher fast scroll can leave the last page's items unloaded. Suspect: the icon prefetch range in `launcher_render.cpp`.
@@ -43,7 +43,7 @@ Open items only.
 - Windows skips a process's unhandled exception filter once its running exe is renamed (measured 2026-11-25), and WER's dump keys no longer match the renamed image. Between an update's rename-aside and the restart, a crash leaves only a WER event.
 - A window that becomes foreground before Reach tracks it is skipped by `reach_host_apply_foreground_change` (`host_window_tracking.cpp:332`; trace 2026-11-25). Unconfirmed whether the record catches up without another foreground change.
 - The input-language indicator reads the keyboard layout of the reported thread (`input_language_win32.cpp:15`); for a console that is the client, not the conhost thread that receives keys. Unverified whether the shown layout differs.
-- Alt+Tab away from a hung app hands the foreground to the next app, then dwm's "Not Responding" ghost window takes it back (0/3 before and after `reach_window_take_foreground`, 2026-11-25). Switching to a hung app also fails.
+- A hung app in front keeps the focus: Alt+Tab hands the foreground to the next app, then dwm's "Not Responding" ghost window takes it back, and a Reach panel opened over it does not get focus either (0/3 each, 2026-11-25). Reach and reachService stay responsive (9/9; window actions on it give up after 750 ms), so it is friction until the app recovers or is ended, not a freeze. Untested: whether a mouse click on another window or the ghost's close button escapes it. Needs an investigation of how the ghost takes the foreground.
 - Folder opens duplicate the launcher's ShellExecute and foreground handover (`explorer_service_win32.cpp:36`, `diagnostics_log_win32.cpp:314`); move them into `app_launcher_win32.cpp`.
 - Launched apps inherit Reach's start-time environment; environment variable changes reach new apps only after Reach restarts.
 - Idle Watch starts during host creation. A full host stop ends its worker until the host is recreated (`host_lifecycle.cpp`, `idle_watch.cpp`).
