@@ -42,6 +42,15 @@ configure_file(
     ${REACH_GENERATED_INCLUDE_DIR}/reach/protocol/version.h
     @ONLY
 )
+add_custom_target(reach_build_info
+    COMMAND ${CMAKE_COMMAND}
+        -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+        -DOUTPUT=${REACH_GENERATED_INCLUDE_DIR}/reach/protocol/build_info.h
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/tools/build_info.cmake
+    BYPRODUCTS ${REACH_GENERATED_INCLUDE_DIR}/reach/protocol/build_info.h
+    COMMENT "Recording the build commit"
+    VERBATIM
+)
 
 function(reach_configure_common target)
     target_include_directories(${target} PUBLIC
@@ -249,6 +258,7 @@ add_library(reach_windows_adapters STATIC
     src/adapters/windows/clipboard_win32.cpp
     src/adapters/windows/crash_dump_prune_win32.cpp
     src/adapters/windows/crash_dump_win32.cpp
+    src/adapters/windows/crash_report_win32.cpp
     src/adapters/windows/diagnostics_log_win32.cpp
     src/adapters/windows/hang_guard_win32.cpp
     src/adapters/windows/install_check_win32.cpp
@@ -428,6 +438,7 @@ endif()
 
 reach_configure_common(reach)
 reach_release_symbols(reach)
+add_dependencies(reach reach_build_info)
 reach_configure_windows(reach)
 target_compile_features(reach PRIVATE
     c_std_11
@@ -609,6 +620,7 @@ if (MSVC)
 endif()
 
 reach_configure_common(reach_service)
+reach_release_symbols(reach_service)
 reach_configure_windows(reach_service)
 target_compile_features(reach_service PRIVATE
     cxx_std_17
@@ -735,6 +747,27 @@ add_custom_target(reach_release_zip
     DEPENDS ${REACH_RELEASE_TARGETS}
     BYPRODUCTS "${REACH_ZIP_PATH}"
     COMMENT "Creating Reach Release ZIP"
+    VERBATIM
+)
+
+# Symbols are published beside the release, never inside it: dumps from a released build can only
+# be read with the exact PDBs that build produced.
+set(REACH_SYMBOLS_DIR "${REACH_DIST_ROOT}/$<CONFIG>-symbols")
+set(REACH_SYMBOLS_ZIP_PATH "${REACH_DIST_ROOT}/reach-v${PROJECT_VERSION}-symbols.zip")
+add_custom_target(reach_symbols_zip
+    COMMAND ${CMAKE_COMMAND} -E rm -rf "${REACH_SYMBOLS_DIR}"
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${REACH_SYMBOLS_DIR}/symbols"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "$<TARGET_PDB_FILE:reach>"
+        "$<TARGET_PDB_FILE:reach_settings>"
+        "$<TARGET_PDB_FILE:reach_service>"
+        "${REACH_SYMBOLS_DIR}/symbols"
+    COMMAND ${CMAKE_COMMAND} -E chdir "${REACH_SYMBOLS_DIR}"
+        ${CMAKE_COMMAND} -E tar "cfv" "${REACH_SYMBOLS_ZIP_PATH}" --format=zip
+        "symbols"
+    DEPENDS reach reach_settings reach_service
+    BYPRODUCTS "${REACH_SYMBOLS_ZIP_PATH}"
+    COMMENT "Creating Reach symbols ZIP"
     VERBATIM
 )
 

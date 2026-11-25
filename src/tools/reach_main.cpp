@@ -3,18 +3,22 @@
 #include <shellapi.h>
 #include <tlhelp32.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "reach/composition/composition_root.h"
 #include "reach/core/frame_clock.h"
 #include "reach/support/workload.h"
 #include "reach/adapters/windows/crash_dump.h"
+#include "reach/adapters/windows/crash_report.h"
 #include "reach/adapters/windows/diagnostics_log.h"
 #include "reach/adapters/windows/frame_wait.h"
 #include "reach/adapters/windows/hang_guard.h"
 #include "reach/adapters/windows/install_check.h"
 #include "reach/adapters/windows/shell_session.h"
 #include "reach/platform/shell_registration.h"
+#include "reach/protocol/build_info.h"
 #include "reach/protocol/reach_service_protocol.h"
+#include "reach/protocol/version.h"
 #include "reach/support/util.h"
 
 static const wchar_t *REACH_LAUNCH_ARG = L"--launch";
@@ -147,12 +151,20 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
 
     reach_result claim = reach_windows_shell_session_claim();
     reach_windows_shell_session_start_health_timer();
-    char start_line[96] = {};
-    snprintf(start_line, sizeof(start_line), "start parent=%lu as_shell=%d claim=%s",
+    char build_id[REACH_CRASH_REPORT_BUILD_ID_CAPACITY] = {};
+    if (!reach_crash_report_build_id(build_id, sizeof(build_id)))
+    {
+        strcpy_s(build_id, "unknown");
+    }
+    char start_line[256] = {};
+    snprintf(start_line, sizeof(start_line),
+             "start version=%s commit=%s build=%s parent=%lu as_shell=%d claim=%s",
+             REACH_VERSION_STRING, REACH_BUILD_COMMIT, build_id,
              (unsigned long)reach_parent_process_id(), launched_as_shell,
              claim == REACH_OK ? "ok" : "failed");
     reach_log_info(start_line);
     reach_crash_dump_prune();
+    reach_crash_report_begin_run();
 
     reach_workload_session workload("reach");
     HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
@@ -311,5 +323,6 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous_instance, PWSTR comma
     reach_windows_frame_timer_destroy(frame_timer);
     CoUninitialize();
     CloseHandle(instance_mutex);
+    reach_crash_report_end_run();
     return exit_code;
 }

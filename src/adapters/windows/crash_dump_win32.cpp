@@ -1,5 +1,6 @@
 #include "reach/adapters/windows/crash_dump.h"
 
+#include "reach/adapters/windows/crash_report.h"
 #include "reach/adapters/windows/diagnostics_log.h"
 #include "reach/support/util.h"
 #include "crash_dump_internal.h"
@@ -32,6 +33,7 @@ static const DWORD REACH_CRASH_DUMP_CODE_TERMINATE = 0xE0000002u;
 static const DWORD REACH_CRASH_DUMP_CODE_ABORT = 0xE0000003u;
 
 static wchar_t reach_crash_dump_process[32] = L"reach";
+static char reach_crash_dump_build[REACH_CRASH_REPORT_BUILD_ID_CAPACITY] = "unknown";
 static wchar_t reach_crash_dump_directory[MAX_PATH] = {};
 static reach_crash_dump_write_fn reach_crash_dump_write = nullptr;
 static HANDLE reach_crash_dump_request = nullptr;
@@ -51,10 +53,10 @@ static int reach_crash_dump_build_path(wchar_t *out_path, size_t out_count, wcha
 {
     SYSTEMTIME now = {};
     GetLocalTime(&now);
-    swprintf_s(out_name, name_count, L"%ls-%04u%02u%02u-%02u%02u%02u-%lu.dmp",
+    swprintf_s(out_name, name_count, L"%ls-%04u%02u%02u-%02u%02u%02u-%lu-%hs.dmp",
                reach_crash_dump_process, (unsigned)now.wYear, (unsigned)now.wMonth,
                (unsigned)now.wDay, (unsigned)now.wHour, (unsigned)now.wMinute,
-               (unsigned)now.wSecond, (unsigned long)GetCurrentProcessId());
+               (unsigned)now.wSecond, (unsigned long)GetCurrentProcessId(), reach_crash_dump_build);
     if (wcscpy_s(out_path, out_count, reach_crash_dump_directory) != 0)
     {
         return 0;
@@ -113,17 +115,31 @@ static DWORD WINAPI reach_crash_dump_thread_main(void *)
                             reach_crash_dump_pointers->ExceptionRecord != nullptr
                         ? reach_crash_dump_pointers->ExceptionRecord->ExceptionAddress
                         : nullptr;
-    char message[256] = {};
-    if (written)
+    // Module bases move on every boot, so the address is logged relative to its module.
+    wchar_t module_path[MAX_PATH] = {};
+    HMODULE module = nullptr;
+    if (address != nullptr &&
+        GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+                               GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                           static_cast<LPCWSTR>(address), &module) &&
+        GetModuleFileNameW(module, module_path, MAX_PATH) == 0)
     {
-        snprintf(message, sizeof(message), "crash code=0x%08lX address=%p dump=%ls",
-                 (unsigned long)reach_crash_dump_exit_code, address, name);
+        module = nullptr;
+    }
+    char location[MAX_PATH + 32] = {};
+    if (module != nullptr)
+    {
+        snprintf(location, sizeof(location), "%ls+0x%llX", PathFindFileNameW(module_path),
+                 (unsigned long long)((uintptr_t)address - (uintptr_t)module));
     }
     else
     {
-        snprintf(message, sizeof(message), "crash code=0x%08lX address=%p dump=none",
-                 (unsigned long)reach_crash_dump_exit_code, address);
+        snprintf(location, sizeof(location), "%p", address);
     }
+
+    char message[MAX_PATH + 160] = {};
+    snprintf(message, sizeof(message), "crash code=0x%08lX at=%s dump=%ls",
+             (unsigned long)reach_crash_dump_exit_code, location, written ? name : L"none");
     reach_log_error(message);
 
     TerminateProcess(GetCurrentProcess(), reach_crash_dump_exit_code);
@@ -232,6 +248,10 @@ void reach_crash_dump_install(const char *process_name)
     }
 
     reach_crash_dump_resolve_directory();
+    if (!reach_crash_report_build_id(reach_crash_dump_build, sizeof(reach_crash_dump_build)))
+    {
+        strcpy_s(reach_crash_dump_build, "unknown");
+    }
 
     HMODULE dbghelp = LoadLibraryExW(L"dbghelp.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
     if (dbghelp != nullptr)

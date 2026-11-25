@@ -108,8 +108,8 @@ jobs:
       - name: Test
         run: ctest --test-dir build -C Debug --output-on-failure
 
-      - name: Build release ZIP
-        run: cmake --build build --config Release --target reach_release_zip --parallel
+      - name: Build release and symbols ZIPs
+        run: cmake --build build --config Release --target reach_release_zip reach_symbols_zip --parallel
 
       - name: Verify release ZIP layout
         shell: pwsh
@@ -146,6 +146,14 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Upload symbols ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: symbols-zip
+          path: build/dist/reach-v${{ steps.version.outputs.version }}-symbols.zip
+          if-no-files-found: error
+          retention-days: 7
+
   release:
     needs: build
     if: github.event_name == 'workflow_dispatch' && inputs.release
@@ -158,13 +166,17 @@ jobs:
         with:
           name: release-zip
 
+      - uses: actions/download-artifact@v4
+        with:
+          name: symbols-zip
+
       - name: Publish release
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           $tag = "v${{ needs.build.outputs.version }}"
-          gh release create $tag "reach-$tag-Release.zip" `
+          gh release create $tag "reach-$tag-Release.zip" "reach-$tag-symbols.zip" `
             --repo "${{ github.repository }}" `
             --target "${{ github.sha }}" `
             --title $tag `
