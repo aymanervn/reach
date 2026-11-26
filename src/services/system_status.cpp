@@ -645,6 +645,25 @@ reach_result reach_system_status_set_default_output_device(reach_system_status *
                                                            device_id);
 }
 
+reach_result reach_system_status_observed_brightness(const reach_system_status *service,
+                                                     reach_brightness_state *out_state)
+{
+    if (out_state != nullptr)
+    {
+        *out_state = {};
+    }
+    if (service == nullptr || out_state == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+    if (service->system_controls.get_observed_brightness == nullptr)
+    {
+        return REACH_NOT_IMPLEMENTED;
+    }
+    return service->system_controls.get_observed_brightness(service->system_controls.userdata,
+                                                            out_state);
+}
+
 reach_result reach_system_status_set_brightness(reach_system_status *service, float level)
 {
     if (service == nullptr)

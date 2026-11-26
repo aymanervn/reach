@@ -52,6 +52,7 @@
 ## System HUD
 
 - Every successful media, volume, mute or brightness action shows the System HUD regardless of Top Bar visibility or game mode. It is pointer-transparent and game-mode visible. Each action resets a 1.5 s total lifetime that includes the closing fade (`reach_feature_notify_system_hud`).
+- Brightness changed by laptop hardware keys also shows the brightness HUD; Reach's own changes and power-source switches do not (`reach_system_controls_observe_brightness`).
 
 ## Tray
 

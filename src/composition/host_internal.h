@@ -1013,6 +1013,7 @@ reach_result reach_host_execute_media_action(reach_host *host, reach_now_playing
 reach_result reach_host_step_main_volume(reach_host *host, float delta);
 reach_result reach_host_toggle_main_volume_mute(reach_host *host);
 reach_result reach_host_step_brightness(reach_host *host, float delta);
+void reach_host_show_brightness(reach_host *host, const reach_brightness_state *state);
 reach_result reach_host_snap_foreground_window(reach_host *host, reach_split_mode mode);
 
 void reach_host_on_system_controls_changed(void *user, uint32_t change_flags);

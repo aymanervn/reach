@@ -42,8 +42,14 @@ static const GUID *const REACH_CONTROL_POWER_SETTINGS[] = {
     &GUID_POWER_SAVING_STATUS,
     &GUID_BATTERY_PERCENTAGE_REMAINING,
     &GUID_ACDC_POWER_SOURCE,
+    // Brightness keys and sliders update this setting; adaptive brightness does not.
+    &GUID_DEVICE_POWER_POLICY_VIDEO_BRIGHTNESS,
 };
 static constexpr DWORD REACH_ENERGY_SAVER_STATUS_UNKNOWN = MAXDWORD;
+static constexpr DWORD REACH_BRIGHTNESS_PERCENT_UNKNOWN = MAXDWORD;
+// The brightness notification does not name its source, so changes within this window of a
+// `set_brightness_level` call are treated as Reach's own.
+static constexpr ULONGLONG REACH_BRIGHTNESS_ECHO_MS = 1000;
 
 struct reach_system_controls_adapter
 {
@@ -58,6 +64,8 @@ struct reach_system_controls_adapter
     HPOWERNOTIFY power_notifications[ARRAYSIZE(REACH_CONTROL_POWER_SETTINGS)];
     DEVICE_NOTIFY_SUBSCRIBE_PARAMETERS power_subscription;
     std::atomic<DWORD> energy_saver_status{REACH_ENERGY_SAVER_STATUS_UNKNOWN};
+    std::atomic<DWORD> observed_brightness_percent{REACH_BRIGHTNESS_PERCENT_UNKNOWN};
+    std::atomic<ULONGLONG> brightness_set_tick{0};
     HANDLE bluetooth_thread;
     HANDLE bluetooth_stop;
     HANDLE bluetooth_request;
@@ -116,6 +124,35 @@ static void reach_system_controls_notify(reach_system_controls_adapter *adapter,
     }
 }
 
+static void reach_system_controls_observe_brightness(reach_system_controls_adapter *adapter,
+                                                     const POWERBROADCAST_SETTING *change)
+{
+    if (change->DataLength != sizeof(DWORD))
+    {
+        return;
+    }
+
+    DWORD percent = 0;
+    std::memcpy(&percent, change->Data, sizeof(percent));
+    if (percent > 100)
+    {
+        percent = 100;
+    }
+
+    // Registration delivers the current level first; only later values are changes.
+    const DWORD previous = adapter->observed_brightness_percent.exchange(percent);
+    if (previous == REACH_BRIGHTNESS_PERCENT_UNKNOWN || previous == percent)
+    {
+        return;
+    }
+    if (GetTickCount64() - adapter->brightness_set_tick.load() < REACH_BRIGHTNESS_ECHO_MS)
+    {
+        return;
+    }
+    reach_system_controls_notify(adapter, REACH_SYSTEM_CONTROLS_CHANGE_BRIGHTNESS |
+                                              REACH_SYSTEM_CONTROLS_CHANGE_BRIGHTNESS_OBSERVED);
+}
+
 static ULONG CALLBACK reach_system_controls_power_notification(void *context, ULONG type,
                                                                void *setting)
 {
@@ -123,6 +160,18 @@ static ULONG CALLBACK reach_system_controls_power_notification(void *context, UL
     {
         auto *adapter = static_cast<reach_system_controls_adapter *>(context);
         const auto *change = static_cast<const POWERBROADCAST_SETTING *>(setting);
+        if (change != nullptr &&
+            IsEqualGUID(change->PowerSetting, GUID_DEVICE_POWER_POLICY_VIDEO_BRIGHTNESS))
+        {
+            reach_system_controls_observe_brightness(adapter, change);
+            return ERROR_SUCCESS;
+        }
+        if (change != nullptr && IsEqualGUID(change->PowerSetting, GUID_ACDC_POWER_SOURCE))
+        {
+            // The brightness setting is stored per power source, so its next value is a new
+            // baseline rather than a change.
+            adapter->observed_brightness_percent.store(REACH_BRIGHTNESS_PERCENT_UNKNOWN);
+        }
         if (change != nullptr && IsEqualGUID(change->PowerSetting, GUID_ENERGY_SAVER_STATUS) &&
             change->DataLength == sizeof(DWORD))
         {
@@ -1311,9 +1360,33 @@ static reach_result reach_system_controls_get_brightness_state(void *userdata,
     return REACH_OK;
 }
 
+static reach_result reach_system_controls_get_observed_brightness(void *userdata,
+                                                                  reach_brightness_state *out_state)
+{
+    auto *adapter = static_cast<reach_system_controls_adapter *>(userdata);
+    if (adapter == nullptr || out_state == nullptr)
+    {
+        return REACH_INVALID_ARGUMENT;
+    }
+
+    const DWORD percent = adapter->observed_brightness_percent.load();
+    *out_state = {};
+    if (percent == REACH_BRIGHTNESS_PERCENT_UNKNOWN)
+    {
+        return REACH_ERROR;
+    }
+    out_state->available = 1;
+    out_state->level = (float)percent / 100.0f;
+    return REACH_OK;
+}
+
 static reach_result reach_system_controls_set_brightness_level(void *userdata, float level)
 {
-    (void)userdata;
+    auto *adapter = static_cast<reach_system_controls_adapter *>(userdata);
+    if (adapter != nullptr)
+    {
+        adapter->brightness_set_tick.store(GetTickCount64());
+    }
 
     if (level < 0.0f)
     {
@@ -1455,6 +1528,10 @@ static reach_result reach_system_controls_set_brightness_level(void *userdata, f
         hr = services->ExecMethod(method_path, method_name, 0, nullptr, in_parameters.Get(),
                                   nullptr, nullptr);
     }
+    if (adapter != nullptr)
+    {
+        adapter->brightness_set_tick.store(GetTickCount64());
+    }
 
     SysFreeString(method_path);
     SysFreeString(class_name);
@@ -1581,6 +1658,7 @@ static void reach_system_controls_stop_watching(void *userdata)
     }
     adapter->energy_saver_status.store(REACH_ENERGY_SAVER_STATUS_UNKNOWN,
                                        std::memory_order_relaxed);
+    adapter->observed_brightness_percent.store(REACH_BRIGHTNESS_PERCENT_UNKNOWN);
     adapter->callback = nullptr;
     adapter->callback_user = nullptr;
     adapter->main_thread_id = 0;
@@ -1651,6 +1729,7 @@ extern "C" reach_result reach_windows_create_system_controls(reach_system_contro
     out_port->set_battery_saver_enabled = reach_system_controls_set_battery_saver_enabled;
     out_port->get_brightness_state = reach_system_controls_get_brightness_state;
     out_port->set_brightness_level = reach_system_controls_set_brightness_level;
+    out_port->get_observed_brightness = reach_system_controls_get_observed_brightness;
     out_port->open_project_menu = reach_system_controls_open_project_menu;
     out_port->set_theme_modes = reach_system_controls_set_theme_modes;
     out_port->start_watching = reach_system_controls_start_watching;

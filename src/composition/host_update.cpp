@@ -60,6 +60,15 @@ void reach_host_on_audio_volume_changed(void *user)
 static void reach_host_process_system_status_requests(reach_host *host)
 {
     uint32_t system_flags = host->system_change_flags.exchange(0);
+    if ((system_flags & REACH_SYSTEM_CONTROLS_CHANGE_BRIGHTNESS_OBSERVED) != 0)
+    {
+        system_flags &= ~REACH_SYSTEM_CONTROLS_CHANGE_BRIGHTNESS_OBSERVED;
+        reach_brightness_state brightness = {};
+        if (reach_system_status_observed_brightness(host->system_status, &brightness) == REACH_OK)
+        {
+            reach_host_show_brightness(host, &brightness);
+        }
+    }
     if (system_flags != 0)
     {
         reach_system_status_refresh_system(host->system_status, system_flags);

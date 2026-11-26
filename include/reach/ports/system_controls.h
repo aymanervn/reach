@@ -20,6 +20,9 @@ extern "C"
 /* Raised, together with CHANGE_BLUETOOTH, when a `request_bluetooth_enabled` call has run to
    completion — whether or not it changed the radio. Not a capability, so not in CHANGE_ALL. */
 #define REACH_SYSTEM_CONTROLS_CHANGE_BLUETOOTH_REQUEST (1u << 4)
+/* Raised, together with CHANGE_BRIGHTNESS, when the display brightness changed without a
+   `set_brightness_level` call (laptop brightness keys). Not a capability, so not in CHANGE_ALL. */
+#define REACH_SYSTEM_CONTROLS_CHANGE_BRIGHTNESS_OBSERVED (1u << 5)
 #define REACH_SYSTEM_CONTROLS_CHANGE_ALL                                                           \
     (REACH_SYSTEM_CONTROLS_CHANGE_NETWORK | REACH_SYSTEM_CONTROLS_CHANGE_BLUETOOTH |               \
      REACH_SYSTEM_CONTROLS_CHANGE_POWER | REACH_SYSTEM_CONTROLS_CHANGE_BRIGHTNESS)
@@ -81,6 +84,9 @@ extern "C"
         reach_result (*get_brightness_state)(void *userdata, reach_brightness_state *out_state);
 
         reach_result (*set_brightness_level)(void *userdata, float level);
+
+        /* Last level the brightness change notification reported. Any thread; never blocks. */
+        reach_result (*get_observed_brightness)(void *userdata, reach_brightness_state *out_state);
 
         reach_result (*open_project_menu)(void *userdata);
 

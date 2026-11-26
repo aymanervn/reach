@@ -98,6 +98,9 @@ extern "C"
     reach_result reach_system_status_set_brightness(reach_system_status *service, float level);
     reach_result reach_system_status_step_brightness(reach_system_status *service, float delta,
                                                      reach_brightness_state *out_state);
+    /* Level last reported by the platform's brightness change notification; does not block. */
+    reach_result reach_system_status_observed_brightness(const reach_system_status *service,
+                                                         reach_brightness_state *out_state);
 
     reach_system_status_bluetooth_outcome
     reach_system_status_set_bluetooth_enabled(reach_system_status *service, int32_t enabled);

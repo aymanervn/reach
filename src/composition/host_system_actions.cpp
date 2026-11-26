@@ -149,17 +149,21 @@ reach_result reach_host_step_brightness(reach_host *host, float delta)
     {
         return result;
     }
-    if (!state.available)
+    reach_host_show_brightness(host, &state);
+    return REACH_OK;
+}
+
+void reach_host_show_brightness(reach_host *host, const reach_brightness_state *state)
+{
+    if (host == nullptr || state == nullptr || !state->available)
     {
-        return REACH_OK;
+        return;
     }
 
     reach_feature_notification notification = {};
     notification.kind = REACH_FEATURE_NOTIFICATION_BRIGHTNESS;
-    notification.brightness = state;
+    notification.brightness = *state;
     reach_host_notify_registered_features(host, &notification);
-
-    return REACH_OK;
 }
 
 reach_result reach_host_cycle_input_language(reach_host *host)

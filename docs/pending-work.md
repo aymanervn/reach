@@ -6,6 +6,7 @@ Open items only.
 
 - Reach tracks at most 96 open windows (`REACH_MAX_OPEN_WINDOWS`, `include/reach/core/limits.h`); later windows are likely missing from Stage and the Dock. Raising it also raises the render group budget, which Stage's static assert in `stage_render.cpp` enforces.
 - Stage covers only the primary monitor, so windows on other monitors stay in place while it is open. Low priority.
+- Validate on a laptop: brightness keys show the brightness HUD, and plugging in or unplugging the charger does not (`reach_system_controls_observe_brightness`).
 
 
 ## Bugs
@@ -50,6 +51,7 @@ Open items only.
 
 ## Architecture debt (cleanup phase)
 
+- The brightness hotkeys never register: the SDK defines no `VK_BRIGHTNESS_UP/DOWN`, so `REACH_INPUT_HOTKEY_BRIGHTNESS_*` and `REACH_UI_EVENT_BRIGHTNESS_*` are dead (`input_win32.cpp:208`, `host_input.cpp:1114`); laptop keys reach the HUD through `REACH_SYSTEM_CONTROLS_CHANGE_BRIGHTNESS_OBSERVED`.
 - `reach_feature_capsule_ops` is bound positionally with five identical signatures.
 - `interfeature_routes.cpp` holds the window-list orchestration, not just slot assignment.
 - Move feature-owned notification, control, resource and rendering adapters out of `feature_registry.cpp` during capsule cleanup. Keep the definitions and service wiring in composition.
