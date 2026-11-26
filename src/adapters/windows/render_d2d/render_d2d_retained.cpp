@@ -562,9 +562,10 @@ static HRESULT sync_blur(reach_render_backend *backend, reach_d2d_retained_layer
         hr = backend->dcomp_device->QueryInterface(IID_PPV_ARGS(&device));
         if (SUCCEEDED(hr))
             hr = device->CreateGaussianBlurEffect(&layer.dcomp_blur);
-        // A hard border keeps the edges opaque instead of fading them into transparency.
+        // Workaround: with a hard border DWM drew black patches where it recomposed only part of
+        // the blurred visual (under Stage's gliding hover pill); a soft border avoids them.
         if (SUCCEEDED(hr))
-            hr = layer.dcomp_blur->SetBorderMode(D2D1_BORDER_MODE_HARD);
+            hr = layer.dcomp_blur->SetBorderMode(D2D1_BORDER_MODE_SOFT);
         if (SUCCEEDED(hr))
             hr = layer.dcomp_visual->SetEffect(layer.dcomp_blur.Get());
     }
