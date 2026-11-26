@@ -152,10 +152,10 @@ static void reach_top_bar_push_power_button(const reach_top_bar_render_input *in
     }
 
     reach_top_bar_push_rect(commands, power_box, theme->fill.secondary, power_box.height * 0.5f);
-    reach_top_bar_push_text(commands, power_box, (const uint16_t *)L"Reach",
-                            metrics.reach_label_text_size * input->dpi_scale,
-                            metrics.reach_label_text_weight, REACH_TEXT_ALIGNMENT_CENTER,
-                            theme->text.primary);
+    reach_top_bar_push_vector_icon(
+        commands,
+        reach_top_bar_center_square(power_box, metrics.reach_icon_size * input->dpi_scale),
+        REACH_VECTOR_ICON_REACH, theme->text.primary);
 
     if (input->click_feedback_index == REACH_TOP_BAR_FEEDBACK_POWER_BUTTON)
     {

@@ -572,10 +572,7 @@ void reach_top_bar_build_layout(reach_top_bar *top_bar, const reach_top_bar_buil
     const float padding = metrics.pill_padding * scale;
     const float power_button_size = height * metrics.bar_button_scale;
     const float power_button_width =
-        reach_top_bar_text_advance(&ctx->text_measure, (const uint16_t *)L"Reach",
-                                   metrics.reach_label_text_size * scale,
-                                   metrics.reach_label_text_weight) +
-        metrics.reach_label_padding * scale * 2.0f;
+        (metrics.reach_icon_size + metrics.reach_icon_padding * 2.0f) * scale;
     const float clock_gap = metrics.clock_gap * scale;
     const float time_size = metrics.clock_time_text_size * scale;
     const float date_size = metrics.clock_date_text_size * scale;
