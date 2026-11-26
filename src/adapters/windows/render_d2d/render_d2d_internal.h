@@ -185,6 +185,7 @@ struct reach_d2d_retained_layer
     ComPtr<IDCompositionRectangleClip> dcomp_clip;
     ComPtr<IDCompositionColorMatrixEffect> dcomp_tint;
     ComPtr<IDCompositionColorMatrixEffect> dcomp_tint_mix;
+    ComPtr<IDCompositionGaussianBlurEffect> dcomp_blur;
     UINT width = 0;
     UINT height = 0;
     UINT capacity_width = 0;

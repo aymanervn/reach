@@ -205,6 +205,115 @@ static reach_result reach_stage_push_tile_header(reach_stage *stage,
     return reach_stage_push_close_button(stage, ctx, index, alpha, out_commands);
 }
 
+// DP metrics of the no-open-windows notice, centred on the Stage surface.
+#define REACH_STAGE_NOTICE_WIDTH 560.0f
+#define REACH_STAGE_NOTICE_TITLE_HEIGHT 32.0f
+#define REACH_STAGE_NOTICE_SUBTITLE_HEIGHT 20.0f
+#define REACH_STAGE_NOTICE_GAP 4.0f
+
+typedef struct reach_stage_notice_layout
+{
+    reach_rect_f32 block;
+    reach_rect_f32 title;
+    reach_rect_f32 subtitle;
+} reach_stage_notice_layout;
+
+// Surface-local rects of the notice text.
+static reach_stage_notice_layout reach_stage_notice_layout_in(const reach_stage_render_context *ctx)
+{
+    float width = ceilf(reach_stage_scaled(ctx, REACH_STAGE_NOTICE_WIDTH));
+    float title = ceilf(reach_stage_scaled(ctx, REACH_STAGE_NOTICE_TITLE_HEIGHT));
+    float subtitle = ceilf(reach_stage_scaled(ctx, REACH_STAGE_NOTICE_SUBTITLE_HEIGHT));
+    float gap = roundf(reach_stage_scaled(ctx, REACH_STAGE_NOTICE_GAP));
+    float height = title + gap + subtitle;
+    reach_stage_notice_layout layout = {};
+    layout.block = {roundf((ctx->bounds.width - width) * 0.5f),
+                    roundf((ctx->bounds.height - height) * 0.5f), width, height};
+    layout.title = {layout.block.x, layout.block.y, width, title};
+    layout.subtitle = {layout.block.x, layout.block.y + title + gap, width, subtitle};
+    return layout;
+}
+
+static reach_render_command reach_stage_notice_text(const reach_stage_render_context *ctx,
+                                                    reach_rect_f32 rect, const char16_t *text,
+                                                    float size, int32_t weight, reach_color color)
+{
+    reach_render_command command = {};
+    command.type = REACH_RENDER_COMMAND_TEXT;
+    command.rect = rect;
+    command.text_size = reach_stage_scaled(ctx, size);
+    command.text_weight = weight;
+    command.text_alignment = REACH_TEXT_ALIGNMENT_CENTER;
+    command.text_ellipsis = 1;
+    command.color = color;
+    command.text_color = color;
+    (void)reach_copy_utf16(command.text, 260, reinterpret_cast<const uint16_t *>(text));
+    return command;
+}
+
+// Pushes both notice lines shifted by offset, in their own colors or all in override when its
+// alpha is positive.
+static reach_result reach_stage_push_notice_lines(const reach_stage_render_context *ctx,
+                                                  const reach_stage_notice_layout *layout,
+                                                  float alpha, reach_point_f32 offset,
+                                                  reach_color override,
+                                                  reach_render_command_buffer *commands)
+{
+    reach_rect_f32 title_rect = layout->title;
+    reach_rect_f32 subtitle_rect = layout->subtitle;
+    title_rect.x += offset.x;
+    title_rect.y += offset.y;
+    subtitle_rect.x += offset.x;
+    subtitle_rect.y += offset.y;
+    reach_color title_color = override.a > 0.0f ? override : ctx->theme->text.primary;
+    reach_color subtitle_color = override.a > 0.0f ? override : ctx->theme->text.secondary;
+    title_color.a *= alpha;
+    subtitle_color.a *= alpha;
+    reach_render_command title =
+        reach_stage_notice_text(ctx, title_rect, u"No open windows", REACH_TEXT_SIZE_HEADING,
+                                REACH_TEXT_WEIGHT_SEMIBOLD, title_color);
+    reach_render_command subtitle =
+        reach_stage_notice_text(ctx, subtitle_rect, u"Apps you open will appear here.",
+                                REACH_TEXT_SIZE_MEDIUM, REACH_TEXT_WEIGHT_NORMAL, subtitle_color);
+    reach_result result = reach_render_command_buffer_push(commands, &title);
+    if (result == REACH_OK)
+        result = reach_render_command_buffer_push(commands, &subtitle);
+    return result;
+}
+
+// Distance below its resting place the notice rises from, in pixels.
+static float reach_stage_notice_rise_distance(const reach_stage *stage)
+{
+    return stage->notice.rise_distance * stage->notice.dpi_scale;
+}
+
+// The CPU path has no group effects or scaling, so the wallpaper stays sharp and the notice rises
+// without its text shadow or scale.
+static reach_result reach_stage_push_sampled_backdrop(const reach_stage *stage,
+                                                      const reach_stage_render_context *ctx,
+                                                      reach_render_command_buffer *commands)
+{
+    float progress = fminf(1.0f, fmaxf(0.0f, stage->state.progress));
+    if (progress <= 0.0f)
+        return REACH_OK;
+    reach_render_command scrim = {};
+    scrim.type = REACH_RENDER_COMMAND_RECT;
+    scrim.rect = {0.0f, 0.0f, ctx->bounds.width, ctx->bounds.height};
+    scrim.color = ctx->theme->artwork_scrim;
+    scrim.color.a *= progress;
+    reach_result result = reach_render_command_buffer_push(commands, &scrim);
+    if (result != REACH_OK || !reach_feature_transition_visible(&stage->notice))
+        return result;
+    float alpha = progress * fminf(1.0f, fmaxf(0.0f, reach_motion_value(&stage->notice.opacity)));
+    if (alpha <= 0.0f)
+        return REACH_OK;
+    float rise = reach_motion_value(&stage->notice.rise);
+    reach_stage_notice_layout layout = reach_stage_notice_layout_in(ctx);
+    return reach_stage_push_notice_lines(
+        ctx, &layout, alpha, {0.0f, reach_stage_notice_rise_distance(stage) * (1.0f - rise)}, {},
+        commands);
+}
+
 enum
 {
     REACH_STAGE_GROUP_BACKDROP = 1,
@@ -217,19 +326,25 @@ enum
     REACH_STAGE_GROUP_PLACEHOLDER,
     REACH_STAGE_GROUP_PLACEHOLDER_ICON,
     REACH_STAGE_GROUP_THUMBNAIL,
-    REACH_STAGE_GROUP_HOVER_PILL
+    REACH_STAGE_GROUP_HOVER_PILL,
+    REACH_STAGE_GROUP_SCRIM,
+    REACH_STAGE_GROUP_NOTICE,
+    REACH_STAGE_GROUP_NOTICE_BODY,
+    REACH_STAGE_GROUP_NOTICE_SHADOW,
+    REACH_STAGE_GROUP_NOTICE_TEXT
 };
 
 // Worst case one tile adds on the compositor path: a closing tile draws background, header, label,
 // placeholder plate, placeholder icon and thumbnail. The hovered tile's close button adds two tint
 // groups, and the hover pill two groups and one command; the desktop tile's backdrop and thumbnail
-// fit in its share.
+// fit in its share. The wallpaper scrim and the no-open-windows notice add five groups and five
+// commands while every app tile departs.
 #define REACH_STAGE_COMPOSITOR_TILE_GROUPS 6
 #define REACH_STAGE_COMPOSITOR_TILE_COMMANDS 6
-static_assert(REACH_STAGE_MAX_TILES * REACH_STAGE_COMPOSITOR_TILE_GROUPS + 4 <=
+static_assert(REACH_STAGE_MAX_TILES * REACH_STAGE_COMPOSITOR_TILE_GROUPS + 4 + 5 <=
                   REACH_MAX_RENDER_GROUPS,
               "every tracked window fits the render group budget on the compositor path");
-static_assert(REACH_STAGE_MAX_TILES * REACH_STAGE_COMPOSITOR_TILE_COMMANDS + 1 <=
+static_assert(REACH_STAGE_MAX_TILES * REACH_STAGE_COMPOSITOR_TILE_COMMANDS + 1 + 5 <=
                   REACH_MAX_RENDER_COMMANDS,
               "every tracked window fits the render command budget on the compositor path");
 
@@ -506,11 +621,22 @@ static reach_result reach_stage_push_compositor_thumbnail(const reach_stage_rend
         tile->source_rect.height <= 0.0f)
         return REACH_OK;
     reach_rect_motion rect = reach_stage_local_rect(&motion->rect, ctx->bounds);
-    reach_rect_f32 base = {0.0f, 0.0f, ceilf(tile->source_rect.width),
-                           ceilf(tile->source_rect.height)};
+    float reduction = tile->desktop
+                          ? fminf(1.0f, REACH_STAGE_WALLPAPER_MAX_HEIGHT / tile->source_rect.height)
+                          : 1.0f;
+    reach_rect_f32 base = {0.0f, 0.0f, ceilf(tile->source_rect.width * reduction),
+                           ceilf(tile->source_rect.height * reduction)};
     reach_motion opacity = reach_motion_clamp(&motion->presence, 0.0f, 1.0f);
     reach_render_group group = reach_stage_scaled_group(
         reach_stage_group_id(REACH_STAGE_GROUP_THUMBNAIL, tile->window), &rect, base, &opacity);
+    if (tile->desktop)
+    {
+        // The wallpaper blurs in step with Stage's presentation; the group scale stretches the
+        // reduced thumbnail and its blur back over the monitor.
+        reach_motion shown = reach_motion_clamp(&motion->alpha, 0.0f, 1.0f);
+        group.blur = reach_motion_affine(
+            &shown, reach_stage_scaled(ctx, ctx->theme->stage_wallpaper_blur) * reduction, 0.0f);
+    }
     reach_render_command thumbnail = {};
     thumbnail.type = REACH_RENDER_COMMAND_WINDOW_THUMBNAIL;
     thumbnail.rect = base;
@@ -654,6 +780,108 @@ static void reach_stage_sampled_motions(const reach_stage *stage, reach_stage_ti
     }
 }
 
+// Stage's presentation progress as a motion the compositor can play, or its sample when Stage
+// draws a sampled frame.
+static reach_motion reach_stage_progress_motion(const reach_stage *stage, double now)
+{
+    reach_motion progress = stage->motions[REACH_STAGE_ANIMATION_PROGRESS];
+    if (stage->compositor_sampled || !reach_motion_active_at(&progress, now))
+        reach_motion_set(&progress, stage->state.progress);
+    return reach_motion_clamp(&progress, 0.0f, 1.0f);
+}
+
+// Dims the wallpaper in dark mode and lightens it in light mode, in step with its blur.
+static reach_result reach_stage_push_compositor_scrim(const reach_stage *stage,
+                                                      const reach_stage_render_context *ctx,
+                                                      double now,
+                                                      reach_render_command_buffer *commands)
+{
+    reach_render_command scrim = {};
+    scrim.type = REACH_RENDER_COMMAND_RECT;
+    scrim.rect = reach_stage_fill_base;
+    scrim.color = ctx->theme->artwork_scrim;
+    reach_render_group group = {};
+    group.id = reach_stage_group_id(REACH_STAGE_GROUP_SCRIM, 0);
+    group.bounds = reach_stage_fill_base;
+    reach_motion_set(&group.scale, ctx->bounds.width / reach_stage_fill_base.width);
+    reach_motion_set(&group.scale_y, ctx->bounds.height / reach_stage_fill_base.height);
+    group.opacity = reach_stage_progress_motion(stage, now);
+    return reach_stage_push_grouped(commands, &group, &scrim);
+}
+
+static reach_result reach_stage_push_compositor_notice(const reach_stage *stage,
+                                                       const reach_stage_render_context *ctx,
+                                                       double now,
+                                                       reach_render_command_buffer *commands)
+{
+    if (!reach_feature_transition_visible(&stage->notice))
+        return REACH_OK;
+    const reach_theme *theme = ctx->theme;
+    reach_render_group container = {};
+    container.id = reach_stage_group_id(REACH_STAGE_GROUP_NOTICE, 0);
+    container.bounds = {0.0f, 0.0f, ctx->bounds.width, ctx->bounds.height};
+    container.opacity = reach_stage_progress_motion(stage, now);
+    reach_result result = reach_render_command_buffer_begin_group(commands, &container);
+    reach_render_command_buffer_end_group(commands);
+    if (result != REACH_OK)
+        return result;
+
+    reach_stage_notice_layout layout = reach_stage_notice_layout_in(ctx);
+    const reach_shadow *shadow = &theme->shadow;
+    int32_t casts = shadow->blur > 0.0f && shadow->color.a > 0.0f;
+    reach_shadow_pad pad =
+        casts ? reach_theme_shadow_pad(shadow, ctx->dpi_scale) : reach_shadow_pad{};
+    // The body rises and grows into place about its centre, like a popup.
+    const reach_feature_transition *notice = &stage->notice;
+    reach_render_group body = {};
+    body.id = reach_stage_group_id(REACH_STAGE_GROUP_NOTICE_BODY, 0);
+    body.parent_id = container.id;
+    body.bounds = {layout.block.x - pad.left, layout.block.y - pad.top,
+                   layout.block.width + pad.left + pad.right,
+                   layout.block.height + pad.top + pad.bottom};
+    body.opacity = reach_motion_clamp(&notice->opacity, 0.0f, 1.0f);
+    float shrink = 1.0f - notice->rise_scale;
+    float centre_x = body.bounds.width * 0.5f * shrink;
+    float start_y = reach_stage_notice_rise_distance(stage) + body.bounds.height * 0.5f * shrink;
+    body.scale = reach_motion_affine(&notice->rise, shrink, notice->rise_scale);
+    body.x = reach_motion_affine(&notice->rise, -centre_x, centre_x);
+    body.y = reach_motion_affine(&notice->rise, -start_y, start_y);
+    result = reach_render_command_buffer_begin_group(commands, &body);
+    reach_render_command_buffer_end_group(commands);
+    if (result != REACH_OK)
+        return result;
+
+    if (casts)
+    {
+        // Group shadows cast only from shapes, so the text casts its shadow as a blurred copy in
+        // the shadow color, with the same deviation the renderer gives shape shadows.
+        reach_render_group shadow_group = {};
+        shadow_group.id = reach_stage_group_id(REACH_STAGE_GROUP_NOTICE_SHADOW, 0);
+        shadow_group.parent_id = body.id;
+        shadow_group.bounds = body.bounds;
+        reach_motion_set(&shadow_group.blur, shadow->blur * ctx->dpi_scale * 0.5f);
+        result = reach_render_command_buffer_begin_group(commands, &shadow_group);
+        if (result == REACH_OK)
+            result = reach_stage_push_notice_lines(
+                ctx, &layout, 1.0f,
+                {shadow->offset_x * ctx->dpi_scale, shadow->offset_y * ctx->dpi_scale},
+                shadow->color, commands);
+        reach_render_command_buffer_end_group(commands);
+        if (result != REACH_OK)
+            return result;
+    }
+
+    reach_render_group text = {};
+    text.id = reach_stage_group_id(REACH_STAGE_GROUP_NOTICE_TEXT, 0);
+    text.parent_id = body.id;
+    text.bounds = layout.block;
+    result = reach_render_command_buffer_begin_group(commands, &text);
+    if (result == REACH_OK)
+        result = reach_stage_push_notice_lines(ctx, &layout, 1.0f, {}, {}, commands);
+    reach_render_command_buffer_end_group(commands);
+    return result;
+}
+
 static reach_result reach_stage_push_compositor_scene(reach_stage *stage,
                                                       const reach_stage_render_context *ctx,
                                                       const reach_stage_tile_motion *motions,
@@ -682,6 +910,11 @@ static reach_result reach_stage_push_compositor_scene(reach_stage *stage,
         if (result == REACH_OK)
             result = reach_stage_push_compositor_thumbnail(ctx, tile, &motions[index], commands);
     }
+    // The scrim and notice cover the wallpaper and stay below every tile.
+    if (result == REACH_OK)
+        result = reach_stage_push_compositor_scrim(stage, ctx, now, commands);
+    if (result == REACH_OK)
+        result = reach_stage_push_compositor_notice(stage, ctx, now, commands);
     // The pill sits behind every tile's chrome, so only its inset ring shows around the tile.
     if (result == REACH_OK)
         result = reach_stage_push_compositor_hover_pill(stage, ctx, now, commands);
@@ -767,6 +1000,11 @@ reach_result reach_stage_append_render_commands(reach_stage *stage,
 
     float eased = state->progress;
 
+    reach_result backdrop_result = reach_stage_push_sampled_backdrop(stage, ctx, out_commands);
+    if (backdrop_result != REACH_OK)
+    {
+        return backdrop_result;
+    }
     reach_result pill_result = reach_stage_push_sampled_hover_pill(stage, ctx, out_commands);
     if (pill_result != REACH_OK)
     {

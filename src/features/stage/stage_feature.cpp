@@ -26,6 +26,8 @@ reach_result reach_stage_create(reach_stage **out_stage)
     reach_pressable_init(&stage->pressable);
     reach_motion_set(&stage->close_hover, 0.0f);
     reach_motion_set(&stage->hover_pill_opacity, 0.0f);
+    reach_feature_transition_init(&stage->notice, REACH_FEATURE_TRANSITION_FROM_BELOW);
+    reach_feature_transition_enable_rise(&stage->notice);
     *out_stage = stage;
     return REACH_OK;
 }
@@ -68,6 +70,17 @@ static int32_t reach_stage_has_apps(const reach_stage_state *state)
         }
     }
     return 0;
+}
+
+// Opens the notice when no app tile remains and closes it when one arrives. A fresh open starts
+// it from hidden, so an empty Stage rises its notice in as it opens.
+static void reach_stage_update_notice(reach_stage *stage, int32_t fresh)
+{
+    if (fresh)
+        reach_feature_transition_reset(&stage->notice);
+    reach_feature_transition_configure(&stage->notice, nullptr, stage->state.dpi_scale,
+                                       REACH_FEATURE_TRANSITION_FROM_BELOW);
+    (void)reach_feature_transition_set_open(&stage->notice, !reach_stage_has_apps(&stage->state));
 }
 
 reach_result reach_stage_open(reach_stage *stage, reach_rect_f32 monitor_bounds, float dpi_scale,
@@ -124,16 +137,9 @@ reach_result reach_stage_open(reach_stage *stage, reach_rect_f32 monitor_bounds,
     state->reflow = 1.0f;
     state->departure_progress = 1.0f;
 
-    if (reach_stage_has_apps(state))
-    {
-        reach_stage_track_start(stage, REACH_STAGE_ANIMATION_PROGRESS, 0.0f, 1.0f,
-                                reach_stage_presentation_spec(state->animation_seconds, 1.0f));
-    }
-    else
-    {
-        reach_motion_set(&stage->motions[REACH_STAGE_ANIMATION_PROGRESS], 1.0f);
-        state->progress = 1.0f;
-    }
+    reach_stage_track_start(stage, REACH_STAGE_ANIMATION_PROGRESS, 0.0f, 1.0f,
+                            reach_stage_presentation_spec(state->animation_seconds, 1.0f));
+    reach_stage_update_notice(stage, 1);
     reach_motion_set(&stage->motions[REACH_STAGE_ANIMATION_REFLOW], 1.0f);
     reach_motion_set(&stage->motions[REACH_STAGE_ANIMATION_DEPARTURE], 1.0f);
     reach_motion_set(&stage->close_hover, 0.0f);
@@ -300,6 +306,7 @@ void reach_stage_depart_tile(reach_stage *stage, size_t index)
     tile->departing = 1;
     stage->state.has_hover = 0;
     reach_stage_start_reflow(stage);
+    reach_stage_update_notice(stage, 0);
 }
 
 size_t reach_stage_tile_generation(const reach_stage *stage)
@@ -317,15 +324,8 @@ static reach_rect_f32 reach_stage_close_destination(const reach_stage_state *sta
 
 static void reach_stage_drive_presentation(reach_stage *stage, float target)
 {
-    if (reach_stage_has_apps(&stage->state))
-    {
-        reach_stage_track_to(stage, REACH_STAGE_ANIMATION_PROGRESS, target,
-                             reach_stage_presentation_spec(stage->state.animation_seconds, 1.0f));
-    }
-    else
-    {
-        reach_motion_set(&stage->motions[REACH_STAGE_ANIMATION_PROGRESS], target);
-    }
+    reach_stage_track_to(stage, REACH_STAGE_ANIMATION_PROGRESS, target,
+                         reach_stage_presentation_spec(stage->state.animation_seconds, 1.0f));
 }
 
 void reach_stage_begin_close(reach_stage *stage)
@@ -412,6 +412,7 @@ void reach_stage_force_close(reach_stage *stage)
     reach_motion_set(&stage->close_hover, 0.0f);
     reach_motion_set(&stage->hover_pill_opacity, 0.0f);
     reach_motion_set(&stage->motions[REACH_STAGE_ANIMATION_RETARGET], 0.0f);
+    reach_feature_transition_reset(&stage->notice);
 }
 
 static int32_t reach_stage_holds_window(const reach_stage_state *state, uintptr_t window)
@@ -608,6 +609,7 @@ int32_t reach_stage_update_windows(reach_stage *stage, const reach_stage_open_wi
     {
         state->tile_generation++;
         reach_stage_start_reflow(stage);
+        reach_stage_update_notice(stage, 0);
         return 1;
     }
 
@@ -791,6 +793,10 @@ static void reach_stage_finish_settled_springs(reach_stage *stage)
     // Strictly under 2 px.
     const float pixel_tolerance = nextafterf(2.0f, 0.0f);
     const float presence_tolerance = 1.0f / 512.0f;
+    // Progress also drives fades and the wallpaper blur, which no tile geometry reflects; an empty
+    // Stage would otherwise snap open on its first tick.
+    if (fabsf(stage->state.progress - settled.state.progress) >= presence_tolerance)
+        return;
     for (size_t index = 0; index < stage->state.tile_count; ++index)
     {
         const reach_stage_tile *now = &stage->state.tiles[index];
@@ -823,6 +829,12 @@ static void reach_stage_capsule_tick(void *capsule, double delta_seconds,
         out->redraw = 1;
         out->request_update = 1;
         return;
+    }
+    // A closing notice stays drawn until its fade completes.
+    if (reach_feature_transition_tick(&stage->notice, delta_seconds))
+    {
+        out->redraw = 1;
+        out->request_update = 1;
     }
     int32_t was_active = reach_stage_tracks_active(stage);
     if (!was_active && !state->closing)
@@ -903,7 +915,13 @@ static int32_t reach_stage_capsule_needs_frame(const void *capsule)
         return 1;
     }
     // Compositor motion plays the hover pill itself; the sampled paths redraw it every frame.
-    if (!compositor && reach_stage_hover_pill_moving(stage))
+    if (!compositor &&
+        (reach_stage_hover_pill_moving(stage) || reach_feature_transition_active(&stage->notice) ||
+         reach_motion_active(&stage->notice.rise)))
+    {
+        return 1;
+    }
+    if (reach_feature_transition_needs_update(&stage->notice))
     {
         return 1;
     }
@@ -946,6 +964,10 @@ static void reach_stage_capsule_surface_geometry(const void *capsule,
                                         stage->state.close_phase == REACH_STAGE_CLOSE_TRANSPARENT;
         if (stage->state.open && reach_stage_compositor_active(stage) && !stage->compositor_sampled)
             out->deadline_seconds = stage->compositor_event_seconds;
+        double notice = stage->notice.completion_seconds;
+        if (stage->state.open && notice > 0.0 &&
+            (out->deadline_seconds <= 0.0 || notice < out->deadline_seconds))
+            out->deadline_seconds = notice;
     }
 }
 

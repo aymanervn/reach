@@ -1046,7 +1046,10 @@ static void test_group_equality_preserves_intent_without_padding(void)
         bytes[at] = 0xa5;
     for (size_t at =
              offsetof(reach_render_group, clip_radius_motion) + sizeof(second.clip_radius_motion);
-         at < sizeof(second); ++at)
+         at < offsetof(reach_render_group, blur); ++at)
+        bytes[at] = 0xa5;
+    for (size_t at = offsetof(reach_render_group, blur) + sizeof(second.blur); at < sizeof(second);
+         ++at)
         bytes[at] = 0xa5;
     expect_true(reach_render_group_equal(&first, &second),
                 "group equality ignores representation padding");

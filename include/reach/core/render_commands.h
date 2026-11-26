@@ -56,6 +56,10 @@ extern "C"
         int32_t has_shadow;
         reach_shadow shadow;
         reach_motion clip_radius_motion;
+        // Gaussian blur standard deviation over the group's content and children, in group-local
+        // units before the group scale. Never negative or repeating, and never with a tint.
+        // Backends without compositor effects draw the group unblurred.
+        reach_motion blur;
     } reach_render_group;
 
     typedef struct reach_render_stretch

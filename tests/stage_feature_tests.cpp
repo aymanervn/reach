@@ -576,14 +576,14 @@ static void test_app_click_uses_shared_close_animation(void)
     reach_stage_destroy(app_close);
 }
 
-static void test_desktop_only_close_has_no_hidden_app_wait(void)
+static void test_desktop_only_close_follows_its_presentation(void)
 {
     reach_stage *stage = nullptr;
     reach_stage_create(&stage);
     reach_stage_set_animation_seconds(stage, 1.0f);
     reach_stage_open_window desktop = make_desktop(100, make_rect(0, 0, 1920, 1080));
     reach_stage_open(stage, make_rect(0, 0, 1920, 1080), 1, &desktop, 1);
-    double seconds = stage_seconds(0.35f) + 0.001;
+    double seconds = stage_seconds(1.0f) + 0.001;
     advance_stage(stage, 1, seconds);
 
     reach_stage_begin_close(stage);
@@ -591,7 +591,7 @@ static void test_desktop_only_close_has_no_hidden_app_wait(void)
     reach_test_motion_clock_advance(seconds);
     reach_stage_capsule_ops()->tick(stage, seconds, &tick);
     expect_true(reach_stage_state_ptr(stage)->close_phase == REACH_STAGE_CLOSE_ALIGNED,
-                "Desktop-only close does not wait for an invisible app track");
+                "Desktop-only close ends with its presentation and waits for nothing else");
     reach_stage_destroy(stage);
 }
 
@@ -1015,6 +1015,8 @@ struct golden_row
 };
 
 static const golden_row golden_rows_100[] = {
+    {1, 0.0f, 0.0f, 1920.0f, 1080.0f, 0.0f, 0, 0.0705882385f, 0.0705882385f, 0.0784313753f, 0.35f,
+     0},
     {1, 28.0f, 207.0f, 846.0f, 666.0f, 0.0f, 0, 0.0705882385f, 0.0705882385f, 0.0784313753f, 1.0f,
      0},
     {1, 28.0002441f, 206.744324f, 846.015137f, 32.0f, 0.0f, 0, 0.141176477f, 0.141176477f,
@@ -1034,6 +1036,8 @@ static const golden_row golden_rows_100[] = {
 };
 
 static const golden_row golden_rows_125[] = {
+    {1, 0.0f, 0.0f, 1920.0f, 1080.0f, 0.0f, 0, 0.0705882385f, 0.0705882385f, 0.0784313753f, 0.35f,
+     0},
     {1, 35.0f, 206.0f, 836.0f, 668.0f, 0.0f, 0, 0.0705882385f, 0.0705882385f, 0.0784313753f, 1.0f,
      0},
     {1, 35.0f, 206.373016f, 836.338623f, 40.0f, 0.0f, 0, 0.141176477f, 0.141176477f, 0.149019614f,
@@ -1053,6 +1057,8 @@ static const golden_row golden_rows_125[] = {
 };
 
 static const golden_row golden_rows_150[] = {
+    {1, 0.0f, 0.0f, 1920.0f, 1080.0f, 0.0f, 0, 0.0705882385f, 0.0705882385f, 0.0784313753f, 0.35f,
+     0},
     {1, 42.0f, 206.0f, 827.0f, 668.0f, 0.0f, 0, 0.0705882385f, 0.0705882385f, 0.0784313753f, 1.0f,
      0},
     {1, 42.0f, 206.00177f, 826.661987f, 48.0f, 0.0f, 0, 0.141176477f, 0.141176477f, 0.149019614f,
@@ -1111,7 +1117,7 @@ int main(void)
     test_close_requires_completion_before_teardown();
     test_close_handoff_holds_only_the_reveal();
     test_app_click_uses_shared_close_animation();
-    test_desktop_only_close_has_no_hidden_app_wait();
+    test_desktop_only_close_follows_its_presentation();
     test_tile_clicks_publish_immediate_window_actions();
     test_closing_stage_retargets_restored_windows();
     test_restored_thumbnail_is_committed_before_reveal();

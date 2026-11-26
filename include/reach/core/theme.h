@@ -194,6 +194,8 @@ extern "C"
         float now_playing_play_button_width;
         float now_playing_prev_next_button_width;
         float stage_animation_seconds;
+        // Gaussian standard deviation of the wallpaper behind open Stage, in DP.
+        float stage_wallpaper_blur;
         float popup_rise_distance;
         float popup_rise_scale;
         reach_motion_spec motion_presets[REACH_MOTION_PRESET_COUNT];

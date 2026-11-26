@@ -4,6 +4,7 @@
 #include "reach/features/stage.h"
 
 #include "reach/core/theme.h"
+#include "reach/features/common/presentation.h"
 #include "reach/features/common/pressable.h"
 #include "reach/features/common/selection_pill.h"
 #include "reach/support/motion.h"
@@ -14,6 +15,9 @@
 // Space the layout keeps around every tile's header and thumbnail, in DP, so the hover pill can
 // surround the tile with an even ring without crowding its neighbours.
 #define REACH_STAGE_TILE_MARGIN 4.0f
+// The blurred wallpaper renders at most this many pixels tall and the compositor stretches it back
+// to the monitor, which bounds the blur's cost on high-resolution displays.
+#define REACH_STAGE_WALLPAPER_MAX_HEIGHT 1080.0f
 
 static inline float reach_stage_animation_seconds_default(void)
 {
@@ -53,6 +57,8 @@ struct reach_stage
     // fades out when no tile is hovered.
     reach_selection_pill hover_pill;
     reach_motion hover_pill_opacity;
+    // The no-open-windows notice: open while Stage holds no app tile, rising in like a popup.
+    reach_feature_transition notice;
     reach_pressable pressable;
     size_t pressable_generation;
 

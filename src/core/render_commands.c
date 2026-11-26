@@ -36,7 +36,8 @@ int32_t reach_render_group_equal(const reach_render_group *first, const reach_re
         !reach_motion_equal(&first->x, &second->x) || !reach_motion_equal(&first->y, &second->y) ||
         !reach_motion_equal(&first->opacity, &second->opacity) ||
         !reach_motion_equal(&first->scale, &second->scale) ||
-        !reach_motion_equal(&first->scale_y, &second->scale_y))
+        !reach_motion_equal(&first->scale_y, &second->scale_y) ||
+        !reach_motion_equal(&first->blur, &second->blur))
         return 0;
     for (index = 0; index < REACH_RENDER_CLIP_EDGE_COUNT; ++index)
         if (!reach_motion_equal(&first->clip_insets[index], &second->clip_insets[index]))
@@ -64,7 +65,7 @@ static int32_t reach_render_group_motion_active(const reach_render_group *group)
                 return 1;
     return reach_motion_active(&group->x) || reach_motion_active(&group->y) ||
            reach_motion_active(&group->scale) || reach_motion_active(&group->scale_y) ||
-           reach_motion_active(&group->opacity);
+           reach_motion_active(&group->opacity) || reach_motion_active(&group->blur);
 }
 
 reach_motion reach_render_group_y_scale(const reach_render_group *group)
@@ -358,6 +359,14 @@ static int32_t reach_render_repetition_valid(const reach_render_group *group, in
             reach_motion_range(&group->clip_radius_motion, &minimum, &maximum) != REACH_OK ||
             !reach_render_motion_endpoints(&group->clip_radius_motion, &minimum, &maximum) ||
             minimum < 0)
+            return 0;
+    }
+    if (group->blur.generation != 0)
+    {
+        float minimum = 0, maximum = 0;
+        if (root || group->has_tint || group->blur.repeating ||
+            reach_motion_range(&group->blur, &minimum, &maximum) != REACH_OK || minimum < 0 ||
+            !isfinite(maximum))
             return 0;
     }
     if (reach_render_group_has_rounded_clip(group))

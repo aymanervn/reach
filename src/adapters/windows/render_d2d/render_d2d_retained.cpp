@@ -536,6 +536,54 @@ static void stop_clip_motion(reach_d2d_retained_layer &layer)
     stop_rounded_clip_motion(layer);
 }
 
+// Only the DirectComposition visual tree applies the blur; group validation keeps it apart from
+// the tint, which owns the visual's effect otherwise.
+static HRESULT sync_blur(reach_render_backend *backend, reach_d2d_retained_layer &layer,
+                         const reach_render_group &group)
+{
+    bool blurring = group.blur.generation != 0;
+    if (backend->compositor != nullptr || layer.dcomp_visual == nullptr ||
+        (!blurring && layer.dcomp_blur == nullptr) ||
+        (blurring && layer.dcomp_blur != nullptr &&
+         reach_motion_equal(&group.blur, &layer.group.blur)))
+        return S_OK;
+    reach_workload_add(REACH_WORKLOAD_PROPERTY_SUBMISSIONS, 1);
+    if (!blurring)
+    {
+        HRESULT hr = layer.dcomp_visual->SetEffect(nullptr);
+        if (SUCCEEDED(hr))
+            layer.dcomp_blur.Reset();
+        return hr;
+    }
+    HRESULT hr = S_OK;
+    if (layer.dcomp_blur == nullptr)
+    {
+        ComPtr<IDCompositionDevice3> device;
+        hr = backend->dcomp_device->QueryInterface(IID_PPV_ARGS(&device));
+        if (SUCCEEDED(hr))
+            hr = device->CreateGaussianBlurEffect(&layer.dcomp_blur);
+        // A hard border keeps the edges opaque instead of fading them into transparency.
+        if (SUCCEEDED(hr))
+            hr = layer.dcomp_blur->SetBorderMode(D2D1_BORDER_MODE_HARD);
+        if (SUCCEEDED(hr))
+            hr = layer.dcomp_visual->SetEffect(layer.dcomp_blur.Get());
+    }
+    if (SUCCEEDED(hr))
+        hr = layer.dcomp_blur->SetStandardDeviation(scalar_value(backend, group.blur, 0.0f));
+    ComPtr<IDCompositionAnimation> animation;
+    HRESULT motion_hr = SUCCEEDED(hr) ? dcomp_motion(backend, group.blur, &animation) : hr;
+    if (FAILED(motion_hr))
+        hr = motion_hr;
+    else if (motion_hr == S_OK)
+        hr = layer.dcomp_blur->SetStandardDeviation(animation.Get());
+    if (FAILED(hr))
+    {
+        (void)layer.dcomp_visual->SetEffect(nullptr);
+        layer.dcomp_blur.Reset();
+    }
+    return hr;
+}
+
 static HRESULT sync_clip(reach_render_backend *backend, reach_d2d_retained_layer &layer,
                          const reach_render_group &group, bool initialized)
 {
@@ -1511,6 +1559,8 @@ static HRESULT sync_layer(reach_render_backend *backend, reach_d2d_retained_laye
         hr = sync_clip(backend, layer, group, initialized);
     if (SUCCEEDED(hr))
         hr = sync_tint(backend, layer, group, content_changed);
+    if (SUCCEEDED(hr))
+        hr = sync_blur(backend, layer, group);
     if (SUCCEEDED(hr))
         hr = reach_d2d_sync_shadow(backend, layer, group);
     if (SUCCEEDED(hr))
